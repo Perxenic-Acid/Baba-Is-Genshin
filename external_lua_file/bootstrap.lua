@@ -78,9 +78,10 @@ function OnStart()
             return
         end
 
+        
         if not result.accepted then
             print(
-                "[RuleWorld] Move rejected:",
+                "[RuleWorld] Invalid action:",
                 result.reason
             )
             return
@@ -88,17 +89,24 @@ function OnStart()
 
         session = next_session
 
-        local change = result.changes[1]
+        if result.changed then
+            local change = result.changes[1]
 
-        print(string.format(
-            "[RuleWorld] Entity %d: (%d,%d) -> (%d,%d)",
-            change.entity_id,
-            change.from.x,
-            change.from.y,
-            change.to.x,
-            change.to.y
-        ))
-
+            print(string.format(
+                "[RuleWorld] Entity %d: (%d,%d) -> (%d,%d)",
+                change.entity_id,
+                change.from.x,
+                change.from.y,
+                change.to.x,
+                change.to.y
+            ))
+        else
+            print(
+                "[RuleWorld] Turn consumed, no movement:",
+                result.reason
+            )
+        end
+        
         render()
     end
 

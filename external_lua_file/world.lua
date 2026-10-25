@@ -123,6 +123,7 @@ local function transition(world, action)
 
     return next_world, {
         accepted = true,
+        changed = true,
         changes = { {
             entity_id = id,
             from = { x = entity.x, y = entity.y },
@@ -227,23 +228,80 @@ function RW_SelfTest()
         return false, "Undo incorrect"
     end
 
-    -- Reach the right boundary.
+    
+    -- Test: Reach the right boundary.
     local edge = RW_CreateSession()
 
-    for _ = 1, 3 do
-        edge = move_right(edge)
+    for i = 1, 3 do
+        local result
+        edge, result = move_right(edge)
+
+        if not result.accepted or not result.changed then
+            return false, "Failed to reach boundary"
+        end
     end
 
-    local after, result = move_right(edge)
-
-    if result.accepted then
-        return false, "Boundary check failed"
+    if edge.world.entities[1].x ~= 5
+        or #edge.history ~= 3 then
+        return false, "Boundary setup incorrect"
     end
 
-    if after ~= edge
-        or #after.history ~= 3 then
-        return false, "Rejected action changed session"
+    -- Test: Blocked movements consume turns.
+    local b1, rb1 = move_right(edge)
+    local b2, rb2 = move_right(b1)
+
+    if not rb1.accepted or rb1.changed ~= false
+        or not rb2.accepted or rb2.changed ~= false then
+        return false, "Blocked turn semantics incorrect"
+    end
+
+    if rb1.reason ~= "blocked_by_edge"
+        or rb2.reason ~= "blocked_by_edge" then
+        return false, "Unexpected blocking reason"
+    end
+
+    if b1.world.entities[1].x ~= 5
+        or b2.world.entities[1].x ~= 5
+        or #b1.history ~= 4
+        or #b2.history ~= 5 then
+        return false, "Blocked turns not recorded"
+    end
+
+    -- Test: Undo two blocked turns.
+    local u1, ru1 = RW_Undo(b2)
+    local u2, ru2 = RW_Undo(u1)
+
+    if not ru1.accepted or not ru2.accepted
+        or u1.world.entities[1].x ~= 5
+        or u2.world.entities[1].x ~= 5
+        or #u1.history ~= 4
+        or #u2.history ~= 3 then
+        return false, "Blocked turn undo failed"
+    end
+
+    -- Test: Undo the preceding movement.
+    local u3, ru3 = RW_Undo(u2)
+
+    if not ru3.accepted
+        or u3.world.entities[1].x ~= 4
+        or #u3.history ~= 2 then
+        return false, "Movement undo failed"
+    end
+
+    -- Test: Invalid actions do not consume turns.
+    local invalid, ri = RW_Step(u3, {
+        type = "move",
+        entity_id = 1,
+        dx = 2,
+        dy = 0
+    })
+
+    if ri.accepted
+        or invalid ~= u3
+        or #invalid.history ~= 2 then
+        return false, "Invalid action consumed a turn"
     end
 
     return true, "All M1 invariants passed"
+
 end

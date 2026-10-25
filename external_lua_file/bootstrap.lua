@@ -1,6 +1,6 @@
 
 -- bootstrap.lua
--- RuleWorld M1: Input and session coordination
+-- RuleWorld M2: Input and module coordination
 
 function OnStart()
     local root = script.object
@@ -10,11 +10,12 @@ function OnStart()
         return
     end
 
-    -- Discover scripts once.
     local scripts = {}
 
     for _, candidate in ipairs(root:GetScripts()) do
-        local path = (candidate.path or ""):gsub("\\", "/")
+        local path =
+            (candidate.path or ""):gsub("\\", "/")
+
         local name = path:match("([^/]+)$")
 
         scripts[name] = candidate
@@ -22,28 +23,38 @@ function OnStart()
     end
 
     local world_api = scripts["world"]
+    local movement_api = scripts["movement"]
     local renderer_api = scripts["renderer"]
 
-    if not world_api or not renderer_api then
+    if not world_api or not movement_api
+        or not renderer_api then
         printerr("[RuleWorld] Required script missing")
         return
     end
 
-    if not world_api.alive or not renderer_api.alive then
-        printerr("[RuleWorld] Required script not alive")
-        return
+    for _, api in ipairs({
+        world_api, movement_api, renderer_api
+    }) do
+        if not api.alive then
+            printerr("[RuleWorld] Script not alive")
+            return
+        end
     end
 
-    -- Run internal tests before starting.
-    local passed, message =
+    local wp, wm =
         world_api:Invoke("RW_SelfTest")
 
-    if not passed then
-        printerr("[RuleWorld] M1 TEST FAILED:", message)
+    local mp, mm =
+        movement_api:Invoke("RW_MovementSelfTest")
+
+    if not wp or not mp then
+        printerr("[RuleWorld] M2 TEST FAILED:",
+            not wp and wm or mm)
         return
     end
 
-    print("[RuleWorld] M1 TEST PASSED:", message)
+    print("[RuleWorld] M2 TEST PASSED:",
+        wm, mm)
 
     local session =
         world_api:Invoke("RW_CreateSession")
@@ -61,7 +72,6 @@ function OnStart()
         )
     end
 
-    -- One input -> one atomic world step.
     local function move(dx, dy)
         local action = {
             type = "move",
@@ -70,43 +80,55 @@ function OnStart()
             dy = dy
         }
 
-        local next_session, result =
-            world_api:Invoke("RW_Step", session, action)
+        -- Phase 1: Resolve intention and constraints.
+        local plan = movement_api:Invoke(
+            "RW_ResolveMovement",
+            session.world,
+            action
+        )
 
-        if not next_session or not result then
-            printerr("[RuleWorld] Transition failed")
+        if not plan then
+            printerr("[RuleWorld] Resolver failed")
             return
         end
 
-        
-        if not result.accepted then
-            print(
-                "[RuleWorld] Invalid action:",
-                result.reason
+        -- Phase 2: Atomically commit the plan.
+        local next_session, result =
+            world_api:Invoke(
+                "RW_Commit",
+                session,
+                plan
             )
+
+        if not next_session or not result then
+            printerr("[RuleWorld] Commit failed")
+            return
+        end
+
+        if not result.accepted then
+            print("[RuleWorld] Invalid action:",
+                result.reason)
             return
         end
 
         session = next_session
 
         if result.changed then
-            local change = result.changes[1]
-
-            print(string.format(
-                "[RuleWorld] Entity %d: (%d,%d) -> (%d,%d)",
-                change.entity_id,
-                change.from.x,
-                change.from.y,
-                change.to.x,
-                change.to.y
-            ))
+            for _, change in ipairs(result.changes) do
+                print(string.format(
+                    "[RuleWorld] Entity %d: (%d,%d) -> (%d,%d)",
+                    change.entity_id,
+                    change.from.x,
+                    change.from.y,
+                    change.to.x,
+                    change.to.y
+                ))
+            end
         else
-            print(
-                "[RuleWorld] Turn consumed, no movement:",
-                result.reason
-            )
+            print("[RuleWorld] Turn consumed:",
+                result.reason or "no_change")
         end
-        
+
         render()
     end
 
@@ -115,22 +137,25 @@ function OnStart()
             world_api:Invoke("RW_Undo", session)
 
         if not next_session or not result then
-            printerr("[RuleWorld] Undo call failed")
+            printerr("[RuleWorld] Undo failed")
             return
         end
 
         if not result.accepted then
-            print("[RuleWorld] Undo rejected:", result.reason)
+            print("[RuleWorld] Undo rejected:",
+                result.reason)
             return
         end
 
         session = next_session
 
-        local e = session.world.entities[1]
+        local entity = session.world.entities[1]
 
         print(string.format(
             "[RuleWorld] Undo -> (%d,%d), history=%d",
-            e.x, e.y, #session.history
+            entity.x,
+            entity.y,
+            #session.history
         ))
 
         render()
@@ -145,12 +170,11 @@ function OnStart()
 
     local key = Enum.KeyEventType
 
-    bind(key.KeyboardMoveForwardKeyDown,   0, -1)
-    bind(key.KeyboardMoveBackwardKeyDown,  0,  1)
-    bind(key.KeyboardMoveLeftKeyDown,     -1,  0)
-    bind(key.KeyboardMoveRightKeyDown,     1,  0)
+    bind(key.KeyboardMoveForwardKeyDown,  0, -1)
+    bind(key.KeyboardMoveBackwardKeyDown, 0,  1)
+    bind(key.KeyboardMoveLeftKeyDown,    -1,  0)
+    bind(key.KeyboardMoveRightKeyDown,    1,  0)
 
-    -- Craftsperson Key 12: default Z
     if key.KeyboardCraftspersonKey12Down then
         root:AddKeyEventListener(
             key.KeyboardCraftspersonKey12Down,
@@ -159,11 +183,10 @@ function OnStart()
                 return true
             end
         )
-        print("[RuleWorld] Undo input registered (Z)")
-    else
-        printerr("[RuleWorld] Undo key unavailable")
+        print("[RuleWorld] Undo registered (Z)")
     end
 
     render()
-    print("[RuleWorld] M1 initialized")
+
+    print("[RuleWorld] M2 initialized")
 end

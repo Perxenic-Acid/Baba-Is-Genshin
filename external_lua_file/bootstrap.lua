@@ -69,6 +69,7 @@ function OnStart()
         { "movement",   "RW_MovementSelfTest" },
         { "renderer",   "RW_RendererSelfTest" },
         { "movement",   "RW_ControlSelfTest" },
+        { "grammar",    "RW_GrammarASTSelfTest" },
     }
 
     for _, test in ipairs(tests) do

@@ -1,4 +1,4 @@
-# RuleWorld checks (M9.3G)
+# RuleWorld checks (M9.3H)
 
 Run from the repository root with Lua 5.1+ (or TeX Live's Lua):
 
@@ -25,7 +25,8 @@ pre-turn state. Coordinate-only legacy movement plans remain supported.
 
 In-game startup should report both new direction self-tests as passed and
 `pipeline atomic turn scheduler`, `Atomic create/delete, ID allocation and Undo passed`,
-`pipeline created/deleted Text rules / Undo`, and `M9.3G initialized`.
+`pipeline created/deleted Text rules / Undo`,
+`pipeline alternate grammar/semantics behavior / Undo`, and `M9.3H initialized`.
 Native rendering/input still require an in-game check.
 
 The runner also loads `tests/scheduler.lua`, which checks the extracted turn
@@ -41,3 +42,10 @@ and exhaustion, stale/invalid operation rejection, and created Text's ordinary
 TEXT IS PUSH behavior. Startup also checks that created/deleted CRATE IS YOU
 symbols activate/deactivate control through the real rule pipeline.
 No additional script mapping is needed for M9.3G.
+
+M9.3H adds verb and semantic registration self-tests and `tests/registration.lua`.
+It checks all six subject/verb/object role orders with positive/negative terms,
+canonical IR parity, physical source IDs, independently registered parse/semantic
+capabilities, deferred fallback, and invalid/duplicate/cyclic configuration rejection.
+Startup compares the actual default and alternate spatial language pipelines for
+PUSH, multiple YOU, conversion and Undo. No new script mapping is needed.

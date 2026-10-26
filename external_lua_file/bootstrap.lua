@@ -133,6 +133,8 @@ function OnStart()
         { "renderer",   "RW_RendererSelfTest" },
         { "movement",   "RW_ControlSelfTest" },
         { "grammar",    "RW_GrammarASTSelfTest" },
+        { "grammar",    "RW_GrammarRegistrationSelfTest" },
+        { "rules",      "RW_SemanticRegistrationSelfTest" },
         { "rules",      "RW_ASTLoweringSelfTest" },
         { "world",      "RW_DirectionStateSelfTest" },
         { "world",      "RW_LifecycleSelfTest" },
@@ -494,7 +496,7 @@ function OnStart()
         end
 
         local generated, deferred, conversions =
-            rules_api:Invoke("RW_LowerRuleAST", ast)
+            rules_api:Invoke("RW_LowerRuleAST", ast, world_state.semantics)
 
         if not generated then
             printerr(
@@ -542,6 +544,59 @@ function OnStart()
             return rules_api:Invoke("RW_PlanConversions", world_state, conversions)
         end
     }
+
+    -- Two physical languages, one semantic IR and one atomic turn behavior.
+    local function same_data(left, right)
+        if type(left) ~= type(right) then return false end
+        if type(left) ~= "table" then return left == right end
+        for key, value in pairs(left) do
+            if not same_data(value, right[key]) then return false end
+        end
+        for key in pairs(right) do if left[key] == nil then return false end end
+        return true
+    end
+    local default_verbs = grammar_api:Invoke("RW_GetVerbRegistry")
+    local registered_verbs = grammar_api:Invoke("RW_RegisterVerb", default_verbs,
+        "bind", {phase = "relation", rhs = {property = true, noun = true}})
+    local default_semantics = rules_api:Invoke("RW_GetSemanticRegistry")
+    local registered_semantics = rules_api:Invoke("RW_RegisterSemantics", default_semantics,
+        "bind", {property = "grant_trait", noun = "transform"})
+    if not registered_verbs or not registered_semantics then
+        printerr("[RuleWorld] TEST FAILED: language/semantics registration")
+        return
+    end
+    for _, case in ipairs({{"PUSH", "SHOVE"}, {"YOU", "DRIVE"}, {"AVATAR", "HERO"}}) do
+        local standard = world_api:Invoke("RW_CreateSession")
+        local alternate = world_api:Invoke("RW_CreateSession")
+        standard.world.entities[8].text.name = case[1]
+        alternate.world.language = {
+            nouns = {BOX = "crate", HERO = "avatar"},
+            verbs = {LINK = "bind"}, properties = {SHOVE = "pushable", DRIVE = "you"},
+            order = {"object", "verb", "subject"}, verb_registry = registered_verbs
+        }
+        alternate.world.semantics = registered_semantics
+        local tokens = {[6] = case[2], [7] = "LINK", [8] = "BOX",
+            [9] = "DRIVE", [10] = "LINK", [11] = "HERO"}
+        for id, token in pairs(tokens) do alternate.world.entities[id].text.name = token end
+        local effects_a = evaluate(standard.world)
+        local effects_b = evaluate(alternate.world)
+        local action = {type = "move", dx = 1, dy = 0}
+        local plan_a = RW_PlanTurn(standard.world, action, turn_services)
+        local plan_b = RW_PlanTurn(alternate.world, action, turn_services)
+        if not effects_a or not effects_b or not same_data(effects_a, effects_b)
+            or not plan_a or not plan_b or not same_data(plan_a, plan_b) then
+            printerr("[RuleWorld] TEST FAILED: alternate language behavior", case[1])
+            return
+        end
+        local completed, committed = world_api:Invoke("RW_Commit", alternate, plan_b)
+        local restored, undone = world_api:Invoke("RW_Undo", completed)
+        if not committed.accepted or not undone.accepted or #restored.history ~= 0
+            or not same_data(restored.world, alternate.world) then
+            printerr("[RuleWorld] TEST FAILED: alternate language Undo")
+            return
+        end
+    end
+    print("[RuleWorld] TEST PASSED: pipeline alternate grammar/semantics behavior / Undo")
 
     -- Exercise the same scheduler the input adapter will use, without a Commit.
     local probe, probe_error = RW_PlanTurn(session.world,
@@ -753,5 +808,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3G initialized")
+    print("[RuleWorld] M9.3H initialized")
 end

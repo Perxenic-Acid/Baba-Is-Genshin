@@ -223,6 +223,54 @@ function RW_GetVerbRegistry()
     return ast_clone(AST_VERBS)
 end
 
+local function valid_verb_registry(registry)
+    if type(registry) ~= "table" then return false end
+    for name, spec in pairs(registry) do
+        if type(name) ~= "string" or name == "" or type(spec) ~= "table"
+            or type(spec.phase) ~= "string" or spec.phase == ""
+            or type(spec.rhs) ~= "table" then return false end
+        for field in pairs(spec) do
+            if field ~= "phase" and field ~= "rhs" then return false end
+        end
+        local categories = 0
+        for category, enabled in pairs(spec.rhs) do
+            if (category ~= "noun" and category ~= "property" and category ~= "special")
+                or type(enabled) ~= "boolean" then return false end
+            if enabled then categories = categories + 1 end
+        end
+        if categories == 0 then return false end
+    end
+    return true
+end
+
+-- Pure data registration: return a new registry, never mutate module globals.
+function RW_RegisterVerb(registry, name, specification)
+    if registry == nil then registry = AST_VERBS end
+    if not valid_verb_registry(registry) or type(name) ~= "string" or name == ""
+        or type(specification) ~= "table" then return nil, "invalid_verb_registration" end
+    if registry[name] ~= nil then return nil, "duplicate_verb" end
+    if not valid_verb_registry({[name] = specification}) then
+        return nil, "invalid_verb_registration"
+    end
+    local result = ast_clone(registry)
+    result[name] = ast_clone(specification)
+    if not valid_verb_registry(result) then return nil, "invalid_verb_registration" end
+    return result
+end
+
+local DEFAULT_ORDER = {"subject", "verb", "object"}
+local function valid_order(order)
+    if type(order) ~= "table" or #order ~= 3 then return false end
+    local seen = {}
+    for key, role in pairs(order) do
+        if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > 3
+            or (role ~= "subject" and role ~= "verb" and role ~= "object")
+            or seen[role] then return false end
+        seen[role] = true
+    end
+    return seen.subject and seen.verb and seen.object
+end
+
 local function ast_valid_language(language)
     return type(language) == "table"
         and type(language.nouns) == "table"
@@ -305,31 +353,30 @@ local function ast_wrap_not(term, enabled)
 end
 
 -- Parse one candidate token sequence.
--- Grammar:
--- [NOT] SUBJECT VERB [NOT] OBJECT
+-- Each semantic role occupies one token, with optional NOT before terms.
+-- Their spatial order is selected by language.order.
 local function ast_parse_candidate(
     chosen, sub_not, obj_not,
     language, line, start, output
 )
-    local subject_pos = 1 + sub_not
-    local verb_pos = subject_pos + 1
-    local object_pos = verb_pos + 1 + obj_not
-
-    if sub_not == 1
-        and not ast_is_not(chosen[1], language) then
-        return
+    local order = language.order or DEFAULT_ORDER
+    local registry = language.verb_registry or AST_VERBS
+    local positions, cursor = {}, 1
+    for _, role in ipairs(order) do
+        local negated = (role == "subject" and sub_not == 1)
+            or (role == "object" and obj_not == 1)
+        if negated then
+            if not ast_is_not(chosen[cursor], language) then return end
+            cursor = cursor + 1
+        end
+        positions[role] = cursor
+        cursor = cursor + 1
     end
-
-    if obj_not == 1
-        and not ast_is_not(
-            chosen[verb_pos + 1], language
-        ) then
-        return
-    end
-
+    local subject_pos, verb_pos, object_pos =
+        positions.subject, positions.verb, positions.object
     local verb_token = chosen[verb_pos].token
     local verb = language.verbs[verb_token]
-    local spec = AST_VERBS[verb]
+    local spec = registry[verb]
 
     if not spec then
         return
@@ -374,6 +421,8 @@ local function ast_parse_candidate(
                     source = {
                         axis = line.axis,
                         line = line.index,
+                        leading_not = (order[1] == "subject" and sub_not == 1)
+                            or (order[1] == "object" and obj_not == 1),
                         start = start,
                         finish = start + #chosen - 1,
                         entity_ids = ids
@@ -385,13 +434,13 @@ local function ast_parse_candidate(
 end
 
 -- Suppress only the shorter candidate that starts inside
--- a valid NOT-prefixed subject and shares exactly the same
+-- a valid leading NOT expression and shares exactly the same
 -- physical word instances. Other overlaps are legitimate.
 local function ast_filter_shadowed(rules)
     local hidden = {}
 
     for _, longer in ipairs(rules) do
-        if longer.subject.tag == "not" then
+        if longer.source.leading_not then
             local a = longer.source
 
             for j, shorter in ipairs(rules) do
@@ -433,12 +482,64 @@ local function ast_filter_shadowed(rules)
     return filtered
 end
 
+function RW_GrammarRegistrationSelfTest()
+    local spec = {phase = "relation", rhs = {property = true, noun = true}}
+    local registry = RW_RegisterVerb(nil, "bind", spec)
+    if not registry or registry.bind == nil or RW_GetVerbRegistry().bind ~= nil then
+        return false, "Verb registration isolation failed"
+    end
+    spec.rhs.property = false
+    if registry.bind.rhs.property ~= true
+        or RW_RegisterVerb(registry, "bind", registry.bind) ~= nil then
+        return false, "Verb registration alias/duplicate failed"
+    end
+    local language = {nouns = {BOX = "crate"}, verbs = {LINK = "bind"},
+        properties = {SHOVE = "pushable"}, operators = {NOT = "not"}, verb_registry = registry}
+    for _, order in ipairs({
+        {"subject", "verb", "object"}, {"object", "verb", "subject"},
+        {"verb", "subject", "object"}, {"verb", "object", "subject"},
+        {"subject", "object", "verb"}, {"object", "subject", "verb"}
+    }) do
+        language.order = order
+        local cells = {}
+        for _, role in ipairs(order) do
+            local token = role == "subject" and "BOX" or (role == "verb" and "LINK" or "SHOVE")
+            cells[#cells + 1] = {{id = #cells + 1, token = token}}
+        end
+        local parsed = RW_ParseRuleAST({{axis = "horizontal", index = 1, cells = cells}}, language)
+        if not parsed or #parsed ~= 1 or parsed[1].subject.type.name ~= "crate"
+            or parsed[1].verb ~= "bind" or parsed[1].object.name ~= "pushable" then
+            return false, "Configurable role order failed"
+        end
+    end
+    language.order = {"object", "verb", "subject"}
+    local cells = {}
+    for index, token in ipairs({"NOT", "SHOVE", "LINK", "BOX"}) do
+        cells[index] = {{id = index, token = token}}
+    end
+    local negated = RW_ParseRuleAST({{axis = "horizontal", index = 1, cells = cells}}, language)
+    if not negated or #negated ~= 1 or negated[1].object.tag ~= "not"
+        or negated[1].source.entity_ids[1] ~= 1 then
+        return false, "Reordered NOT shadowing/provenance failed"
+    end
+    language.order = {"subject", "subject", "verb"}
+    if RW_ParseRuleAST({}, language) ~= nil then return false, "Invalid order accepted" end
+    return true, "Isolated verb registration and configurable role order passed"
+end
+
 -- Spatial lines -> typed, non-executable Rule AST.
 function RW_ParseRuleAST(lines, language)
     if type(lines) ~= "table"
         or not ast_valid_language(language) then
         return nil, "invalid_ast_input"
     end
+
+    local order = language.order
+    if order == nil then order = DEFAULT_ORDER end
+    if not valid_order(order) then return nil, "invalid_ast_order" end
+    local registry = language.verb_registry
+    if registry == nil then registry = AST_VERBS end
+    if not valid_verb_registry(registry) then return nil, "invalid_verb_registry" end
 
     local output = {}
 

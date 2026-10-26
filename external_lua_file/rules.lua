@@ -214,13 +214,53 @@ function RW_EvaluateRules(world, generated_rules)
     return active
 end
 
+-- M9.3H: relation semantics are level-selected data, separate from parsing.
+local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform"}}
+local function semantic_clone(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, item in pairs(value) do result[key] = semantic_clone(item) end
+    return result
+end
+local function valid_semantics(registry)
+    if type(registry) ~= "table" then return false end
+    for name, spec in pairs(registry) do
+        if type(name) ~= "string" or name == "" or type(spec) ~= "table" then return false end
+        if spec.property == nil and spec.noun == nil then return false end
+        for category, operation in pairs(spec) do
+            if not ((category == "property" and operation == "grant_trait")
+                or (category == "noun" and operation == "transform")) then return false end
+        end
+    end
+    return true
+end
+function RW_GetSemanticRegistry()
+    return semantic_clone(DEFAULT_SEMANTICS)
+end
+function RW_RegisterSemantics(registry, name, specification)
+    if registry == nil then registry = DEFAULT_SEMANTICS end
+    if not valid_semantics(registry) or type(name) ~= "string" or name == ""
+        or type(specification) ~= "table" then return nil, "invalid_semantic_registration" end
+    if registry[name] ~= nil then return nil, "duplicate_semantics" end
+    if not valid_semantics({[name] = specification}) then
+        return nil, "invalid_semantic_registration"
+    end
+    local result = semantic_clone(registry)
+    result[name] = semantic_clone(specification)
+    if not valid_semantics(result) then return nil, "invalid_semantic_registration" end
+    return result
+end
+
 -- M9.3C: typed Rule AST -> property IR + conversion declarations.
--- Only positive NOUN IS PROPERTY and simple NOUN IS NOUN
--- are executable. All other relations remain deferred.
-function RW_LowerRuleAST(ast_rules)
+-- Default IS semantics execute positive properties and simple conversions.
+-- A level registry may assign those capabilities to a different relation ID.
+function RW_LowerRuleAST(ast_rules, registry)
     if type(ast_rules) ~= "table" then
         return nil, "invalid_ast_rules"
     end
+
+    if registry == nil then registry = DEFAULT_SEMANTICS end
+    if not valid_semantics(registry) then return nil, "invalid_semantic_registry" end
 
     local generated = {}
     local deferred = {}
@@ -235,6 +275,7 @@ function RW_LowerRuleAST(ast_rules)
             return nil, "invalid_ast_rule_" .. tostring(i)
         end
 
+        local semantics = registry[ast.verb]
         local subject = ast.subject
         local object = ast.object
         local subject_type = subject.type
@@ -247,7 +288,7 @@ function RW_LowerRuleAST(ast_rules)
             and subject_type.name ~= ""
 
         local property_rule =
-            ast.verb == "is"
+            semantics and semantics.property == "grant_trait"
             and simple_subject
             and object.tag == "property"
             and type(object.name) == "string"
@@ -255,7 +296,7 @@ function RW_LowerRuleAST(ast_rules)
 
         local target_type = object.type
         local conversion_rule =
-            ast.verb == "is"
+            semantics and semantics.noun == "transform"
             and simple_subject
             and object.tag == "noun"
             and type(target_type) == "table"
@@ -299,6 +340,36 @@ function RW_LowerRuleAST(ast_rules)
     end
 
     return generated, deferred, conversions
+end
+
+function RW_SemanticRegistrationSelfTest()
+    local spec = {property = "grant_trait", noun = "transform"}
+    local registry = RW_RegisterSemantics(nil, "bind", spec)
+    if not registry or RW_GetSemanticRegistry().bind ~= nil then
+        return false, "Semantic registration isolation failed"
+    end
+    spec.property = "bad"
+    if registry.bind.property ~= "grant_trait"
+        or RW_RegisterSemantics(registry, "bind", registry.bind) ~= nil then
+        return false, "Semantic alias/duplicate failed"
+    end
+    local ast = {{verb = "bind", subject = {tag = "noun", type = {tag = "object", name = "crate"}},
+        object = {tag = "property", name = "pushable"}, when = {op = "always"}}}
+    local generated, deferred = RW_LowerRuleAST(ast, registry)
+    local absent, preserved = RW_LowerRuleAST(ast)
+    if not generated or #generated ~= 1 or #deferred ~= 0
+        or not absent or #absent ~= 0 or #preserved ~= 1 or preserved[1] ~= ast[1] then
+        return false, "Registered/missing semantics execution boundary failed"
+    end
+    local disabled, retained = RW_LowerRuleAST(ast, {})
+    if not disabled or #disabled ~= 0 or #retained ~= 1 then
+        return false, "Explicit empty semantic registry ignored"
+    end
+    if RW_RegisterSemantics(nil, "bad", {property = "unknown"}) ~= nil
+        or RW_LowerRuleAST(ast, false) ~= nil then
+        return false, "Invalid semantics accepted"
+    end
+    return true, "Isolated semantic registration and deferred fallback passed"
 end
 
 -- Pure conversion planner: never mutates the world.

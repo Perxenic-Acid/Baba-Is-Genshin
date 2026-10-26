@@ -18,7 +18,7 @@ local services = {
         if not lines then return nil, read_error end
         local ast, parse_error = RW_ParseRuleAST(lines, world.language)
         if not ast then return nil, parse_error end
-        local generated, deferred, conversions = RW_LowerRuleAST(ast)
+        local generated, deferred, conversions = RW_LowerRuleAST(ast, world.semantics)
         if not generated then return nil, deferred end
         local effects, rule_error = RW_EvaluateRules(world, generated)
         return effects, rule_error, conversions

@@ -384,6 +384,55 @@ local function ast_parse_candidate(
     end
 end
 
+-- Suppress only the shorter candidate that starts inside
+-- a valid NOT-prefixed subject and shares exactly the same
+-- physical word instances. Other overlaps are legitimate.
+local function ast_filter_shadowed(rules)
+    local hidden = {}
+
+    for _, longer in ipairs(rules) do
+        if longer.subject.tag == "not" then
+            local a = longer.source
+
+            for j, shorter in ipairs(rules) do
+                local b = shorter.source
+
+                if longer.verb == shorter.verb
+                    and a.axis == b.axis
+                    and a.line == b.line
+                    and b.start == a.start + 1
+                    and b.finish == a.finish
+                    and #a.entity_ids == #b.entity_ids + 1 then
+
+                    local identical_suffix = true
+
+                    for k = 1, #b.entity_ids do
+                        if b.entity_ids[k]
+                            ~= a.entity_ids[k + 1] then
+                            identical_suffix = false
+                            break
+                        end
+                    end
+
+                    if identical_suffix then
+                        hidden[j] = true
+                    end
+                end
+            end
+        end
+    end
+
+    local filtered = {}
+
+    for i, rule in ipairs(rules) do
+        if not hidden[i] then
+            filtered[#filtered + 1] = rule
+        end
+    end
+
+    return filtered
+end
+
 -- Spatial lines -> typed, non-executable Rule AST.
 function RW_ParseRuleAST(lines, language)
     if type(lines) ~= "table"
@@ -456,7 +505,7 @@ function RW_ParseRuleAST(lines, language)
         end
     end
 
-    return output
+    return ast_filter_shadowed(output)
 end
 
 function RW_GrammarASTSelfTest()
@@ -643,6 +692,29 @@ function RW_GrammarASTSelfTest()
 
     if not illegal or #illegal ~= 0 then
         return false, "Verb RHS restriction failed"
+    end
+
+    -- NOT-prefix suppression must not erase independent
+    -- overlapping sentences or stacked token alternatives.
+    local overlapping = parse({
+        "AVATAR", "IS", "ROCK", "IS", "PUSH"
+    })
+
+    if not overlapping
+        or #overlapping ~= 2
+        or overlapping[1].source.start ~= 1
+        or overlapping[2].source.start ~= 3 then
+        return false, "Valid overlapping rules lost"
+    end
+
+    local negated_subject = one({
+        "NOT", "AVATAR", "IS", "ROCK"
+    })
+
+    if not negated_subject
+        or negated_subject.subject.tag ~= "not"
+        or negated_subject.source.finish ~= 4 then
+        return false, "NOT subject shadowing failed"
     end
 
     -- Source information must survive parsing.

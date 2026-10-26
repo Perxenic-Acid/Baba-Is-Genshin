@@ -201,11 +201,13 @@ function OnStart()
 
     -- World -> spatial lines -> generated IR
     -- -> active effects.
-    local function evaluate()
+    local function evaluate(world_state)
+        world_state = world_state or session.world
+
         local lines, read_error =
             reader_api:Invoke(
                 "RW_ReadLines",
-                session.world
+                world_state
             )
 
         if not lines then
@@ -220,7 +222,7 @@ function OnStart()
             grammar_api:Invoke(
                 "RW_ParseRuleAST",
                 lines,
-                session.world.language
+                world_state.language
             )
 
         if not ast then
@@ -231,7 +233,7 @@ function OnStart()
             return nil
         end
 
-        local generated, deferred =
+        local generated, deferred, conversions =
             rules_api:Invoke("RW_LowerRuleAST", ast)
 
         if not generated then
@@ -245,7 +247,7 @@ function OnStart()
         local effects, rule_error =
             rules_api:Invoke(
                 "RW_EvaluateRules",
-                session.world,
+                world_state,
                 generated
             )
 
@@ -257,7 +259,7 @@ function OnStart()
             return nil
         end
 
-        return effects, #ast, #deferred
+        return effects, #ast, #deferred, conversions
     end
 
     local previous_rule_count = nil
@@ -326,7 +328,53 @@ function OnStart()
             return
         end
 
-        -- Commit against the authoritative state.
+        if plan.consumes_turn then
+            -- Work on the post-movement state, but DO NOT
+            -- commit yet. A newly assembled conversion
+            -- applies in this same turn.
+            local preview, preview_error =
+                world_api:Invoke(
+                    "RW_PreviewPlan",
+                    session.world,
+                    plan
+                )
+
+            if not preview then
+                printerr(
+                    "[RuleWorld] Movement preview failed:",
+                    preview_error
+                )
+                return
+            end
+
+            local post_effects, _, _, conversions =
+                evaluate(preview)
+
+            if not post_effects then
+                return
+            end
+
+            local conversion_changes, conversion_error =
+                rules_api:Invoke(
+                    "RW_PlanConversions",
+                    preview,
+                    conversions
+                )
+
+            if not conversion_changes then
+                printerr(
+                    "[RuleWorld] Conversion planning failed:",
+                    conversion_error
+                )
+                return
+            end
+
+            for _, change in ipairs(conversion_changes) do
+                plan.changes[#plan.changes + 1] = change
+            end
+        end
+
+        -- Movement and transformation: one atomic commit.
         local next_session, result =
             world_api:Invoke(
                 "RW_Commit",
@@ -351,14 +399,23 @@ function OnStart()
 
         if result.changed then
             for _, change in ipairs(result.changes) do
-                print(string.format(
-                    "[RuleWorld] Entity %d: (%d,%d) -> (%d,%d)",
-                    change.entity_id,
-                    change.from.x,
-                    change.from.y,
-                    change.to.x,
-                    change.to.y
-                ))
+                if change.kind == "transform" then
+                    print(string.format(
+                        "[RuleWorld] Entity %d: %s -> %s",
+                        change.entity_id,
+                        change.from,
+                        change.to
+                    ))
+                else
+                    print(string.format(
+                        "[RuleWorld] Entity %d: (%d,%d) -> (%d,%d)",
+                        change.entity_id,
+                        change.from.x,
+                        change.from.y,
+                        change.to.x,
+                        change.to.y
+                    ))
+                end
             end
         else
             print(
@@ -428,5 +485,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3B initialized")
+    print("[RuleWorld] M9.3C initialized")
 end

@@ -182,7 +182,7 @@ local function get_label(entity)
         return entity.symbol.token
     end
 
-    if entity.id == 1 then
+    if entity.archetype == "avatar" then
         return "★"
     end
 
@@ -196,7 +196,7 @@ local function get_colors(entity)
             Color(36, 26, 15, 255)
     end
 
-    if entity.id == 1 then
+    if entity.archetype == "avatar" then
         return
             Color(77, 107, 195, 255),
             Color(255, 255, 255, 255)

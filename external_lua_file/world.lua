@@ -58,9 +58,8 @@ local function validate_plan(world, plan)
 
     for _, change in ipairs(plan.changes) do
         if type(change) ~= "table"
-            or change.kind ~= "move"
-            or type(change.from) ~= "table"
-            or type(change.to) ~= "table" then
+            or (change.kind ~= "move"
+                and change.kind ~= "transform") then
             return false, "invalid_operation"
         end
 
@@ -71,20 +70,46 @@ local function validate_plan(world, plan)
             return false, "unknown_entity"
         end
 
-        if seen[id] then
+        -- One movement and one transformation per entity
+        -- are allowed in a single atomic turn.
+        local key = tostring(id) .. ":" .. change.kind
+
+        if seen[key] then
             return false, "duplicate_operation"
         end
 
-        seen[id] = true
+        seen[key] = true
 
-        if entity.x ~= change.from.x
-            or entity.y ~= change.from.y then
-            return false, "stale_operation"
-        end
+        if change.kind == "move" then
+            if type(change.from) ~= "table"
+                or type(change.to) ~= "table" then
+                return false, "invalid_operation"
+            end
 
-        if not is_integer(change.to.x)
-            or not is_integer(change.to.y) then
-            return false, "invalid_position"
+            if entity.x ~= change.from.x
+                or entity.y ~= change.from.y then
+                return false, "stale_operation"
+            end
+
+            if not is_integer(change.to.x)
+                or not is_integer(change.to.y) then
+                return false, "invalid_position"
+            end
+        else
+            if entity.kind ~= "object"
+                or type(change.from) ~= "string"
+                or type(change.to) ~= "string"
+                or change.to == "" then
+                return false, "invalid_transformation"
+            end
+
+            if entity.archetype ~= change.from then
+                return false, "stale_transformation"
+            end
+
+            if change.to == change.from then
+                return false, "redundant_transformation"
+            end
         end
     end
 
@@ -242,6 +267,35 @@ function RW_CreateSession()
     }
 end
 
+-- Preview without recording history. Used for post-movement
+-- rule evaluation before the whole turn is committed.
+function RW_PreviewPlan(world, plan)
+    local valid, reason = validate_plan(world, plan)
+
+    if not valid then
+        return nil, reason
+    end
+
+    if not plan.consumes_turn then
+        return nil, plan.reason or "no_turn"
+    end
+
+    local projected = clone(world)
+
+    for _, change in ipairs(plan.changes) do
+        local entity = projected.entities[change.entity_id]
+
+        if change.kind == "move" then
+            entity.x = change.to.x
+            entity.y = change.to.y
+        elseif change.kind == "transform" then
+            entity.archetype = change.to
+        end
+    end
+
+    return projected
+end
+
 -- Commit a prepared plan atomically.
 function RW_Commit(session, plan)
     local valid, reason =
@@ -268,8 +322,12 @@ function RW_Commit(session, plan)
             local entity =
                 next_world.entities[change.entity_id]
 
-            entity.x = change.to.x
-            entity.y = change.to.y
+            if change.kind == "move" then
+                entity.x = change.to.x
+                entity.y = change.to.y
+            elseif change.kind == "transform" then
+                entity.archetype = change.to
+            end
         end
     end
 
@@ -389,6 +447,66 @@ function RW_SelfTest()
     if rb.accepted or bad ~= s0
         or s0.world.entities[1].x ~= 2 then
         return false, "Atomic validation failed"
+    end
+
+    -- Move and transform the same entity atomically.
+    local transform_plan = {
+        consumes_turn = true,
+        changes = {
+            {
+                kind = "move",
+                entity_id = 4,
+                from = { x = 3, y = 2 },
+                to = { x = 4, y = 3 }
+            },
+            {
+                kind = "transform",
+                entity_id = 4,
+                from = "crate",
+                to = "avatar"
+            }
+        }
+    }
+
+    local preview = RW_PreviewPlan(s0.world, transform_plan)
+
+    if not preview
+        or preview.entities[4].x ~= 4
+        or preview.entities[4].y ~= 3
+        or preview.entities[4].archetype ~= "avatar"
+        or s0.world.entities[4].archetype ~= "crate" then
+        return false, "Transformation preview failed"
+    end
+
+    local converted, conversion_result =
+        RW_Commit(s0, transform_plan)
+
+    if not conversion_result.accepted
+        or #converted.history ~= 1
+        or converted.world.entities[4].archetype ~= "avatar"
+        or converted.world.entities[4].x ~= 4 then
+        return false, "Atomic transformation failed"
+    end
+
+    local restored, undone = RW_Undo(converted)
+
+    if not undone.accepted
+        or #restored.history ~= 0
+        or restored.world.entities[4].archetype ~= "crate"
+        or restored.world.entities[4].x ~= 3
+        or restored.world.entities[4].y ~= 2 then
+        return false, "Transformation undo failed"
+    end
+
+    -- A stale transform must reject the complete turn.
+    local stale = clone(transform_plan)
+    stale.changes[2].from = "rock"
+    local rejected_session, rejection = RW_Commit(s0, stale)
+
+    if rejection.accepted
+        or rejected_session ~= s0
+        or s0.world.entities[4].x ~= 3 then
+        return false, "Transformation validation failed"
     end
 
     return true, "World invariants passed"

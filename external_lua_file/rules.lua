@@ -204,10 +204,9 @@ function RW_EvaluateRules(world, generated_rules)
     return active
 end
 
--- M9.3B: typed Rule AST -> executable property-rule IR.
--- Only positive "NOUN IS PROPERTY" is executable for now.
--- Other valid AST relationships are returned as deferred;
--- they are NEVER silently reinterpreted as property grants.
+-- M9.3C: typed Rule AST -> property IR + conversion declarations.
+-- Only positive NOUN IS PROPERTY and simple NOUN IS NOUN
+-- are executable. All other relations remain deferred.
 function RW_LowerRuleAST(ast_rules)
     if type(ast_rules) ~= "table" then
         return nil, "invalid_ast_rules"
@@ -215,6 +214,7 @@ function RW_LowerRuleAST(ast_rules)
 
     local generated = {}
     local deferred = {}
+    local conversions = {}
 
     for i, ast in ipairs(ast_rules) do
         if type(ast) ~= "table"
@@ -229,18 +229,32 @@ function RW_LowerRuleAST(ast_rules)
         local object = ast.object
         local subject_type = subject.type
 
-        local supported =
-            ast.verb == "is"
-            and subject.tag == "noun"
+        local simple_subject =
+            subject.tag == "noun"
             and type(subject_type) == "table"
             and subject_type.tag == "object"
             and type(subject_type.name) == "string"
             and subject_type.name ~= ""
+
+        local property_rule =
+            ast.verb == "is"
+            and simple_subject
             and object.tag == "property"
             and type(object.name) == "string"
             and object.name ~= ""
 
-        if supported then
+        local target_type = object.type
+        local conversion_rule =
+            ast.verb == "is"
+            and simple_subject
+            and object.tag == "noun"
+            and type(target_type) == "table"
+            and target_type.tag == "object"
+            and type(target_type.name) == "string"
+            and target_type.name ~= ""
+            and ast.when.op == "always"
+
+        if property_rule then
             generated[#generated + 1] = {
                 when = ast.when,
                 effects = {{
@@ -253,13 +267,100 @@ function RW_LowerRuleAST(ast_rules)
                 }},
                 source = ast.source
             }
+        elseif conversion_rule then
+            if subject_type.name == target_type.name then
+                conversions[#conversions + 1] = {
+                    op = "protect_transform",
+                    source_type = subject_type.name,
+                    source = ast.source
+                }
+            else
+                conversions[#conversions + 1] = {
+                    op = "transform",
+                    source_type = subject_type.name,
+                    target_type = target_type.name,
+                    source = ast.source
+                }
+            end
         else
-            -- Keep the whole AST intact for future semantic stages.
+            -- Preserve unsupported syntax verbatim.
             deferred[#deferred + 1] = ast
         end
     end
 
-    return generated, deferred
+    return generated, deferred, conversions
+end
+
+-- Pure conversion planner: never mutates the world.
+-- A IS A protects A from all ordinary IS conversions.
+-- Multiple distinct targets currently require a later,
+-- explicit one-to-many conversion implementation.
+function RW_PlanConversions(world, conversions)
+    if type(world) ~= "table"
+        or type(world.entities) ~= "table"
+        or type(conversions) ~= "table" then
+        return nil, "invalid_conversion_input"
+    end
+
+    local targets = {}
+    local protected = {}
+
+    for _, relation in ipairs(conversions) do
+        if type(relation) ~= "table"
+            or type(relation.source_type) ~= "string"
+            or relation.source_type == "" then
+            return nil, "invalid_conversion_relation"
+        end
+
+        local source_type = relation.source_type
+
+        if relation.op == "protect_transform" then
+            protected[source_type] = true
+        elseif relation.op == "transform"
+            and type(relation.target_type) == "string"
+            and relation.target_type ~= ""
+            and relation.target_type ~= source_type then
+            local previous = targets[source_type]
+
+            if previous ~= nil
+                and previous ~= relation.target_type then
+                return nil, "multiple_conversion_targets"
+            end
+
+            targets[source_type] = relation.target_type
+        else
+            return nil, "invalid_conversion_relation"
+        end
+    end
+
+    local ids = {}
+
+    for id in pairs(world.entities) do
+        ids[#ids + 1] = id
+    end
+
+    table.sort(ids)
+
+    local changes = {}
+
+    for _, id in ipairs(ids) do
+        local entity = world.entities[id]
+        local source_type = entity.archetype
+
+        if entity.kind == "object"
+            and type(source_type) == "string"
+            and targets[source_type] ~= nil
+            and not protected[source_type] then
+            changes[#changes + 1] = {
+                kind = "transform",
+                entity_id = id,
+                from = source_type,
+                to = targets[source_type]
+            }
+        end
+    end
+
+    return changes
 end
 
 function RW_ASTLoweringSelfTest()
@@ -295,12 +396,15 @@ function RW_ASTLoweringSelfTest()
         { tag = "property", name = "you" }
     )
 
-    local executable, deferred = RW_LowerRuleAST({
-        property, transformation, has, negation, special
+    local identity = rule("is", noun("crate"), noun("crate"))
+
+    local executable, deferred, conversions = RW_LowerRuleAST({
+        property, transformation, has, negation, special, identity
     })
 
-    if not executable or not deferred
-        or #executable ~= 1 or #deferred ~= 4 then
+    if not executable or not deferred or not conversions
+        or #executable ~= 1 or #deferred ~= 3
+        or #conversions ~= 2 then
         return false, "Executable/deferred partition failed"
     end
 
@@ -315,10 +419,13 @@ function RW_ASTLoweringSelfTest()
     end
 
     -- Unsupported syntax is preserved, not executed.
-    if deferred[1] ~= transformation
-        or deferred[2] ~= has
-        or deferred[3] ~= negation
-        or deferred[4] ~= special then
+    if deferred[1] ~= has
+        or deferred[2] ~= negation
+        or deferred[3] ~= special
+        or conversions[1].op ~= "transform"
+        or conversions[1].source_type ~= "crate"
+        or conversions[1].target_type ~= "rock"
+        or conversions[2].op ~= "protect_transform" then
         return false, "Deferred AST provenance lost"
     end
 
@@ -338,7 +445,45 @@ function RW_ASTLoweringSelfTest()
         return false, "Malformed AST accepted"
     end
 
-    return true, "AST property lowering passed"
+    local test_world = {
+        entities = {
+            [2] = { id = 2, kind = "object", archetype = "crate" },
+            [3] = { id = 3, kind = "object", archetype = "crate" },
+            [4] = { id = 4, kind = "object", archetype = "avatar" },
+            [5] = { id = 5, kind = "text", archetype = "crate" }
+        }
+    }
+
+    local planned = RW_PlanConversions(test_world, { conversions[1] })
+
+    if not planned or #planned ~= 2
+        or planned[1].entity_id ~= 2
+        or planned[2].entity_id ~= 3
+        or planned[1].to ~= "rock"
+        or test_world.entities[2].archetype ~= "crate" then
+        return false, "IS NOUN conversion planning failed"
+    end
+
+    local guarded = RW_PlanConversions(test_world, conversions)
+
+    if not guarded or #guarded ~= 0 then
+        return false, "IS identity protection failed"
+    end
+
+    local conflict, conflict_error = RW_PlanConversions(
+        test_world,
+        {
+            conversions[1],
+            { op = "transform", source_type = "crate", target_type = "avatar" }
+        }
+    )
+
+    if conflict ~= nil
+        or conflict_error ~= "multiple_conversion_targets" then
+        return false, "Conflicting conversions not rejected"
+    end
+
+    return true, "AST property and conversion lowering passed"
 end
 
 function RW_RulesSelfTest()

@@ -29,29 +29,10 @@ local function get_environment(world, x, y)
     return "floor"
 end
 
--- A simple constraint resolver.
-local function resolve_entry(world, mover, x, y)
-    local environment =
-        get_environment(world, x, y)
 
-    if environment == "edge" then
-        return false, "blocked_by_edge"
-    end
+-- Resolve one movement intention and its dependencies.
+-- No world state is mutated during planning.
 
-    for id, entity in pairs(world.entities) do
-        if id ~= mover.id
-            and entity.x == x
-            and entity.y == y
-            and entity.traits
-            and entity.traits.block_entry then
-            return false, "blocked_by_entity"
-        end
-    end
-
-    return true
-end
-
--- Public resolver.
 function RW_ResolveMovement(world, action)
     if type(action) ~= "table"
         or action.type ~= "move" then
@@ -67,27 +48,78 @@ function RW_ResolveMovement(world, action)
         return invalid("invalid_direction")
     end
 
-    local entity = world.entities[action.entity_id]
+    local mover = world.entities[action.entity_id]
 
-    if not entity then
+    if not mover then
         return invalid("unknown_entity")
     end
 
-    local nx = entity.x + dx
-    local ny = entity.y + dy
+    local planned = {}
+    local visiting = {}
+    local changes = {}
 
-    local allowed, reason =
-        resolve_entry(world, entity, nx, ny)
+    local function try_move(id)
+        -- An entity can participate only once in this plan.
+        if planned[id] then
+            return true
+        end
 
-    if not allowed then
-        return blocked(reason)
-    end
+        if visiting[id] then
+            return false, "cyclic_dependency"
+        end
 
-    return {
-        consumes_turn = true,
-        changes = {{
+        local entity = world.entities[id]
+        visiting[id] = true
+
+        local nx = entity.x + dx
+        local ny = entity.y + dy
+
+        if get_environment(world, nx, ny) == "edge" then
+            visiting[id] = nil
+            return false, "blocked_by_edge"
+        end
+
+        -- Gather occupants deterministically.
+        local occupants = {}
+
+        for other_id, other in pairs(world.entities) do
+            if other_id ~= id
+                and other.x == nx
+                and other.y == ny then
+                occupants[#occupants + 1] = other_id
+            end
+        end
+
+        table.sort(occupants)
+
+        for _, other_id in ipairs(occupants) do
+            if not planned[other_id] then
+                local other = world.entities[other_id]
+                local traits = other.traits or {}
+
+                if traits.pushable then
+                    -- Push takes priority over STOP-like blocking.
+                    local ok, reason = try_move(other_id)
+
+                    if not ok then
+                        visiting[id] = nil
+                        return false, reason
+                    end
+
+                elseif traits.block_entry then
+                    visiting[id] = nil
+                    return false, "blocked_by_entity"
+                end
+            end
+        end
+
+        visiting[id] = nil
+        planned[id] = true
+
+        -- Append dependencies before their mover.
+        changes[#changes + 1] = {
             kind = "move",
-            entity_id = entity.id,
+            entity_id = id,
             from = {
                 x = entity.x,
                 y = entity.y
@@ -96,9 +128,23 @@ function RW_ResolveMovement(world, action)
                 x = nx,
                 y = ny
             }
-        }}
+        }
+
+        return true
+    end
+
+    local ok, reason = try_move(mover.id)
+
+    if not ok then
+        return blocked(reason)
+    end
+
+    return {
+        consumes_turn = true,
+        changes = changes
     }
 end
+
 
 function RW_MovementSelfTest()
     local world = {
@@ -150,6 +196,89 @@ function RW_MovementSelfTest()
         or #edge.changes ~= 0 then
         return false, "EDGE constraint failed"
     end
+
+
+    -- Test: Two-object push chain.
+    local puzzle = {
+        width = 5,
+        height = 5,
+        entities = {
+            [1] = { id = 1, x = 2, y = 2 },
+            [2] = {
+                id = 2, x = 3, y = 2,
+                traits = {
+                    pushable = true,
+                    block_entry = true
+                }
+            },
+            [3] = {
+                id = 3, x = 4, y = 2,
+                traits = { pushable = true }
+            }
+        }
+    }
+
+    local function push_right()
+        return RW_ResolveMovement(puzzle, {
+            type = "move",
+            entity_id = 1,
+            dx = 1,
+            dy = 0
+        })
+    end
+
+    local plan = push_right()
+
+    if not plan.consumes_turn
+        or #plan.changes ~= 3 then
+        return false, "Push chain planning failed"
+    end
+
+    -- The farthest object is planned first.
+    if plan.changes[1].entity_id ~= 3
+        or plan.changes[2].entity_id ~= 2
+        or plan.changes[3].entity_id ~= 1 then
+        return false, "Push dependency order incorrect"
+    end
+
+    -- Planning must not mutate the input world.
+    if puzzle.entities[1].x ~= 2
+        or puzzle.entities[2].x ~= 3
+        or puzzle.entities[3].x ~= 4 then
+        return false, "Movement resolver mutated world"
+    end
+
+    -- Simulate the post-commit positions.
+    puzzle.entities[1].x = 3
+    puzzle.entities[2].x = 4
+    puzzle.entities[3].x = 5
+
+    local edge_plan = push_right()
+
+    if not edge_plan.consumes_turn
+        or #edge_plan.changes ~= 0
+        or edge_plan.reason ~= "blocked_by_edge" then
+        return false, "Blocked push chain failed"
+    end
+
+    -- Reset positions, then add an immovable object.
+    puzzle.entities[1].x = 2
+    puzzle.entities[2].x = 3
+    puzzle.entities[3].x = 4
+
+    puzzle.entities[4] = {
+        id = 4, x = 5, y = 2,
+        traits = { block_entry = true }
+    }
+
+    local stop_plan = push_right()
+
+    if not stop_plan.consumes_turn
+        or #stop_plan.changes ~= 0
+        or stop_plan.reason ~= "blocked_by_entity" then
+        return false, "STOP behind PUSH chain failed"
+    end
+
 
     return true, "Movement constraints passed"
 end

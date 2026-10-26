@@ -1,4 +1,3 @@
-
 -- bootstrap.lua
 -- RuleWorld M2: Input and module coordination
 
@@ -25,15 +24,17 @@ function OnStart()
     local world_api = scripts["world"]
     local movement_api = scripts["movement"]
     local renderer_api = scripts["renderer"]
+    local properties_api = scripts["properties"]
+    local rules_api = scripts["rules"]
 
     if not world_api or not movement_api
-        or not renderer_api then
+        or not renderer_api or not properties_api then
         printerr("[RuleWorld] Required script missing")
         return
     end
 
     for _, api in ipairs({
-        world_api, movement_api, renderer_api
+        world_api, movement_api, properties_api, renderer_api
     }) do
         if not api.alive then
             printerr("[RuleWorld] Script not alive")
@@ -47,14 +48,24 @@ function OnStart()
     local mp, mm =
         movement_api:Invoke("RW_MovementSelfTest")
 
-    if not wp or not mp then
-        printerr("[RuleWorld] M2 TEST FAILED:",
-            not wp and wm or mm)
+    local pp, pm =
+        properties_api:Invoke("RW_PropertiesSelfTest")
+
+    local rp, rm =
+        rules_api:Invoke("RW_RulesSelfTest")
+
+    if not wp or not mp or not pp or not rp then
+        printerr(
+            "[RuleWorld] M5 TEST FAILED:",
+            not wp and wm
+            or not mp and mm
+            or not pp and pm
+            or rm
+        )
         return
     end
 
-    print("[RuleWorld] M2 TEST PASSED:",
-        wm, mm)
+    print("[RuleWorld] M5 TEST PASSED:", wm, mm, pm, rm)
 
     local session =
         world_api:Invoke("RW_CreateSession")
@@ -64,11 +75,32 @@ function OnStart()
         return
     end
 
+    local function evaluate_rules()
+        local grants, err = rules_api:Invoke(
+            "RW_EvaluateRules",
+            session.world
+        )
+
+        if not grants then
+            printerr(
+                "[RuleWorld] Rule evaluation failed:",
+                err
+            )
+            return nil
+        end
+
+        return grants
+    end
+
     local function render()
+        local grants = evaluate_rules()
+        if not grants then return end
+
         renderer_api:Invoke(
             "RW_Render",
             session.world,
-            #session.history
+            #session.history,
+            #grants
         )
     end
 
@@ -81,9 +113,27 @@ function OnStart()
         }
 
         -- Phase 1: Resolve intention and constraints.
+        local grants = evaluate_rules()
+        if not grants then return end
+
+        local effective_world, property_error =
+            properties_api:Invoke(
+                "RW_ProjectWorld",
+                session.world,
+                grants
+            )
+
+        if not effective_world then
+            printerr(
+                "[RuleWorld] Property projection failed:",
+                property_error
+            )
+            return
+        end
+
         local plan = movement_api:Invoke(
             "RW_ResolveMovement",
-            session.world,
+            effective_world,
             action
         )
 
@@ -170,10 +220,10 @@ function OnStart()
 
     local key = Enum.KeyEventType
 
-    bind(key.KeyboardMoveForwardKeyDown,  0, -1)
-    bind(key.KeyboardMoveBackwardKeyDown, 0,  1)
-    bind(key.KeyboardMoveLeftKeyDown,    -1,  0)
-    bind(key.KeyboardMoveRightKeyDown,    1,  0)
+    bind(key.KeyboardMoveForwardKeyDown, 0, -1)
+    bind(key.KeyboardMoveBackwardKeyDown, 0, 1)
+    bind(key.KeyboardMoveLeftKeyDown, -1, 0)
+    bind(key.KeyboardMoveRightKeyDown, 1, 0)
 
     if key.KeyboardCraftspersonKey12Down then
         root:AddKeyEventListener(

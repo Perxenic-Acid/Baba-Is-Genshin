@@ -1,7 +1,7 @@
 -- renderer.lua
 -- Miliastra UI renderer.
 
-function RW_Render(world, history_depth)
+function RW_Render(world, history_depth, active_grants)
     local root = script.object
     if not root then
         printerr("[RuleWorld] Renderer has no host")
@@ -16,7 +16,8 @@ function RW_Render(world, history_depth)
 
     local lines = {
         "RuleWorld M1",
-        "History: " .. tostring(history_depth or 0)
+        "History: " .. tostring(history_depth or 0),
+        "Active effects: " .. tostring(active_grants or 0)
     }
 
     for y = 1, world.height do

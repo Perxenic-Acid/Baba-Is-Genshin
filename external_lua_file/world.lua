@@ -1,4 +1,3 @@
-
 -- world.lua
 -- RuleWorld M2: World state, atomic commit, history
 
@@ -113,9 +112,7 @@ function RW_CreateSession()
                     kind = "object",
                     x = 3,
                     y = 3,
-                    traits = {
-                        block_entry = true
-                    }
+                    traits = { block_entry = true }
                 },
 
                 [3] = {
@@ -123,8 +120,58 @@ function RW_CreateSession()
                     kind = "object",
                     x = 4,
                     y = 4
+                },
+
+                [4] = {
+                    id = 4,
+                    kind = "object",
+                    archetype = "crate",
+                    x = 3,
+                    y = 2,
+                    traits = { block_entry = true }
+                },
+
+                [5] = {
+                    id = 5,
+                    kind = "object",
+                    archetype = "crate",
+                    x = 4,
+                    y = 2
+                },
+
+                [6] = {
+                    id = 6,
+                    kind = "object",
+                    archetype = "plate",
+                    x = 2,
+                    y = 2
                 }
-            }
+            },
+
+
+            rule_sources = { {
+                when = {
+                    op = "overlap",
+                    left = {
+                        kind = "id",
+                        value = 1
+                    },
+                    right = {
+                        kind = "archetype",
+                        value = "plate"
+                    }
+                },
+
+                effects = { {
+                    op = "grant_trait",
+                    target = {
+                        kind = "archetype",
+                        value = "crate"
+                    },
+                    trait = "pushable"
+                } }
+            } }
+
         },
 
         history = {}
@@ -216,12 +263,12 @@ function RW_SelfTest()
 
     local move = {
         consumes_turn = true,
-        changes = {{
+        changes = { {
             kind = "move",
             entity_id = 1,
             from = { x = 2, y = 2 },
             to = { x = 3, y = 2 }
-        }}
+        } }
     }
 
     local s1, r1 = RW_Commit(s0, move)

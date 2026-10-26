@@ -191,6 +191,113 @@ function OnStart()
 
     print("[RuleWorld] TEST PASSED: pipeline AST/legacy parity")
 
+    -- End-to-end M9.3C fixture: spell CRATE IS AVATAR,
+    -- move once, then transform both crates in the same
+    -- atomic history entry. No changes to the live level.
+    local conversion_session =
+        world_api:Invoke("RW_CreateSession")
+
+    local conversion_world = conversion_session.world
+
+    conversion_world.entities[9].x = 4
+    conversion_world.entities[9].y = 4
+    conversion_world.entities[8].x = 12
+    conversion_world.entities[8].y = 12
+
+    local conversion_turn = {
+        consumes_turn = true,
+        changes = {{
+            kind = "move",
+            entity_id = 1,
+            from = { x = 2, y = 2 },
+            to = { x = 2, y = 3 }
+        }}
+    }
+
+    local preview, preview_error =
+        world_api:Invoke(
+            "RW_PreviewPlan",
+            conversion_world,
+            conversion_turn
+        )
+
+    if not preview then
+        printerr(
+            "[RuleWorld] TEST FAILED: conversion preview",
+            preview_error
+        )
+        return
+    end
+
+    local parsed_lines = reader_api:Invoke(
+        "RW_ReadLines", preview
+    )
+
+    local parsed_ast = grammar_api:Invoke(
+        "RW_ParseRuleAST",
+        parsed_lines,
+        preview.language
+    )
+
+    if not parsed_ast then
+        printerr("[RuleWorld] TEST FAILED: conversion grammar")
+        return
+    end
+
+    local _, deferred, conversion_relations =
+        rules_api:Invoke("RW_LowerRuleAST", parsed_ast)
+
+    local conversion_ops, conversion_error =
+        rules_api:Invoke(
+            "RW_PlanConversions",
+            preview,
+            conversion_relations
+        )
+
+    if not conversion_ops or #conversion_ops ~= 2
+        or #deferred ~= 0 then
+        printerr(
+            "[RuleWorld] TEST FAILED: conversion planner",
+            conversion_error or "unexpected output"
+        )
+        return
+    end
+
+    for _, change in ipairs(conversion_ops) do
+        conversion_turn.changes[#conversion_turn.changes + 1] = change
+    end
+
+    local completed, completion_result =
+        world_api:Invoke(
+            "RW_Commit",
+            conversion_session,
+            conversion_turn
+        )
+
+    if not completion_result.accepted
+        or completed.world.entities[4].archetype ~= "avatar"
+        or completed.world.entities[5].archetype ~= "avatar"
+        or completed.world.entities[1].y ~= 3
+        or #completed.history ~= 1 then
+        printerr("[RuleWorld] TEST FAILED: conversion commit")
+        return
+    end
+
+    local restored, undo_result =
+        world_api:Invoke("RW_Undo", completed)
+
+    if not undo_result.accepted
+        or #restored.history ~= 0
+        or restored.world.entities[4].archetype ~= "crate"
+        or restored.world.entities[5].archetype ~= "crate"
+        or restored.world.entities[1].y ~= 2
+        or conversion_world.entities[4].archetype ~= "crate" then
+        printerr("[RuleWorld] TEST FAILED: conversion undo")
+        return
+    end
+
+    print("[RuleWorld] TEST PASSED: pipeline CRATE IS AVATAR / Undo")
+
     local session =
         world_api:Invoke("RW_CreateSession")
 

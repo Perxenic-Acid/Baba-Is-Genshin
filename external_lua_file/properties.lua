@@ -152,16 +152,16 @@ function RW_PropertiesSelfTest()
     end
 
     -- Source world must remain unchanged.
-    if original.entities[1].traits.pushable
-        or original.entities[2].traits then
+    if original.entities[1].traits ~= nil
+        or original.entities[2].traits ~= nil then
         return false, "Projection mutated world"
     end
 
     -- Empty effect list retracts derived traits.
     local inactive = RW_ProjectWorld(original, {})
 
-    if inactive.entities[1].traits.pushable
-        or inactive.entities[2].traits then
+    if inactive.entities[1].traits ~= nil
+        or inactive.entities[2].traits ~= nil then
         return false, "Effect retraction failed"
     end
 

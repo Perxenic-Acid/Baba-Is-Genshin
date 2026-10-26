@@ -3,6 +3,16 @@
 
 local HISTORY_LIMIT = 128
 
+-- Intrinsic Object/Text state, independent of rule-derived traits.
+local DIRECTIONS = {
+    Left = true, Up = true, Right = true,
+    Down = true, Mid = true, None = true
+}
+
+local function valid_direction(value)
+    return type(value) == "string" and DIRECTIONS[value] == true
+end
+
 local function clone(value, seen)
     if type(value) ~= "table" then
         return value
@@ -59,7 +69,8 @@ local function validate_plan(world, plan)
     for _, change in ipairs(plan.changes) do
         if type(change) ~= "table"
             or (change.kind ~= "move"
-                and change.kind ~= "transform") then
+                and change.kind ~= "transform"
+                and change.kind ~= "direction") then
             return false, "invalid_operation"
         end
 
@@ -70,8 +81,7 @@ local function validate_plan(world, plan)
             return false, "unknown_entity"
         end
 
-        -- One movement and one transformation per entity
-        -- are allowed in a single atomic turn.
+        -- Movement, direction and transformation share one atomic turn.
         local key = tostring(id) .. ":" .. change.kind
 
         if seen[key] then
@@ -79,8 +89,28 @@ local function validate_plan(world, plan)
         end
 
         seen[key] = true
+        if change.kind == "direction"
+            or (change.kind == "move" and type(change.to) == "table"
+                and change.to.direction ~= nil) then
+            local direction_key = tostring(id) .. ":direction_write"
+            if seen[direction_key] then
+                return false, "duplicate_direction"
+            end
+            seen[direction_key] = true
+        end
 
-        if change.kind == "move" then
+        if change.kind == "direction" then
+            if not valid_direction(change.from)
+                or not valid_direction(change.to) then
+                return false, "invalid_direction"
+            end
+            if (entity.direction or "None") ~= change.from then
+                return false, "stale_direction"
+            end
+            if change.from == change.to then
+                return false, "redundant_direction"
+            end
+        elseif change.kind == "move" then
             if type(change.from) ~= "table"
                 or type(change.to) ~= "table" then
                 return false, "invalid_operation"
@@ -94,6 +124,15 @@ local function validate_plan(world, plan)
             if not is_integer(change.to.x)
                 or not is_integer(change.to.y) then
                 return false, "invalid_position"
+            end
+            if change.from.direction ~= nil or change.to.direction ~= nil then
+                if not valid_direction(change.from.direction)
+                    or not valid_direction(change.to.direction) then
+                    return false, "invalid_direction"
+                end
+                if (entity.direction or "None") ~= change.from.direction then
+                    return false, "stale_direction"
+                end
             end
         else
             if entity.kind ~= "object"
@@ -117,6 +156,73 @@ local function validate_plan(world, plan)
     return true
 end
 
+-- Six intrinsic values, stale-plan rejection and atomic Undo.
+function RW_DirectionStateSelfTest()
+    local s = RW_CreateSession()
+    for _, direction in ipairs({"Left", "Up", "Right", "Down", "Mid", "None"}) do
+        local original = s
+        -- Choose a distinct valid source even for None.
+        s.world.entities[1].direction = direction == "None" and "Mid" or "None"
+        local before = s.world.entities[1].direction
+        local plan = { consumes_turn = true, changes = {
+            { kind = "move", entity_id = 1,
+                from = {x = 2, y = 2, direction = before},
+                to = {x = 2, y = 3, direction = direction} },
+            { kind = "transform", entity_id = 1, from = "avatar", to = "crate" }
+        } }
+        local preview = RW_PreviewPlan(s.world, plan)
+        local next_session, result = RW_Commit(s, plan)
+        if not preview or not result.accepted
+            or preview.entities[1].direction ~= direction
+            or next_session.world.entities[1].direction ~= direction
+            or s.world.entities[1].direction ~= before then
+            return false, "Direction preview/commit mutated source"
+        end
+        local undone = RW_Undo(next_session)
+        if undone.world ~= original.world or #undone.history ~= 0
+            or undone.world.entities[1].archetype ~= "avatar"
+            or undone.world.entities[1].y ~= 2
+            or undone.world.entities[1].direction ~= before then
+            return false, "Direction/move/transform Undo failed"
+        end
+        -- Direction-only turn, including Text.
+        local face = { consumes_turn = true, changes = {
+            {kind = "direction", entity_id = 6, from = "None", to = "Up"}
+        } }
+        local faced, facing = RW_Commit(s, face)
+        local restored = RW_Undo(faced)
+        if not facing.changed or faced.world.entities[6].direction ~= "Up"
+            or restored.world.entities[6].direction ~= "None" then
+            return false, "Text direction-only Undo failed"
+        end
+        -- A bad direction must reject an otherwise valid move + transform.
+        for _, bad_value in ipairs({"north", "", 1}) do
+            local bad = clone(plan)
+            bad.changes[1].to.direction = bad_value
+            local rejected_session, rejection = RW_Commit(s, bad)
+            if rejection.accepted or rejected_session ~= s
+                or RW_PreviewPlan(s.world, bad) ~= nil then
+                return false, "Invalid direction partially committed"
+            end
+        end
+        local stale = clone(plan)
+        stale.changes[1].from.direction = before == "Mid" and "None" or "Mid"
+        local unchanged, rejection = RW_Commit(s, stale)
+        if rejection.accepted or unchanged ~= s then
+            return false, "Stale direction accepted"
+        end
+        local duplicate = clone(plan)
+        duplicate.changes[#duplicate.changes + 1] = {
+            kind = "direction", entity_id = 1, from = before, to = "Down"
+        }
+        local unchanged2, rejection2 = RW_Commit(s, duplicate)
+        if rejection2.accepted or unchanged2 ~= s then
+            return false, "Competing direction writes accepted"
+        end
+    end
+    return true, "Six-value direction state and atomic Undo passed"
+end
+
 -- Public API --------------------------------
 
 
@@ -131,50 +237,50 @@ function RW_CreateSession()
             -- Neither class has intrinsic rule-derived traits.
             entities = {
                 [1] = {
-                    id = 1, kind = "object", class = "object",
+                    id = 1, kind = "object", direction = "None", class = "object",
                     archetype = "avatar", x = 2, y = 2
                 },
                 [2] = {
-                    id = 2, kind = "object", class = "object",
+                    id = 2, kind = "object", direction = "None", class = "object",
                     x = 6, y = 3
                 },
                 [3] = {
-                    id = 3, kind = "object", class = "object",
+                    id = 3, kind = "object", direction = "None", class = "object",
                     x = 6, y = 5
                 },
                 [4] = {
-                    id = 4, kind = "object", class = "object",
+                    id = 4, kind = "object", direction = "None", class = "object",
                     archetype = "crate", x = 3, y = 2
                 },
                 [5] = {
-                    id = 5, kind = "object", class = "object",
+                    id = 5, kind = "object", direction = "None", class = "object",
                     archetype = "crate", x = 4, y = 2
                 },
 
                 -- Editor-facing Text.name is independent
                 -- of derived PUSH/STOP/YOU/WORD properties.
                 [6] = {
-                    id = 6, kind = "object", class = "text",
+                    id = 6, kind = "object", direction = "None", class = "text",
                     x = 2, y = 4, text = { name = "CRATE" }
                 },
                 [7] = {
-                    id = 7, kind = "object", class = "text",
+                    id = 7, kind = "object", direction = "None", class = "text",
                     x = 3, y = 4, text = { name = "IS" }
                 },
                 [8] = {
-                    id = 8, kind = "object", class = "text",
+                    id = 8, kind = "object", direction = "None", class = "text",
                     x = 4, y = 4, text = { name = "PUSH" }
                 },
                 [9] = {
-                    id = 9, kind = "object", class = "text",
+                    id = 9, kind = "object", direction = "None", class = "text",
                     x = 1, y = 5, text = { name = "AVATAR" }
                 },
                 [10] = {
-                    id = 10, kind = "object", class = "text",
+                    id = 10, kind = "object", direction = "None", class = "text",
                     x = 2, y = 5, text = { name = "IS" }
                 },
                 [11] = {
-                    id = 11, kind = "object", class = "text",
+                    id = 11, kind = "object", direction = "None", class = "text",
                     x = 3, y = 5, text = { name = "YOU" }
                 }
             },
@@ -239,6 +345,9 @@ function RW_PreviewPlan(world, plan)
         if change.kind == "move" then
             entity.x = change.to.x
             entity.y = change.to.y
+            entity.direction = change.to.direction or entity.direction
+        elseif change.kind == "direction" then
+            entity.direction = change.to
         elseif change.kind == "transform" then
             entity.archetype = change.to
         end
@@ -276,6 +385,9 @@ function RW_Commit(session, plan)
             if change.kind == "move" then
                 entity.x = change.to.x
                 entity.y = change.to.y
+                entity.direction = change.to.direction or entity.direction
+            elseif change.kind == "direction" then
+                entity.direction = change.to
             elseif change.kind == "transform" then
                 entity.archetype = change.to
             end
@@ -338,7 +450,8 @@ function RW_SelfTest()
         if entity.kind ~= "object"
             or (entity.class ~= "object"
                 and entity.class ~= "text")
-            or entity.traits ~= nil then
+            or entity.traits ~= nil
+            or not valid_direction(entity.direction) then
             return false, "Invalid authored Object state"
         end
 

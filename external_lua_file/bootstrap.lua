@@ -71,6 +71,8 @@ function OnStart()
         { "movement",   "RW_ControlSelfTest" },
         { "grammar",    "RW_GrammarASTSelfTest" },
         { "rules",      "RW_ASTLoweringSelfTest" },
+        { "world",      "RW_DirectionStateSelfTest" },
+        { "movement",   "RW_DirectionMovementSelfTest" },
     }
 
     for _, test in ipairs(tests) do
@@ -600,6 +602,11 @@ function OnStart()
                         change.from,
                         change.to
                     ))
+                elseif change.kind == "direction" then
+                    print(string.format(
+                        "[RuleWorld] Entity %d direction: %s -> %s",
+                        change.entity_id, change.from, change.to
+                    ))
                 else
                     print(string.format(
                         "[RuleWorld] Entity %d: (%d,%d) -> (%d,%d)",
@@ -679,5 +686,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3D initialized")
+    print("[RuleWorld] M9.3E initialized")
 end

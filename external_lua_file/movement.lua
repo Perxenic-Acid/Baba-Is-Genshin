@@ -2,6 +2,73 @@
 -- movement.lua
 -- RuleWorld M2: Movement intentions and constraints
 
+local function direction_for(dx, dy)
+    if dx == -1 then return "Left" end
+    if dx == 1 then return "Right" end
+    if dy == -1 then return "Up" end
+    return "Down"
+end
+
+function RW_DirectionMovementSelfTest()
+    for _, vector in ipairs({{-1, 0, "Left"}, {0, -1, "Up"},
+        {1, 0, "Right"}, {0, 1, "Down"}}) do
+        local dx, dy, direction = vector[1], vector[2], vector[3]
+        local world = {width = 7, height = 7, entities = {
+            [1] = {id = 1, x = 4, y = 4, direction = "Mid", traits = {you = true}},
+            [2] = {id = 2, x = 4 + dx, y = 4 + dy, direction = "None",
+                class = "text", traits = {pushable = true}},
+            [3] = {id = 3, x = 4 + 2*dx, y = 4 + 2*dy, direction = "Left",
+                traits = {pushable = true, you = true}},
+            [4] = {id = 4, x = 1, y = 1, direction = "Up", traits = {}}
+        }}
+        local action = {type = "move", dx = dx, dy = dy}
+        local plan = RW_ResolveTurn(world, action)
+        if #plan.changes ~= 3 then return false, "Directional push count failed" end
+        for _, change in ipairs(plan.changes) do
+            local source = world.entities[change.entity_id]
+            if change.kind ~= "move" or change.to.direction ~= direction
+                or change.from.direction ~= source.direction
+                or change.to.x ~= source.x + dx or change.to.y ~= source.y + dy then
+                return false, "Push participants did not face movement direction"
+            end
+        end
+        if world.entities[1].direction ~= "Mid" or world.entities[2].direction ~= "None" then
+            return false, "Direction planning mutated source"
+        end
+        -- STOP behind the chain: both YOU turn, passive PUSH retains direction.
+        world.entities[5] = {id = 5, x = 4 + 3*dx, y = 4 + 3*dy,
+            direction = "None", traits = {block_entry = true}}
+        local stopped = RW_ResolveTurn(world, action)
+        local count = 0
+        for _, change in ipairs(stopped.changes) do
+            if change.kind ~= "direction" or change.to ~= direction
+                or (change.entity_id ~= 1 and change.entity_id ~= 3) then
+                return false, "Blocked push leaked movement or passive direction"
+            end
+            count = count + 1
+        end
+        if count ~= (direction == "Left" and 1 or 2)
+            or stopped.reason ~= "all_blocked" then
+            return false, "Blocked YOU direction failed"
+        end
+        -- EDGE blocks a lone YOU, which still faces the requested direction.
+        world.entities = {[1] = {id = 1,
+            x = dx == -1 and 1 or (dx == 1 and 7 or 4),
+            y = dy == -1 and 1 or (dy == 1 and 7 or 4),
+            direction = "Mid", traits = {you = true}}}
+        local edge = RW_ResolveTurn(world, action)
+        if edge.reason ~= "blocked_by_edge" or #edge.changes ~= 1
+            or edge.changes[1].kind ~= "direction" or edge.changes[1].to ~= direction then
+            return false, "EDGE direction failed"
+        end
+        world.entities[1].direction = direction
+        if #RW_ResolveTurn(world, action).changes ~= 0 then
+            return false, "Repeated blocked direction generated redundant write"
+        end
+    end
+    return true, "Direction movement, blocking and PUSH passed"
+end
+
 local function invalid(reason)
     return {
         consumes_turn = false,
@@ -122,11 +189,13 @@ function RW_ResolveMovement(world, action)
             entity_id = id,
             from = {
                 x = entity.x,
-                y = entity.y
+                y = entity.y,
+                direction = entity.direction or "None"
             },
             to = {
                 x = nx,
-                y = ny
+                y = ny,
+                direction = direction_for(dx, dy)
             }
         }
 
@@ -386,6 +455,7 @@ function RW_ResolveTurn(world, action)
             if #part.changes == 0 then
                 blocked_count = blocked_count + 1
                 last_block_reason = part.reason
+                working.entities[id].direction = direction_for(dx, dy)
             else
                 -- Update only the temporary world.
                 for _, change in ipairs(part.changes) do
@@ -394,6 +464,7 @@ function RW_ResolveTurn(world, action)
 
                     entity.x = change.to.x
                     entity.y = change.to.y
+                    entity.direction = change.to.direction
 
                     displaced[change.entity_id] = true
                 end
@@ -426,20 +497,27 @@ function RW_ResolveTurn(world, action)
 
                 from = {
                     x = before.x,
-                    y = before.y
+                    y = before.y,
+                    direction = before.direction or "None"
                 },
 
                 to = {
                     x = after.x,
-                    y = after.y
+                    y = after.y,
+                    direction = after.direction
                 }
+            }
+        elseif (before.direction or "None") ~= (after.direction or "None") then
+            changes[#changes + 1] = {
+                kind = "direction", entity_id = id,
+                from = before.direction or "None", to = after.direction
             }
         end
     end
 
     local reason = nil
 
-    if #changes == 0 then
+    if blocked_count == #controllers then
         if #controllers == 1 then
             reason = last_block_reason or "blocked"
         else
@@ -468,7 +546,7 @@ function RW_ControlSelfTest()
 
     local function moved_to(plan, id, x, y)
         for _, change in ipairs(plan.changes) do
-            if change.entity_id == id then
+            if change.kind == "move" and change.entity_id == id then
                 return change.to.x == x
                     and change.to.y == y
             end
@@ -514,7 +592,7 @@ function RW_ControlSelfTest()
     local partial = move_right(world)
 
     if not partial.consumes_turn
-        or #partial.changes ~= 1
+        or #partial.changes ~= 2
         or not moved_to(partial, 1, 3, 2) then
         return false, "Partial movement failed"
     end

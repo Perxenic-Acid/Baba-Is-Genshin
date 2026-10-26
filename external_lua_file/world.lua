@@ -93,85 +93,111 @@ end
 
 -- Public API --------------------------------
 
+
 function RW_CreateSession()
     return {
         world = {
-            width = 5,
-            height = 5,
+            width = 7,
+            height = 6,
 
             entities = {
+                -- Controlled test entity
                 [1] = {
                     id = 1,
                     kind = "object",
-                    x = 2,
-                    y = 2
+                    x = 2, y = 2
                 },
 
+                -- Fixed blocking entity
                 [2] = {
                     id = 2,
                     kind = "object",
-                    x = 3,
-                    y = 3,
-                    traits = { block_entry = true }
+                    x = 6, y = 3,
+                    traits = {
+                        block_entry = true
+                    }
                 },
 
+                -- Ordinary nonblocking entity
                 [3] = {
                     id = 3,
                     kind = "object",
-                    x = 4,
-                    y = 4
+                    x = 6, y = 5
                 },
 
+                -- Two crates
                 [4] = {
                     id = 4,
                     kind = "object",
                     archetype = "crate",
-                    x = 3,
-                    y = 2,
-                    traits = { block_entry = true }
+                    x = 3, y = 2,
+                    traits = {
+                        block_entry = true
+                    }
                 },
 
                 [5] = {
                     id = 5,
                     kind = "object",
                     archetype = "crate",
-                    x = 4,
-                    y = 2
+                    x = 4, y = 2
                 },
 
+                -- Movable text blocks
                 [6] = {
                     id = 6,
-                    kind = "object",
-                    archetype = "plate",
-                    x = 2,
-                    y = 2
-                }
-            },
-
-
-            rule_sources = { {
-                when = {
-                    op = "overlap",
-                    left = {
-                        kind = "id",
-                        value = 1
+                    kind = "text",
+                    x = 2, y = 4,
+                    symbol = {
+                        token = "CRATE"
                     },
-                    right = {
-                        kind = "archetype",
-                        value = "plate"
+                    traits = {
+                        pushable = true
                     }
                 },
 
-                effects = { {
-                    op = "grant_trait",
-                    target = {
-                        kind = "archetype",
-                        value = "crate"
+                [7] = {
+                    id = 7,
+                    kind = "text",
+                    x = 3, y = 4,
+                    symbol = {
+                        token = "IS"
                     },
-                    trait = "pushable"
-                } }
-            } }
+                    traits = {
+                        pushable = true
+                    }
+                },
 
+                [8] = {
+                    id = 8,
+                    kind = "text",
+                    x = 4, y = 4,
+                    symbol = {
+                        token = "PUSH"
+                    },
+                    traits = {
+                        pushable = true
+                    }
+                }
+            },
+
+            -- No permanent rule sources in this level.
+            rule_sources = {},
+
+            -- Level-selected vocabulary.
+            language = {
+                nouns = {
+                    CRATE = "crate"
+                },
+
+                copulas = {
+                    IS = "grant_trait"
+                },
+
+                properties = {
+                    PUSH = "pushable"
+                }
+            }
         },
 
         history = {}

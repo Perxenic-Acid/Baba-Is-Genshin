@@ -1,5 +1,6 @@
+
 -- bootstrap.lua
--- RuleWorld M2: Input and module coordination
+-- RuleWorld M7: Runtime coordination
 
 function OnStart()
     local root = script.object
@@ -9,63 +10,86 @@ function OnStart()
         return
     end
 
+    -- Discover mapped scripts.
     local scripts = {}
 
     for _, candidate in ipairs(root:GetScripts()) do
         local path =
             (candidate.path or ""):gsub("\\", "/")
-
         local name = path:match("([^/]+)$")
 
         scripts[name] = candidate
+
         print("[RuleWorld] Found script:", path)
     end
 
-    local world_api = scripts["world"]
-    local movement_api = scripts["movement"]
-    local renderer_api = scripts["renderer"]
-    local properties_api = scripts["properties"]
-    local rules_api = scripts["rules"]
+    -- All modules required by M7.
+    local required = {
+        "world",
+        "reader",
+        "grammar",
+        "rules",
+        "properties",
+        "movement",
+        "renderer"
+    }
 
-    if not world_api or not movement_api
-        or not renderer_api or not properties_api then
-        printerr("[RuleWorld] Required script missing")
-        return
-    end
+    for _, name in ipairs(required) do
+        local api = scripts[name]
 
-    for _, api in ipairs({
-        world_api, movement_api, properties_api, renderer_api
-    }) do
+        if not api then
+            printerr(
+                "[RuleWorld] Missing module:", name
+            )
+            return
+        end
+
         if not api.alive then
-            printerr("[RuleWorld] Script not alive")
+            printerr(
+                "[RuleWorld] Module not alive:", name
+            )
             return
         end
     end
 
-    local wp, wm =
-        world_api:Invoke("RW_SelfTest")
+    local world_api = scripts.world
+    local reader_api = scripts.reader
+    local grammar_api = scripts.grammar
+    local rules_api = scripts.rules
+    local properties_api = scripts.properties
+    local movement_api = scripts.movement
+    local renderer_api = scripts.renderer
 
-    local mp, mm =
-        movement_api:Invoke("RW_MovementSelfTest")
+    -- Module self-tests.
+    local tests = {
+        { "world", "RW_SelfTest" },
+        { "reader", "RW_ReaderSelfTest" },
+        { "grammar", "RW_GrammarSelfTest" },
+        { "rules", "RW_RulesSelfTest" },
+        { "properties", "RW_PropertiesSelfTest" },
+        { "movement", "RW_MovementSelfTest" }
+    }
 
-    local pp, pm =
-        properties_api:Invoke("RW_PropertiesSelfTest")
+    for _, test in ipairs(tests) do
+        local name = test[1]
+        local method = test[2]
 
-    local rp, rm =
-        rules_api:Invoke("RW_RulesSelfTest")
+        local passed, message =
+            scripts[name]:Invoke(method)
 
-    if not wp or not mp or not pp or not rp then
-        printerr(
-            "[RuleWorld] M5 TEST FAILED:",
-            not wp and wm
-            or not mp and mm
-            or not pp and pm
-            or rm
+        if not passed then
+            printerr(
+                "[RuleWorld] TEST FAILED:",
+                name, message
+            )
+            return
+        end
+
+        print(
+            "[RuleWorld] TEST PASSED:",
+            name, message
         )
-        return
     end
-
-    print("[RuleWorld] M5 TEST PASSED:", wm, mm, pm, rm)
 
     local session =
         world_api:Invoke("RW_CreateSession")
@@ -75,32 +99,77 @@ function OnStart()
         return
     end
 
-    local function evaluate_rules()
-        local grants, err = rules_api:Invoke(
-            "RW_EvaluateRules",
-            session.world
-        )
+    -- World -> spatial lines -> generated IR
+    -- -> active effects.
+    local function evaluate()
+        local lines, read_error =
+            reader_api:Invoke(
+                "RW_ReadLines",
+                session.world
+            )
 
-        if not grants then
+        if not lines then
             printerr(
-                "[RuleWorld] Rule evaluation failed:",
-                err
+                "[RuleWorld] Reader failed:",
+                read_error
             )
             return nil
         end
 
-        return grants
+        local generated, grammar_error =
+            grammar_api:Invoke(
+                "RW_CompileRules",
+                lines,
+                session.world.language
+            )
+
+        if not generated then
+            printerr(
+                "[RuleWorld] Grammar failed:",
+                grammar_error
+            )
+            return nil
+        end
+
+        local effects, rule_error =
+            rules_api:Invoke(
+                "RW_EvaluateRules",
+                session.world,
+                generated
+            )
+
+        if not effects then
+            printerr(
+                "[RuleWorld] Rule evaluation failed:",
+                rule_error
+            )
+            return nil
+        end
+
+        return effects, #generated
     end
 
+    local previous_rule_count = nil
+
     local function render()
-        local grants = evaluate_rules()
-        if not grants then return end
+        local effects, rule_count = evaluate()
+        if not effects then return end
+
+        if previous_rule_count ~= rule_count then
+            print(string.format(
+                "[RuleWorld] Spatial rules: %d, effects: %d",
+                rule_count,
+                #effects
+            ))
+
+            previous_rule_count = rule_count
+        end
 
         renderer_api:Invoke(
             "RW_Render",
             session.world,
             #session.history,
-            #grants
+            #effects
         )
     end
 
@@ -112,25 +181,26 @@ function OnStart()
             dy = dy
         }
 
-        -- Phase 1: Resolve intention and constraints.
-        local grants = evaluate_rules()
-        if not grants then return end
+        -- Evaluate rules against the OLD world.
+        local effects = evaluate()
+        if not effects then return end
 
-        local effective_world, property_error =
+        local effective_world, projection_error =
             properties_api:Invoke(
                 "RW_ProjectWorld",
                 session.world,
-                grants
+                effects
             )
 
         if not effective_world then
             printerr(
-                "[RuleWorld] Property projection failed:",
-                property_error
+                "[RuleWorld] Projection failed:",
+                projection_error
             )
             return
         end
 
+        -- Resolve the full movement plan.
         local plan = movement_api:Invoke(
             "RW_ResolveMovement",
             effective_world,
@@ -138,11 +208,11 @@ function OnStart()
         )
 
         if not plan then
-            printerr("[RuleWorld] Resolver failed")
+            printerr("[RuleWorld] Movement failed")
             return
         end
 
-        -- Phase 2: Atomically commit the plan.
+        -- Commit against the authoritative state.
         local next_session, result =
             world_api:Invoke(
                 "RW_Commit",
@@ -156,8 +226,10 @@ function OnStart()
         end
 
         if not result.accepted then
-            print("[RuleWorld] Invalid action:",
-                result.reason)
+            print(
+                "[RuleWorld] Invalid action:",
+                result.reason
+            )
             return
         end
 
@@ -175,16 +247,22 @@ function OnStart()
                 ))
             end
         else
-            print("[RuleWorld] Turn consumed:",
-                result.reason or "no_change")
+            print(
+                "[RuleWorld] Turn consumed:",
+                result.reason or "no_change"
+            )
         end
 
+        -- This evaluates the NEW world.
         render()
     end
 
     local function undo()
         local next_session, result =
-            world_api:Invoke("RW_Undo", session)
+            world_api:Invoke(
+                "RW_Undo",
+                session
+            )
 
         if not next_session or not result then
             printerr("[RuleWorld] Undo failed")
@@ -192,20 +270,20 @@ function OnStart()
         end
 
         if not result.accepted then
-            print("[RuleWorld] Undo rejected:",
-                result.reason)
+            print(
+                "[RuleWorld] Undo rejected:",
+                result.reason
+            )
             return
         end
 
         session = next_session
 
-        local entity = session.world.entities[1]
+        local e = session.world.entities[1]
 
         print(string.format(
             "[RuleWorld] Undo -> (%d,%d), history=%d",
-            entity.x,
-            entity.y,
-            #session.history
+            e.x, e.y, #session.history
         ))
 
         render()
@@ -220,10 +298,10 @@ function OnStart()
 
     local key = Enum.KeyEventType
 
-    bind(key.KeyboardMoveForwardKeyDown, 0, -1)
-    bind(key.KeyboardMoveBackwardKeyDown, 0, 1)
-    bind(key.KeyboardMoveLeftKeyDown, -1, 0)
-    bind(key.KeyboardMoveRightKeyDown, 1, 0)
+    bind(key.KeyboardMoveForwardKeyDown,   0, -1)
+    bind(key.KeyboardMoveBackwardKeyDown,  0,  1)
+    bind(key.KeyboardMoveLeftKeyDown,     -1,  0)
+    bind(key.KeyboardMoveRightKeyDown,     1,  0)
 
     if key.KeyboardCraftspersonKey12Down then
         root:AddKeyEventListener(
@@ -238,5 +316,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M2 initialized")
+    print("[RuleWorld] M7 initialized")
 end

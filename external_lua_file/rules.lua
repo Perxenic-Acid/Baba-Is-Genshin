@@ -304,6 +304,7 @@ function RW_PlanConversions(world, conversions)
 
     local targets = {}
     local protected = {}
+    local conflicts = {}
 
     for _, relation in ipairs(conversions) do
         if type(relation) ~= "table"
@@ -324,12 +325,20 @@ function RW_PlanConversions(world, conversions)
 
             if previous ~= nil
                 and previous ~= relation.target_type then
-                return nil, "multiple_conversion_targets"
+                conflicts[source_type] = true
+            else
+                targets[source_type] = relation.target_type
             end
-
-            targets[source_type] = relation.target_type
         else
             return nil, "invalid_conversion_relation"
+        end
+    end
+
+    -- A IS A shields its source from conflicting conversions
+    -- independently of the textual rule enumeration order.
+    for source_type in pairs(conflicts) do
+        if not protected[source_type] then
+            return nil, "multiple_conversion_targets"
         end
     end
 
@@ -481,6 +490,20 @@ function RW_ASTLoweringSelfTest()
     if conflict ~= nil
         or conflict_error ~= "multiple_conversion_targets" then
         return false, "Conflicting conversions not rejected"
+    end
+
+    local protected_conflict = RW_PlanConversions(
+        test_world,
+        {
+            conversions[1],
+            { op = "transform", source_type = "crate", target_type = "avatar" },
+            conversions[2]
+        }
+    )
+
+    if not protected_conflict
+        or #protected_conflict ~= 0 then
+        return false, "Identity guard priority failed"
     end
 
     return true, "AST property and conversion lowering passed"

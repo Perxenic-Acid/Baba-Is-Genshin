@@ -67,7 +67,8 @@ function OnStart()
         { "grammar", "RW_GrammarSelfTest" },
         { "rules", "RW_RulesSelfTest" },
         { "properties", "RW_PropertiesSelfTest" },
-        { "movement", "RW_MovementSelfTest" }
+        { "movement", "RW_MovementSelfTest" },
+        { "renderer", "RW_RendererSelfTest" }
     }
 
     for _, test in ipairs(tests) do

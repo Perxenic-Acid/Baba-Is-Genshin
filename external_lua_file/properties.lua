@@ -33,7 +33,8 @@ local function valid_selector(s)
             and s.value % 1 == 0
     end
 
-    if s.kind == "archetype" then
+    if s.kind == "archetype"
+        or s.kind == "class" then
         return type(s.value) == "string"
             and s.value ~= ""
     end
@@ -48,6 +49,15 @@ local function matches(entity, selector)
 
     if selector.kind == "archetype" then
         return entity.archetype == selector.value
+    end
+
+    if selector.kind == "class" then
+        if selector.value == "object" then
+            return entity.kind == "object"
+        end
+
+        return entity.kind == "object"
+            and entity.class == selector.value
     end
 
     return false
@@ -98,15 +108,25 @@ function RW_PropertiesSelfTest()
             [1] = {
                 id = 1,
                 archetype = "crate",
-                traits = { block_entry = true }
+                kind = "object",
+                class = "object"
             },
             [2] = {
                 id = 2,
-                archetype = "crate"
+                archetype = "crate",
+                kind = "object",
+                class = "object"
             },
             [3] = {
                 id = 3,
-                archetype = "other"
+                archetype = "other",
+                kind = "object",
+                class = "object"
+            },
+            [4] = {
+                id = 4,
+                kind = "object", class = "text",
+                text = { name = "BOX" }
             }
         }
     }
@@ -129,10 +149,6 @@ function RW_PropertiesSelfTest()
         or not active.entities[2].traits.pushable
         or active.entities[3].traits then
         return false, "Trait grant failed"
-    end
-
-    if not active.entities[1].traits.block_entry then
-        return false, "Intrinsic trait lost"
     end
 
     -- Source world must remain unchanged.
@@ -162,6 +178,36 @@ function RW_PropertiesSelfTest()
     if not individual.entities[3].traits.pushable
         or individual.entities[2].traits then
         return false, "ID targeting failed"
+    end
+
+    -- A class selector matches text and its Object superclass.
+    local text_only = RW_ProjectWorld(original, {{
+        op = "grant_trait",
+        target = { kind = "class", value = "text" },
+        trait = "pushable"
+    }})
+
+    if not text_only
+        or not text_only.entities[4].traits.pushable
+        or text_only.entities[1].traits ~= nil
+        or original.entities[4].traits ~= nil then
+        return false, "Text class projection failed"
+    end
+
+    local all_objects = RW_ProjectWorld(original, {{
+        op = "grant_trait",
+        target = { kind = "class", value = "object" },
+        trait = "you"
+    }})
+
+    if not all_objects then
+        return false, "Object class projection failed"
+    end
+
+    for _, entity in pairs(all_objects.entities) do
+        if not entity.traits or not entity.traits.you then
+            return false, "Superclass inheritance failed"
+        end
     end
 
     -- Invalid effects must not be applied.

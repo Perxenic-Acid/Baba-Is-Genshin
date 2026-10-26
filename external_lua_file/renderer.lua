@@ -178,8 +178,8 @@ local function ensure_grid(world)
 end
 
 local function get_label(entity)
-    if entity.symbol then
-        return entity.symbol.token
+    if entity.class == "text" then
+        return entity.text and entity.text.name or "?"
     end
 
     if entity.archetype == "avatar" then
@@ -190,7 +190,7 @@ local function get_label(entity)
 end
 
 local function get_colors(entity)
-    if entity.symbol then
+    if entity.class == "text" then
         return
             Color(205, 159, 89, 255),
             Color(36, 26, 15, 255)

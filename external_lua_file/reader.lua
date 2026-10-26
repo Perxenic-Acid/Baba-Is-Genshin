@@ -27,18 +27,19 @@ function RW_ReadLines(world)
     local positions = {}
 
     for id, entity in pairs(world.entities) do
-        local symbol = entity.symbol
+        if entity.class == "text" then
+            local text_data = entity.text
 
-        if symbol ~= nil then
-            if type(symbol) ~= "table"
-                or type(symbol.token) ~= "string"
-                or symbol.token == "" then
-                return nil, "invalid_symbol"
+            if entity.kind ~= "object"
+                or type(text_data) ~= "table"
+                or type(text_data.name) ~= "string"
+                or text_data.name == "" then
+                return nil, "invalid_text"
             end
 
             if not is_integer(entity.x)
                 or not is_integer(entity.y) then
-                return nil, "invalid_symbol_position"
+                return nil, "invalid_text_position"
             end
 
             -- Only visible board coordinates are scanned.
@@ -55,7 +56,7 @@ function RW_ReadLines(world)
 
                 positions[k][#positions[k] + 1] = {
                     id = id,
-                    token = symbol.token
+                    token = text_data.name
                 }
             end
         end
@@ -110,34 +111,42 @@ function RW_ReaderSelfTest()
         entities = {
             [1] = {
                 id = 1, x = 1, y = 2,
-                symbol = { token = "BOX" }
+                kind = "object", class = "text", text = { name = "BOX" }
             },
             [2] = {
                 id = 2, x = 2, y = 2,
-                symbol = { token = "LINK" }
+                kind = "object", class = "text", text = { name = "LINK" }
             },
             [3] = {
                 id = 3, x = 3, y = 2,
-                symbol = { token = "MOVE" }
+                kind = "object", class = "text", text = { name = "MOVE" }
             },
             [4] = {
                 id = 4, x = 1, y = 2,
-                symbol = { token = "ALT" }
+                kind = "object", class = "text", text = { name = "ALT" }
             },
             [5] = {
                 id = 5, x = 1, y = 3,
-                symbol = { token = "LINK" }
+                kind = "object", class = "text", text = { name = "LINK" }
             },
             [6] = {
                 id = 6, x = 1, y = 4,
-                symbol = { token = "STOP" }
+                kind = "object", class = "text", text = { name = "STOP" }
             }
         }
     }
 
+    -- A non-Text object must not become a word merely
+    -- because it happens to carry a similarly named field.
+    world.entities[7] = {
+        id = 7, kind = "object", class = "object",
+        x = 4, y = 2, text = { name = "DECOY" }
+    }
+
     local lines = RW_ReadLines(world)
 
-    if not lines or #lines ~= 8 then
+    if not lines or #lines ~= 8
+        or #lines[2].cells[4] ~= 0 then
         return false, "Line enumeration failed"
     end
 
@@ -162,8 +171,23 @@ function RW_ReaderSelfTest()
         return false, "Vertical reading failed"
     end
 
-    if world.entities[1].symbol.token ~= "BOX" then
+    if world.entities[1].text.name ~= "BOX" then
         return false, "Reader mutated world"
+    end
+
+    -- Reject a Text instance with missing editor-provided name.
+    local wrong = {
+        width = 2, height = 2,
+        entities = {
+            [1] = { id = 1, kind = "object", class = "text",
+                    x = 1, y = 1 }
+        }
+    }
+
+    local invalid, err = RW_ReadLines(wrong)
+
+    if invalid ~= nil or err ~= "invalid_text" then
+        return false, "Invalid Text accepted"
     end
 
     return true, "Spatial reader passed"

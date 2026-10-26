@@ -97,6 +97,7 @@ local function validate_plan(world, plan)
             end
         else
             if entity.kind ~= "object"
+                or entity.class == "text"
                 or type(change.from) ~= "string"
                 or type(change.to) ~= "string"
                 or change.to == "" then
@@ -125,119 +126,69 @@ function RW_CreateSession()
             width = 12,
             height = 12,
 
+            -- Every entity is an Object. Text is an Object
+            -- subclass distinguished by class="text".
+            -- Neither class has intrinsic rule-derived traits.
             entities = {
-                -- Controlled test entity
                 [1] = {
-                    id = 1,
-                    kind = "object",
-                    archetype = "avatar",
-                    x = 2,
-                    y = 2
+                    id = 1, kind = "object", class = "object",
+                    archetype = "avatar", x = 2, y = 2
                 },
-
-                -- Fixed blocking entity
                 [2] = {
-                    id = 2,
-                    kind = "object",
-                    x = 6,
-                    y = 3,
-                    -- traits = {
-                    --     block_entry = true
-                    -- }
+                    id = 2, kind = "object", class = "object",
+                    x = 6, y = 3
                 },
-
-                -- Ordinary nonblocking entity
                 [3] = {
-                    id = 3,
-                    kind = "object",
-                    x = 6,
-                    y = 5
+                    id = 3, kind = "object", class = "object",
+                    x = 6, y = 5
                 },
-
-                -- Two crates
                 [4] = {
-                    id = 4,
-                    kind = "object",
-                    archetype = "crate",
-                    x = 3,
-                    y = 2,
-                    -- traits = {
-                    --     block_entry = true
-                    -- }
+                    id = 4, kind = "object", class = "object",
+                    archetype = "crate", x = 3, y = 2
                 },
-
                 [5] = {
-                    id = 5,
-                    kind = "object",
-                    archetype = "crate",
-                    x = 4,
-                    y = 2
+                    id = 5, kind = "object", class = "object",
+                    archetype = "crate", x = 4, y = 2
                 },
 
-                -- Movable text blocks
+                -- Editor-facing Text.name is independent
+                -- of derived PUSH/STOP/YOU/WORD properties.
                 [6] = {
-                    id = 6,
-                    kind = "text",
-                    x = 2,
-                    y = 4,
-                    symbol = {
-                        token = "CRATE"
-                    },
-                    traits = { pushable = true }
+                    id = 6, kind = "object", class = "text",
+                    x = 2, y = 4, text = { name = "CRATE" }
                 },
-
                 [7] = {
-                    id = 7,
-                    kind = "text",
-                    x = 3,
-                    y = 4,
-                    symbol = {
-                        token = "IS"
-                    },
-                    traits = { pushable = true }
+                    id = 7, kind = "object", class = "text",
+                    x = 3, y = 4, text = { name = "IS" }
                 },
-
                 [8] = {
-                    id = 8,
-                    kind = "text",
-                    x = 4,
-                    y = 4,
-                    symbol = {
-                        token = "PUSH"
-                    },
-                    traits = { pushable = true }
+                    id = 8, kind = "object", class = "text",
+                    x = 4, y = 4, text = { name = "PUSH" }
                 },
-
                 [9] = {
-                    id = 9,
-                    kind = "text",
-                    x = 1,
-                    y = 5,
-                    symbol = { token = "AVATAR" },
-                    traits = { pushable = true }
+                    id = 9, kind = "object", class = "text",
+                    x = 1, y = 5, text = { name = "AVATAR" }
                 },
-
                 [10] = {
-                    id = 10,
-                    kind = "text",
-                    x = 2,
-                    y = 5,
-                    symbol = { token = "IS" },
-                    traits = { pushable = true }
+                    id = 10, kind = "object", class = "text",
+                    x = 2, y = 5, text = { name = "IS" }
                 },
-
                 [11] = {
-                    id = 11,
-                    kind = "text",
-                    x = 3,
-                    y = 5,
-                    symbol = { token = "YOU" },
-                    traits = { pushable = true }
+                    id = 11, kind = "object", class = "text",
+                    x = 3, y = 5, text = { name = "YOU" }
                 }
             },
 
-            -- No permanent rule sources in this level.
-            rule_sources = {},
+            -- Base rules are ordinary Rule IR sources,
+            -- not intrinsic traits of Text instances.
+            rule_sources = {{
+                when = { op = "always" },
+                effects = {{
+                    op = "grant_trait",
+                    target = { kind = "class", value = "text" },
+                    trait = "pushable"
+                }}
+            }},
 
             -- Level-selected vocabulary.
             language = {
@@ -382,6 +333,34 @@ end
 -- Internal invariant tests.
 function RW_SelfTest()
     local s0 = RW_CreateSession()
+
+    for _, entity in pairs(s0.world.entities) do
+        if entity.kind ~= "object"
+            or (entity.class ~= "object"
+                and entity.class ~= "text")
+            or entity.traits ~= nil then
+            return false, "Invalid authored Object state"
+        end
+
+        if entity.class == "text" then
+            if type(entity.text) ~= "table"
+                or type(entity.text.name) ~= "string"
+                or entity.text.name == ""
+                or entity.symbol ~= nil then
+                return false, "Invalid authored Text subclass"
+            end
+        end
+    end
+
+    local base = s0.world.rule_sources[1]
+
+    if #s0.world.rule_sources ~= 1
+        or not base
+        or base.effects[1].target.kind ~= "class"
+        or base.effects[1].target.value ~= "text"
+        or base.effects[1].trait ~= "pushable" then
+        return false, "TEXT IS PUSH base rule absent"
+    end
 
     local move = {
         consumes_turn = true,

@@ -189,6 +189,38 @@ function OnStart()
         return
     end
 
+    -- The authoritative level contains NO intrinsic PUSH
+    -- traits. TEXT IS PUSH is applied only in effective_world,
+    -- independently of any spatial CRATE IS PUSH rule.
+    local base_world = world_api:Invoke("RW_CreateSession")
+    local base_lines = reader_api:Invoke(
+        "RW_ReadLines", base_world.world
+    )
+    local base_ast = grammar_api:Invoke(
+        "RW_ParseRuleAST", base_lines, base_world.world.language
+    )
+    local base_generated = rules_api:Invoke(
+        "RW_LowerRuleAST", base_ast
+    )
+    local base_effects = rules_api:Invoke(
+        "RW_EvaluateRules", base_world.world, base_generated
+    )
+    local effective = properties_api:Invoke(
+        "RW_ProjectWorld", base_world.world, base_effects
+    )
+
+    if not effective
+        or #base_effects ~= 3
+        or base_world.world.entities[6].traits ~= nil
+        or not effective.entities[6].traits.pushable
+        or not effective.entities[11].traits.pushable
+        or effective.entities[1].traits ~= nil then
+        printerr("[RuleWorld] TEST FAILED: TEXT IS PUSH base rule")
+        return
+    end
+
+    print("[RuleWorld] TEST PASSED: pipeline TEXT IS PUSH base rule")
+
     print("[RuleWorld] TEST PASSED: pipeline AST/legacy parity")
 
     -- End-to-end M9.3C fixture: spell CRATE IS AVATAR,
@@ -592,5 +624,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3C initialized")
+    print("[RuleWorld] M9.3D initialized")
 end

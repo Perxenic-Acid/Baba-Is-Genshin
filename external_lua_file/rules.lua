@@ -12,7 +12,8 @@ local function valid_selector(s)
             and s.value % 1 == 0
     end
 
-    if s.kind == "archetype" then
+    if s.kind == "archetype"
+        or s.kind == "class" then
         return type(s.value) == "string"
             and s.value ~= ""
     end
@@ -27,6 +28,15 @@ local function matches(entity, selector)
 
     if selector.kind == "archetype" then
         return entity.archetype == selector.value
+    end
+
+    if selector.kind == "class" then
+        if selector.value == "object" then
+            return entity.kind == "object"
+        end
+
+        return entity.kind == "object"
+            and entity.class == selector.value
     end
 
     return false
@@ -357,6 +367,7 @@ function RW_PlanConversions(world, conversions)
         local source_type = entity.archetype
 
         if entity.kind == "object"
+            and entity.class ~= "text"
             and type(source_type) == "string"
             and targets[source_type] ~= nil
             and not protected[source_type] then
@@ -459,7 +470,8 @@ function RW_ASTLoweringSelfTest()
             [2] = { id = 2, kind = "object", archetype = "crate" },
             [3] = { id = 3, kind = "object", archetype = "crate" },
             [4] = { id = 4, kind = "object", archetype = "avatar" },
-            [5] = { id = 5, kind = "text", archetype = "crate" }
+            [5] = { id = 5, kind = "object", class = "text",
+                    archetype = "crate", text = { name = "CRATE" } }
         }
     }
 
@@ -629,6 +641,40 @@ function RW_RulesSelfTest()
     if result ~= nil
         or err ~= "unknown_condition_operator" then
         return false, "Invalid IR validation failed"
+    end
+
+    -- A Text is an Object, but not every Object is Text.
+    local class_world = {
+        entities = {
+            [1] = {
+                id = 1, kind = "object", class = "text",
+                x = 1, y = 1, text = { name = "BOX" }
+            },
+            [2] = {
+                id = 2, kind = "object", class = "object",
+                x = 1, y = 1
+            }
+        },
+        rule_sources = {{
+            when = {
+                op = "overlap",
+                left = { kind = "class", value = "text" },
+                right = { kind = "class", value = "object" }
+            },
+            effects = {{
+                op = "grant_trait",
+                target = { kind = "class", value = "text" },
+                trait = "pushable"
+            }}
+        }}
+    }
+
+    local class_effects = RW_EvaluateRules(class_world)
+
+    if not class_effects
+        or #class_effects ~= 1
+        or class_effects[1].target.kind ~= "class" then
+        return false, "Class selector condition failed"
     end
 
     return true, "Rule IR evaluation passed"

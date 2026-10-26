@@ -97,32 +97,36 @@ end
 function RW_CreateSession()
     return {
         world = {
-            width = 7,
-            height = 6,
+            width = 12,
+            height = 12,
 
             entities = {
                 -- Controlled test entity
                 [1] = {
                     id = 1,
                     kind = "object",
-                    x = 2, y = 2
+                    archetype = "avatar",
+                    x = 2,
+                    y = 2
                 },
 
                 -- Fixed blocking entity
                 [2] = {
                     id = 2,
                     kind = "object",
-                    x = 6, y = 3,
-                    traits = {
-                        block_entry = true
-                    }
+                    x = 6,
+                    y = 3,
+                    -- traits = {
+                    --     block_entry = true
+                    -- }
                 },
 
                 -- Ordinary nonblocking entity
                 [3] = {
                     id = 3,
                     kind = "object",
-                    x = 6, y = 5
+                    x = 6,
+                    y = 5
                 },
 
                 -- Two crates
@@ -130,54 +134,80 @@ function RW_CreateSession()
                     id = 4,
                     kind = "object",
                     archetype = "crate",
-                    x = 3, y = 2,
-                    traits = {
-                        block_entry = true
-                    }
+                    x = 3,
+                    y = 2,
+                    -- traits = {
+                    --     block_entry = true
+                    -- }
                 },
 
                 [5] = {
                     id = 5,
                     kind = "object",
                     archetype = "crate",
-                    x = 4, y = 2
+                    x = 4,
+                    y = 2
                 },
 
                 -- Movable text blocks
                 [6] = {
                     id = 6,
                     kind = "text",
-                    x = 2, y = 4,
+                    x = 2,
+                    y = 4,
                     symbol = {
                         token = "CRATE"
                     },
-                    traits = {
-                        pushable = true
-                    }
+                    traits = { pushable = true }
                 },
 
                 [7] = {
                     id = 7,
                     kind = "text",
-                    x = 3, y = 4,
+                    x = 3,
+                    y = 4,
                     symbol = {
                         token = "IS"
                     },
-                    traits = {
-                        pushable = true
-                    }
+                    traits = { pushable = true }
                 },
 
                 [8] = {
                     id = 8,
                     kind = "text",
-                    x = 4, y = 4,
+                    x = 4,
+                    y = 4,
                     symbol = {
                         token = "PUSH"
                     },
-                    traits = {
-                        pushable = true
-                    }
+                    traits = { pushable = true }
+                },
+
+                [9] = {
+                    id = 9,
+                    kind = "text",
+                    x = 1,
+                    y = 5,
+                    symbol = { token = "AVATAR" },
+                    traits = { pushable = true }
+                },
+
+                [10] = {
+                    id = 10,
+                    kind = "text",
+                    x = 2,
+                    y = 5,
+                    symbol = { token = "IS" },
+                    traits = { pushable = true }
+                },
+
+                [11] = {
+                    id = 11,
+                    kind = "text",
+                    x = 3,
+                    y = 5,
+                    symbol = { token = "YOU" },
+                    traits = { pushable = true }
                 }
             },
 
@@ -187,7 +217,8 @@ function RW_CreateSession()
             -- Level-selected vocabulary.
             language = {
                 nouns = {
-                    CRATE = "crate"
+                    CRATE = "crate",
+                    AVATAR = "avatar"
                 },
 
                 copulas = {
@@ -195,7 +226,8 @@ function RW_CreateSession()
                 },
 
                 properties = {
-                    PUSH = "pushable"
+                    PUSH = "pushable",
+                    YOU = "you"
                 }
             }
         },

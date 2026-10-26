@@ -1,4 +1,3 @@
-
 -- bootstrap.lua
 -- RuleWorld M7: Runtime coordination
 
@@ -62,13 +61,14 @@ function OnStart()
 
     -- Module self-tests.
     local tests = {
-        { "world", "RW_SelfTest" },
-        { "reader", "RW_ReaderSelfTest" },
-        { "grammar", "RW_GrammarSelfTest" },
-        { "rules", "RW_RulesSelfTest" },
+        { "world",      "RW_SelfTest" },
+        { "reader",     "RW_ReaderSelfTest" },
+        { "grammar",    "RW_GrammarSelfTest" },
+        { "rules",      "RW_RulesSelfTest" },
         { "properties", "RW_PropertiesSelfTest" },
-        { "movement", "RW_MovementSelfTest" },
-        { "renderer", "RW_RendererSelfTest" }
+        { "movement",   "RW_MovementSelfTest" },
+        { "renderer",   "RW_RendererSelfTest" },
+        { "movement",   "RW_ControlSelfTest" },
     }
 
     for _, test in ipairs(tests) do
@@ -177,7 +177,6 @@ function OnStart()
     local function move(dx, dy)
         local action = {
             type = "move",
-            entity_id = 1,
             dx = dx,
             dy = dy
         }
@@ -203,7 +202,7 @@ function OnStart()
 
         -- Resolve the full movement plan.
         local plan = movement_api:Invoke(
-            "RW_ResolveMovement",
+            "RW_ResolveTurn",
             effective_world,
             action
         )
@@ -280,11 +279,9 @@ function OnStart()
 
         session = next_session
 
-        local e = session.world.entities[1]
-
         print(string.format(
-            "[RuleWorld] Undo -> (%d,%d), history=%d",
-            e.x, e.y, #session.history
+            "[RuleWorld] Undo -> history=%d",
+            #session.history
         ))
 
         render()
@@ -299,10 +296,10 @@ function OnStart()
 
     local key = Enum.KeyEventType
 
-    bind(key.KeyboardMoveForwardKeyDown,   0, -1)
-    bind(key.KeyboardMoveBackwardKeyDown,  0,  1)
-    bind(key.KeyboardMoveLeftKeyDown,     -1,  0)
-    bind(key.KeyboardMoveRightKeyDown,     1,  0)
+    bind(key.KeyboardMoveForwardKeyDown, 0, -1)
+    bind(key.KeyboardMoveBackwardKeyDown, 0, 1)
+    bind(key.KeyboardMoveLeftKeyDown, -1, 0)
+    bind(key.KeyboardMoveRightKeyDown, 1, 0)
 
     if key.KeyboardCraftspersonKey12Down then
         root:AddKeyEventListener(
@@ -317,5 +314,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M7 initialized")
+    print("[RuleWorld] M9.2 initialized")
 end

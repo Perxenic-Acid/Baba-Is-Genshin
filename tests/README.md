@@ -1,4 +1,4 @@
-# RuleWorld checks (M9.3F)
+# RuleWorld checks (M9.3G)
 
 Run from the repository root with Lua 5.1+ (or TeX Live's Lua):
 
@@ -24,7 +24,8 @@ directions, reject stale or competing writes, and Undo restores the complete
 pre-turn state. Coordinate-only legacy movement plans remain supported.
 
 In-game startup should report both new direction self-tests as passed and
-`pipeline atomic turn scheduler` followed by `M9.3F initialized`.
+`pipeline atomic turn scheduler`, `Atomic create/delete, ID allocation and Undo passed`,
+`pipeline created/deleted Text rules / Undo`, and `M9.3G initialized`.
 Native rendering/input still require an in-game check.
 
 The runner also loads `tests/scheduler.lua`, which checks the extracted turn
@@ -32,3 +33,11 @@ planner using real modules: movement + intrinsic direction + IS conversion in
 one Undo, failure at each planning stage, complete-plan rejection, invalid
 actions, no-YOU empty turns, and separation of subplanner-owned operation lists.
 No additional script mapping is needed for M9.3F.
+
+M9.3G adds `tests/lifecycle.lua` and the in-world `RW_LifecycleSelfTest`.
+They verify mixed create/delete/move/transform/direction plans, one-step Undo,
+replay, operation order independence, nested payload isolation, ID allocation
+and exhaustion, stale/invalid operation rejection, and created Text's ordinary
+TEXT IS PUSH behavior. Startup also checks that created/deleted CRATE IS YOU
+symbols activate/deactivate control through the real rule pipeline.
+No additional script mapping is needed for M9.3G.

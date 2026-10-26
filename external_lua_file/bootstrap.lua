@@ -135,6 +135,7 @@ function OnStart()
         { "grammar",    "RW_GrammarASTSelfTest" },
         { "rules",      "RW_ASTLoweringSelfTest" },
         { "world",      "RW_DirectionStateSelfTest" },
+        { "world",      "RW_LifecycleSelfTest" },
         { "movement",   "RW_DirectionMovementSelfTest" },
     }
 
@@ -554,6 +555,42 @@ function OnStart()
     end
     print("[RuleWorld] TEST PASSED: pipeline atomic turn scheduler")
 
+    -- Created/deleted symbols flow through the real Reader/AST/Rule pipeline.
+    local lifecycle = world_api:Invoke("RW_CreateSession")
+    local specifications = {}
+    for index, name in ipairs({"CRATE", "IS", "YOU"}) do
+        specifications[index] = {kind = "object", class = "text",
+            x = 6 + index, y = 8, direction = "None", text = {name = name}}
+    end
+    local creation = world_api:Invoke("RW_PlanCreate", lifecycle.world, specifications)
+    if not creation then
+        printerr("[RuleWorld] TEST FAILED: lifecycle creation planning")
+        return
+    end
+    local populated, created_result = world_api:Invoke("RW_Commit", lifecycle, creation)
+    if not created_result.accepted then
+        printerr("[RuleWorld] TEST FAILED: lifecycle creation commit")
+        return
+    end
+    local controlled = RW_PlanTurn(populated.world,
+        {type = "move", dx = 0, dy = 1}, turn_services)
+    if not controlled or #controlled.changes ~= 3 then
+        printerr("[RuleWorld] TEST FAILED: created Text rule evaluation")
+        return
+    end
+    local deletion = world_api:Invoke("RW_PlanDelete", populated.world, {12})
+    local removed, deleted_result = world_api:Invoke("RW_Commit", populated, deletion)
+    local uncontrolled = RW_PlanTurn(removed.world,
+        {type = "move", dx = 0, dy = 1}, turn_services)
+    local returned, restored_result = world_api:Invoke("RW_Undo", removed)
+    if not deleted_result.accepted or not uncontrolled or #uncontrolled.changes ~= 1
+        or not restored_result.accepted or not returned.world.entities[12]
+        or returned.world.next_entity_id ~= 15 then
+        printerr("[RuleWorld] TEST FAILED: deleted Text rule/Undo")
+        return
+    end
+    print("[RuleWorld] TEST PASSED: pipeline created/deleted Text rules / Undo")
+
     local previous_rule_count = nil
     local previous_deferred_count = nil
 
@@ -621,7 +658,11 @@ function OnStart()
 
         if result.changed then
             for _, change in ipairs(result.changes) do
-                if change.kind == "transform" then
+                if change.kind == "create" or change.kind == "delete" then
+                    print(string.format(
+                        "[RuleWorld] Entity %d: %s", change.entity_id, change.kind
+                    ))
+                elseif change.kind == "transform" then
                     print(string.format(
                         "[RuleWorld] Entity %d: %s -> %s",
                         change.entity_id,
@@ -712,5 +753,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3F initialized")
+    print("[RuleWorld] M9.3G initialized")
 end

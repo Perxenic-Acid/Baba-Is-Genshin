@@ -49,111 +49,260 @@ local function is_integer(n)
         and n % 1 == 0
 end
 
--- Validate every operation before modifying anything.
+-- Plans and creation specifications use dense ordered operation lists.
+local function is_list(value)
+    if type(value) ~= "table" then return false end
+    local count = 0
+    for key in pairs(value) do
+        if not is_integer(key) or key < 1 then return false end
+        count = count + 1
+    end
+    return count == #value
+end
+
+local MAX_ID = 9007199254740991
+local function valid_id(id)
+    return is_integer(id) and id > 0 and id <= MAX_ID
+end
+
+local function same_state(a, b, seen)
+    if type(a) ~= type(b) then return false end
+    if type(a) ~= "table" then return a == b end
+    seen = seen or {}
+    if seen[a] then return seen[a] == b end
+    seen[a] = b
+    for key, value in pairs(a) do
+        if not same_state(value, b[key], seen) then return false end
+    end
+    for key in pairs(b) do
+        if a[key] == nil then return false end
+    end
+    return true
+end
+
+local function valid_new_entity(world, entity, id)
+    if not is_integer(world.width) or not is_integer(world.height)
+        or world.width < 1 or world.height < 1
+        or type(entity) ~= "table" or entity.id ~= id
+        or entity.kind ~= "object"
+        or (entity.class ~= "object" and entity.class ~= "text")
+        or not valid_direction(entity.direction)
+        or not is_integer(entity.x) or not is_integer(entity.y)
+        or entity.x < 1 or entity.x > world.width
+        or entity.y < 1 or entity.y > world.height
+        or entity.traits ~= nil or entity.symbol ~= nil then
+        return false
+    end
+    if entity.class == "text" then
+        return type(entity.text) == "table"
+            and type(entity.text.name) == "string" and entity.text.name ~= ""
+            and entity.archetype == nil
+    end
+    return entity.text == nil and (entity.archetype == nil
+        or (type(entity.archetype) == "string" and entity.archetype ~= ""))
+end
+
+-- A frontier is part of the authoritative world. Never reconstruct it after
+-- deletion: IDs cannot be recycled within a timeline. Undo restores it.
+local function valid_frontier(world)
+    if not valid_id(world.next_entity_id) then return false end
+    for id, entity in pairs(world.entities) do
+        if not valid_id(id) or type(entity) ~= "table"
+            or entity.id ~= id or id >= world.next_entity_id then
+            return false
+        end
+    end
+    return true
+end
+
+-- Validate against the ORIGINAL world, independently of operation order.
+-- Existing move/direction/transform writes may coexist with one terminal delete.
 local function validate_plan(world, plan)
     if type(plan) ~= "table"
         or type(plan.consumes_turn) ~= "boolean"
-        or type(plan.changes) ~= "table" then
+        or not is_list(plan.changes) then
         return false, "invalid_plan"
     end
-
     if not plan.consumes_turn then
-        if #plan.changes ~= 0 then
+        if #plan.changes ~= 0 or plan.id_allocation ~= nil then
             return false, "invalid_no_turn_plan"
         end
         return true
     end
 
-    local seen = {}
-
+    local seen, created = {}, {}
+    local create_count = 0
     for _, change in ipairs(plan.changes) do
         if type(change) ~= "table"
-            or (change.kind ~= "move"
-                and change.kind ~= "transform"
-                and change.kind ~= "direction") then
+            or (change.kind ~= "move" and change.kind ~= "transform"
+                and change.kind ~= "direction" and change.kind ~= "create"
+                and change.kind ~= "delete") then
             return false, "invalid_operation"
         end
-
         local id = change.entity_id
+        if not valid_id(id) then return false, "invalid_entity_id" end
         local entity = world.entities[id]
+        seen[id] = seen[id] or {}
+        if seen[id][change.kind] then return false, "duplicate_operation" end
+        seen[id][change.kind] = true
 
-        if not entity then
-            return false, "unknown_entity"
-        end
-
-        -- Movement, direction and transformation share one atomic turn.
-        local key = tostring(id) .. ":" .. change.kind
-
-        if seen[key] then
-            return false, "duplicate_operation"
-        end
-
-        seen[key] = true
-        if change.kind == "direction"
-            or (change.kind == "move" and type(change.to) == "table"
-                and change.to.direction ~= nil) then
-            local direction_key = tostring(id) .. ":direction_write"
-            if seen[direction_key] then
-                return false, "duplicate_direction"
+        if change.kind == "create" then
+            if entity then return false, "entity_already_exists" end
+            if change.from ~= nil or not valid_new_entity(world, change.to, id) then
+                return false, "invalid_creation"
             end
-            seen[direction_key] = true
-        end
-
-        if change.kind == "direction" then
-            if not valid_direction(change.from)
-                or not valid_direction(change.to) then
-                return false, "invalid_direction"
-            end
-            if (entity.direction or "None") ~= change.from then
-                return false, "stale_direction"
-            end
-            if change.from == change.to then
-                return false, "redundant_direction"
-            end
-        elseif change.kind == "move" then
-            if type(change.from) ~= "table"
-                or type(change.to) ~= "table" then
-                return false, "invalid_operation"
+            created[id] = true
+            create_count = create_count + 1
+        else
+            -- New entities are fully specified by create.to; they cannot be
+            -- moved, transformed or deleted in the same original-world plan.
+            if not entity then return false, "unknown_entity" end
+            if change.kind == "direction"
+                or (change.kind == "move" and type(change.to) == "table"
+                    and change.to.direction ~= nil) then
+                if seen[id].direction_write then return false, "duplicate_direction" end
+                seen[id].direction_write = true
             end
 
-            if entity.x ~= change.from.x
-                or entity.y ~= change.from.y then
-                return false, "stale_operation"
-            end
-
-            if not is_integer(change.to.x)
-                or not is_integer(change.to.y) then
-                return false, "invalid_position"
-            end
-            if change.from.direction ~= nil or change.to.direction ~= nil then
-                if not valid_direction(change.from.direction)
-                    or not valid_direction(change.to.direction) then
+            if change.kind == "delete" then
+                if type(change.from) ~= "table" or change.to ~= nil then
+                    return false, "invalid_deletion"
+                end
+                if not same_state(entity, change.from) then
+                    return false, "stale_deletion"
+                end
+            elseif change.kind == "direction" then
+                if not valid_direction(change.from) or not valid_direction(change.to) then
                     return false, "invalid_direction"
                 end
-                if (entity.direction or "None") ~= change.from.direction then
+                if (entity.direction or "None") ~= change.from then
                     return false, "stale_direction"
                 end
-            end
-        else
-            if entity.kind ~= "object"
-                or entity.class == "text"
-                or type(change.from) ~= "string"
-                or type(change.to) ~= "string"
-                or change.to == "" then
-                return false, "invalid_transformation"
-            end
-
-            if entity.archetype ~= change.from then
-                return false, "stale_transformation"
-            end
-
-            if change.to == change.from then
-                return false, "redundant_transformation"
+                if change.from == change.to then return false, "redundant_direction" end
+            elseif change.kind == "move" then
+                if type(change.from) ~= "table" or type(change.to) ~= "table" then
+                    return false, "invalid_operation"
+                end
+                if entity.x ~= change.from.x or entity.y ~= change.from.y then
+                    return false, "stale_operation"
+                end
+                if not is_integer(change.to.x) or not is_integer(change.to.y) then
+                    return false, "invalid_position"
+                end
+                if change.from.direction ~= nil or change.to.direction ~= nil then
+                    if not valid_direction(change.from.direction)
+                        or not valid_direction(change.to.direction) then
+                        return false, "invalid_direction"
+                    end
+                    if (entity.direction or "None") ~= change.from.direction then
+                        return false, "stale_direction"
+                    end
+                end
+            else
+                if entity.kind ~= "object" or entity.class == "text"
+                    or type(change.from) ~= "string" or type(change.to) ~= "string"
+                    or change.to == "" then
+                    return false, "invalid_transformation"
+                end
+                if entity.archetype ~= change.from then return false, "stale_transformation" end
+                if change.to == change.from then return false, "redundant_transformation" end
             end
         end
     end
 
+    if create_count == 0 then
+        if plan.id_allocation ~= nil then return false, "invalid_id_allocation" end
+    else
+        if not valid_frontier(world) then return false, "invalid_id_frontier" end
+        local allocation = plan.id_allocation
+        if type(allocation) ~= "table" or allocation.from ~= world.next_entity_id then
+            return false, "stale_id_allocation"
+        end
+        local next_id = world.next_entity_id + create_count
+        if not valid_id(next_id) or allocation.to ~= next_id then
+            return false, "invalid_id_allocation"
+        end
+        for id = allocation.from, allocation.to - 1 do
+            if not created[id] then return false, "noncontiguous_entity_ids" end
+        end
+    end
     return true
+end
+
+-- Single application path for Preview and Commit; deletion is terminal even
+-- if it precedes a movement/transform in the operation list.
+local function apply_plan(world, plan)
+    local projected = clone(world)
+    for _, change in ipairs(plan.changes) do
+        local entity = projected.entities[change.entity_id]
+        if change.kind == "create" then
+            projected.entities[change.entity_id] = clone(change.to)
+        elseif change.kind == "move" then
+            entity.x, entity.y = change.to.x, change.to.y
+            entity.direction = change.to.direction or entity.direction
+        elseif change.kind == "direction" then
+            entity.direction = change.to
+        elseif change.kind == "transform" then
+            entity.archetype = change.to
+        end
+    end
+    for _, change in ipairs(plan.changes) do
+        if change.kind == "delete" then projected.entities[change.entity_id] = nil end
+    end
+    if plan.id_allocation then projected.next_entity_id = plan.id_allocation.to end
+    return projected
+end
+
+-- Plan constructors allocate only in the returned plan, never in the world.
+-- Combine an allocation batch with other operations via plan.changes.
+function RW_PlanCreate(world, specifications)
+    if type(world) ~= "table" or type(world.entities) ~= "table"
+        or not is_integer(world.width) or not is_integer(world.height)
+        or world.width < 1 or world.height < 1 or not valid_frontier(world) then
+        return nil, "invalid_creation_world"
+    end
+    if not is_list(specifications) then return nil, "invalid_creation_list" end
+    local plan = {consumes_turn = true, changes = {}}
+    if #specifications == 0 then return plan end
+    if not valid_id(world.next_entity_id + #specifications) then
+        return nil, "entity_id_exhausted"
+    end
+    for index, specification in ipairs(specifications) do
+        if type(specification) ~= "table" or specification.id ~= nil then
+            return nil, "invalid_creation_specification"
+        end
+        local entity = clone(specification)
+        entity.id = world.next_entity_id + index - 1
+        if not valid_new_entity(world, entity, entity.id) then return nil, "invalid_creation" end
+        plan.changes[#plan.changes + 1] = {
+            kind = "create", entity_id = entity.id, to = entity
+        }
+    end
+    plan.id_allocation = {from = world.next_entity_id,
+        to = world.next_entity_id + #specifications}
+    return plan
+end
+
+function RW_PlanDelete(world, ids)
+    if type(world) ~= "table" or type(world.entities) ~= "table" then
+        return nil, "invalid_world"
+    end
+    if not is_list(ids) then return nil, "invalid_deletion_list" end
+    local ordered, seen = {}, {}
+    for _, id in ipairs(ids) do
+        if not valid_id(id) or not world.entities[id] then return nil, "unknown_entity" end
+        if seen[id] then return nil, "duplicate_operation" end
+        seen[id] = true
+        ordered[#ordered + 1] = id
+    end
+    table.sort(ordered)
+    local plan = {consumes_turn = true, changes = {}}
+    for _, id in ipairs(ordered) do
+        plan.changes[#plan.changes + 1] = {
+            kind = "delete", entity_id = id, from = clone(world.entities[id])
+        }
+    end
+    return plan
 end
 
 -- Six intrinsic values, stale-plan rejection and atomic Undo.
@@ -231,6 +380,7 @@ function RW_CreateSession()
         world = {
             width = 12,
             height = 12,
+            next_entity_id = 12,
 
             -- Every entity is an Object. Text is an Object
             -- subclass distinguished by class="text".
@@ -337,23 +487,7 @@ function RW_PreviewPlan(world, plan)
         return nil, plan.reason or "no_turn"
     end
 
-    local projected = clone(world)
-
-    for _, change in ipairs(plan.changes) do
-        local entity = projected.entities[change.entity_id]
-
-        if change.kind == "move" then
-            entity.x = change.to.x
-            entity.y = change.to.y
-            entity.direction = change.to.direction or entity.direction
-        elseif change.kind == "direction" then
-            entity.direction = change.to
-        elseif change.kind == "transform" then
-            entity.archetype = change.to
-        end
-    end
-
-    return projected
+    return apply_plan(world, plan)
 end
 
 -- Commit a prepared plan atomically.
@@ -375,24 +509,7 @@ function RW_Commit(session, plan)
 
     local next_world = session.world
 
-    if changed then
-        next_world = clone(session.world)
-
-        for _, change in ipairs(plan.changes) do
-            local entity =
-                next_world.entities[change.entity_id]
-
-            if change.kind == "move" then
-                entity.x = change.to.x
-                entity.y = change.to.y
-                entity.direction = change.to.direction or entity.direction
-            elseif change.kind == "direction" then
-                entity.direction = change.to
-            elseif change.kind == "transform" then
-                entity.archetype = change.to
-            end
-        end
-    end
+    if changed then next_world = apply_plan(session.world, plan) end
 
     local history = {}
 
@@ -442,9 +559,108 @@ function RW_Undo(session)
     }
 end
 
+-- M9.3G: lifecycle operations share the existing atomic state boundary.
+function RW_LifecycleSelfTest()
+    local s = RW_CreateSession()
+    local specifications = {
+        {kind = "object", class = "object", archetype = "crate",
+            x = 2, y = 2, direction = "Mid"},
+        {kind = "object", class = "text", x = 2, y = 2,
+            direction = "None", text = {name = "AVATAR"}}
+    }
+    local plan = RW_PlanCreate(s.world, specifications)
+    local deletion = RW_PlanDelete(s.world, {6, 4})
+    if not plan or not deletion or #plan.changes ~= 2
+        or plan.changes[1].entity_id ~= 12 or plan.changes[2].entity_id ~= 13
+        or deletion.changes[1].entity_id ~= 4 or s.world.next_entity_id ~= 12 then
+        return false, "Lifecycle planning/ID order failed"
+    end
+    -- Creation owns a copy of nested Text state.
+    specifications[2].text.name = "CHANGED"
+    if plan.changes[2].to.text.name ~= "AVATAR" then
+        return false, "Creation specification alias leaked"
+    end
+    for _, change in ipairs(deletion.changes) do plan.changes[#plan.changes + 1] = change end
+    local additions = {
+        {kind = "move", entity_id = 1,
+            from = {x = 2, y = 2, direction = "None"},
+            to = {x = 2, y = 3, direction = "Down"}},
+        {kind = "transform", entity_id = 1, from = "avatar", to = "crate"},
+        -- Deletion precedes these writes in the list but is terminal.
+        {kind = "move", entity_id = 4, from = {x = 3, y = 2}, to = {x = 3, y = 3}},
+        {kind = "transform", entity_id = 4, from = "crate", to = "avatar"}
+    }
+    for _, change in ipairs(additions) do plan.changes[#plan.changes + 1] = change end
+    local preview = RW_PreviewPlan(s.world, plan)
+    local committed, result = RW_Commit(s, plan)
+    if not preview or not result.accepted or not result.changed
+        or not same_state(preview, committed.world) or #committed.history ~= 1
+        or committed.world.next_entity_id ~= 14
+        or committed.world.entities[4] or committed.world.entities[6]
+        or committed.world.entities[1].archetype ~= "crate"
+        or committed.world.entities[1].direction ~= "Down"
+        or committed.world.entities[12].direction ~= "Mid"
+        or committed.world.entities[13].text.name ~= "AVATAR"
+        or s.world.entities[1].y ~= 2 or not s.world.entities[6] then
+        return false, "Mixed lifecycle Preview/Commit failed"
+    end
+    local restored = RW_Undo(committed)
+    if restored.world ~= s.world or #restored.history ~= 0
+        or restored.world.next_entity_id ~= 12 or restored.world.entities[12] then
+        return false, "Lifecycle Undo failed"
+    end
+    local replayed, replay_result = RW_Commit(restored, plan)
+    if not replay_result.accepted or not same_state(replayed.world, committed.world) then
+        return false, "Lifecycle deterministic replay failed"
+    end
+    local reversed = clone(plan)
+    for index = 1, math.floor(#reversed.changes / 2) do
+        local other = #reversed.changes - index + 1
+        reversed.changes[index], reversed.changes[other] =
+            reversed.changes[other], reversed.changes[index]
+    end
+    if not same_state(RW_PreviewPlan(s.world, reversed), preview) then
+        return false, "Lifecycle operation order changed result"
+    end
+    local remove_new = RW_PlanDelete(committed.world, {12, 13})
+    local removed = RW_Commit(committed, remove_new)
+    local fresh = RW_PlanCreate(removed.world, {specifications[1]})
+    if removed.world.next_entity_id ~= 14 or fresh.changes[1].entity_id ~= 14 then
+        return false, "Deleted ID was recycled"
+    end
+    local stale_session, stale_result = RW_Commit(removed, plan)
+    if stale_result.accepted or stale_session ~= removed then
+        return false, "Old allocation was reused"
+    end
+    -- A stale nested delete must reject movement, creation and ID advance too.
+    local bad = clone(plan)
+    bad.changes[4].from.text.name = "IS"
+    local unchanged, rejection = RW_Commit(s, bad)
+    if rejection.accepted or unchanged ~= s or s.world.next_entity_id ~= 12
+        or RW_PreviewPlan(s.world, bad) ~= nil then
+        return false, "Stale deletion partially committed"
+    end
+    local duplicate = clone(plan)
+    duplicate.changes[#duplicate.changes + 1] = clone(duplicate.changes[1])
+    local unchanged2, rejected2 = RW_Commit(s, duplicate)
+    if rejected2.accepted or unchanged2 ~= s then
+        return false, "Duplicate creation accepted"
+    end
+    -- Neither committed nor preview state aliases create.to payloads.
+    plan.changes[2].to.text.name = "MUTATED"
+    if committed.world.entities[13].text.name ~= "AVATAR"
+        or preview.entities[13].text.name ~= "AVATAR" then
+        return false, "Lifecycle payload alias leaked"
+    end
+    return true, "Atomic create/delete, ID allocation and Undo passed"
+end
+
 -- Internal invariant tests.
 function RW_SelfTest()
     local s0 = RW_CreateSession()
+    if not valid_frontier(s0.world) then
+        return false, "Invalid authored entity ID frontier"
+    end
 
     for _, entity in pairs(s0.world.entities) do
         if entity.kind ~= "object"

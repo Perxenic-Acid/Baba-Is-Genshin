@@ -221,6 +221,12 @@ function RW_CreateSession()
                     AVATAR = "avatar"
                 },
 
+                -- New typed AST vocabulary. The legacy copula
+                -- remains until its compiler is retired.
+                verbs = {
+                    IS = "is"
+                },
+
                 copulas = {
                     IS = "grant_trait"
                 },

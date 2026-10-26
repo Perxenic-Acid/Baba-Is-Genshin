@@ -70,6 +70,7 @@ function OnStart()
         { "renderer",   "RW_RendererSelfTest" },
         { "movement",   "RW_ControlSelfTest" },
         { "grammar",    "RW_GrammarASTSelfTest" },
+        { "rules",      "RW_ASTLoweringSelfTest" },
     }
 
     for _, test in ipairs(tests) do
@@ -92,6 +93,103 @@ function OnStart()
             name, message
         )
     end
+
+    -- M9.3B migration gate: compare old and typed-AST pipelines
+    -- on the real fixture, both intact and with a broken word rule.
+    local function verify_ast_parity(test_world)
+        local lines, read_err =
+            reader_api:Invoke("RW_ReadLines", test_world)
+        if not lines then return false, read_err end
+
+        local legacy, old_err = grammar_api:Invoke(
+            "RW_CompileRules", lines, test_world.language
+        )
+        if not legacy then return false, old_err end
+
+        local ast, parse_err = grammar_api:Invoke(
+            "RW_ParseRuleAST", lines, test_world.language
+        )
+        if not ast then return false, parse_err end
+
+        local generated, deferred = rules_api:Invoke(
+            "RW_LowerRuleAST", ast
+        )
+        if not generated then return false, deferred end
+
+        if #deferred ~= 0 or #generated ~= #legacy then
+            return false, "rule count/deferred mismatch"
+        end
+
+        local old_effects, old_eval_err = rules_api:Invoke(
+            "RW_EvaluateRules", test_world, legacy
+        )
+        if not old_effects then return false, old_eval_err end
+
+        local new_effects, new_eval_err = rules_api:Invoke(
+            "RW_EvaluateRules", test_world, generated
+        )
+        if not new_effects then return false, new_eval_err end
+
+        local function signatures(effects)
+            local result = {}
+            for _, effect in ipairs(effects) do
+                local target = effect.target or {}
+                result[#result + 1] = table.concat({
+                    tostring(effect.op),
+                    tostring(target.kind),
+                    tostring(target.value),
+                    tostring(effect.trait)
+                }, ":")
+            end
+            table.sort(result)
+            return result
+        end
+
+        local left = signatures(old_effects)
+        local right = signatures(new_effects)
+
+        if #left ~= #right then
+            return false, "active effect count mismatch"
+        end
+        for i = 1, #left do
+            if left[i] ~= right[i] then
+                return false, "active effect mismatch"
+            end
+        end
+
+        return true
+    end
+
+    local parity_session =
+        world_api:Invoke("RW_CreateSession")
+
+    if not parity_session then
+        printerr("[RuleWorld] AST parity: no test world")
+        return
+    end
+
+    local parity_ok, parity_err =
+        verify_ast_parity(parity_session.world)
+
+    if not parity_ok then
+        printerr("[RuleWorld] AST parity failed:", parity_err)
+        return
+    end
+
+    -- Break CRATE IS PUSH without changing the live session.
+    local test_word = parity_session.world.entities[8]
+    test_word.x = parity_session.world.width
+    test_word.y = parity_session.world.height
+
+    parity_ok, parity_err =
+        verify_ast_parity(parity_session.world)
+
+    if not parity_ok then
+        printerr("[RuleWorld] AST broken-rule parity failed:", parity_err)
+        return
+    end
+
+    print("[RuleWorld] TEST PASSED: pipeline AST/legacy parity")
 
     local session =
         world_api:Invoke("RW_CreateSession")
@@ -118,17 +216,28 @@ function OnStart()
             return nil
         end
 
-        local generated, grammar_error =
+        local ast, grammar_error =
             grammar_api:Invoke(
-                "RW_CompileRules",
+                "RW_ParseRuleAST",
                 lines,
                 session.world.language
             )
 
+        if not ast then
+            printerr(
+                "[RuleWorld] AST grammar failed:",
+                grammar_error
+            )
+            return nil
+        end
+
+        local generated, deferred =
+            rules_api:Invoke("RW_LowerRuleAST", ast)
+
         if not generated then
             printerr(
-                "[RuleWorld] Grammar failed:",
-                grammar_error
+                "[RuleWorld] AST lowering failed:",
+                deferred
             )
             return nil
         end
@@ -148,23 +257,27 @@ function OnStart()
             return nil
         end
 
-        return effects, #generated
+        return effects, #ast, #deferred
     end
 
     local previous_rule_count = nil
+    local previous_deferred_count = nil
 
     local function render()
-        local effects, rule_count = evaluate()
+        local effects, rule_count, deferred_count = evaluate()
         if not effects then return end
 
-        if previous_rule_count ~= rule_count then
+        if previous_rule_count ~= rule_count
+            or previous_deferred_count ~= deferred_count then
             print(string.format(
-                "[RuleWorld] Spatial rules: %d, effects: %d",
+                "[RuleWorld] Spatial rules: %d, effects: %d, deferred: %d",
                 rule_count,
-                #effects
+                #effects,
+                deferred_count
             ))
 
             previous_rule_count = rule_count
+            previous_deferred_count = deferred_count
         end
 
         renderer_api:Invoke(
@@ -315,5 +428,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.2 initialized")
+    print("[RuleWorld] M9.3B initialized")
 end

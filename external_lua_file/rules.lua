@@ -204,6 +204,143 @@ function RW_EvaluateRules(world, generated_rules)
     return active
 end
 
+-- M9.3B: typed Rule AST -> executable property-rule IR.
+-- Only positive "NOUN IS PROPERTY" is executable for now.
+-- Other valid AST relationships are returned as deferred;
+-- they are NEVER silently reinterpreted as property grants.
+function RW_LowerRuleAST(ast_rules)
+    if type(ast_rules) ~= "table" then
+        return nil, "invalid_ast_rules"
+    end
+
+    local generated = {}
+    local deferred = {}
+
+    for i, ast in ipairs(ast_rules) do
+        if type(ast) ~= "table"
+            or type(ast.verb) ~= "string"
+            or type(ast.subject) ~= "table"
+            or type(ast.object) ~= "table"
+            or type(ast.when) ~= "table" then
+            return nil, "invalid_ast_rule_" .. tostring(i)
+        end
+
+        local subject = ast.subject
+        local object = ast.object
+        local subject_type = subject.type
+
+        local supported =
+            ast.verb == "is"
+            and subject.tag == "noun"
+            and type(subject_type) == "table"
+            and subject_type.tag == "object"
+            and type(subject_type.name) == "string"
+            and subject_type.name ~= ""
+            and object.tag == "property"
+            and type(object.name) == "string"
+            and object.name ~= ""
+
+        if supported then
+            generated[#generated + 1] = {
+                when = ast.when,
+                effects = {{
+                    op = "grant_trait",
+                    target = {
+                        kind = "archetype",
+                        value = subject_type.name
+                    },
+                    trait = object.name
+                }},
+                source = ast.source
+            }
+        else
+            -- Keep the whole AST intact for future semantic stages.
+            deferred[#deferred + 1] = ast
+        end
+    end
+
+    return generated, deferred
+end
+
+function RW_ASTLoweringSelfTest()
+    local function noun(name)
+        return {
+            tag = "noun",
+            type = { tag = "object", name = name }
+        }
+    end
+
+    local function rule(verb, subject, object)
+        return {
+            subject = subject,
+            verb = verb,
+            object = object,
+            when = { op = "always" },
+            source = { axis = "horizontal", line = 1 }
+        }
+    end
+
+    local property = rule(
+        "is", noun("crate"),
+        { tag = "property", name = "pushable" }
+    )
+    local transformation = rule("is", noun("crate"), noun("rock"))
+    local has = rule("has", noun("crate"), noun("rock"))
+    local negation = rule(
+        "is", noun("crate"),
+        { tag = "not", operand = { tag = "property", name = "pushable" } }
+    )
+    local special = rule(
+        "is", { tag = "special", name = "all" },
+        { tag = "property", name = "you" }
+    )
+
+    local executable, deferred = RW_LowerRuleAST({
+        property, transformation, has, negation, special
+    })
+
+    if not executable or not deferred
+        or #executable ~= 1 or #deferred ~= 4 then
+        return false, "Executable/deferred partition failed"
+    end
+
+    local effect = executable[1].effects[1]
+
+    if effect.op ~= "grant_trait"
+        or effect.target.kind ~= "archetype"
+        or effect.target.value ~= "crate"
+        or effect.trait ~= "pushable"
+        or executable[1].source ~= property.source then
+        return false, "Property lowering failed"
+    end
+
+    -- Unsupported syntax is preserved, not executed.
+    if deferred[1] ~= transformation
+        or deferred[2] ~= has
+        or deferred[3] ~= negation
+        or deferred[4] ~= special then
+        return false, "Deferred AST provenance lost"
+    end
+
+    -- Source AST is not mutated.
+    if property.effects ~= nil
+        or property.subject.type.name ~= "crate" then
+        return false, "AST mutated by lowering"
+    end
+
+    local invalid, err = RW_LowerRuleAST({{
+        subject = noun("crate"),
+        verb = "is",
+        object = { tag = "property", name = "you" }
+    }})
+
+    if invalid ~= nil or err ~= "invalid_ast_rule_1" then
+        return false, "Malformed AST accepted"
+    end
+
+    return true, "AST property lowering passed"
+end
+
 function RW_RulesSelfTest()
     local player = { kind = "id", value = 1 }
     local plate = { kind = "id", value = 6 }

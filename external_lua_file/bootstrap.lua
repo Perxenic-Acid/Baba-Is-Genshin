@@ -209,13 +209,68 @@ function OnStart()
         "RW_ProjectWorld", base_world.world, base_effects
     )
 
-    if not effective
-        or #base_effects ~= 3
-        or base_world.world.entities[6].traits ~= nil
-        or not effective.entities[6].traits.pushable
-        or not effective.entities[11].traits.pushable
-        or effective.entities[1].traits ~= nil then
+    local function has_trait(world_state, id, trait)
+        local entity = world_state.entities[id]
+
+        return entity ~= nil
+            and entity.traits ~= nil
+            and entity.traits[trait] == true
+    end
+
+    local base_valid =
+        effective ~= nil
+        and #base_effects == 3
+        -- No rule-derived traits may leak into authored state.
+        and base_world.world.entities[6].traits == nil
+        and base_world.world.entities[1].traits == nil
+        -- Each Text receives PUSH from the class-based base rule.
+        and has_trait(effective, 6, "pushable")
+        and has_trait(effective, 7, "pushable")
+        and has_trait(effective, 8, "pushable")
+        and has_trait(effective, 9, "pushable")
+        and has_trait(effective, 10, "pushable")
+        and has_trait(effective, 11, "pushable")
+        -- CRATE IS PUSH and AVATAR IS YOU still work normally.
+        and has_trait(effective, 4, "pushable")
+        and has_trait(effective, 5, "pushable")
+        and has_trait(effective, 1, "you")
+        -- Being YOU does not imply being PUSH.
+        and not has_trait(effective, 1, "pushable")
+
+    if not base_valid then
         printerr("[RuleWorld] TEST FAILED: TEXT IS PUSH base rule")
+        return
+    end
+
+    -- Breaking CRATE IS PUSH must retract PUSH from crates
+    -- without affecting the rule-derived PUSH of any Text.
+    base_world.world.entities[8].x = 12
+    base_world.world.entities[8].y = 12
+
+    local broken_lines = reader_api:Invoke(
+        "RW_ReadLines", base_world.world
+    )
+    local broken_ast = grammar_api:Invoke(
+        "RW_ParseRuleAST", broken_lines, base_world.world.language
+    )
+    local broken_generated = rules_api:Invoke(
+        "RW_LowerRuleAST", broken_ast
+    )
+    local broken_effects = rules_api:Invoke(
+        "RW_EvaluateRules", base_world.world, broken_generated
+    )
+    local broken_effective = properties_api:Invoke(
+        "RW_ProjectWorld", base_world.world, broken_effects
+    )
+
+    if not broken_effective
+        or #broken_effects ~= 2
+        or has_trait(broken_effective, 4, "pushable")
+        or has_trait(broken_effective, 5, "pushable")
+        or not has_trait(broken_effective, 6, "pushable")
+        or not has_trait(broken_effective, 8, "pushable")
+        or not has_trait(broken_effective, 1, "you") then
+        printerr("[RuleWorld] TEST FAILED: TEXT PUSH retraction isolation")
         return
     end
 

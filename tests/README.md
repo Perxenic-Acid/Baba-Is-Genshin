@@ -1,4 +1,4 @@
-# M9.3E checks
+# RuleWorld checks (M9.3F)
 
 Run from the repository root with Lua 5.1+ (or TeX Live's Lua):
 
@@ -24,4 +24,11 @@ directions, reject stale or competing writes, and Undo restores the complete
 pre-turn state. Coordinate-only legacy movement plans remain supported.
 
 In-game startup should report both new direction self-tests as passed and
-`M9.3E initialized`. Native rendering/input still require an in-game check.
+`pipeline atomic turn scheduler` followed by `M9.3F initialized`.
+Native rendering/input still require an in-game check.
+
+The runner also loads `tests/scheduler.lua`, which checks the extracted turn
+planner using real modules: movement + intrinsic direction + IS conversion in
+one Undo, failure at each planning stage, complete-plan rejection, invalid
+actions, no-YOU empty turns, and separation of subplanner-owned operation lists.
+No additional script mapping is needed for M9.3F.

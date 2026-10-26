@@ -1,6 +1,69 @@
 -- bootstrap.lua
 -- RuleWorld M7: Runtime coordination
 
+-- M9.3F: host-independent turn planning. Services adapt mapped scripts;
+-- no UI calls, logging, session ownership or Commit occur in this function.
+-- Services must treat world/context inputs as read-only.
+function RW_PlanTurn(world, action, services)
+    local trace = {}
+    local function fail(stage, reason)
+        return nil, {stage = stage, reason = reason or "stage_failed", trace = trace}
+    end
+    if type(world) ~= "table" or type(world.entities) ~= "table" then
+        return fail("input", "invalid_world")
+    end
+    if type(services) ~= "table" then
+        return fail("input", "invalid_services")
+    end
+    for _, name in ipairs({"evaluate", "project", "resolve", "preview", "convert"}) do
+        if type(services[name]) ~= "function" then
+            return fail("input", "missing_service_" .. name)
+        end
+    end
+
+    trace[#trace + 1] = "rules_before"
+    local effects, rule_error = services.evaluate(world)
+    if not effects then return fail("rules_before", rule_error) end
+
+    trace[#trace + 1] = "project"
+    local effective, projection_error = services.project(world, effects)
+    if not effective then return fail("project", projection_error) end
+
+    trace[#trace + 1] = "movement"
+    local movement, movement_error = services.resolve(effective, action)
+    if not movement then return fail("movement", movement_error) end
+    if not movement.consumes_turn then
+        return movement, nil, trace
+    end
+
+    trace[#trace + 1] = "preview_movement"
+    local preview, preview_error = services.preview(world, movement)
+    if not preview then return fail("preview_movement", preview_error) end
+
+    trace[#trace + 1] = "rules_after"
+    local post_effects, post_error, conversions = services.evaluate(preview)
+    if not post_effects then return fail("rules_after", post_error) end
+
+    trace[#trace + 1] = "conversions"
+    local operations, conversion_error = services.convert(preview, conversions)
+    if not operations then return fail("conversions", conversion_error) end
+
+    -- Own the combined list: never append into another planner's result.
+    local plan = {consumes_turn = true, reason = movement.reason, changes = {}}
+    for _, change in ipairs(movement.changes) do
+        plan.changes[#plan.changes + 1] = change
+    end
+    for _, change in ipairs(operations) do
+        plan.changes[#plan.changes + 1] = change
+    end
+
+    -- Validate the WHOLE plan before returning it to the host for one Commit.
+    trace[#trace + 1] = "preview_complete"
+    local complete, complete_error = services.preview(world, plan)
+    if not complete then return fail("preview_complete", complete_error) end
+    return plan, nil, trace
+end
+
 function OnStart()
     local root = script.object
 
@@ -458,6 +521,39 @@ function OnStart()
         return effects, #ast, #deferred, conversions
     end
 
+    -- Mapped script calls stay in the host adapter, outside the scheduler.
+    local turn_services = {
+        evaluate = function(world_state)
+            local effects, rule_count, deferred_count, conversions = evaluate(world_state)
+            if not effects then return nil, "evaluation_failed" end
+            return effects, nil, conversions
+        end,
+        project = function(world_state, effects)
+            return properties_api:Invoke("RW_ProjectWorld", world_state, effects)
+        end,
+        resolve = function(world_state, action)
+            return movement_api:Invoke("RW_ResolveTurn", world_state, action)
+        end,
+        preview = function(world_state, plan)
+            return world_api:Invoke("RW_PreviewPlan", world_state, plan)
+        end,
+        convert = function(world_state, conversions)
+            return rules_api:Invoke("RW_PlanConversions", world_state, conversions)
+        end
+    }
+
+    -- Exercise the same scheduler the input adapter will use, without a Commit.
+    local probe, probe_error = RW_PlanTurn(session.world,
+        {type = "move", dx = 1, dy = 0}, turn_services)
+    if not probe or not probe.consumes_turn or #probe.changes ~= 3
+        or session.world.entities[1].x ~= 2
+        or session.world.entities[1].direction ~= "None" then
+        printerr("[RuleWorld] TEST FAILED: turn scheduler",
+            probe_error and probe_error.reason or "unexpected_plan")
+        return
+    end
+    print("[RuleWorld] TEST PASSED: pipeline atomic turn scheduler")
+
     local previous_rule_count = nil
     local previous_deferred_count = nil
 
@@ -493,81 +589,11 @@ function OnStart()
             dy = dy
         }
 
-        -- Evaluate rules against the OLD world.
-        local effects = evaluate()
-        if not effects then return end
-
-        local effective_world, projection_error =
-            properties_api:Invoke(
-                "RW_ProjectWorld",
-                session.world,
-                effects
-            )
-
-        if not effective_world then
-            printerr(
-                "[RuleWorld] Projection failed:",
-                projection_error
-            )
-            return
-        end
-
-        -- Resolve the full movement plan.
-        local plan = movement_api:Invoke(
-            "RW_ResolveTurn",
-            effective_world,
-            action
-        )
-
+        local plan, planning_error = RW_PlanTurn(session.world, action, turn_services)
         if not plan then
-            printerr("[RuleWorld] Movement failed")
+            printerr("[RuleWorld] Turn planning failed:",
+                planning_error.stage, planning_error.reason)
             return
-        end
-
-        if plan.consumes_turn then
-            -- Work on the post-movement state, but DO NOT
-            -- commit yet. A newly assembled conversion
-            -- applies in this same turn.
-            local preview, preview_error =
-                world_api:Invoke(
-                    "RW_PreviewPlan",
-                    session.world,
-                    plan
-                )
-
-            if not preview then
-                printerr(
-                    "[RuleWorld] Movement preview failed:",
-                    preview_error
-                )
-                return
-            end
-
-            local post_effects, _, _, conversions =
-                evaluate(preview)
-
-            if not post_effects then
-                return
-            end
-
-            local conversion_changes, conversion_error =
-                rules_api:Invoke(
-                    "RW_PlanConversions",
-                    preview,
-                    conversions
-                )
-
-            if not conversion_changes then
-                printerr(
-                    "[RuleWorld] Conversion planning failed:",
-                    conversion_error
-                )
-                return
-            end
-
-            for _, change in ipairs(conversion_changes) do
-                plan.changes[#plan.changes + 1] = change
-            end
         end
 
         -- Movement and transformation: one atomic commit.
@@ -686,5 +712,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3E initialized")
+    print("[RuleWorld] M9.3F initialized")
 end

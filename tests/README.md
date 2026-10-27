@@ -27,7 +27,7 @@ In-game startup should report both new direction self-tests as passed and
 `pipeline atomic turn scheduler`, `Atomic create/delete, ID allocation and Undo passed`,
 `pipeline created/deleted Text rules / Undo`,
 `pipeline alternate grammar/semantics behavior / Undo`,
-`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3K initialized`.
+`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3L initialized`.
 Native rendering/input still require an in-game check.
 
 The runner also loads `tests/scheduler.lua`, which checks the extracted turn
@@ -68,3 +68,12 @@ M9.3K adds RW_LevelTreeSelfTest and tests/level_tree.lua. The runner also exerci
 A/B/OUT through real host input callbacks: push, return, persistent re-entry,
 independent siblings, and local/empty Undo. Native manual steps are documented in
 ../docs/NESTED_LEVELS.md. No additional mapping or keys are required.
+
+M9.3L supersedes K's automatic portals and local-only Undo. tests/level_transactions.lua
+covers SELECT authority independent of YOU, rule retraction, explicit confirmation,
+parent/win/level-transform exits, whole-tree Undo/replay and rejection boundaries.
+The bootstrap adds a real mapped-pipeline startup probe for all three exits.
+Host tests invoke RW_ConfirmSelectedLevel directly and assert no substitute key is
+bound, as requested by the user. Physical Enter support remains unresolved;
+do not present old WASD-only/F-key navigation steps as current manual instructions.
+See ../docs/NESTED_LEVELS.md for the updated scope and reference sources.

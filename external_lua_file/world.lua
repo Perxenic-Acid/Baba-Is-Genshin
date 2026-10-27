@@ -93,6 +93,14 @@ local function valid_new_entity(world, entity, id)
         or entity.traits ~= nil or entity.behaviors ~= nil or entity.symbol ~= nil then
         return false
     end
+    if entity.level_link ~= nil then
+        local link = entity.level_link
+        if entity.class ~= "object" or type(link) ~= "table"
+            or type(link.source_type) ~= "string" or link.source_type == ""
+            or (link.target ~= "child" and link.target ~= "parent")
+            or (link.target == "child" and (type(link.definition_id) ~= "string"
+                or link.definition_id == "")) then return false end
+    end
     if entity.class == "text" then
         return type(entity.text) == "table"
             and type(entity.text.name) == "string" and entity.text.name ~= ""
@@ -935,7 +943,8 @@ function RW_CreateLevelTree(definitions, root_definition_id)
     if not definition then return nil, "unknown_definition" end
     local root = RW_InstantiateLevel(definition, "instance:1")
     return {definitions=clone(definitions), instances={[root.instance_id]=root},
-        children={}, active_id=root.instance_id, stack={}, next_instance_id=2}
+        children={}, active_id=root.instance_id, stack={}, entry_links={}, outcomes={},
+        history={}, next_instance_id=2}
 end
 
 function RW_GetActiveLevel(tree)
@@ -974,7 +983,7 @@ function RW_EnterLevel(tree, slot, definition_id)
     if existing then
         result.active_id = existing
     else
-        local id = "instance:" .. tostring(tree.next_instance_id)
+        local id = "instance:" .. string.format("%.0f",tree.next_instance_id)
         result.instances = copy_map(tree.instances)
         result.instances[id] = RW_InstantiateLevel(tree.definitions[definition_id], id)
         result.children = copy_map(tree.children)
@@ -1024,4 +1033,146 @@ function RW_LevelTreeSelfTest()
         return false, "Local child Undo mutated retained snapshot"
     end
     return true, "Nested enter/return, retained instances and local Undo passed"
+end
+
+function RW_BindLevelEntry(tree, entity_id)
+    if #tree.stack == 0 then return nil, "at_root" end
+    local result = copy_map(tree)
+    result.entry_links = copy_map(tree.entry_links)
+    result.entry_links[tree.active_id] = {parent_id=tree.stack[#tree.stack], entity_id=entity_id}
+    return result
+end
+
+function RW_RecordLevelOutcome(tree, kind, target_type)
+    if kind ~= "win" and kind ~= "transform" then return nil, "invalid_level_outcome" end
+    if kind == "transform" and (type(target_type) ~= "string" or target_type == "") then
+        return nil, "invalid_level_transform"
+    end
+    local result = copy_map(tree)
+    result.outcomes = copy_map(tree.outcomes)
+    result.outcomes[tree.active_id] = {kind=kind,target_type=target_type}
+    if kind == "transform" then
+        local entry = tree.entry_links[tree.active_id]
+        if not entry then return nil, "no_parent_level_block" end
+        local parent = tree.instances[entry.parent_id]
+        local block = parent.world.entities[entry.entity_id]
+        if not block then return nil, "missing_parent_level_block" end
+        local changed, accepted = RW_Commit(parent, {consumes_turn=true, changes={
+            {kind="transform",entity_id=block.id,from=block.archetype,to=target_type}}})
+        if not accepted.accepted then return nil, accepted.reason end
+        result.instances = copy_map(tree.instances)
+        result.instances[entry.parent_id] = changed
+    end
+    if #tree.stack > 0 then return RW_ReturnLevel(result) end
+    return result
+end
+
+local function valid_tree_candidate(tree)
+    if type(tree) ~= "table" or type(tree.instances) ~= "table"
+        or type(tree.definitions) ~= "table" or type(tree.children) ~= "table"
+        or type(tree.entry_links) ~= "table" or type(tree.outcomes) ~= "table"
+        or not is_list(tree.stack) or not valid_id(tree.next_instance_id)
+        or not tree.instances[tree.active_id] then return false end
+    for id, session in pairs(tree.instances) do
+        local sequence = type(id) == "string" and tonumber(id:match("^instance:(%d+)$"))
+        if not sequence or not valid_id(sequence) or sequence >= tree.next_instance_id
+            or type(session) ~= "table" or session.instance_id ~= id
+            or not tree.definitions[session.definition_id] or not is_list(session.history)
+            or not validate_definition({id=session.definition_id,initial_world=session.world}) then return false end
+    end
+    local seen = {[tree.active_id]=true}
+    for _, id in ipairs(tree.stack) do
+        if not tree.instances[id] or seen[id] then return false end
+        seen[id] = true
+    end
+    for parent, slots in pairs(tree.children) do
+        if not tree.instances[parent] or type(slots) ~= "table" then return false end
+        for slot, id in pairs(slots) do
+            if type(slot) ~= "string" or slot == "" or not tree.instances[id] or id == parent then return false end
+        end
+    end
+    return true
+end
+
+-- The planner produces a complete candidate. Commit owns the only history write.
+function RW_CommitLevelTree(tree, plan)
+    if type(plan) ~= "table" or plan.before ~= tree or type(plan.after) ~= "table"
+        or not valid_tree_candidate(plan.after) or plan.after.history ~= tree.history then
+        return tree, rejected("invalid_or_stale_tree_plan")
+    end
+    local result = copy_map(plan.after)
+    local snapshot = copy_map(tree)
+    snapshot.history = nil -- Avoid nested history chains; frames share immutable state.
+    result.history = copy_map(tree.history)
+    if #result.history >= HISTORY_LIMIT then table.remove(result.history,1) end
+    result.history[#result.history+1] = snapshot
+    return result, {accepted=true,changed=true,reason=plan.reason,changes=plan.changes or {}}
+end
+
+function RW_UndoLevelTree(tree)
+    if #tree.history == 0 then return tree, rejected("empty_history") end
+    local result = copy_map(tree.history[#tree.history])
+    result.history = copy_map(tree.history)
+    result.history[#result.history] = nil
+    return result, {accepted=true,changed=true,reason="undo",changes={}}
+end
+
+-- Native-playtest definitions: actual level blocks, an independent SELECT cursor,
+-- a YOU actor, a win contact, and an assemblable scoped LEVEL conversion.
+function RW_GetNavigationDefinitions()
+    local function object(world,id,archetype,x,y,link)
+        world.entities[id] = {id=id,kind="object",class="object",direction="None",
+            archetype=archetype,x=x,y=y,level_link=link}
+        world.next_entity_id = math.max(world.next_entity_id,id+1)
+    end
+    local function grant(world,archetype,trait)
+        world.rule_sources[#world.rule_sources+1] = {when={op="always"},effects={
+            {op="grant_trait",target={kind="archetype",value=archetype},trait=trait}}}
+    end
+    local function portal(world,id,x,y,name,definition_id)
+        object(world,id,"level_block",x,y,{source_type="level_block",target=definition_id and "child" or "parent",
+            definition_id=definition_id,label=name})
+    end
+    local function configure(world)
+        grant(world,"cursor","select")
+        grant(world,"path","path")
+        grant(world,"flag","win")
+        world.language.nouns.CURSOR = "cursor"
+        world.language.nouns.FLAG = "flag"
+        world.language.nouns.LEVEL = {tag="level"}
+        world.language.properties.SELECT = "select"
+        world.language.properties.WIN = "win"
+    end
+    local root = default_world()
+    configure(root)
+    root.entities[1].x = 6
+    object(root,12,"cursor",2,2)
+    portal(root,13,2,1,"A","navigation.puzzle")
+    portal(root,14,1,2,"B","navigation.puzzle")
+    portal(root,15,3,1,"T","navigation.transform")
+    local id = 16
+    for y=1,3 do for x=1,7 do
+        object(root,id,"path",x,y)
+        id = id+1
+    end end
+    local puzzle = default_world()
+    configure(puzzle)
+    object(puzzle,12,"cursor",1,1)
+    portal(puzzle,13,2,1,"PARENT")
+    object(puzzle,14,"path",1,1)
+    object(puzzle,15,"flag",2,3)
+    local transform = clone(puzzle)
+    transform.entities[1].x, transform.entities[1].y = 9,10
+    transform.entities[15].x, transform.entities[15].y = 2,10
+    for index, token in ipairs({"LEVEL","IS","CRATE"}) do
+        local token_id = 15+index
+        transform.entities[token_id] = {id=token_id,kind="object",class="text",direction="None",
+            x=6+index,y=index == 3 and 9 or 8,text={name=token}}
+    end
+    transform.next_entity_id = 19
+    return {
+        ["navigation.root"] = {id="navigation.root",initial_world=root},
+        ["navigation.puzzle"] = {id="navigation.puzzle",initial_world=puzzle},
+        ["navigation.transform"] = {id="navigation.transform",initial_world=transform}
+    }, "navigation.root"
 end

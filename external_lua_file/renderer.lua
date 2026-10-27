@@ -178,6 +178,12 @@ local function ensure_grid(world)
 end
 
 local function get_label(entity)
+    if entity.level_link and entity.archetype == entity.level_link.source_type then
+        return entity.level_link.label or "LEVEL"
+    end
+    if entity.archetype == "cursor" then return "SEL" end
+    if entity.archetype == "path" then return "." end
+    if entity.archetype == "flag" then return "WIN" end
     if entity.class == "text" then
         return entity.text and entity.text.name or "?"
     end
@@ -190,6 +196,11 @@ local function get_label(entity)
 end
 
 local function get_colors(entity)
+    if entity.level_link and entity.archetype == entity.level_link.source_type then
+        return Color(112,70,145,255), Color(255,255,255,255)
+    end
+    if entity.archetype == "cursor" then return Color(220,220,230,255), Color(20,20,30,255) end
+    if entity.archetype == "path" then return Color(43,55,75,255), Color(90,110,140,255) end
     if entity.class == "text" then
         return
             Color(205, 159, 89, 255),
@@ -260,10 +271,10 @@ local function draw_entities(world)
                 occupancy[slot_index] = slot
             end
 
-            slot[#slot + 1] = {
+            if entity.archetype ~= "path" then slot[#slot + 1] = {
                 id = id,
                 entity = entity
-            }
+            } end
         end
     end
 
@@ -359,6 +370,12 @@ function RW_Render(world, history_depth, active_effects, navigation)
         cell.text = ""
         cell.bgColor = Color(43, 55, 75, 255)
     end
+    for _, entity in pairs(world.entities) do
+        if entity.archetype == "path" then
+            local cell = cells[(entity.y-1)*world.width+entity.x]
+            if cell then cell.text = "."; cell.fontSize = 18; cell.fontColor = Color(90,110,140,255) end
+        end
+    end
     for _, portal in ipairs(navigation and navigation.portals or {}) do
         local cell = cells[(portal.y-1)*world.width+portal.x]
         if cell then
@@ -373,10 +390,11 @@ function RW_Render(world, history_depth, active_effects, navigation)
     if status_text then
         status_text.text = string.format(
             (navigation and navigation.title or "RuleWorld") .. "\n" ..
-            "Turns: %d    Active effects: %d\n" ..
-            "WASD: Move    Z: Undo",
+            (navigation and "Undo steps: %d    Active effects: %d\n" or "Turns: %d    Active effects: %d\n") ..
+            "%s",
             history_depth or 0,
-            active_effects or 0
+            active_effects or 0,
+            navigation and navigation.hint or "WASD: Move    Z: Undo"
         )
     end
 

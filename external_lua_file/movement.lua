@@ -9,7 +9,8 @@ local function has_capability(world, entity, capability)
         return type(entity.behaviors) == "table" and entity.behaviors[capability] == true
     end
     if world.behavior_registry ~= nil then return false end
-    local legacy = {control = "you", push = "pushable", block_entry = "block_entry"}
+    local legacy = {control = "you", select = "select", select_path = "path",
+        win = "win", push = "pushable", block_entry = "block_entry"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -368,7 +369,7 @@ end
 -- Order: front-to-back along the movement direction.
 -- Produce one atomic plan relative to the input world.
 
-function RW_ResolveTurn(world, action)
+local function resolve_you_turn(world, action)
     if type(world) ~= "table"
         or type(world.entities) ~= "table" then
         return invalid("invalid_world")
@@ -657,4 +658,99 @@ function RW_ControlSelfTest()
     end
 
     return true, "Multiple YOU control passed"
+end
+
+-- SELECT is not YOU: it follows traversable map objects without pushing them.
+function RW_ResolveTurn(world, action)
+    local plan = resolve_you_turn(world, action)
+    if not plan.consumes_turn then return plan end
+    local writes = {}
+    for index, change in ipairs(plan.changes) do writes[change.entity_id] = index end
+    local selected = false
+    for id, entity in pairs(world.entities) do
+        if has_capability(world, entity, "select") then
+            selected = true
+            local x, y = entity.x + action.dx, entity.y + action.dy
+            local traversable = false
+            for other_id, other in pairs(world.entities) do
+                if other_id ~= id and other.x == x and other.y == y
+                    and (has_capability(world, other, "select_path")
+                        or (other.level_link and other.archetype == other.level_link.source_type)) then
+                    traversable = true
+                end
+            end
+            if traversable and x >= 1 and x <= world.width and y >= 1 and y <= world.height then
+                local operation = {kind="move",entity_id=id,
+                    from={x=entity.x,y=entity.y,direction=entity.direction or "None"},
+                    to={x=x,y=y,direction=direction_for(action.dx,action.dy)}}
+                -- Both properties: SELECT positioning takes precedence; never double-step.
+                if writes[id] then plan.changes[writes[id]] = operation
+                else plan.changes[#plan.changes+1] = operation end
+            end
+        end
+    end
+    if selected then
+        table.sort(plan.changes, function(a,b) return a.entity_id < b.entity_id end)
+        if #plan.changes > 0 then plan.reason = nil
+        elseif plan.reason == "no_you" then plan.reason = "select_blocked" end
+    end
+    return plan
+end
+
+function RW_LevelSelectionCandidates(world)
+    local candidates, seen = {}, {}
+    for id, cursor in pairs(world.entities) do
+        if has_capability(world, cursor, "select") then
+            for target_id, target in pairs(world.entities) do
+                local link = target.level_link
+                if id ~= target_id and not has_capability(world,target,"select")
+                    and cursor.x == target.x and cursor.y == target.y
+                    and link and target.archetype == link.source_type and not seen[target_id] then
+                    seen[target_id] = true
+                    candidates[#candidates+1] = target_id
+                end
+            end
+        end
+    end
+    table.sort(candidates)
+    return candidates
+end
+
+function RW_HasWinContact(world)
+    for _, actor in pairs(world.entities) do
+        if has_capability(world, actor, "control") then
+            for _, target in pairs(world.entities) do
+                if actor.x == target.x and actor.y == target.y
+                    and has_capability(world, target, "win") then return true end
+            end
+        end
+    end
+    return false
+end
+
+function RW_LevelSelectionSelfTest()
+    local world = {width=4,height=3,entities={
+        [7]={id=7,x=1,y=1,direction="None",traits={select=true}},
+        [8]={id=8,x=2,y=1,direction="None",archetype="portal",level_link={source_type="portal",target="parent"}},
+        [9]={id=9,x=2,y=1,direction="None",traits={pushable=true}},
+        [10]={id=10,x=4,y=3,direction="None",traits={you=true}}
+    }}
+    local before = RW_LevelSelectionCandidates(world)
+    local plan = RW_ResolveTurn(world,{type="move",dx=1,dy=0})
+    local cursor_move
+    for _, change in ipairs(plan.changes) do
+        if change.entity_id == 9 then return false, "SELECT pushed an ordinary object" end
+        if change.entity_id == 7 then cursor_move = change end
+    end
+    if #before ~= 0 or not cursor_move or cursor_move.to.x ~= 2 then
+        return false, "SELECT path movement failed"
+    end
+    world.entities[7].x = 2
+    if RW_LevelSelectionCandidates(world)[1] ~= 8 then return false, "Non-Avatar SELECT failed" end
+    world.entities[7].traits = {you=true}
+    if #RW_LevelSelectionCandidates(world) ~= 0 then return false, "YOU gained SELECT authority" end
+    world.entities[7].traits = {select=true}
+    world.entities[7].behaviors = {} -- Rule retraction disables raw legacy traits.
+    if #RW_LevelSelectionCandidates(world) ~= 0 then return false, "Retracted SELECT still active" end
+    return true, "SELECT independent of YOU, path movement and entry authority passed"
 end

@@ -72,3 +72,10 @@ tests/selectors_behaviors.lua 另覆盖默认选择器、缺失字段、无匹�
 
 无新增脚本映射。本轮没有增加关卡内容、嵌套世界、持久化进度或跨层操作；
 下一阶段是关卡定义与运行实例的分离规格及最小闭环。
+
+## M9.3L 扩展
+
+行为能力集合新增 select（地图选择/确认资格）、select_path（SELECT 可经过的
+地图对象）、win（与 YOU 接触产生关卡胜利结果）。它们与 control 分开，
+不会由 YOU 自动授予 SELECT；默认属性映射为 select/path/win。
+完整关卡块、确认、三种退出和整树 Undo 契约见 NESTED_LEVELS.md。

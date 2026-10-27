@@ -25,7 +25,8 @@ end
 
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
-    you = {control = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    you = {control = true}, select = {select = true}, path = {select_path = true},
+    win = {win = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -33,7 +34,8 @@ local function valid_behaviors(registry)
         if type(name) ~= "string" or name == "" or type(spec) ~= "table" then return false end
         local count = 0
         for capability, enabled in pairs(spec) do
-            if (capability ~= "control" and capability ~= "push" and capability ~= "block_entry")
+            if (capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
+                    and capability ~= "select" and capability ~= "select_path" and capability ~= "win")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end

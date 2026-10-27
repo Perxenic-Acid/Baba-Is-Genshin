@@ -412,7 +412,17 @@ function RW_LowerRuleAST(ast_rules, registry)
             and target_type.name ~= ""
             and ast.when.op == "always"
 
-        if property_rule then
+        local level_subject = subject.tag == "noun" and type(subject_type) == "table"
+            and subject_type.tag == "level" and ast.when.op == "always"
+        if level_subject and semantics and semantics.noun == "transform"
+            and object.tag == "noun" and type(target_type) == "table"
+            and target_type.tag == "object" and type(target_type.name) == "string" and target_type.name ~= "" then
+            conversions[#conversions+1] = {op="transform_level", target_type=target_type.name,
+                source=ast.source}
+        elseif level_subject and semantics and semantics.noun == "transform"
+            and object.tag == "noun" and type(target_type) == "table" and target_type.tag == "level" then
+            conversions[#conversions+1] = {op="protect_level", source=ast.source}
+        elseif property_rule then
             generated[#generated + 1] = {
                 when = ast.when,
                 effects = {{

@@ -45,11 +45,25 @@ function RW_PlanTurn(world, action, services)
     if not post_effects then return fail("rules_after", post_error) end
 
     trace[#trace + 1] = "conversions"
-    local operations, conversion_error = services.convert(preview, conversions)
+    local entity_conversions, level_targets, protected = {}, {}, false
+    for _, conversion in ipairs(conversions or {}) do
+        if conversion.op == "transform_level" then level_targets[conversion.target_type] = true
+        elseif conversion.op == "protect_level" then protected = true
+        else entity_conversions[#entity_conversions+1] = conversion end
+    end
+    local target_type
+    if not protected then
+        for target in pairs(level_targets) do
+            if target_type then return fail("conversions", "conflicting_level_transforms") end
+            target_type = target
+        end
+    end
+    local operations, conversion_error = services.convert(preview, entity_conversions)
     if not operations then return fail("conversions", conversion_error) end
 
     -- Own the combined list: never append into another planner's result.
-    local plan = {consumes_turn = true, reason = movement.reason, changes = {}}
+    local plan = {consumes_turn = true, reason = movement.reason, changes = {},
+        level_transform = target_type}
     for _, change in ipairs(movement.changes) do
         plan.changes[#plan.changes + 1] = change
     end
@@ -62,6 +76,56 @@ function RW_PlanTurn(world, action, services)
     local complete, complete_error = services.preview(world, plan)
     if not complete then return fail("preview_complete", complete_error) end
     return plan, nil, trace
+end
+
+-- Whole-tree transaction planner: navigation, outcomes and movement share one Undo.
+function RW_PlanLevelAction(tree, action, services)
+    local function fail(reason) return nil, {stage="level_action",reason=reason} end
+    if type(action) ~= "table" then return fail("invalid_action") end
+    local session = services.active(tree)
+    local effects, err = services.evaluate(session.world)
+    if not effects then return fail(err) end
+    local effective, project_error = services.project(session.world,effects)
+    if not effective then return fail(project_error) end
+    if action.type == "confirm" then
+        local candidates = services.candidates(effective)
+        if #candidates == 0 then return fail("no_selected_level") end
+        if #candidates > 1 then return fail("ambiguous_selected_levels") end
+        local entity_id = candidates[1]
+        local link = session.world.entities[entity_id].level_link
+        local next_tree, reason
+        if link.target == "parent" then next_tree, reason = services.return_level(tree)
+        else
+            next_tree, reason = services.enter(tree,tostring(entity_id),link.definition_id)
+            if next_tree then next_tree, reason = services.bind_entry(next_tree,entity_id) end
+        end
+        if not next_tree then return fail(reason) end
+        return {before=tree,after=next_tree,reason="confirm_level",changes={}}
+    end
+    local turn, planning_error = RW_PlanTurn(session.world,action,services)
+    if not turn then return nil, planning_error end
+    if not turn.consumes_turn then return fail(turn.reason) end
+    local completed, accepted = services.commit_session(session,turn)
+    if not accepted.accepted then return fail(accepted.reason) end
+    local next_tree, update_error = services.update(tree,completed)
+    if not next_tree then return fail(update_error) end
+    local post_effects, post_error = services.evaluate(completed.world)
+    if not post_effects then return fail(post_error) end
+    local post, projection_error = services.project(completed.world,post_effects)
+    if not post then return fail(projection_error) end
+    local outcome = turn.level_transform and "transform" or (services.win(post) and "win" or nil)
+    if outcome then
+        next_tree, update_error = services.outcome(next_tree,outcome,turn.level_transform)
+        if not next_tree then return fail(update_error) end
+    end
+    return {before=tree,after=next_tree,reason=outcome or turn.reason,changes=turn.changes}
+end
+
+-- Host confirmation entry point. No substitute physical key is bound.
+local confirm_selected_level = nil
+function RW_ConfirmSelectedLevel()
+    if not confirm_selected_level then return false, "not_initialized" end
+    return confirm_selected_level()
 end
 
 function OnStart()
@@ -142,6 +206,7 @@ function OnStart()
         { "world",      "RW_LevelInstanceSelfTest" },
         { "world",      "RW_LevelTreeSelfTest" },
         { "movement",   "RW_DirectionMovementSelfTest" },
+        { "movement",   "RW_LevelSelectionSelfTest" },
     }
 
     for _, test in ipairs(tests) do
@@ -721,46 +786,66 @@ function OnStart()
     end
     print("[RuleWorld] TEST PASSED: pipeline created/deleted Text rules / Undo")
 
-    -- Minimal navigation fixture: A and B instantiate the same puzzle definition.
-    -- Portals are a host interaction fixture, not new language or movement axioms.
-    local demo_definition = world_api:Invoke("RW_GetDefaultLevelDefinition")
-    local level_tree = world_api:Invoke("RW_CreateLevelTree",
-        {[demo_definition.id] = demo_definition}, demo_definition.id)
-    session = world_api:Invoke("RW_GetActiveLevel", level_tree)
+    local demo_definitions, root_definition_id = world_api:Invoke("RW_GetNavigationDefinitions")
+    local level_tree = world_api:Invoke("RW_CreateLevelTree",demo_definitions,root_definition_id)
+    session = world_api:Invoke("RW_GetActiveLevel",level_tree)
+    local level_services = {}
+    for name, service in pairs(turn_services) do level_services[name] = service end
+    level_services.active = function(tree) return world_api:Invoke("RW_GetActiveLevel",tree) end
+    level_services.update = function(tree,value) return world_api:Invoke("RW_UpdateActiveLevel",tree,value) end
+    level_services.enter = function(tree,slot,id) return world_api:Invoke("RW_EnterLevel",tree,slot,id) end
+    level_services.return_level = function(tree) return world_api:Invoke("RW_ReturnLevel",tree) end
+    level_services.bind_entry = function(tree,id) return world_api:Invoke("RW_BindLevelEntry",tree,id) end
+    level_services.commit_session = function(value,plan) return world_api:Invoke("RW_Commit",value,plan) end
+    level_services.outcome = function(tree,kind,target) return world_api:Invoke("RW_RecordLevelOutcome",tree,kind,target) end
+    level_services.candidates = function(world) return movement_api:Invoke("RW_LevelSelectionCandidates",world) end
+    level_services.win = function(world) return movement_api:Invoke("RW_HasWinContact",world) end
+
+    -- Real mapped pipeline probe; never change the live tree during self-tests.
+    do
+        local probe = level_tree
+        local function step(action)
+            local plan, err = RW_PlanLevelAction(probe,action,level_services)
+            if not plan then return false, err and err.reason end
+            local result
+            probe, result = world_api:Invoke("RW_CommitLevelTree",probe,plan)
+            return result.accepted
+        end
+        local function up() return step({type="move",dx=0,dy=-1}) end
+        local function confirm() return step({type="confirm"}) end
+        if not up() or probe.active_id ~= level_tree.active_id or not confirm()
+            or #probe.stack ~= 1 then
+            printerr("[RuleWorld] TEST FAILED: explicit SELECT confirmation"); return
+        end
+        local entered = probe
+        if not step({type="move",dx=1,dy=0}) or not confirm() or #probe.stack ~= 0 then
+            printerr("[RuleWorld] TEST FAILED: parent block exit"); return
+        end
+        probe = world_api:Invoke("RW_UndoLevelTree",probe)
+        if probe.active_id ~= entered.active_id
+            or world_api:Invoke("RW_GetActiveLevel",probe).world.entities[4].x ~= 4 then
+            printerr("[RuleWorld] TEST FAILED: navigation Undo"); return
+        end
+        probe = entered
+        if not step({type="move",dx=0,dy=1}) or #probe.stack ~= 0 then
+            printerr("[RuleWorld] TEST FAILED: win exit"); return
+        end
+        probe = level_tree
+        if not up() or not step({type="move",dx=1,dy=0}) or not confirm() or not up()
+            or #probe.stack ~= 0
+            or world_api:Invoke("RW_GetActiveLevel",probe).world.entities[15].archetype ~= "crate" then
+            printerr("[RuleWorld] TEST FAILED: level transform exit"); return
+        end
+        probe = world_api:Invoke("RW_UndoLevelTree",probe)
+        if #probe.stack ~= 1 or world_api:Invoke("RW_GetActiveLevel",probe).world.entities[18].y ~= 9 then
+            printerr("[RuleWorld] TEST FAILED: level transform Undo"); return
+        end
+        print("[RuleWorld] TEST PASSED: pipeline SELECT confirm / parent / win / level transform / tree Undo")
+    end
 
     local function navigation_view()
-        if #level_tree.stack == 0 then
-            return {title="MAP / " .. session.instance_id,
-                portals={{x=2,y=1,label="A"},{x=1,y=2,label="B"}}}
-        end
-        return {title="PUZZLE / " .. session.instance_id,
-            portals={{x=2,y=1,label="OUT"}}}
-    end
-
-    local function retain_session()
-        level_tree = world_api:Invoke("RW_UpdateActiveLevel", level_tree, session)
-    end
-
-    local function navigate_after_move(before)
-        local after = session.world.entities[1]
-        if not before or not after or (before.x == after.x and before.y == after.y) then return end
-        local destination, reason
-        if #level_tree.stack > 0 and after.x == 2 and after.y == 1 then
-            destination, reason = world_api:Invoke("RW_ReturnLevel", level_tree)
-        elseif #level_tree.stack == 0 then
-            local slot = after.x == 2 and after.y == 1 and "A"
-                or (after.x == 1 and after.y == 2 and "B" or nil)
-            if slot then
-                destination, reason = world_api:Invoke("RW_EnterLevel", level_tree, slot, demo_definition.id)
-            end
-        end
-        if reason then printerr("[RuleWorld] Navigation failed:", reason) end
-        if destination then
-            level_tree = destination
-            session = world_api:Invoke("RW_GetActiveLevel", level_tree)
-            print(string.format("[RuleWorld] Navigation -> %s depth=%d history=%d",
-                session.instance_id, #level_tree.stack, #session.history))
-        end
+        return {title=(#level_tree.stack == 0 and "MAP / " or "PUZZLE / ") .. session.instance_id,
+            hint="WASD: YOU + SELECT   Confirm: unbound   Z: Whole-tree Undo",portals={}}
     end
 
     local previous_rule_count = nil
@@ -786,120 +871,37 @@ function OnStart()
         renderer_api:Invoke(
             "RW_Render",
             session.world,
-            #session.history,
+            #level_tree.history,
             #effects,
             navigation_view()
         )
     end
 
-    local function move(dx, dy)
-        local before = session.world.entities[1]
-        local action = {
-            type = "move",
-            dx = dx,
-            dy = dy
-        }
-
-        local plan, planning_error = RW_PlanTurn(session.world, action, turn_services)
+    local function act(action)
+        local plan, planning_error = RW_PlanLevelAction(level_tree,action,level_services)
         if not plan then
-            printerr("[RuleWorld] Turn planning failed:",
-                planning_error.stage, planning_error.reason)
-            return
+            print("[RuleWorld] Action rejected:",planning_error.stage,planning_error.reason)
+            return false, planning_error.reason
         end
-
-        -- Movement and transformation: one atomic commit.
-        local next_session, result =
-            world_api:Invoke(
-                "RW_Commit",
-                session,
-                plan
-            )
-
-        if not next_session or not result then
-            printerr("[RuleWorld] Commit failed")
-            return
-        end
-
-        if not result.accepted then
-            print(
-                "[RuleWorld] Invalid action:",
-                result.reason
-            )
-            return
-        end
-
-        session = next_session
-
-        if result.changed then
-            for _, change in ipairs(result.changes) do
-                if change.kind == "create" or change.kind == "delete" then
-                    print(string.format(
-                        "[RuleWorld] Entity %d: %s", change.entity_id, change.kind
-                    ))
-                elseif change.kind == "transform" then
-                    print(string.format(
-                        "[RuleWorld] Entity %d: %s -> %s",
-                        change.entity_id,
-                        change.from,
-                        change.to
-                    ))
-                elseif change.kind == "direction" then
-                    print(string.format(
-                        "[RuleWorld] Entity %d direction: %s -> %s",
-                        change.entity_id, change.from, change.to
-                    ))
-                else
-                    print(string.format(
-                        "[RuleWorld] Entity %d: (%d,%d) -> (%d,%d)",
-                        change.entity_id,
-                        change.from.x,
-                        change.from.y,
-                        change.to.x,
-                        change.to.y
-                    ))
-                end
-            end
-        else
-            print(
-                "[RuleWorld] Turn consumed:",
-                result.reason or "no_change"
-            )
-        end
-
-        retain_session()
-        navigate_after_move(before)
-        -- This evaluates the NEW active world.
+        local next_tree, result = world_api:Invoke("RW_CommitLevelTree",level_tree,plan)
+        if not result.accepted then printerr("[RuleWorld] Tree commit rejected:",result.reason); return false, result.reason end
+        level_tree = next_tree
+        session = world_api:Invoke("RW_GetActiveLevel",level_tree)
+        print(string.format("[RuleWorld] Tree action %s -> %s depth=%d history=%d",
+            result.reason or action.type,session.instance_id,#level_tree.stack,#level_tree.history))
         render()
+        return true
     end
 
+    local function move(dx,dy) act({type="move",dx=dx,dy=dy}) end
+
     local function undo()
-        local next_session, result =
-            world_api:Invoke(
-                "RW_Undo",
-                session
-            )
-
-        if not next_session or not result then
-            printerr("[RuleWorld] Undo failed")
-            return
-        end
-
-        if not result.accepted then
-            print(
-                "[RuleWorld] Undo rejected:",
-                result.reason
-            )
-            return
-        end
-
-        session = next_session
-        retain_session()
-
-        print(string.format(
-            "[RuleWorld] Undo -> history=%d",
-            #session.history
-        ))
-
+        local next_tree, result = world_api:Invoke("RW_UndoLevelTree",level_tree)
+        if not result.accepted then print("[RuleWorld] Undo rejected:",result.reason); return end
+        level_tree = next_tree
+        session = world_api:Invoke("RW_GetActiveLevel",level_tree)
+        print(string.format("[RuleWorld] Tree Undo -> %s depth=%d history=%d",
+            session.instance_id,#level_tree.stack,#level_tree.history))
         render()
     end
 
@@ -928,7 +930,9 @@ function OnStart()
         print("[RuleWorld] Undo registered (Z)")
     end
 
+    confirm_selected_level = function() return act({type="confirm"}) end
+    print("[RuleWorld] Confirm action ready; physical key intentionally unbound")
     render()
 
-    print("[RuleWorld] M9.3K initialized")
+    print("[RuleWorld] M9.3L initialized")
 end

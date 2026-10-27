@@ -161,10 +161,10 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.empty_behaviors={}
     local globally_denied={}
     for _,effect in ipairs(effects) do
-        if effect.target and effect.target.kind == "empty" and effect.op == "deny_trait" then globally_denied[effect.trait]=true end
+        if not effect.when and effect.target and effect.target.kind == "empty" and effect.op == "deny_trait" then globally_denied[effect.trait]=true end
     end
     for _,effect in ipairs(effects) do
-        if effect.target and effect.target.kind == "empty" and effect.op == "grant_trait" and not globally_denied[effect.trait] then
+        if not effect.when and effect.target and effect.target.kind == "empty" and effect.op == "grant_trait" and not globally_denied[effect.trait] then
             for capability,enabled in pairs(registry[effect.trait] or {}) do
                 if enabled then projected.empty_behaviors[capability]=true end
             end

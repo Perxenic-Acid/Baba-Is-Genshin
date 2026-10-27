@@ -62,7 +62,7 @@ EMPTY 是当前没有任何实体的格子，不是隐藏实体；文字、Line�
 - EMPTY 的持久逐格方向、销毁/HAS 生命周期尚未实现；EMPTY HAS … 明确保留 deferred。
   EMPTY YOU + DEFEAT 的逐格销毁效果和与作用域 LEVEL 的所有交互尚未全面复刻。
 - 当前 LEVEL 作用域的 ALL/TEXT/EMPTY 转换、多个不同 LEVEL 转换目标仍未实现。
-- 主体 AND、实体上下文条件、GROUP/MIMIC、任意 Meta 深度仍在后续范围。
+- M9.3V 已接入主语 AND 与 ON/NEAR 上下文条件；GROUP/MIMIC、任意 Meta 深度仍在后续范围。
 - WORD 仍使用物理 Text 冷启动的有界求解，不声称覆盖原版所有递归来源判断。
 
 ## 真机测试

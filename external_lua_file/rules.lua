@@ -131,6 +131,126 @@ function RW_SelectEntities(world, selector)
 end
 
 -- Concrete effects are short-lived results for this world, not saved rules.
+-- Contextual conditions are tested against one identity (or one virtual Empty cell).
+function RW_TestEntityCondition(world,node,entity)
+    if type(node) ~= "table" then return nil,"invalid_condition" end
+    if node.op == "always" then return true end
+    if node.op == "not" then
+        local value,err=RW_TestEntityCondition(world,node.condition,entity)
+        if value == nil then return nil,err end;return not value
+    end
+    if node.op == "all" then
+        if not dense_list(node.terms) then return nil,"invalid_condition_terms" end
+        local result=true
+        for _,term in ipairs(node.terms) do local v,e=RW_TestEntityCondition(world,term,entity)
+            if v == nil then return nil,e end;result=result and v end
+        return result
+    end
+    if node.op ~= "spatial" or not dense_list(node.clauses) or #node.clauses == 0
+        or type(entity) ~= "table" or type(entity.x) ~= "number" or type(entity.y) ~= "number" then
+        return nil,"invalid_spatial_condition"
+    end
+    if type(world.width) ~= "number" or type(world.height) ~= "number" then return nil,"invalid_spatial_grid" end
+    local function term_value(term)
+        local negative=false
+        for depth=1,256 do
+            if type(term) ~= "table" then return nil end
+            if term.tag ~= "not" then
+                if term.tag == "noun" and type(term.type) == "table" then
+                    return term.type.tag == "level" and "@level" or term.type.name,negative
+                elseif term.tag == "special" then return "@" .. term.name,negative end
+                return nil
+            end
+            negative=not negative;term=term.operand
+        end
+    end
+    local result=true
+    for _,clause in ipairs(node.clauses) do
+        if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near")
+            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or #clause.parameters == 0 then
+            return nil,"invalid_spatial_clause"
+        end
+        local parameters={}
+        for _,term in ipairs(clause.parameters) do
+            local name,negative=term_value(term)
+            if not name then return nil,"invalid_spatial_parameter" end
+            if name == "@all" then
+                if negative then
+                    parameters[#parameters+1]={name="@empty"};parameters[#parameters+1]={name="@text"}
+                else for _,ordinary in ipairs(RW_NounPalette(world)) do parameters[#parameters+1]={name=ordinary} end end
+            else parameters[#parameters+1]={name=name,negative=negative} end
+        end
+        -- testcond evaluates concrete parameters before complements; positives reverse
+        -- physical order, negatives retain it. This matters when witnesses overlap.
+        local ordered={}
+        for _,parameter in ipairs(parameters) do
+            if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
+        end
+        parameters=ordered
+        local candidates={}
+        for id,target in pairs(world.entities) do
+            if id ~= entity.id and math.abs(target.x-entity.x) <= (clause.relation == "near" and 1 or 0)
+                and math.abs(target.y-entity.y) <= (clause.relation == "near" and 1 or 0) then
+                candidates[#candidates+1]=target
+            end
+        end
+        table.sort(candidates,function(a,b)
+            if a.x ~= b.x then return a.x < b.x end
+            if a.y ~= b.y then return a.y < b.y end
+            return a.id < b.id
+        end)
+        local used,allfound={},0
+        for _,parameter in ipairs(parameters) do
+            local matched,contribution=false,nil
+            if parameter.name == "@level" and not parameter.negative and not used["@level"] then
+                used["@level"]=true;matched=true
+            elseif parameter.name == "@empty" and parameter.negative and clause.relation == "on" then
+                -- Original ON NOT EMPTY consumes/counts every remaining co-occupant.
+                contribution=0
+                if entity.class ~= "empty" then
+                    for _,target in ipairs(candidates) do
+                        if not used[target.id] then used[target.id]=true;contribution=contribution+1 end
+                    end
+                end
+            elseif parameter.name == "@empty" then
+                local radius=clause.relation == "near" and 1 or 0
+                for dx=-radius,radius do for dy=-radius,radius do
+                    local x,y=entity.x+dx,entity.y+dy;local key="empty:" .. x .. ":" .. y
+                    if x >= 1 and y >= 1 and x <= world.width and y <= world.height and not used[key] then
+                        local occupied=false
+                        for _,target in pairs(world.entities) do if target.x == x and target.y == y then occupied=true;break end end
+                        local empty=not occupied
+                        if dx == 0 and dy == 0 then
+                            if entity.class == "empty" then empty=false
+                            elseif parameter.negative then
+                                local others=0;for _,target in pairs(world.entities) do if target.x == x and target.y == y then others=others+1 end end
+                                if others <= 1 then empty=true end
+                            end
+                        end
+                        if not (radius == 0 and entity.class == "empty") and
+                            ((not parameter.negative and empty) or (parameter.negative and not empty)) then
+                            if not matched then used[key]=true;matched=true end
+                        end
+                    end
+                end end
+            else
+                for _,target in ipairs(candidates) do
+                    local name=target.class == "text" and "@text" or target.archetype
+                    local expected=parameter.name == "@level" and "level_block" or parameter.name
+                    local eligible=parameter.negative and name ~= expected and name ~= "@text"
+                        or not parameter.negative and name == expected
+                    if eligible and not used[target.id] then used[target.id]=true;matched=true;break end
+                end
+            end
+            allfound=allfound+(contribution or (matched and 1 or 0))
+        end
+        local found=allfound == #parameters
+        if clause.negated then found=not found end
+        result=result and found
+    end
+    return result
+end
+
 function RW_ResolveEffects(world, effects)
     if type(world) ~= "table" or type(world.entities) ~= "table" then return nil, "invalid_world" end
     if not valid_selectors(selector_registry(world)) then return nil, "invalid_selector_registry" end
@@ -143,7 +263,18 @@ function RW_ResolveEffects(world, effects)
         end
         local ids, err = RW_SelectEntities(world, effect.target)
         if not ids then return nil, err end
-        local resolved={op=effect.op,trait=effect.trait,
+        if effect.when then
+            local _,why=RW_TestEntityCondition(world,effect.when,{class="empty",x=1,y=1})
+            if why then return nil,why end
+            local selected={}
+            for _,id in ipairs(ids) do
+                local enabled,why=RW_TestEntityCondition(world,effect.when,world.entities[id])
+                if enabled == nil then return nil,why end
+                if enabled then selected[#selected+1]=id end
+            end
+            ids=selected
+        end
+        local resolved={op=effect.op,trait=effect.trait,when=effect.when,
             target={kind=effect.target.kind,value=effect.target.value},entity_ids=ids}
         if effect.target.kind == "empty" then
             if type(world.width) ~= "number" or type(world.height) ~= "number"
@@ -154,7 +285,12 @@ function RW_ResolveEffects(world, effects)
             local occupied={}
             for _,entity in pairs(world.entities) do occupied[entity.x .. ":" .. entity.y]=true end
             for y=1,world.height do for x=1,world.width do
-                if not occupied[x .. ":" .. y] then resolved.cells[#resolved.cells+1]={x=x,y=y} end
+                if not occupied[x .. ":" .. y] then
+                    local enabled,why=true,nil
+                    if effect.when then enabled,why=RW_TestEntityCondition(world,effect.when,{class="empty",x=x,y=y}) end
+                    if enabled == nil then return nil,why end
+                    if enabled then resolved.cells[#resolved.cells+1]={x=x,y=y} end
+                end
             end end
         end
         result[#result+1]=resolved
@@ -297,8 +433,9 @@ function RW_EvaluateRules(world, generated_rules)
                 end
             end
 
-            local enabled, err =
-                evaluate_condition(world, rule.when)
+            local enabled,err
+            if rule.when and rule.when.op == "spatial" then enabled=true
+            else enabled,err=evaluate_condition(world,rule.when) end
 
             if enabled == nil then
                 return false, err
@@ -308,6 +445,7 @@ function RW_EvaluateRules(world, generated_rules)
                 for _, effect in ipairs(rule.effects) do
                     active[#active + 1] = {
                         op = effect.op,
+                        when = rule.when.op == "spatial" and query_clone(rule.when) or nil,
                         target = {
                             kind = effect.target.kind,
                             value = effect.target.value
@@ -573,16 +711,43 @@ function RW_WordTokenMap(world, effective)
     end
     return tokens
 end
+function RW_RelationApplies(world,relation,entity)
+    if relation.exclusions ~= nil and not dense_list(relation.exclusions) then return nil,"invalid_relation_exclusions" end
+    if relation.when then
+        local enabled,err=RW_TestEntityCondition(world,relation.when,entity)
+        if enabled == nil then return nil,err end
+        if not enabled then return false end
+    end
+    for _,condition in ipairs(relation.exclusions or {}) do
+        local disabled,err=RW_TestEntityCondition(world,condition,entity)
+        if disabled == nil then return nil,err end
+        if disabled then return false end
+    end
+    return true
+end
 function RW_PlanConversions(world, conversions)
     if type(world) ~= "table" or type(world.entities) ~= "table"
         or not dense_list(conversions) then return nil,"invalid_conversion_input" end
-    local targets,protected,forbidden={},{},{}
+    local targets,protected,forbidden,conditional={},{},{},{}
     for _,relation in ipairs(conversions) do
         if type(relation) ~= "table" or type(relation.source_type) ~= "string" or relation.source_type == "" then
             return nil,"invalid_conversion_relation"
         end
         local source=relation.source_type
-        if relation.op == "protect_transform" then protected[source]=true
+        if relation.when or relation.exclusions then
+            if relation.op ~= "protect_transform" and relation.op ~= "forbid_transform" and relation.op ~= "write_text"
+                and relation.op ~= "transform_text" and relation.op ~= "transform_all" and relation.op ~= "transform" then
+                return nil,"invalid_conversion_relation"
+            end
+            if (relation.op == "write_text" and (type(relation.target_text) ~= "string" or relation.target_text == ""))
+                or ((relation.op == "transform" or relation.op == "forbid_transform")
+                    and (type(relation.target_type) ~= "string" or relation.target_type == "")) then
+                return nil,"invalid_conversion_relation"
+            end
+            local _,why=RW_RelationApplies(world,relation,{class="empty",x=1,y=1})
+            if why then return nil,why end
+            conditional[source]=conditional[source] or {};conditional[source][#conditional[source]+1]=relation
+        elseif relation.op == "protect_transform" then protected[source]=true
         elseif relation.op == "forbid_transform" and type(relation.target_type) == "string" then
             forbidden[source]=forbidden[source] or {}; forbidden[source][relation.target_type]=true
         elseif relation.op == "write_text" and type(relation.target_text) == "string" and relation.target_text ~= "" then
@@ -609,15 +774,28 @@ function RW_PlanConversions(world, conversions)
         next_id,created=next_id+1,created+1; return true
     end
     local function convert(entity,source,virtual)
-        local bans=forbidden[source] or {}
+        local bans=query_clone(forbidden[source] or {})
+        local choices=query_clone(targets[source] or {})
+        local protect=protected[source]
+        for _,relation in ipairs(conditional[source] or {}) do
+            local enabled,err=RW_RelationApplies(world,relation,virtual and {class="empty",x=entity.x,y=entity.y} or entity)
+            if enabled == nil then return nil,err end
+            if enabled then
+                if relation.op == "protect_transform" then protect=true
+                elseif relation.op == "forbid_transform" then bans[relation.target_type]=true
+                elseif relation.op == "write_text" then choices[#choices+1]={text_name=relation.target_text}
+                else choices[#choices+1]=relation.op == "transform_text" and "@text"
+                    or relation.op == "transform_all" and "@all" or relation.target_type end
+            end
+        end
         -- A IS NOT A destroys A, including Text. It is not HAS destruction.
         if bans[source] then
             if not virtual then changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)} end
             return true
         end
-        if protected[source] or not targets[source] then return true end
+        if protect or #choices == 0 then return true end
         local products,retain,remove={},false,false
-        for _,target in ipairs(targets[source]) do
+        for _,target in ipairs(choices) do
             if not bans[target] and not (type(target) == "table" and bans["@text"]) then
                 if target == "@all" then
                     if not virtual and entity.class ~= "text" then retain=true end
@@ -662,7 +840,7 @@ function RW_PlanConversions(world, conversions)
         if source then local ok,err=convert(entity,source,false); if not ok then return nil,err end end
     end
     -- All EMPTY products read one frozen occupancy snapshot: no within-phase cascade.
-    if targets["@empty"] then
+    if targets["@empty"] or conditional["@empty"] then
         for y=1,world.height do for x=1,world.width do
             if not occupied[x .. ":" .. y] then
                 local ok,err=convert({kind="object",class="object",x=x,y=y,direction="None"},"@empty",true)
@@ -695,6 +873,7 @@ local function unwrap(term)
 end
 local function noun_term(name) return {tag="noun",type={tag="object",name=name}} end
 local function written_token(world,term)
+    if term.tag == "literal" then return term.token end
     local vocabulary=term.tag == "property" and world.language.properties
         or term.tag == "special" and world.language.specials or world.language.nouns
     local matches={}
@@ -718,6 +897,11 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     local generated,deferred,relations={},{},{}
     local contain_bans,contain_origins,contain_verbs={},{},{}
     local write_bans,write_origins,write_verbs={},{},{}
+    local function add_ban(store,verb,key,target,condition)
+        store[verb]=store[verb] or {};local bans=store[verb]
+        bans[key]=bans[key] or {};bans[key][target]=bans[key][target] or {}
+        bans[key][target][#bans[key][target]+1]=query_clone(condition)
+    end
     local function append(list,items) for _,item in ipairs(items) do list[#list+1]=item end end
     for _,ast in ipairs(ast_rules) do
         if type(ast) ~= "table" or type(ast.when) ~= "table" then return nil,"invalid_ast_rule" end
@@ -739,18 +923,19 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         else subjects={subj} end
         local sem=registry[ast.verb]
         local supported=false
+        local generated_start,relations_start=#generated+1,#relations+1
+        local contextual=ast.when.op == "spatial"
         for _,subject in ipairs(subjects) do
             local rule=query_clone(ast); rule.subject=subject; rule.object=objnot and {tag="not",operand=obj} or obj
             local key=subject_key(subject)
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
-            if sem and key and ast.when.op == "always" and sem.noun == "write_text"
+            if sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "write_text"
                 and (not objnot or sem.negative_noun == "forbid_write") then
                 local token=written_token(world,obj)
                 if token then
                     if objnot then
-                        write_bans[ast.verb]=write_bans[ast.verb] or {}
-                        local bans=write_bans[ast.verb];bans[key]=bans[key] or {};bans[key][token]=true
+                        add_ban(write_bans,ast.verb,key,token,ast.when)
                     else
                         local products={token}
                         if obj.tag == "special" and obj.name == "all" then
@@ -769,15 +954,13 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     end
                     supported=true
                 end
-            elseif sem and key and ast.when.op == "always" and sem.noun == "contain"
+            elseif sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "contain"
                 and objnot and sem.negative_noun == "forbid_contain" then
                 local target=subject_key(obj)
                 if obj.tag == "special" and obj.name == "all" then target="@all" end
                 if obj.tag == "noun" and obj.type and obj.type.tag == "level" then target=obj.type.block_type or "level_block" end
                 if target and key ~= "@empty" then
-                    contain_bans[ast.verb]=contain_bans[ast.verb] or {}
-                    local bans=contain_bans[ast.verb]
-                    bans[key]=bans[key] or {};bans[key][target]=true
+                    add_ban(contain_bans,ast.verb,key,target,ast.when)
                     supported=true
                 end
             elseif sem and key and obj.tag == "property" and sem.property == "grant_trait"
@@ -787,7 +970,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     target=special and (key == "@text" and {kind="class",value="text"} or {kind="empty",value="empty"})
                         or {kind="archetype",value=key}}}}
                 supported=true
-            elseif sem and key and ast.when.op == "always" and sem.noun == "contain" and not objnot
+            elseif sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "contain" and not objnot
                 and obj.tag == "special" and (obj.name == "all" or obj.name == "empty") then
                 if obj.name == "all" and key ~= "@empty" then
                     for _,name in ipairs(RW_NounPalette(world)) do
@@ -797,7 +980,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     end
                 end
                 supported=key ~= "@empty"
-            elseif sem and key and ast.when.op == "always" and sem.noun == "transform" then
+            elseif sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "transform" then
                 local target=subject_key(obj)
                 if obj.tag == "noun" and obj.type and obj.type.tag == "level" then target=obj.type.block_type or "level_block" end
                 if obj.tag == "special" and obj.name == "all" then target="@all" end
@@ -811,6 +994,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     relations[#relations+1]={op=op,source_type=key,target_type=target,source=ast.source}
                     supported=true
                 else
+                    if contextual then rule.when={op="always"} end
                     local g,d,r=lower_simple({rule},registry)
                     if not g then return nil,d end
                     append(generated,g);append(relations,r);supported=supported or #d == 0
@@ -818,7 +1002,10 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             elseif sem and key == "@empty" and sem.noun == "contain" then
                 -- Empty destruction/HAS needs cell-local lifecycle state, not IDs.
                 supported=false
+            elseif contextual and subject.tag == "noun" and subject.type and subject.type.tag == "level" then
+                supported=false -- Scoped LEVEL surroundings require the campaign context.
             else
+                if contextual then rule.when={op="always"} end
                 local g,d,r=lower_simple({rule},registry)
                 if not g then return nil,d end
                 append(generated,g);append(relations,r);supported=supported or #d == 0
@@ -836,6 +1023,10 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 end
             end
         end
+        if contextual then
+            for index=generated_start,#generated do generated[index].when=query_clone(ast.when) end
+            for index=relations_start,#relations do relations[index].when=query_clone(ast.when) end
+        end
         if not supported and #subjects > 0 then deferred[#deferred+1]=ast end
     end
     local filtered={}
@@ -845,11 +1036,23 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local key=relation.target.kind == "class" and "@text" or relation.target.value
             local bans=(contain_bans[contain_verbs[index]] or {})[key] or {}
             local product=relation.product.kind == "text" and "@text" or relation.product.archetype
-            blocked=bans[product] or (contain_origins[index] == "@all" and bans["@all"])
+            relation.exclusions={}
+            for _,condition in ipairs(bans[product] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
+            if contain_origins[index] == "@all" then
+                for _,condition in ipairs(bans["@all"] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
+            end
         end
         if relation.op == "write_text" then
             local bans=(write_bans[write_verbs[index]] or {})[relation.source_type] or {}
-            blocked=bans[relation.target_text] or bans[write_origins[index]]
+            relation.exclusions={}
+            for _,condition in ipairs(bans[relation.target_text] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
+            if write_origins[index] ~= relation.target_text then
+                for _,condition in ipairs(bans[write_origins[index]] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
+            end
+        end
+        if relation.exclusions then
+            for _,condition in ipairs(relation.exclusions) do if condition.op == "always" then blocked=true end end
+            if #relation.exclusions == 0 then relation.exclusions=nil end
         end
         if not blocked then filtered[#filtered+1]=relation end
     end
@@ -1181,7 +1384,9 @@ function RW_PlanHasBirths(world, victims, relations)
         if not entity or seen[id] then return nil,"invalid_has_victim" end
         seen[id]=true
         for _,relation in ipairs(relations) do
-            if matches(entity,relation.target,world) then
+            local enabled,err=RW_RelationApplies(world,relation,entity)
+            if enabled == nil then return nil,err end
+            if matches(entity,relation.target,world) and enabled then
                 local product={kind="object",class=relation.product.kind == "text" and "text" or "object",
                     x=entity.x,y=entity.y,direction=entity.direction}
                 if product.class == "text" then product.text={name=RW_NounTextName(world,entity)}

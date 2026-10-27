@@ -162,7 +162,7 @@ end
 -- This parser does not execute rules.
 
 local AST_VERBS = {
-    write = {phase="conversion",rhs={noun=true,property=true,special=true}},
+    write = {phase="conversion",rhs={noun=true,property=true,special=true,literal=true}},
     is = {
         phase = "relation",
         rhs = {
@@ -235,7 +235,7 @@ local function valid_verb_registry(registry)
         end
         local categories = 0
         for category, enabled in pairs(spec.rhs) do
-            if (category ~= "noun" and category ~= "property" and category ~= "special")
+            if (category ~= "noun" and category ~= "property" and category ~= "special" and category ~= "literal")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then categories = categories + 1 end
         end
@@ -274,6 +274,7 @@ end
 
 local function ast_valid_language(language)
     return type(language) == "table"
+        and (language.prepositions == nil or type(language.prepositions) == "table")
         and type(language.nouns) == "table"
         and type(language.properties) == "table"
         and type(language.verbs) == "table"
@@ -332,6 +333,10 @@ local function ast_term_options(token, language, property_ok)
         end
     end
 
+    if property_ok and ((language.verbs or {})[token] or (language.prepositions or {})[token]
+        or (language.operators or {})[token] == "and") then
+        result[#result+1]={tag="literal",token=token}
+    end
     return result
 end
 
@@ -487,6 +492,83 @@ local function ast_parse_candidate(
     end
 end
 
+-- Canonical syntax: subjects joined by AND, followed by spatial clauses.
+local function ast_parse_heads(line,language,output)
+    local cells=line.cells
+    local registry=language.verb_registry or AST_VERBS
+    local operators=language.operators or {}
+    local budget=0
+    local function append(a,b)
+        local r=ast_clone(a);for _,v in ipairs(b) do r[#r+1]=v end;return r
+    end
+    local function terms(position,property_ok,callback,prefixes)
+        budget=budget+1;if budget > 50000 or #output > 50000 then return end
+        prefixes=prefixes or {}
+        for _,word in ipairs(cells[position] or {}) do
+            if ast_is_not(word,language) then terms(position+1,property_ok,callback,append(prefixes,{word})) end
+            for _,term in ipairs(ast_term_options(word.token,language,property_ok)) do
+                callback(ast_wrap_not(term,#prefixes),position+1,append(prefixes,{word}),#prefixes)
+            end
+        end
+    end
+    for start=1,#cells do
+        local walk
+        walk=function(subjects,clauses,position,path,leading)
+            budget=budget+1;if budget > 50000 or #output > 50000 then return end
+            for _,word in ipairs(cells[position] or {}) do
+                local verb=language.verbs[word.token];local spec=registry[verb]
+                if spec then
+                    terms(position+1,true,function(object,finish,rhs)
+                        local raw=object;while raw.tag == "not" do raw=raw.operand end
+                        if spec.rhs[raw.tag] then
+                            local chosen=append(append(path,{word}),rhs)
+                            local ids={};for _,w in ipairs(chosen) do ids[#ids+1]=w.id end
+                            for _,subject in ipairs(subjects) do
+                                local base={subject=ast_clone(subject),verb=verb,object=object,
+                                    when=#clauses == 0 and {op="always"} or {op="spatial",clauses=ast_clone(clauses)},
+                                    source={axis=line.axis,line=line.index,start=start,finish=finish-1,
+                                        leading_not=leading > 0,prefix_finish=position-1,entity_ids=ids}}
+                                ast_extend_rhs(base,chosen,language,line,start,output)
+                            end
+                        end
+                    end)
+                end
+                if operators[word.token] == "and" and #clauses == 0 then
+                    terms(position+1,false,function(subject,finish,words)
+                        walk(append(subjects,{subject}),clauses,finish,append(append(path,{word}),words),leading)
+                    end)
+                end
+            end
+            local function condition_at(cursor,prefix)
+                for _,word in ipairs(cells[cursor] or {}) do
+                    if ast_is_not(word,language) then condition_at(cursor+1,append(prefix,{word})) end
+                    local relation=(language.prepositions or {})[word.token]
+                    if relation == "on" or relation == "near" then
+                        local arguments
+                        arguments=function(at,params,words)
+                            terms(at,false,function(parameter,finish,more)
+                                local next_params=append(params,{parameter});local next_words=append(words,more)
+                                local clause={relation=relation,negated=#prefix % 2 == 1,parameters=next_params}
+                                walk(subjects,append(clauses,{clause}),finish,append(path,next_words),leading)
+                                for _,conjunction in ipairs(cells[finish] or {}) do
+                                    if operators[conjunction.token] == "and" then
+                                        arguments(finish+1,next_params,append(next_words,{conjunction}))
+                                    end
+                                end
+                            end)
+                        end
+                        arguments(cursor+1,{},append(prefix,{word}))
+                    end
+                end
+            end
+            condition_at(position,{})
+        end
+        terms(start,false,function(subject,position,path,leading) walk({subject},{},position,path,leading) end)
+    end
+    if budget > 50000 or #output > 50000 then return nil,"rule_complexity_limit" end
+    return true
+end
+
 -- Suppress only the shorter candidate that starts inside
 -- a valid leading NOT expression and shares exactly the same
 -- physical word instances. Other overlaps are legitimate.
@@ -498,10 +580,12 @@ local function ast_filter_shadowed(rules)
     end
     local hidden={}
     for _,rule in ipairs(rules) do
-        if rule.source.leading_not then
+        local count=rule.source.prefix_finish and (rule.source.prefix_finish-rule.source.start)
+            or (rule.source.leading_not and 1 or 0)
+        for offset=1,count do
             local suffix={}
-            for i=2,#rule.source.entity_ids do suffix[#suffix+1]=rule.source.entity_ids[i] end
-            hidden[key(rule,rule.source.start+1,suffix)]=true
+            for i=offset+1,#rule.source.entity_ids do suffix[#suffix+1]=rule.source.entity_ids[i] end
+            hidden[key(rule,rule.source.start+offset,suffix)]=true
         end
     end
     local filtered={}
@@ -604,6 +688,10 @@ function RW_ParseRuleAST(lines, language)
                 if span >= 3 and variants >= 5000 then return nil,"rule_complexity_limit" end
             end
         end
+        if order[1] == "subject" and order[2] == "verb" and order[3] == "object" then
+            local ok,err=ast_parse_heads(line,language,output)
+            if not ok then return nil,err end
+        else
         local budget=0
         for start=1,#cells do
             local chosen={}
@@ -638,6 +726,7 @@ function RW_ParseRuleAST(lines, language)
             role_at(1,start,0,0)
         end
         if budget > 50000 or #output > 50000 then return nil,"rule_complexity_limit" end
+        end -- alternate role order
     end
 
     return ast_filter_shadowed(output)

@@ -81,3 +81,14 @@
   each SINK/DEFEAT victim independently, never conversions or CRASH. Check CRASH on
   surviving real units after destruction using the frozen rule frame (EMPTY excluded).
   See docs/TERMINAL_WORDS.md for source references, tests and manual routes.
+
+- ON/NEAR are per-identity spatial conditions, never one board-global Boolean.
+  NEAR includes the same cell and eight neighbors, excludes the source identity;
+  parameters joined by AND require distinct witnesses. Preserve original concrete-before-
+  complement evaluation and ON NOT EMPTY counting. Relation conditions/exclusions must
+  re-evaluate per conversion source and per HAS victim in the frozen contact frame.
+- Canonical syntax supports subject AND and ON/NEAR clauses; keep complete physical
+  sentence multiplicity and suppress interior subject/condition suffix parses.
+  Existing alternate role orders keep their prior simple/RHS-AND behavior.
+  WRITE syntax-word literals are an intentional extension requested by the user;
+  do not accidentally accept them as IS/HAS noun arguments. See docs/SPATIAL_WORDS.md.

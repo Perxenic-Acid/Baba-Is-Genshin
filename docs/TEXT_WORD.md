@@ -87,3 +87,5 @@ tests/text_word.lua 验证类转换/身份/指向、混合重复产物、原子�
 重叠重复规则与关卡导航回归通过。离线验证不代表本步已真机验收。
 
 Flag 不再有隐藏的 WIN 预设。旧 A/B、T 胜利测试关卡通过棋盘上可见的 FLAG IS WIN 赋予属性。
+
+M9.3V：主语 AND、ON/NEAR 条件及 WRITE 语法词已接入，见 [SPATIAL_WORDS.md](SPATIAL_WORDS.md)。

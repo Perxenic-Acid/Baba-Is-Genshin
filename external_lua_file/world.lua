@@ -509,6 +509,7 @@ local function default_world()
                     STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
+                prepositions = {ON="on",NEAR="near"},
                 operators = {AND="and",NOT="not"}
             }
     }
@@ -1440,6 +1441,12 @@ function RW_GetNavigationDefinitions()
             x=index*3,y=12,direction="None"}
         combos.next_entity_id=id+1
     end
+    for index,spec in ipairs({{"ON",1,12},{"NEAR",12,12},{"AND",12,4}}) do
+        local id=31+index
+        combos.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},
+            x=spec[2],y=spec[3],direction="None"}
+        combos.next_entity_id=id+1
+    end
     definitions["navigation.specials"]={id="navigation.specials",initial_world=combos}
     portal(root,51,3,2,"NAT","navigation.specials")
     local loop=clone(lab)
@@ -1474,6 +1481,30 @@ function RW_GetNavigationDefinitions()
     end
     definitions["navigation.complex"]={id="navigation.complex",initial_world=complex}
     portal(root,53,6,2,"TC","navigation.complex")
+    local conditions=clone(lab)
+    conditions.entities={};conditions.next_entity_id=1
+    conditions.language.nouns.FLAG="flag"
+    object(conditions,1,"avatar",4,5)
+    object(conditions,2,"rock",4,4)
+    object(conditions,3,"flag",4,3)
+    object(conditions,4,"crate",9,4)
+    object(conditions,5,"rock",8,4)
+    object(conditions,6,"cursor",1,1)
+    portal(conditions,7,2,1,"PARENT")
+    object(conditions,8,"line",1,1)
+    grant(conditions,"crate","pushable")
+    for row,words in ipairs({{"ROCK","ON","FLAG","IS","WORD"},
+        {"ROCK","NEAR","CRATE","IS","WORD"},{"CRATE","AND","FLAG","IS","SAFE"}}) do
+        for offset,token in ipairs(words) do
+            local id=conditions.next_entity_id
+            conditions.entities[id]={id=id,kind="object",class="text",text={name=token},
+                x=offset+1,y=5+row*2,direction="None"}
+            conditions.next_entity_id=id+1
+        end
+    end
+    definitions["navigation.conditions"]={id="navigation.conditions",initial_world=conditions}
+    portal(root,54,8,1,"COND","navigation.conditions")
+    object(root,55,"line",8,1)
     -- WIN is authored visibly in these two victory fixtures, never a Flag default.
     for _,world in ipairs({puzzle,transform}) do
         for offset,token in ipairs({"FLAG","IS","WIN"}) do

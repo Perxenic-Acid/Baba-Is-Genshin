@@ -30,7 +30,8 @@ TEXT/EMPTY/ALL；WRITE NOT 取消对应产物，WRITE NOT ALL 只取消 ALL 展�
 重复物理规则保留重复产物，ALL WRITE ALL 保留两条展开路径。
 结果保留位置、方向及 level_link，首个产物保留 ID，多产物使用事务分配器；
 转换不触发 HAS。Text 写成相同的 Text 不提交冗余 retype，后续重复产物仍创建。
-尚不支持谓词/连接词作为 WRITE 的 RHS，也沿用已有作用域 LEVEL 文字转换未实现的边界。
+M9.3V 按用户要求扩展了已注册谓词、ON/NEAR、AND 的 WRITE RHS；
+沿用已有作用域 LEVEL 文字转换未实现的边界，见 SPATIAL_WORDS.md。
 
 SAFE 接入已实现的 SINK/DEFEAT，以及作用域 LEVEL 的 DEFEAT 保护。
 它不抑制转换、CRASH 或复杂度终止。EMPTY 的销毁/HAS 和尚未实现的其他销毁词仍属后续工作。

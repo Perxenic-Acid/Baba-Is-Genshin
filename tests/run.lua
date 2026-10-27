@@ -19,7 +19,7 @@ printerr = function(...) error(table.concat({...}, " ")) end
 local keys = {
     KeyboardMoveForwardKeyDown = "up", KeyboardMoveBackwardKeyDown = "down",
     KeyboardMoveLeftKeyDown = "left", KeyboardMoveRightKeyDown = "right",
-    KeyboardCraftspersonKey12Down = "undo", KeyboardInteractKeyDown = "confirm"
+    KeyboardCraftspersonKey12Down = "undo", KeyboardInteractKeyDown = "confirm", KeyboardJumpKeyDown="wait"
 }
 Enum = {KeyEventType = keys}
 script = {object = {
@@ -357,6 +357,25 @@ press("SSSAAWWDDDDDDDDWAAAAASSD")
 assert(rendered.width==12 and rendered.entities[3].level_link.label=="WHERE")
 press("Z");assert(rendered.width==24 and avatar(rendered).x==11)
 print("PASS: official BIY and WHERE solutions, boundary WIN/Undo, rule break/rebuild and activation")
+while history_depth>0 do listeners.undo() end
+press("DDDDDDDDDDFDDDF")
+assert(rendered.width==24 and rendered.height==18 and avatar(rendered).x==15 and avatar(rendered).y==15)
+assert(avatar(rendered).behaviors.control and avatar(rendered).behaviors.push)
+local source
+for _,e in pairs(rendered.entities) do if e.archetype=="belt" and e.x==16 and e.y==11 then source=e end end
+assert(source and source.behaviors.shift and source.direction=="Up")
+press("DWWWW")
+assert(avatar(rendered).x==16 and avatar(rendered).y==10 and avatar(rendered).direction=="Up")
+press("Z")
+assert(avatar(rendered).x==16 and avatar(rendered).y==12)
+press("W")
+assert(avatar(rendered).y==10)
+local before_wait=history_depth
+listeners.wait()
+assert(avatar(rendered).y==10 and history_depth==before_wait+1)
+press("Z")
+assert(avatar(rendered).y==10 and history_depth==before_wait)
+print("PASS: official Chasm Automated Doors imports WORD/NOT/AND, belt SHIFT, wait binding and atomic Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -398,3 +417,5 @@ dofile("tests/weak.lua")
 dofile("tests/float.lua")
 
 dofile("tests/text_activation.lua")
+
+dofile("tests/shift.lua")

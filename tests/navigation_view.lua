@@ -77,6 +77,14 @@ methods.AddCursorEventListener=mouse_listener
 assert(RW_RendererSelfTest())
 assert(RW_Render(typed,0,1))
 assert(not rows.RW_Choice_44.alive)
+local conveyor={width=2,height=2,entities={
+ [1]={id=1,kind="object",class="object",archetype="belt",x=1,y=1,direction="Up",behaviors={shift=true}}
+}}
+assert(RW_Render(conveyor,0,0))
+local belt_view
+for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then belt_view=c end end
+assert(belt_view.text=="^" and belt_view.bgColor[1]==65)
+conveyor.entities[1].direction="Right";assert(RW_Render(conveyor,0,0));assert(belt_view.text==">")
 local words={width=5,height=2,active_text_ids={[1]=true},entities={
  [1]={id=1,kind="object",class="text",text={name="IS"},x=2,y=1,behaviors={}},
  [2]={id=2,kind="object",class="text",text={name="WIN"},x=4,y=1,behaviors={win=true,defeat=true}}

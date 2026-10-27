@@ -16,7 +16,8 @@ and undoing rules refreshes colors. Terminal boards still render without parsing
 ## Imported fixtures
 
 Source: installed official `Data/Worlds/baba/0level.l/.ld` (Baba Is You) and
-`1level.l/.ld` (Where Do I Go?), with tile definitions from `Data/values.lua`.
+`1level.l/.ld` (Where Do I Go?), plus `163level.l/.ld` (Automated Doors, Chasm),
+with tile definitions from `Data/values.lua`.
 These are temporary engine test fixtures, not our authored level pack.
 
 `tools/import_baba_reference.py` reads zlib MAIN tile grids and DATA direction
@@ -32,14 +33,15 @@ Adaptations:
 * The special EDGE border becomes the world boundary: dimensions shrink by two;
   original interior coordinate (x,y) becomes Lua (x,y). No playable rows/columns
   are cropped. Object/Text coordinates and authored directions are preserved.
-* A Cursor/Line and parent link occupy the empty upper-left corner for navigation.
+* A Cursor/Line and parent link occupy an empty corner for navigation; Automated
+  Doors uses the lower-left corner because its upper-left contains rule tiles.
 * Base Text Push/Cursor Select/Line Path/Level Stop remain; no hidden Avatar You,
   Rock Push, Wall Stop or Flag Win is added. Those rules must come from the tiles.
 
 ## Navigation and manual checks
 
 Root cursor starts at (2,2): D ten times, F opens REF.
-REF: D, F enters BIY; D twice, F enters WHERE. The cursor stays on the chosen
+REF: D, F enters BIY; D twice, F enters WHERE; D three times, F enters AUTO. The cursor stays on the chosen
 portal after returning, so adjust the number of moves accordingly.
 
 BIY: D eight times pushes through the Rock barrier, reaches Flag and wins.
@@ -62,3 +64,11 @@ can make the 33-wide reference board's words small; no gameplay coordinates chan
 
 Run `luatex --luaonly tests/run.lua` for the full suite and startup budget check.
 Normal start remains self-test-free; real-device acceptance is pending.
+
+## Later reference: Automated Doors (M9.4B)
+
+The official Chasm map (`182level.ld`) references `163level` as Automated Doors.
+AUTO preserves the authored WORD/NOT/AND rules and directional belts. SHIFT is
+implemented for this fixture; see SHIFT.md. The native regression checks initial
+YOU/PUSH, belt SHIFT, entering the upper passage, wait and atomic Undo. It does
+not claim an end-to-end proof of every solution to this more complex puzzle.

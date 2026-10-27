@@ -506,7 +506,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float"
+                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {ON="on",NEAR="near"},
@@ -1626,7 +1626,7 @@ function RW_GetNavigationDefinitions()
     local function official_world(width,height,entries)
         local world=RW_CreateSession().world
         world.width=width;world.height=height;world.entities={};world.next_entity_id=1
-        world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall"}
+        world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall",BELT="belt"}
         for _,spec in ipairs(entries) do
             local id=world.next_entity_id
             if spec[1]:sub(1,5) == "text_" then
@@ -1635,8 +1635,11 @@ function RW_GetNavigationDefinitions()
                 world.next_entity_id=id+1
             else object(world,id,spec[1],spec[2],spec[3]);world.entities[id].direction=spec[4] end
         end
+        local navigation_y=1
+        for _,e in pairs(world.entities) do if e.y==1 and e.x<=2 then navigation_y=height end end
+        for _,e in pairs(world.entities) do assert(not (e.y==navigation_y and e.x<=2),"reference navigation overlaps authored objects") end
         local id=world.next_entity_id
-        object(world,id,"cursor",1,1);portal(world,id+1,2,1,"PARENT");object(world,id+2,"line",1,1)
+        object(world,id,"cursor",1,navigation_y);portal(world,id+1,2,navigation_y,"PARENT");object(world,id+2,"line",1,navigation_y)
         return world
     end
     -- Original 0level: baba is you; .l SHA256 4762df8b454da9a790f7e0ecd99bf2b6270b056c27bd12a855b2c09ea6507c7c
@@ -1751,12 +1754,139 @@ function RW_GetNavigationDefinitions()
         {"wall",16,17,"Down"},
         {"wall",17,17,"Down"},
     })}
+    -- Original 163level: automated doors; .l SHA256 396f04a62715359b6163013f37e922e5aefe5d7d332e6a6251397755f11ee29c
+    definitions["reference.2"]={id="reference.2",initial_world=official_world(24,18,{
+        {"text_avatar",1,1,"Down"},
+        {"text_is",2,1,"Down"},
+        {"text_you",3,1,"Down"},
+        {"text_and",4,1,"Up"},
+        {"text_push",5,1,"Up"},
+        {"wall",6,1,"Up"},
+        {"wall",23,1,"Right"},
+        {"text_wall",24,1,"Down"},
+        {"text_flag",1,2,"Down"},
+        {"text_is",2,2,"Right"},
+        {"text_win",3,2,"Down"},
+        {"wall",4,2,"Up"},
+        {"wall",5,2,"Up"},
+        {"wall",6,2,"Up"},
+        {"wall",12,2,"Left"},
+        {"wall",13,2,"Left"},
+        {"wall",14,2,"Down"},
+        {"wall",15,2,"Down"},
+        {"wall",16,2,"Down"},
+        {"wall",17,2,"Right"},
+        {"wall",18,2,"Right"},
+        {"wall",19,2,"Left"},
+        {"wall",23,2,"Left"},
+        {"text_is",24,2,"Down"},
+        {"wall",1,3,"Down"},
+        {"wall",2,3,"Down"},
+        {"wall",3,3,"Down"},
+        {"wall",4,3,"Left"},
+        {"wall",12,3,"Down"},
+        {"wall",15,3,"Right"},
+        {"text_wall",16,3,"Right"},
+        {"text_is",17,3,"Right"},
+        {"text_stop",18,3,"Right"},
+        {"wall",19,3,"Left"},
+        {"wall",23,3,"Down"},
+        {"text_wall",24,3,"Down"},
+        {"wall",12,4,"Left"},
+        {"wall",19,4,"Down"},
+        {"wall",23,4,"Down"},
+        {"text_and",24,4,"Down"},
+        {"wall",12,5,"Down"},
+        {"text_rock",14,5,"Down"},
+        {"text_is",15,5,"Down"},
+        {"text_word",16,5,"Down"},
+        {"wall",19,5,"Down"},
+        {"wall",23,5,"Down"},
+        {"text_not",24,5,"Down"},
+        {"wall",12,6,"Down"},
+        {"wall",19,6,"Left"},
+        {"wall",23,6,"Left"},
+        {"text_you",24,6,"Down"},
+        {"wall",12,7,"Down"},
+        {"wall",19,7,"Down"},
+        {"wall",23,7,"Down"},
+        {"wall",24,7,"Down"},
+        {"wall",12,8,"Down"},
+        {"wall",16,8,"Right"},
+        {"wall",19,8,"Down"},
+        {"wall",23,8,"Down"},
+        {"wall",24,8,"Left"},
+        {"wall",12,9,"Down"},
+        {"wall",19,9,"Down"},
+        {"wall",23,9,"Left"},
+        {"text_belt",24,9,"Left"},
+        {"wall",12,10,"Right"},
+        {"wall",15,10,"Down"},
+        {"wall",18,10,"Down"},
+        {"wall",19,10,"Down"},
+        {"wall",23,10,"Down"},
+        {"text_is",24,10,"Down"},
+        {"wall",12,11,"Left"},
+        {"wall",13,11,"Down"},
+        {"wall",14,11,"Down"},
+        {"wall",15,11,"Down"},
+        {"belt",16,11,"Up"},
+        {"wall",17,11,"Down"},
+        {"wall",18,11,"Down"},
+        {"wall",19,11,"Right"},
+        {"wall",23,11,"Down"},
+        {"text_belt",24,11,"Down"},
+        {"wall",23,12,"Down"},
+        {"text_and",24,12,"Down"},
+        {"wall",5,13,"Down"},
+        {"belt",6,13,"Down"},
+        {"wall",7,13,"Right"},
+        {"wall",8,13,"Right"},
+        {"wall",9,13,"Right"},
+        {"wall",10,13,"Right"},
+        {"wall",11,13,"Right"},
+        {"text_you",15,13,"Down"},
+        {"text_not",17,13,"Down"},
+        {"wall",23,13,"Down"},
+        {"text_shift",24,13,"Down"},
+        {"wall",5,14,"Down"},
+        {"wall",11,14,"Down"},
+        {"wall",23,14,"Down"},
+        {"text_and",24,14,"Down"},
+        {"wall",5,15,"Down"},
+        {"text_is",6,15,"Down"},
+        {"text_is",9,15,"Down"},
+        {"text_flag",10,15,"Right"},
+        {"wall",11,15,"Right"},
+        {"avatar",15,15,"Right"},
+        {"rock",17,15,"Right"},
+        {"wall",23,15,"Right"},
+        {"text_not",24,15,"Down"},
+        {"wall",5,16,"Right"},
+        {"text_defeat",6,16,"Right"},
+        {"wall",11,16,"Right"},
+        {"wall",23,16,"Right"},
+        {"text_you",24,16,"Down"},
+        {"wall",5,17,"Right"},
+        {"wall",6,17,"Right"},
+        {"wall",7,17,"Right"},
+        {"wall",8,17,"Right"},
+        {"wall",9,17,"Right"},
+        {"wall",10,17,"Right"},
+        {"wall",11,17,"Right"},
+        {"wall",23,17,"Right"},
+        {"wall",24,17,"Down"},
+        {"wall",23,18,"Right"},
+        {"wall",24,18,"Right"},
+    })}
     local reference_map=RW_CreateSession().world
     reference_map.entities={};reference_map.next_entity_id=1
     object(reference_map,1,"cursor",2,2)
     portal(reference_map,2,3,2,"BIY","reference.0")
     portal(reference_map,3,4,2,"WHERE","reference.1")
     portal(reference_map,4,1,2,"PARENT")
+    portal(reference_map,9,5,2,"AUTO","reference.2")
+    object(reference_map,10,"line",5,2)
     for x=1,4 do object(reference_map,4+x,"line",x,2) end
     definitions["navigation.reference"]={id="navigation.reference",initial_world=reference_map}
     portal(root,64,12,2,"REF","navigation.reference")

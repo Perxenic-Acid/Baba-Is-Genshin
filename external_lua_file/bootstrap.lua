@@ -130,7 +130,7 @@ function RW_PlanTurn(world, action, services)
     end
 
     trace[#trace + 1] = "rules_before"
-    local effects, rule_error, before_conversions = services.evaluate(world)
+    local effects, rule_error, before_conversions, before_rules = services.evaluate(world)
     if not effects then return fail("rules_before", rule_error) end
 
     trace[#trace + 1] = "project"
@@ -166,6 +166,36 @@ function RW_PlanTurn(world, action, services)
             for _,change in ipairs(stage.plan.changes) do movement_prefix.changes[#movement_prefix.changes+1]=change end
         end
         preview=after
+    end
+    if services.shift then
+        local refreshed,why=services.refresh(preview,before_rules)
+        if not refreshed then return fail("shift_rules",why) end
+        local shifted_world,err=services.project(preview,refreshed,level_traits_from(before_conversions))
+        if not shifted_world then return fail("shift_project",err) end
+        local shift,shift_error=services.shift(shifted_world)
+        if not shift then return fail("shift",shift_error) end
+        local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,
+            changes=movement.changes,board_shift=movement.board_shift}}}
+        stages[#stages+1]={name="shift",plan={consumes_turn=true,changes=shift.changes}}
+        local after,problem=services.preview(preview,stages[#stages].plan)
+        if not after then return fail("preview_shift",problem) end
+        if #(shift.destructions or {})>0 then
+            local ids,contents={},{}
+            for _,death in ipairs(shift.destructions) do ids[#ids+1]=death.entity_id end
+            for _,relation in ipairs(before_conversions or {}) do if relation.op=="has" then contents[#contents+1]=relation end end
+            if not services.destroy then return fail("shift_destruction","missing_destruction_service") end
+            local destruction,why=services.destroy(after,ids,contents,"shift",shift.destructions)
+            if not destruction then return fail("shift_destruction",why) end
+            local next_world,err=services.preview(after,destruction)
+            if not next_world then return fail("shift_destruction",err) end
+            stages[#stages+1]={name="shift_destruction",plan=destruction};after=next_world
+        end
+        movement_prefix={consumes_turn=true,reason=movement.reason,changes={},stages=stages}
+        for _,stage in ipairs(stages) do for _,change in ipairs(stage.plan.changes) do
+            movement_prefix.changes[#movement_prefix.changes+1]=change
+        end end
+        preview=after
+        trace[#trace+1]="shift"
     end
     trace[#trace + 1] = "rules_after"
     local post_effects, post_error, conversions = services.evaluate(preview)
@@ -238,7 +268,7 @@ function RW_PlanTurn(world, action, services)
         local weak_new={}
         for _,stage in ipairs(plan.stages) do
             for _,change in ipairs(stage.plan.changes) do
-                if stage.name == "movement_destruction" and change.kind == "create" then weak_new[change.entity_id]=true
+                if (stage.name == "movement_destruction" or stage.name == "shift_destruction") and change.kind == "create" then weak_new[change.entity_id]=true
                 elseif stage.name == "conversion" then weak_new[change.entity_id]=nil end
             end
         end
@@ -866,6 +896,7 @@ local function start(run_self_tests)
     turn_services.contact=function(world,effective,kind,contents)
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services)
     end
+    turn_services.shift=function(world) return movement_api:Invoke("RW_ResolveShift",world) end
     turn_services.destroy=function(world,ids,contents,cause,deaths)
         return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths)
     end
@@ -1367,6 +1398,14 @@ local function start(run_self_tests)
     bind(key.KeyboardMoveLeftKeyDown, -1, 0)
     bind(key.KeyboardMoveRightKeyDown, 1, 0)
 
+    if key.KeyboardJumpKeyDown then
+        root:AddKeyEventListener(key.KeyboardJumpKeyDown,function()
+            if not pending_selection then act({type="wait"}) end
+            return true
+        end)
+        print("[RuleWorld] Wait registered (Space)")
+    end
+
     if key.KeyboardCraftspersonKey12Down then
         root:AddKeyEventListener(
             key.KeyboardCraftspersonKey12Down,
@@ -1404,7 +1443,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4A initialized")
+    print("[RuleWorld] M9.4B initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

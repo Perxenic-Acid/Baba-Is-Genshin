@@ -129,3 +129,11 @@
   installed official MAIN/DATA layers. Keep provenance/hashes and --check parity.
   Preserve play-area coordinates/directions; adaptations are documented. Large
   boards scale within the existing renderer footprint. Keep native start <=2M.
+
+- SHIFT collects same-layer non-self riders after YOU, before rule recompilation
+  and conversion. Each distinct source adds an impulse, first source sets its
+  direction; duplicate SHIFT grants do not multiply a source. Use the ordinary
+  PUSH/STOP/WEAK/unlock solver, record deaths/HAS and blocked facing, then align
+  surviving final co-occupants. Keep SHIFT and shift destruction as sequential
+  atomic stages. Wait consumes a turn without moving YOU/SELECT; terminal states
+  still reject it. See docs/SHIFT.md for timing boundaries and original references.

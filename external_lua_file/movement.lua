@@ -11,7 +11,7 @@ local function has_capability(world, entity, capability)
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", select = "select", select_path = "path",
         win = "win", push = "pushable", block_entry = "block_entry",
-        open="open",shut="shut",safe="safe",weak="weak",float="float"}
+        open="open",shut="shut",safe="safe",weak="weak",float="float",shift="shift"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -768,8 +768,82 @@ function RW_ControlSelfTest()
     return true, "Multiple YOU control passed"
 end
 
+-- SHIFT snapshots its riders after YOU, then applies each collected impulse.
+-- Movement and deaths still use the ordinary collision solver and death frames.
+function RW_ResolveShift(world)
+    local working={};for k,v in pairs(world) do working[k]=v end
+    working.entities={}
+    local ids={}
+    for id,e in pairs(world.entities) do
+        local copy={};for k,v in pairs(e) do copy[k]=v end
+        working.entities[id]=copy;ids[#ids+1]=id
+    end
+    table.sort(ids)
+    local vectors={Left={-1,0},Up={0,-1},Right={1,0},Down={0,1}}
+    local tasks,order={},{}
+    for _,id in ipairs(ids) do
+        local belt=world.entities[id]
+        if has_capability(world,belt,"shift") and vectors[belt.direction] then
+            for _,other_id in ipairs(ids) do
+                local rider=world.entities[other_id]
+                if other_id ~= id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider) then
+                    if not tasks[other_id] then
+                        tasks[other_id]={direction=belt.direction,count=0};order[#order+1]=other_id
+                    end
+                    tasks[other_id].count=tasks[other_id].count+1
+                end
+            end
+        end
+    end
+    local deaths,records={},{}
+    for _,id in ipairs(order) do
+        local task=tasks[id];local vector=vectors[task.direction]
+        for impulse=1,task.count do
+            if not working.entities[id] then break end
+            local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
+            if not part.consumes_turn then return nil,part.reason end
+            -- Original SHIFT turns even a blocked rider.
+            working.entities[id].direction=task.direction
+            for _,change in ipairs(part.changes) do
+                local e=working.entities[change.entity_id]
+                if change.kind=="move" then e.x=change.to.x;e.y=change.to.y;e.direction=change.to.direction
+                elseif change.kind=="direction" then e.direction=change.to end
+            end
+            for _,death in ipairs(part.destructions or {}) do
+                deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+            end
+        end
+    end
+    -- Original moveblock also aligns surviving occupants at their final position,
+    -- without adding another displacement when entering a second belt this turn.
+    for _,id in ipairs(ids) do
+        local belt=working.entities[id]
+        if belt and has_capability(world,belt,"shift") and vectors[belt.direction] then
+            for _,other_id in ipairs(ids) do
+                local rider=working.entities[other_id]
+                if rider and other_id~=id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider) then
+                    rider.direction=belt.direction
+                end
+            end
+        end
+    end
+    local changes={}
+    for _,id in ipairs(ids) do
+        local before=world.entities[id];local after=working.entities[id] or records[id]
+        if before.x~=after.x or before.y~=after.y then
+            changes[#changes+1]={kind="move",entity_id=id,
+                from={x=before.x,y=before.y,direction=before.direction or "None"},
+                to={x=after.x,y=after.y,direction=after.direction or "None"}}
+        elseif (before.direction or "None")~=(after.direction or "None") then
+            changes[#changes+1]={kind="direction",entity_id=id,from=before.direction or "None",to=after.direction or "None"}
+        end
+    end
+    return {consumes_turn=true,changes=changes,destructions=deaths,reason="shift"}
+end
+
 -- SELECT is not YOU: it follows traversable map objects without pushing them.
 function RW_ResolveTurn(world, action)
+    if type(action)=="table" and action.type=="wait" then return {consumes_turn=true,changes={},reason="wait"} end
     local movement_world=world
     if world.empty_cells then
         -- Ephemeral movement agents, never part of a Plan/Commit or allocator.

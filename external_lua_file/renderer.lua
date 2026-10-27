@@ -200,6 +200,9 @@ local function get_label(entity)
     if entity.archetype == "flag" then return "FLAG" end
     if entity.archetype == "skull" then return "SKULL" end
     if entity.archetype == "water" then return "WATER" end
+    if entity.archetype == "belt" then
+        return ({Left="<",Up="^",Right=">",Down="v"})[entity.direction] or "BELT"
+    end
     if entity.archetype == "rock" then return "ROCK" end
     if entity.archetype == "wall" then return "WALL" end
     if entity.archetype == "crate" then return "CRATE" end
@@ -225,6 +228,7 @@ local function get_colors(entity,active)
     if capabilities.win then return Color(238,206,88,255), Color(30,24,10,255) end
     if capabilities.select then return Color(220,220,230,255), Color(20,20,30,255) end
     if capabilities.word then return Color(112,90,170,255), Color(255,255,255,255) end
+    if capabilities.shift then return Color(65,125,125,255),Color(255,255,255,255) end
     if entity.level_link then
         return Color(112,70,145,255), Color(255,255,255,255)
     end

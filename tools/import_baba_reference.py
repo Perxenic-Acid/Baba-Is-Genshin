@@ -16,7 +16,7 @@ def generate(data):
     out = [BEGIN, '''    local function official_world(width,height,entries)
         local world=RW_CreateSession().world
         world.width=width;world.height=height;world.entities={};world.next_entity_id=1
-        world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall"}
+        world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall",BELT="belt"}
         for _,spec in ipairs(entries) do
             local id=world.next_entity_id
             if spec[1]:sub(1,5) == "text_" then
@@ -25,12 +25,15 @@ def generate(data):
                 world.next_entity_id=id+1
             else object(world,id,spec[1],spec[2],spec[3]);world.entities[id].direction=spec[4] end
         end
+        local navigation_y=1
+        for _,e in pairs(world.entities) do if e.y==1 and e.x<=2 then navigation_y=height end end
+        for _,e in pairs(world.entities) do assert(not (e.y==navigation_y and e.x<=2),"reference navigation overlaps authored objects") end
         local id=world.next_entity_id
-        object(world,id,"cursor",1,1);portal(world,id+1,2,1,"PARENT");object(world,id+2,"line",1,1)
+        object(world,id,"cursor",1,navigation_y);portal(world,id+1,2,navigation_y,"PARENT");object(world,id+2,"line",1,navigation_y)
         return world
     end
 ''']
-    for index, stem in enumerate(('0level','1level')):
+    for index, stem in enumerate(('0level','1level','163level')):
         path = data / 'Worlds' / 'baba' / (stem + '.l')
         raw = path.read_bytes()
         ld = path.with_suffix('.ld').read_text(encoding='utf-8-sig')
@@ -55,8 +58,8 @@ def generate(data):
                 name = overrides.get(obj,name)
                 if name in ('tile','grass'): continue
                 name = name.replace('baba','avatar')
-                assert name in ('avatar','rock','flag','wall') or name in {
-                    'text_avatar','text_rock','text_flag','text_wall','text_is','text_you','text_push','text_stop','text_win'}
+                assert name in ('avatar','rock','flag','wall','belt') or name in {
+                    'text_avatar','text_rock','text_flag','text_wall','text_belt','text_is','text_you','text_push','text_stop','text_win','text_word','text_not','text_and','text_defeat','text_shift'}
                 x,y = i%width,i//width
                 assert 0<x<width-1 and 0<y<height-1
                 entries.append((name,x,y,('Right','Up','Left','Down')[directions[i]]))
@@ -73,6 +76,8 @@ def generate(data):
     portal(reference_map,2,3,2,"BIY","reference.0")
     portal(reference_map,3,4,2,"WHERE","reference.1")
     portal(reference_map,4,1,2,"PARENT")
+    portal(reference_map,9,5,2,"AUTO","reference.2")
+    object(reference_map,10,"line",5,2)
     for x=1,4 do object(reference_map,4+x,"line",x,2) end
     definitions["navigation.reference"]={id="navigation.reference",initial_world=reference_map}
     portal(root,64,12,2,"REF","navigation.reference")

@@ -91,3 +91,12 @@ RW_ParseRuleAST 触发 `Lua execution took too long`，尚未创建棋盘。
 重复 NOT、六种语序、物理重叠与 AND 的规则数回归保持通过。
 另修复旧日志暴露的 AddCursorEventListener 缺失：宿主无该方法时不绑定鼠标事件，
 选关继续使用 W/S/F/Z；测试覆盖缺失方法的原生控件。
+
+## TXT 关卡的 Cursor 词典修正
+
+截图的 NOT ROCK IS WORD 应使 Cursor/Line 获得 WORD。原 TXT 关卡放置了这两个普通
+对象，却没有注册相应名词；现已给 TXT 及其 NAT/LOOP 派生关卡补 CURSOR、LINE 与
+特殊 LEVEL 的明确词典项。测试复现 Cursor 和父关卡块重叠，再接 IS TEXT，验证
+Cursor 转成 text_Cursor、父关卡块不转换、Z 恢复 SELECT 与 WORD。
+LEVEL 是特殊名词，不在 NOT ROCK 或 ALL 的展开范围；不会借该句得到 WORD。
+这是与 Cursor 配置遗漏不同的情况；原版依据见 rules.lua:addoption 与 syntax.lua:setupnounlists。

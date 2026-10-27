@@ -119,4 +119,38 @@ local definitions=RW_GetNavigationDefinitions()
 local nat=RW_InstantiateLevel(definitions["navigation.specials"],"test:specials")
 f=compile(nat.world);assert(#f.ast == 0 and #f.deferred == 0)
 p=RW_ProjectWorld(nat.world,f.effects);assert(p.entities[1].behaviors.control)
+-- Screenshot regression: NOT ROCK IS WORD under Cursor+Level / IS / TEXT.
+local screenshot=RW_InstantiateLevel(definitions["navigation.text_word"],"test:cursor-text")
+local w=screenshot.world
+w.entities[12].x=2 -- Cursor shares the parent Level block at (2,1).
+w.entities[5].x,w.entities[5].y=3,1
+w.entities[8].x,w.entities[8].y=4,1
+w.entities[7].x,w.entities[7].y=3,5
+w.entities[6].x,w.entities[6].y=6,5
+w.entities[1].x,w.entities[1].y=4,2
+w.entities[3].x,w.entities[3].y=5,4
+w.entities[9].x,w.entities[9].y=7,8
+f=compile(w)
+assert(f.word_tokens[12] == "CURSOR" and f.word_tokens[14] == "LINE")
+assert(not f.word_tokens[13], "Ordinary NOT must exclude special LEVEL")
+local seen_cursor_conversion=false
+for _,relation in ipairs(f.relations) do
+    if relation.op == "transform_text" and relation.source_type == "cursor" then seen_cursor_conversion=true end
+end
+assert(seen_cursor_conversion)
+local turn_services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,
+    convert=RW_PlanConversions,refresh=RW_EvaluateRules,
+    contact=function(world,effective,kind,contents)
+        return RW_PlanContactPhase(world,effective,kind,contents,{victims=RW_ResolveContactVictims,
+            births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete})
+    end,
+    evaluate=function(world) local frame=compile(world);return frame.effects,nil,frame.relations,frame.rules end}
+local plan,problem=RW_PlanTurn(w,{type="move",dx=1,dy=0},turn_services)
+assert(plan,problem and problem.reason)
+local changed,status=RW_Commit(screenshot,plan);assert(status.accepted,status.reason)
+assert(changed.world.entities[12].class == "text" and changed.world.entities[12].text.name == "CURSOR")
+assert(changed.world.entities[13].archetype == "level_block" and changed.world.entities[13].level_link.target == "parent")
+local restored=RW_Undo(changed);assert(restored.world == w)
+p=projected(restored);assert(p.entities[12].behaviors.select and p.entities[12].behaviors.word)
+print("PASS: screenshot Cursor WORD/IS TEXT conversion on overlapping parent Level and Undo; LEVEL exclusion")
 print("PASS: NOT parity/complements, ALL palette/products, TEXT retype, virtual EMPTY conversion/STOP/YOU/WIN, sandbox")

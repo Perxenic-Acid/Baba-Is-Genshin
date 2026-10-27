@@ -1390,6 +1390,11 @@ function RW_GetNavigationDefinitions()
     }
     lab.next_entity_id=10
     lab.language.nouns.ROCK="rock"
+    -- Authored helper objects are real noun types too: NOT/ALL and WORD must
+    -- see Cursor/Line even without a movable noun tile in the sandbox.
+    lab.language.nouns.CURSOR="cursor"
+    lab.language.nouns.LINE="line"
+    lab.language.nouns.LEVEL={tag="level",block_type="level_block"}
     grant(lab,"avatar","you")
     grant(lab,"rock","pushable") -- Makes the requested object freely movable.
     object(lab,12,"cursor",1,1)

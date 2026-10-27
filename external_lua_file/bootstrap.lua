@@ -139,6 +139,7 @@ function OnStart()
         { "rules",      "RW_ASTLoweringSelfTest" },
         { "world",      "RW_DirectionStateSelfTest" },
         { "world",      "RW_LifecycleSelfTest" },
+        { "world",      "RW_LevelInstanceSelfTest" },
         { "movement",   "RW_DirectionMovementSelfTest" },
     }
 
@@ -881,5 +882,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3I initialized")
+    print("[RuleWorld] M9.3J initialized")
 end

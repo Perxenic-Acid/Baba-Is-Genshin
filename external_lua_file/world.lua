@@ -375,9 +375,8 @@ end
 -- Public API --------------------------------
 
 
-function RW_CreateSession()
+local function default_world()
     return {
-        world = {
             width = 12,
             height = 12,
             next_entity_id = 12,
@@ -468,10 +467,101 @@ function RW_CreateSession()
                     YOU = "you"
                 }
             }
-        },
-
-        history = {}
     }
+end
+
+-- Level definitions are reusable data; sessions own independent runtime snapshots.
+-- No implicit instance allocator: the future parent/campaign owns instance IDs.
+local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true,
+    rule_sources=true, language=true, semantics=true, selectors=true,
+    behavior_registry=true}
+
+local function plain_data(value, visiting)
+    local kind = type(value)
+    if kind == "number" then return value == value and value ~= math.huge and value ~= -math.huge end
+    if kind ~= "table" then return kind == "string" or kind == "boolean" or kind == "nil" end
+    if getmetatable(value) ~= nil then return false end
+    visiting = visiting or {}
+    if visiting[value] then return false end
+    visiting[value] = true
+    for key, item in pairs(value) do
+        if (type(key) ~= "string" and type(key) ~= "number")
+            or not plain_data(key, visiting) or not plain_data(item, visiting) then return false end
+    end
+    visiting[value] = nil
+    return true
+end
+
+local function validate_definition(definition)
+    if type(definition) ~= "table" or not plain_data(definition)
+        or type(definition.id) ~= "string" or definition.id == ""
+        or type(definition.initial_world) ~= "table" then return false end
+    for key in pairs(definition) do
+        if key ~= "id" and key ~= "initial_world" then return false end
+    end
+    local world = definition.initial_world
+    for key in pairs(world) do if not WORLD_FIELDS[key] then return false end end
+    if not is_integer(world.width) or world.width < 1
+        or not is_integer(world.height) or world.height < 1
+        or type(world.entities) ~= "table" or not valid_frontier(world) then return false end
+    for id, entity in pairs(world.entities) do
+        if not valid_new_entity(world, entity, id) then return false end
+    end
+    for _, key in ipairs({"rule_sources", "language", "semantics", "selectors", "behavior_registry"}) do
+        if world[key] ~= nil and type(world[key]) ~= "table" then return false end
+    end
+    return true
+end
+
+function RW_GetDefaultLevelDefinition()
+    return {id = "ruleworld.demo", initial_world = default_world()}
+end
+
+function RW_CreateLevelDefinition(id, initial_world)
+    local definition = {id = id, initial_world = initial_world}
+    if not validate_definition(definition) then return nil, "invalid_level_definition" end
+    return clone(definition)
+end
+
+function RW_InstantiateLevel(definition, instance_id)
+    if not validate_definition(definition) then return nil, "invalid_level_definition" end
+    if type(instance_id) ~= "string" or instance_id == "" then return nil, "invalid_instance_id" end
+    return {definition_id = definition.id, instance_id = instance_id,
+        world = clone(definition.initial_world), history = {}}
+end
+
+-- Existing callers retain the default demo. IDs are local to the owning parent;
+-- entity IDs are local to an instance, never globally unique across instances.
+function RW_CreateSession()
+    return RW_InstantiateLevel(RW_GetDefaultLevelDefinition(), "root")
+end
+
+function RW_LevelInstanceSelfTest()
+    local definition = RW_GetDefaultLevelDefinition()
+    local a = RW_InstantiateLevel(definition, "a")
+    local b = RW_InstantiateLevel(definition, "b")
+    local plan = {consumes_turn=true, changes={{kind="direction", entity_id=1,
+        from="None", to="Left"}}}
+    local moved, result = RW_Commit(a, plan)
+    local restored = RW_Undo(moved)
+    if not result.accepted or moved.instance_id ~= "a"
+        or moved.definition_id ~= definition.id or restored.instance_id ~= "a"
+        or restored.world ~= a.world or #restored.history ~= 0
+        or moved.world.entities[1].direction ~= "Left"
+        or b.world.entities[1].direction ~= "None"
+        or definition.initial_world.entities[1].direction ~= "None" then
+        return false, "Level instance identity/isolation/Undo failed"
+    end
+    definition.initial_world.language.nouns.CRATE = "changed"
+    if a.world.language.nouns.CRATE ~= "crate" or b.world.language.nouns.CRATE ~= "crate" then
+        return false, "Level configuration alias leaked"
+    end
+    local invalid = RW_GetDefaultLevelDefinition()
+    invalid.initial_world.entities[1].behaviors = {control=true}
+    if RW_InstantiateLevel(invalid, "bad") ~= nil then
+        return false, "Derived runtime state accepted as level definition"
+    end
+    return true, "Level definition/runtime instance isolation passed"
 end
 
 -- Preview without recording history. Used for post-movement
@@ -525,6 +615,8 @@ function RW_Commit(session, plan)
 
     return {
         world = next_world,
+        definition_id = session.definition_id,
+        instance_id = session.instance_id,
         history = history
     }, {
         accepted = true,
@@ -550,6 +642,8 @@ function RW_Undo(session)
 
     return {
         world = previous_world,
+        definition_id = session.definition_id,
+        instance_id = session.instance_id,
         history = history
     }, {
         accepted = true,

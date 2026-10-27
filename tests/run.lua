@@ -70,3 +70,5 @@ dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
 dofile("tests/registration.lua")
 dofile("tests/selectors_behaviors.lua")
+
+dofile("tests/levels.lua")

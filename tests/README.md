@@ -27,7 +27,7 @@ In-game startup should report both new direction self-tests as passed and
 `pipeline atomic turn scheduler`, `Atomic create/delete, ID allocation and Undo passed`,
 `pipeline created/deleted Text rules / Undo`,
 `pipeline alternate grammar/semantics behavior / Undo`,
-`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3I initialized`.
+`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3J initialized`.
 Native rendering/input still require an in-game check.
 
 The runner also loads `tests/scheduler.lua`, which checks the extracted turn
@@ -57,3 +57,9 @@ before RW_ProjectWorld. The new tests/selectors_behaviors.lua checks selector
 coverage and isolated registries, capability mapping/retraction, explicit empty
 registries, and invalid data rejection. Startup also exercises custom selectors
 and behavior names through blocking, pushing, condition changes and atomic Undo.
+
+M9.3J adds tests/levels.lua and RW_LevelInstanceSelfTest. It checks definition
+ownership, independent runtime/configuration/ID allocation/history, real rule and
+PUSH scheduling, Commit/Undo identity, invalid templates and empty levels.
+In-game startup should additionally report Level definition/runtime instance
+isolation passed. No new script mapping is needed.

@@ -14,8 +14,8 @@ end
 -- Services must treat world/context inputs as read-only.
 function RW_PlanTurn(world, action, services)
     local trace = {}
-    local function fail(stage, reason)
-        return nil, {stage = stage, reason = reason or "stage_failed", trace = trace}
+    local function fail(stage, reason, phase)
+        return nil, {stage = stage, reason = reason or "stage_failed", phase=phase,trace = trace}
     end
     if type(world) ~= "table" or type(world.entities) ~= "table" then
         return fail("input", "invalid_world")
@@ -70,20 +70,24 @@ function RW_PlanTurn(world, action, services)
     local operations, conversion_error, allocation = services.convert(preview, entity_conversions)
     if not operations then return fail("conversions", conversion_error) end
 
-    -- Own the combined list: never append into another planner's result.
-    local plan = {consumes_turn = true, reason = movement.reason, changes = {},
-        level_transform = target_type, level_traits = level_traits,board_shift=movement.board_shift,id_allocation=allocation}
-    for _, change in ipairs(movement.changes) do
-        plan.changes[#plan.changes + 1] = change
-    end
-    for _, change in ipairs(operations) do
-        plan.changes[#plan.changes + 1] = change
+    -- Keep phase-local preconditions: conversion reads the movement snapshot,
+    -- while the transaction still has a single Commit/Undo boundary.
+    local movement_stage = {consumes_turn=true,changes={},board_shift=movement.board_shift}
+    local conversion_stage = {consumes_turn=true,changes={},id_allocation=allocation}
+    for _, change in ipairs(movement.changes) do movement_stage.changes[#movement_stage.changes+1]=change end
+    for _, change in ipairs(operations) do conversion_stage.changes[#conversion_stage.changes+1]=change end
+    local plan = {consumes_turn=true,reason=movement.reason,changes={},
+        level_transform=target_type,level_traits=level_traits,stages={
+            {name="movement",plan=movement_stage},{name="conversion",plan=conversion_stage}}}
+
+    for _, stage in ipairs(plan.stages) do
+        for _, change in ipairs(stage.plan.changes) do plan.changes[#plan.changes+1]=change end
     end
 
     -- Validate the WHOLE plan before returning it to the host for one Commit.
     trace[#trace + 1] = "preview_complete"
-    local complete, complete_error = services.preview(world, plan)
-    if not complete then return fail("preview_complete", complete_error) end
+    local complete, complete_error, phase = services.preview(world, plan)
+    if not complete then return fail("preview_complete", complete_error,phase) end
     return plan, nil, trace
 end
 
@@ -257,6 +261,7 @@ function OnStart()
         { "rules",      "RW_ASTLoweringSelfTest" },
         { "world",      "RW_DirectionStateSelfTest" },
         { "world",      "RW_LifecycleSelfTest" },
+        { "world",      "RW_StageTransactionSelfTest" },
         { "world",      "RW_LevelInstanceSelfTest" },
         { "world",      "RW_LevelTreeSelfTest" },
         { "movement",   "RW_DirectionMovementSelfTest" },
@@ -1103,5 +1108,5 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3P initialized")
+    print("[RuleWorld] M9.3Q initialized")
 end

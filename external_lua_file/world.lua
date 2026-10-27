@@ -593,42 +593,68 @@ function RW_LevelInstanceSelfTest()
     return true, "Level definition/runtime instance isolation passed"
 end
 
--- Preview without recording history. Used for post-movement
--- rule evaluation before the whole turn is committed.
-function RW_PreviewPlan(world, plan)
-    local valid, reason = validate_plan(world, plan)
-
-    if not valid then
-        return nil, reason
+-- A phase sequence is validated against successive private snapshots. Flat plans
+-- keep their original simultaneous-operation contract; nested sequences are rejected.
+local function preview_transaction(world, plan)
+    if type(plan) ~= "table" then return nil,"invalid_plan" end
+    if plan.stages == nil then
+        local valid, reason = validate_plan(world,plan)
+        if not valid then return nil,reason end
+        if not plan.consumes_turn then return nil,plan.reason or "no_turn" end
+        return apply_plan(world,plan),nil,#plan.changes > 0 or plan.board_shift ~= nil
     end
-
-    if not plan.consumes_turn then
-        return nil, plan.reason or "no_turn"
+    if plan.consumes_turn ~= true or not is_list(plan.changes)
+        or plan.id_allocation ~= nil or plan.board_shift ~= nil
+        or not is_list(plan.stages) or #plan.stages == 0 or #plan.stages > 32 then
+        return nil,"invalid_stage_sequence"
     end
-
-    return apply_plan(world, plan)
+    local current, changed, names, summary = world,false,{},{}
+    for _, stage in ipairs(plan.stages) do
+        if type(stage) ~= "table" or type(stage.name) ~= "string" or stage.name == ""
+            or names[stage.name] or type(stage.plan) ~= "table" or stage.plan.stages ~= nil then
+            return nil,"invalid_stage"
+        end
+        names[stage.name] = true
+        local valid, reason = validate_plan(current,stage.plan)
+        if not valid then return nil,reason,nil,stage.name end
+        if not stage.plan.consumes_turn then return nil,"non_consuming_stage",nil,stage.name end
+        for _, change in ipairs(stage.plan.changes) do summary[#summary+1]=change end
+        current = apply_plan(current,stage.plan)
+        changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil
+    end
+    if not same_state(plan.changes,summary) then return nil,"stage_summary_mismatch" end
+    return current,nil,changed
 end
 
--- Commit a prepared plan atomically.
+-- Owned sequential plan; creation is still pure and does not record history.
+function RW_PlanStages(world, stages)
+    local plan = {consumes_turn=true,changes={},stages=clone(stages)}
+    if is_list(plan.stages) then
+        for _, stage in ipairs(plan.stages) do
+            if type(stage) == "table" and type(stage.plan) == "table" and is_list(stage.plan.changes) then
+                for _, change in ipairs(stage.plan.changes) do plan.changes[#plan.changes+1]=clone(change) end
+            end
+        end
+    end
+    local preview, reason, _, phase = preview_transaction(world,plan)
+    if not preview then return nil,reason,nil,phase end
+    return plan,nil,preview
+end
+
+function RW_PreviewPlan(world, plan)
+    local preview, reason, _, phase = preview_transaction(world,plan)
+    return preview,reason,phase
+end
+
+-- One final world, one history frame, even across multiple sequential phases.
 function RW_Commit(session, plan)
-    local valid, reason =
-        validate_plan(session.world, plan)
-
-    if not valid then
-        return session, rejected(reason)
+    local preview, reason, changed, phase = preview_transaction(session.world,plan)
+    if not preview then
+        local result = rejected(reason)
+        result.phase = phase
+        return session,result
     end
-
-    if not plan.consumes_turn then
-        return session, rejected(
-            plan.reason or "no_turn"
-        )
-    end
-
-    local changed = #plan.changes > 0 or plan.board_shift ~= nil
-
-    local next_world = session.world
-
-    if changed then next_world = apply_plan(session.world, plan) end
+    local next_world = changed and preview or session.world
 
     local history = {}
 
@@ -652,8 +678,27 @@ function RW_Commit(session, plan)
         accepted = true,
         changed = changed,
         reason = plan.reason,
-        changes = plan.changes
+        changes = plan.changes,
+        stages = plan.stages
     }
+end
+
+function RW_StageTransactionSelfTest()
+    local session = RW_CreateSession()
+    local frontier = session.world.next_entity_id
+    local creation = RW_PlanCreate(session.world,{{kind="object",class="object",
+        archetype="rock",x=4,y=4,direction="Mid"}})
+    local created = RW_PreviewPlan(session.world,creation)
+    local removal = RW_PlanDelete(created,{frontier})
+    local plan = RW_PlanStages(session.world,{{name="create",plan=creation},{name="remove",plan=removal}})
+    local committed,result = RW_Commit(session,plan)
+    if not result.accepted or not result.changed or #committed.history ~= 1
+        or committed.world.entities[frontier] or committed.world.next_entity_id ~= frontier+1 then
+        return false,"Sequential lifecycle transaction failed"
+    end
+    local restored = RW_Undo(committed)
+    if restored.world ~= session.world then return false,"Stage transaction Undo failed" end
+    return true,"Sequential phases, transient creation/deletion and single Undo passed"
 end
 
 function RW_Undo(session)

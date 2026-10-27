@@ -29,3 +29,7 @@
 - Defaults: Text IS Push, Cursor IS Select, Line IS Path, Level IS Stop.
   Line/Path is our explicit abstraction over the original authored map paths.
 - See docs/LEVEL_BOUNDARIES.md for M9.3N menus, scroll and test routes.
+
+- Scheduled turns use sequential stages. Top-level changes is a checked diagnostic
+  summary, never flatten it into a simultaneous plan. Child preconditions refer
+  to the previous phase snapshot. See docs/PHASE_TRANSACTIONS.md.

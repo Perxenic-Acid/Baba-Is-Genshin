@@ -174,3 +174,5 @@ dofile("tests/level_boundaries.lua")
 dofile("tests/conversion_split.lua")
 
 dofile("tests/rule_multiplicity.lua")
+
+dofile("tests/stage_transactions.lua")

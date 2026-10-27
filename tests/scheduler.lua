@@ -77,7 +77,7 @@ invalid_conversion.convert = function()
 end
 local bad, error_info = RW_PlanTurn(s.world, action, invalid_conversion)
 assert(not bad and error_info.stage == "preview_complete"
-    and error_info.reason == "stale_transformation" and equal(s, before))
+    and error_info.reason == "stale_transformation" and error_info.phase == "conversion" and equal(s, before))
 
 -- Invalid input skips conversion; effective empty turns retain existing semantics.
 local invalid = assert(RW_PlanTurn(s.world, {type = "move", dx = 2, dy = 0}, services))
@@ -100,6 +100,7 @@ observing.resolve = function(...)
     return captured
 end
 local combined = assert(RW_PlanTurn(s.world, action, observing))
-assert(#captured.changes == 1 and #combined.changes == 3)
+assert(#captured.changes == 1 and #combined.changes == 3
+    and #combined.stages[1].plan.changes == 1 and #combined.stages[2].plan.changes == 2)
 assert(equal(s, before))
 print("PASS: scheduler atomic conversion/Undo, every failure boundary, complete validation, empty turns")

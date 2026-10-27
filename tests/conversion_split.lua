@@ -13,7 +13,7 @@ local first_id = session.world.next_entity_id
 session.world.entities[4].direction = "Mid"
 local plan,err = RW_PlanTurn(session.world,{type="move",dx=0,dy=-1},services)
 assert(plan,err and err.reason)
-assert(plan.id_allocation.from == first_id and plan.id_allocation.to == first_id+2)
+assert(plan.stages[2].plan.id_allocation.from == first_id and plan.stages[2].plan.id_allocation.to == first_id+2)
 local changed,result = RW_Commit(session,plan)
 assert(result.accepted and #changed.history == 1)
 for index,id in ipairs({4,5}) do

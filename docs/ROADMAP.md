@@ -3,6 +3,9 @@
 更新：2026-10-27。以下后续顺序是恢复历史设计后对当前代码的实施安排，
 不是声称从历史记录中找到了 M9.3F 及以后原定编号。
 
+最新能力盘点见 [INFRASTRUCTURE_AUDIT.md](INFRASTRUCTURE_AUDIT.md)。
+下文按历史里程碑保留；有冲突时以较新里程碑为准。
+
 ## 当前基线
 
 八个映射脚本：bootstrap、world、reader、grammar、rules、properties、
@@ -87,14 +90,15 @@ instance_id。原有无参 CreateSession 保持兼容。定义数据、实例配
 给出的五种终局结果。测试地图第三行新增 W/D/WD/DW/RW/N 六组实操样例。
 启动实际映射管线和离线 F 回调测试通过；真机待验证。见 LEVEL_SEMANTICS.md。
 
-## 后续候选，按依赖逐项落实
+## 后续顺序
 
-1. 真机验证 F 确认与本步跨层撤销；再扩展结果/进度与跨关卡 Meta，
-   不得让前端临时标志承担权威状态。
-2. 分开实现可见性、可达性与进度条件；最后用最小嵌套样例验证地图揭示和
-   子地图达标计数。具体关卡内容、美术和 3D 表现留在基础契约之后。
+1. 回合内顺序阶段事务（M9.3Q 已完成），支持本回合新对象被后续阶段处理。
+2. 接触/销毁/出生最小闭环，以普通 DEFEAT、SINK/HAS 驱动实现。
+3. 主体上下文条件、否定规则、主体 AND，与对应词一起推进。
+4. 自主移动、随机状态、特殊主语、多目标 LEVEL 等按词的需求补齐。
+5. 地图揭示/通行/进度和长期保存单独建设，不阻塞第一批普通词。
 
-后续候选的详细接口、优先级和编号可随讨论修订，不能一次性视作冻结规格。
+具体源码依据和范围见 INFRASTRUCTURE_AUDIT.md，不把 deferred 当作已实现。
 
 ## 本地工作约定
 
@@ -121,3 +125,10 @@ instance_id。原有无参 CreateSession 保持兼容。定义数据、实例配
 修正上一版按目标名词去重的错误：重复规则逐条生成，完整 AND 路径乘到所有项。
 用户重叠示例为 24 条完整句子、48 个 Rock。tests/rule_multiplicity.lua 覆盖实际管线；
 tests/reference_multiplicity.lua 可独立运行以对照本机原版源码。
+
+## M9.3Q
+
+新增顺序阶段计划 RW_PlanStages；现有移动/转换管线改走阶段快照，保持一次
+Commit/Undo。允许后续阶段修改本回合新对象，晚失败整步拒绝并报告 phase。
+启动自测与 tests/stage_transactions.lua 通过；不改变当前地图的预期玩法。
+详见 PHASE_TRANSACTIONS.md。

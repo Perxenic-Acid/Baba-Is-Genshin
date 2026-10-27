@@ -352,6 +352,45 @@ local function ast_wrap_not(term, enabled)
     }
 end
 
+-- Expand configured RHS AND in physical order. Each term remains a typed rule,
+-- with the complete prefix's word IDs retained for provenance and ordered effects.
+local function ast_extend_rhs(base, chosen, language, line, start, output)
+    local order = language.order or DEFAULT_ORDER
+    if order[3] ~= "object" then return end
+    local operators = language.operators or {}
+    local registry = language.verb_registry or AST_VERBS
+    local function extend(previous, finish)
+        local conjunctions = line.cells[finish+1] or {}
+        for _, conjunction in ipairs(conjunctions) do
+            if operators[conjunction.token] == "and" then
+                local function term_at(position, negated, prefix)
+                    for _, word in ipairs(line.cells[position] or {}) do
+                        for _, object in ipairs(ast_term_options(word.token,language,true)) do
+                            if registry[base.verb].rhs[object.tag] then
+                                local rule = ast_clone(base)
+                                rule.object = ast_wrap_not(object,negated)
+                                rule.source.entity_ids = ast_clone(previous.source.entity_ids)
+                                rule.source.entity_ids[#rule.source.entity_ids+1] = conjunction.id
+                                if prefix then rule.source.entity_ids[#rule.source.entity_ids+1] = prefix.id end
+                                rule.source.entity_ids[#rule.source.entity_ids+1] = word.id
+                                rule.source.finish = position
+                                rule.source.rhs_index = (previous.source.rhs_index or 1)+1
+                                output[#output+1] = rule
+                                extend(rule,position)
+                            end
+                        end
+                    end
+                end
+                term_at(finish+2,false)
+                for _, word in ipairs(line.cells[finish+2] or {}) do
+                    if ast_is_not(word,language) then term_at(finish+3,true,word) end
+                end
+            end
+        end
+    end
+    extend(base,start+#chosen-1)
+end
+
 -- Parse one candidate token sequence.
 -- Each semantic role occupies one token, with optional NOT before terms.
 -- Their spatial order is selected by language.order.
@@ -403,7 +442,7 @@ local function ast_parse_candidate(
                     ids[i] = chosen[i].id
                 end
 
-                output[#output + 1] = {
+                local rule = {
                     subject = ast_wrap_not(
                         subject, sub_not == 1
                     ),
@@ -428,6 +467,8 @@ local function ast_parse_candidate(
                         entity_ids = ids
                     }
                 }
+                output[#output+1] = rule
+                ast_extend_rhs(rule,chosen,language,line,start,output)
             end
         end
     end

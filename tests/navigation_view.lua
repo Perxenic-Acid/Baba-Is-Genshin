@@ -25,5 +25,18 @@ assert(#controls == 4 and controls[2].text == "" and controls[3].text == "OUT")
 assert(controls[2].bgColor[1] == 43 and status.text:find("PUZZLE"))
 assert(RW_Render(world,0,0))
 assert(controls[3].text == "" and status.text:find("RuleWorld"))
+local typed = {width=2,height=2,entities={
+    [1]={id=1,kind="object",class="object",archetype="flag",x=1,y=1,behaviors={}},
+    [2]={id=2,kind="object",class="object",archetype="rock",x=2,y=1,behaviors={win=true}},
+    [3]={id=3,kind="object",class="object",archetype="level_block",x=1,y=2,behaviors={}},
+    [4]={id=4,kind="object",class="object",archetype="crate",x=2,y=2,behaviors={},
+        level_link={source_type="level_block",target="parent",label="A"}}
+}}
+assert(RW_Render(typed,0,1))
+local views = {}
+for _, control in ipairs(controls) do if control.name then views[control.name] = control end end
+assert(views.RW_Entity_1.text == "FLAG" and views.RW_Entity_1.bgColor[1] ~= 238)
+assert(views.RW_Entity_2.bgColor[1] == 238)
+assert(views.RW_Entity_3.text == "LEVEL?" and views.RW_Entity_4.text == "A:crate")
 game, script, Color, RW_Render = old_game, old_script, old_color, old_render
 print("PASS: native renderer portal labels, status and same-size instance refresh")

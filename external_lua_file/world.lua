@@ -96,7 +96,7 @@ local function valid_new_entity(world, entity, id)
     if entity.level_link ~= nil then
         local link = entity.level_link
         if entity.class ~= "object" or type(link) ~= "table"
-            or type(link.source_type) ~= "string" or link.source_type == ""
+            or (link.source_type ~= nil and (type(link.source_type) ~= "string" or link.source_type == ""))
             or (link.target ~= "child" and link.target ~= "parent")
             or (link.target == "child" and (type(link.definition_id) ~= "string"
                 or link.definition_id == "")) then return false end
@@ -1044,7 +1044,7 @@ function RW_BindLevelEntry(tree, entity_id)
 end
 
 function RW_RecordLevelOutcome(tree, kind, target_type)
-    if kind ~= "win" and kind ~= "transform" then return nil, "invalid_level_outcome" end
+    if kind ~= "win" and kind ~= "transform" and kind ~= "defeat" then return nil, "invalid_level_outcome" end
     if kind == "transform" and (type(target_type) ~= "string" or target_type == "") then
         return nil, "invalid_level_transform"
     end
@@ -1063,7 +1063,7 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
         result.instances = copy_map(tree.instances)
         result.instances[entry.parent_id] = changed
     end
-    if #tree.stack > 0 then return RW_ReturnLevel(result) end
+    if kind ~= "defeat" and #tree.stack > 0 then return RW_ReturnLevel(result) end
     return result
 end
 
@@ -1096,6 +1096,8 @@ end
 
 -- The planner produces a complete candidate. Commit owns the only history write.
 function RW_CommitLevelTree(tree, plan)
+    local outcome = tree.outcomes[tree.active_id]
+    if outcome and outcome.kind == "defeat" then return tree,rejected("level_defeated_undo_only") end
     if type(plan) ~= "table" or plan.before ~= tree or type(plan.after) ~= "table"
         or not valid_tree_candidate(plan.after) or plan.after.history ~= tree.history then
         return tree, rejected("invalid_or_stale_tree_plan")
@@ -1139,9 +1141,12 @@ function RW_GetNavigationDefinitions()
         grant(world,"flag","win")
         world.language.nouns.CURSOR = "cursor"
         world.language.nouns.FLAG = "flag"
-        world.language.nouns.LEVEL = {tag="level"}
+        world.language.nouns.LEVEL = {tag="level",block_type="level_block"}
+        world.language.operators = {AND="and"}
         world.language.properties.SELECT = "select"
         world.language.properties.WIN = "win"
+        world.language.properties.DEFEAT = "defeat"
+        world.language.nouns.ROCK = "rock"
     end
     local root = default_world()
     configure(root)
@@ -1170,9 +1175,38 @@ function RW_GetNavigationDefinitions()
             x=6+index,y=index == 3 and 9 or 8,text={name=token}}
     end
     transform.next_entity_id = 19
-    return {
+    local definitions = {
         ["navigation.root"] = {id="navigation.root",initial_world=root},
         ["navigation.puzzle"] = {id="navigation.puzzle",initial_world=puzzle},
         ["navigation.transform"] = {id="navigation.transform",initial_world=transform}
-    }, "navigation.root"
+    }
+    -- Push the SUBJECT into place: no terminal prefix is active before the test.
+    local cases = {
+        {id="win",label="W",words={"LEVEL","IS","WIN"}},
+        {id="defeat",label="D",words={"LEVEL","IS","DEFEAT"}},
+        {id="win_defeat",label="WD",words={"LEVEL","IS","WIN","AND","DEFEAT"}},
+        {id="defeat_win",label="DW",words={"LEVEL","IS","DEFEAT","AND","WIN"}},
+        {id="rock_win",label="RW",words={"LEVEL","IS","ROCK","AND","WIN"}},
+        {id="noun_level",label="N",words={"CRATE","IS","LEVEL"}}
+    }
+    for column, test in ipairs(cases) do
+        local world = clone(puzzle)
+        world.entities[15] = nil -- No incidental contact WIN in these test worlds.
+        world.entities[1].x,world.entities[1].y = 4,10
+        for offset, token in ipairs(test.words) do
+            local token_id = 15+offset
+            world.entities[token_id] = {id=token_id,kind="object",class="text",direction="None",
+                x=3+offset,y=offset == 1 and 9 or 8,text={name=token}}
+        end
+        world.next_entity_id = 16+#test.words
+        if test.id == "noun_level" then
+            world.entities[4].level_link = {source_type="crate",target="child",definition_id="navigation.puzzle",label="C"}
+            object(world,world.next_entity_id,"path",1,2)
+            object(world,world.next_entity_id,"path",2,2)
+        end
+        local definition_id = "navigation." .. test.id
+        definitions[definition_id] = {id=definition_id,initial_world=world}
+        portal(root,36+column,column,3,test.label,definition_id)
+    end
+    return definitions, "navigation.root"
 end

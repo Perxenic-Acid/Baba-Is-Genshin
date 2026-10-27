@@ -14,6 +14,12 @@ local function has_capability(world, entity, capability)
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
+local function level_surface(world,entity)
+    local level = world.language and world.language.nouns and world.language.nouns.LEVEL
+    local block_type = type(level) == "table" and level.block_type or "level_block"
+    return entity.level_link ~= nil or entity.archetype == block_type
+end
+
 local function direction_for(dx, dy)
     if dx == -1 then return "Left" end
     if dx == 1 then return "Right" end
@@ -675,7 +681,7 @@ function RW_ResolveTurn(world, action)
             for other_id, other in pairs(world.entities) do
                 if other_id ~= id and other.x == x and other.y == y
                     and (has_capability(world, other, "select_path")
-                        or (other.level_link and other.archetype == other.level_link.source_type)) then
+                        or level_surface(world,other)) then
                     traversable = true
                 end
             end
@@ -702,10 +708,9 @@ function RW_LevelSelectionCandidates(world)
     for id, cursor in pairs(world.entities) do
         if has_capability(world, cursor, "select") then
             for target_id, target in pairs(world.entities) do
-                local link = target.level_link
                 if id ~= target_id and not has_capability(world,target,"select")
                     and cursor.x == target.x and cursor.y == target.y
-                    and link and target.archetype == link.source_type and not seen[target_id] then
+                    and level_surface(world,target) and not seen[target_id] then
                     seen[target_id] = true
                     candidates[#candidates+1] = target_id
                 end

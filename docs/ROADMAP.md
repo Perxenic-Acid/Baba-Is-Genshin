@@ -79,6 +79,14 @@ instance_id。原有无参 CreateSession 保持兼容。定义数据、实例配
 确认入口仍可 Invoke，不要求物理 Enter。
 详见 NESTED_LEVELS.md。原版语义查阅约定已写入 AGENTS.md。
 
+## M9.3M：有序关卡属性与 ID 指向
+
+核对原版 convert.lua/mapcursor.lua/blocks.lua，修复转换后仍可选关的指向保留。
+支持 NOUN IS LEVEL，明确可用性来自具体 ID 的 level_link，而不是 Level 外形。
+新增配置化 RHS AND、按序关卡属性、直接 WIN 和仅 Undo 的 DEFEAT，覆盖用户
+给出的五种终局结果。测试地图第三行新增 W/D/WD/DW/RW/N 六组实操样例。
+启动实际映射管线和离线 F 回调测试通过；真机待验证。见 LEVEL_SEMANTICS.md。
+
 ## 后续候选，按依赖逐项落实
 
 1. 真机验证 F 确认与本步跨层撤销；再扩展结果/进度与跨关卡 Meta，

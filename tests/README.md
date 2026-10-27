@@ -27,7 +27,7 @@ In-game startup should report both new direction self-tests as passed and
 `pipeline atomic turn scheduler`, `Atomic create/delete, ID allocation and Undo passed`,
 `pipeline created/deleted Text rules / Undo`,
 `pipeline alternate grammar/semantics behavior / Undo`,
-`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3L initialized`.
+`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3M initialized`.
 Native rendering/input still require an in-game check.
 
 The runner also loads `tests/scheduler.lua`, which checks the extracted turn
@@ -77,3 +77,10 @@ Host tests use the registered KeyboardInteractKeyDown callback (F), as clarified
 by the user. Physical Enter is not required. Updated manual F-key test sequences
 cover parent return, win, level transformation and cross-level Undo.
 See ../docs/NESTED_LEVELS.md for the updated scope and reference sources.
+
+M9.3M adds tests/level_semantics.lua for identity-bound links through conversion,
+Noun IS Level usability, WIN as a property on arbitrary objects/Text, ordered RHS
+AND provenance, LEVEL WIN/DEFEAT ordering, conversion priority, and defeat-only Undo.
+The mapped startup probe and F callback tests exercise all five terminal fixtures;
+N checks configured versus unconfigured IDs. See ../docs/LEVEL_SEMANTICS.md for
+manual test sequences. Native rendering tests also verify property-based WIN color.

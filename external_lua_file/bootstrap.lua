@@ -45,10 +45,11 @@ function RW_PlanTurn(world, action, services)
     if not post_effects then return fail("rules_after", post_error) end
 
     trace[#trace + 1] = "conversions"
-    local entity_conversions, level_targets, protected = {}, {}, false
+    local entity_conversions, level_targets, protected, level_traits = {}, {}, false, {}
     for _, conversion in ipairs(conversions or {}) do
         if conversion.op == "transform_level" then level_targets[conversion.target_type] = true
         elseif conversion.op == "protect_level" then protected = true
+        elseif conversion.op == "level_trait" then level_traits[#level_traits+1] = conversion.trait
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     local target_type
@@ -63,7 +64,7 @@ function RW_PlanTurn(world, action, services)
 
     -- Own the combined list: never append into another planner's result.
     local plan = {consumes_turn = true, reason = movement.reason, changes = {},
-        level_transform = target_type}
+        level_transform = target_type, level_traits = level_traits}
     for _, change in ipairs(movement.changes) do
         plan.changes[#plan.changes + 1] = change
     end
@@ -83,6 +84,8 @@ function RW_PlanLevelAction(tree, action, services)
     local function fail(reason) return nil, {stage="level_action",reason=reason} end
     if type(action) ~= "table" then return fail("invalid_action") end
     local session = services.active(tree)
+    local previous_outcome = tree.outcomes[tree.active_id]
+    if previous_outcome and previous_outcome.kind == "defeat" then return fail("level_defeated_undo_only") end
     local effects, err = services.evaluate(session.world)
     if not effects then return fail(err) end
     local effective, project_error = services.project(session.world,effects)
@@ -93,6 +96,7 @@ function RW_PlanLevelAction(tree, action, services)
         if #candidates > 1 then return fail("ambiguous_selected_levels") end
         local entity_id = candidates[1]
         local link = session.world.entities[entity_id].level_link
+        if not link then return fail("unavailable_level") end
         local next_tree, reason
         if link.target == "parent" then next_tree, reason = services.return_level(tree)
         else
@@ -113,7 +117,10 @@ function RW_PlanLevelAction(tree, action, services)
     if not post_effects then return fail(post_error) end
     local post, projection_error = services.project(completed.world,post_effects)
     if not post then return fail(projection_error) end
-    local outcome = turn.level_transform and "transform" or (services.win(post) and "win" or nil)
+    local level_outcome, outcome_error = services.level_outcome(post,turn.level_traits)
+    if outcome_error then return fail(outcome_error) end
+    local outcome = turn.level_transform and "transform" or level_outcome
+        or (services.win(post) and "win" or nil)
     if outcome then
         next_tree, update_error = services.outcome(next_tree,outcome,turn.level_transform)
         if not next_tree then return fail(update_error) end
@@ -800,6 +807,9 @@ function OnStart()
     level_services.outcome = function(tree,kind,target) return world_api:Invoke("RW_RecordLevelOutcome",tree,kind,target) end
     level_services.candidates = function(world) return movement_api:Invoke("RW_LevelSelectionCandidates",world) end
     level_services.win = function(world) return movement_api:Invoke("RW_HasWinContact",world) end
+    level_services.level_outcome = function(world,traits)
+        return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",world,traits)
+    end
 
     -- Real mapped pipeline probe; never change the live tree during self-tests.
     do
@@ -843,9 +853,52 @@ function OnStart()
         print("[RuleWorld] TEST PASSED: pipeline SELECT confirm / parent / win / level transform / tree Undo")
     end
 
+    do
+        local function apply(probe,action)
+            local plan = RW_PlanLevelAction(probe,action,level_services)
+            if not plan then return nil end
+            local next_tree, accepted = world_api:Invoke("RW_CommitLevelTree",probe,plan)
+            return accepted.accepted and next_tree or nil
+        end
+        local cases = {{"win","win"},{"defeat","defeat"},{"win_defeat","win"},
+            {"defeat_win","defeat"},{"rock_win","transform"}}
+        for index, test in ipairs(cases) do
+            local probe = level_services.enter(level_tree,tostring(36+index),"navigation." .. test[1])
+            probe = level_services.bind_entry(probe,36+index)
+            local child_id = probe.active_id
+            local completed = apply(probe,{type="move",dx=0,dy=-1})
+            if not completed or not completed.outcomes[child_id]
+                or completed.outcomes[child_id].kind ~= test[2]
+                or (test[2] == "defeat" and completed.active_id ~= child_id)
+                or (test[2] ~= "defeat" and completed.active_id ~= level_tree.active_id) then
+                printerr("[RuleWorld] TEST FAILED: ordered LEVEL outcome",test[1]); return
+            end
+            if test[2] == "defeat" and RW_PlanLevelAction(completed,{type="confirm"},level_services) then
+                printerr("[RuleWorld] TEST FAILED: defeated level accepted input"); return
+            end
+            local undone = world_api:Invoke("RW_UndoLevelTree",completed)
+            if undone.active_id ~= child_id or undone.outcomes[child_id]
+                or level_services.active(undone).world.entities[16].y ~= 9 then
+                printerr("[RuleWorld] TEST FAILED: ordered LEVEL outcome Undo",test[1]); return
+            end
+        end
+        local probe = level_services.enter(level_tree,"42","navigation.noun_level")
+        probe = level_services.bind_entry(probe,42)
+        local completed = apply(probe,{type="move",dx=0,dy=-1})
+        local world = completed and level_services.active(completed).world
+        if not world or world.entities[4].archetype ~= "level_block"
+            or world.entities[5].archetype ~= "level_block" or not world.entities[4].level_link
+            or world.entities[5].level_link then
+            printerr("[RuleWorld] TEST FAILED: Noun IS LEVEL identity-bound destinations"); return
+        end
+        print("[RuleWorld] TEST PASSED: pipeline ordered LEVEL WIN/DEFEAT/transform and Noun IS LEVEL / Undo")
+    end
+
     local function navigation_view()
-        return {title=(#level_tree.stack == 0 and "MAP / " or "PUZZLE / ") .. session.instance_id,
-            hint="WASD: YOU + SELECT   F: Confirm   Z: Whole-tree Undo",portals={}}
+        local outcome = level_tree.outcomes[level_tree.active_id]
+        local defeated = outcome and outcome.kind == "defeat"
+        return {title=(defeated and "DEFEAT / " or (#level_tree.stack == 0 and "MAP / " or "PUZZLE / ")) .. session.instance_id,
+            hint=defeated and "DEFEAT: Z Undo only" or "WASD: YOU + SELECT   F: Confirm   Z: Whole-tree Undo",portals={}}
     end
 
     local previous_rule_count = nil
@@ -868,9 +921,11 @@ function OnStart()
             previous_deferred_count = deferred_count
         end
 
+        local display_world, projection_error = properties_api:Invoke("RW_ProjectWorld",session.world,effects)
+        if not display_world then printerr("[RuleWorld] View projection failed:",projection_error); return end
         renderer_api:Invoke(
             "RW_Render",
-            session.world,
+            display_world,
             #level_tree.history,
             #effects,
             navigation_view()
@@ -942,5 +997,5 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3L initialized")
+    print("[RuleWorld] M9.3M initialized")
 end

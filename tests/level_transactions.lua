@@ -4,6 +4,7 @@ local services = {
     return_level=RW_ReturnLevel, bind_entry=RW_BindLevelEntry,
     commit_session=RW_Commit, outcome=RW_RecordLevelOutcome,
     candidates=RW_LevelSelectionCandidates, win=RW_HasWinContact,
+    level_outcome=RW_ResolveLevelPropertyOutcome,
     project=RW_ProjectWorld, resolve=RW_ResolveTurn, preview=RW_PreviewPlan,
     convert=RW_PlanConversions,
     evaluate=function(world)
@@ -68,7 +69,8 @@ assert(converted.outcomes[t.active_id].kind == "transform")
 assert(RW_GetActiveLevel(converted).world.entities[15].archetype == "crate")
 local effects = assert(services.evaluate(RW_GetActiveLevel(converted).world))
 local projected = assert(RW_ProjectWorld(RW_GetActiveLevel(converted).world,effects))
-assert(#RW_LevelSelectionCandidates(projected) == 0, "Transformed block still enterable")
+assert(RW_LevelSelectionCandidates(projected)[1] == 15, "Transformed level lost its destination")
+assert(step(converted,confirm).active_id == t.active_id)
 local unconvert = RW_UndoLevelTree(converted)
 assert(unconvert.active_id == t.active_id and not unconvert.outcomes[t.active_id])
 assert(unconvert.instances[initial.active_id].world.entities[15].archetype == "level_block")

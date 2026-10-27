@@ -15,3 +15,10 @@
 - Keep the eight existing mapped scripts unless a deployment change is necessary.
   Verify with `luatex --luaonly tests/run.lua`, inspect the actual repository diff,
   and stage explicit files. Do not infer in-game success from offline tests alone.
+
+- Level destinations are identity-bound metadata, preserved across transformations.
+  Never disable SELECT entry just because a linked object has a different archetype.
+  Noun IS Level may create unusable level shapes without configured destinations.
+- Preserve ordered LEVEL terminal properties: WIN then DEFEAT wins, the reverse
+  defeats; conversion precedes terminal properties. Defeat accepts only Undo.
+  See docs/LEVEL_SEMANTICS.md for source locations and the exact test matrix.

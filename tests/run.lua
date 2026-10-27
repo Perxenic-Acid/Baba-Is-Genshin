@@ -98,6 +98,39 @@ listeners.undo()
 assert(navigation.title:find("MAP") and rendered.entities[15].archetype == "level_block")
 assert(initial.entities[15].archetype == "level_block", "Earlier snapshot mutated")
 print("PASS: host SELECT/confirm, parent block, win, level transform and cross-level Undo")
+-- Native F callbacks and status for the five ordered LEVEL fixtures.
+for column, expected in ipairs({"win","defeat","win","defeat","transform"}) do
+    while history_depth > 0 do listeners.undo() end
+    if column == 1 then listeners.left() end
+    for _=3,column do listeners.right() end
+    listeners.down(); listeners.confirm(); listeners.up()
+    if expected == "defeat" then
+        assert(navigation.title:find("DEFEAT") and navigation.hint:find("Z Undo only"))
+        local depth = history_depth
+        listeners.right(); listeners.confirm()
+        assert(history_depth == depth and navigation.title:find("DEFEAT"))
+    else
+        assert(navigation.title:find("MAP"))
+        if expected == "transform" then assert(rendered.entities[41].archetype == "rock") end
+    end
+    listeners.undo()
+    assert(navigation.title:find("PUZZLE") and rendered.entities[16].y == 9)
+end
+print("PASS: F interaction and native status for ordered LEVEL outcomes and defeat-only Undo")
+while history_depth > 0 do listeners.undo() end
+for _=1,4 do listeners.right() end
+listeners.down(); listeners.confirm(); listeners.up() -- N: CRATE IS LEVEL.
+assert(rendered.entities[4].archetype == "level_block" and rendered.entities[5].archetype == "level_block")
+local noun_title = navigation.title
+listeners.down(); listeners.right(); listeners.right(); listeners.confirm()
+assert(navigation.title ~= noun_title and navigation.title:find("PUZZLE"))
+listeners.right(); listeners.confirm() -- Nested parent block returns to N.
+assert(navigation.title == noun_title)
+listeners.right()
+local unavailable_depth = history_depth
+listeners.confirm()
+assert(navigation.title == noun_title and history_depth == unavailable_depth)
+print("PASS: F enters the configured converted ID and rejects the unconfigured LEVEL ID")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -109,5 +142,7 @@ dofile("tests/levels.lua")
 dofile("tests/level_tree.lua")
 
 dofile("tests/level_transactions.lua")
+
+dofile("tests/level_semantics.lua")
 
 dofile("tests/navigation_view.lua")

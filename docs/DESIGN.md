@@ -63,3 +63,12 @@ Object/Text 增加 direction：Left、Up、Right、Down、Mid、None。方向是
 - 退出形式包括内部指向父级的关卡块、获胜、当前关卡转换。
 - 撤销必须恢复关卡切换与完整上下文，不能跨越未记入历史的导航事件。
 - 后续实现语义时持续核对本机 Baba Is You/Data 原版脚本，不能靠印象补规则。
+
+## M9.3M 用户明确的关卡语义
+
+- WIN 是属性，检测 YOU 重叠触发获胜，不能把 Flag 外形当作获胜条件。
+- 转换后的 Level 仍响应 SELECT；ID 上的关卡指向必须跨外形转换保留。
+- NOUN IS LEVEL 可执行；未设定关卡指向的具体 ID 只变为不可用 Level。
+- LEVEL IS WIN 直接胜利；LEVEL IS DEFEAT 失败且仅允许撤销。
+- LEVEL IS WIN AND DEFEAT 胜利；反过来则失败；LEVEL IS ROCK AND WIN
+  转换且不胜利。必须保留顺序并对照原版源码，不能用无序属性集合代替。

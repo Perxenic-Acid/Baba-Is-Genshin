@@ -178,12 +178,17 @@ local function ensure_grid(world)
 end
 
 local function get_label(entity)
-    if entity.level_link and entity.archetype == entity.level_link.source_type then
-        return entity.level_link.label or "LEVEL"
+    if entity.level_link then
+        local label = entity.level_link.label or "LEVEL"
+        if entity.level_link.source_type and entity.archetype ~= entity.level_link.source_type then
+            return label .. ":" .. tostring(entity.archetype)
+        end
+        return label
     end
+    if entity.archetype == "level_block" then return "LEVEL?" end
     if entity.archetype == "cursor" then return "SEL" end
     if entity.archetype == "path" then return "." end
-    if entity.archetype == "flag" then return "WIN" end
+    if entity.archetype == "flag" then return "FLAG" end
     if entity.class == "text" then
         return entity.text and entity.text.name or "?"
     end
@@ -196,7 +201,10 @@ local function get_label(entity)
 end
 
 local function get_colors(entity)
-    if entity.level_link and entity.archetype == entity.level_link.source_type then
+    local capabilities = entity.behaviors or {}
+    if capabilities.win then return Color(238,206,88,255), Color(30,24,10,255) end
+    if capabilities.select then return Color(220,220,230,255), Color(20,20,30,255) end
+    if entity.level_link then
         return Color(112,70,145,255), Color(255,255,255,255)
     end
     if entity.archetype == "cursor" then return Color(220,220,230,255), Color(20,20,30,255) end
@@ -311,6 +319,8 @@ local function draw_entities(world)
 
                         if count > 1 and #label > 2 then
                             label = label:sub(1, 1)
+                            if entity.level_link and entity.level_link.source_type
+                                and entity.archetype ~= entity.level_link.source_type then label = label .. "*" end
                         end
 
                         local font_size = 18

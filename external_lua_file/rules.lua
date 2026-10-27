@@ -414,14 +414,28 @@ function RW_LowerRuleAST(ast_rules, registry)
 
         local level_subject = subject.tag == "noun" and type(subject_type) == "table"
             and subject_type.tag == "level" and ast.when.op == "always"
-        if level_subject and semantics and semantics.noun == "transform"
+        if level_subject and semantics and semantics.property == "grant_trait"
+            and object.tag == "property" and type(object.name) == "string" and object.name ~= "" then
+            conversions[#conversions+1] = {op="level_trait",trait=object.name,source=ast.source}
+            generated[#generated+1] = {when=ast.when,effects={{op="grant_trait",
+                target={kind="archetype",value=subject_type.block_type or "level_block"},trait=object.name}},source=ast.source}
+        elseif simple_subject and semantics and semantics.noun == "transform"
+            and object.tag == "noun" and type(target_type) == "table" and target_type.tag == "level"
+            and ast.when.op == "always" then
+            conversions[#conversions+1] = {op="transform",source_type=subject_type.name,
+                target_type=target_type.block_type or "level_block",source=ast.source}
+        elseif level_subject and semantics and semantics.noun == "transform"
             and object.tag == "noun" and type(target_type) == "table"
             and target_type.tag == "object" and type(target_type.name) == "string" and target_type.name ~= "" then
             conversions[#conversions+1] = {op="transform_level", target_type=target_type.name,
                 source=ast.source}
+            conversions[#conversions+1] = {op="transform",source_type=subject_type.block_type or "level_block",
+                target_type=target_type.name,source=ast.source}
         elseif level_subject and semantics and semantics.noun == "transform"
             and object.tag == "noun" and type(target_type) == "table" and target_type.tag == "level" then
             conversions[#conversions+1] = {op="protect_level", source=ast.source}
+            conversions[#conversions+1] = {op="protect_transform",
+                source_type=subject_type.block_type or "level_block",source=ast.source}
         elseif property_rule then
             generated[#generated + 1] = {
                 when = ast.when,

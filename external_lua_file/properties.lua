@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    win = {win = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    win = {win = true}, defeat = {defeat = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -35,7 +35,8 @@ local function valid_behaviors(registry)
         local count = 0
         for capability, enabled in pairs(spec) do
             if (capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
-                    and capability ~= "select" and capability ~= "select_path" and capability ~= "win")
+                    and capability ~= "select" and capability ~= "select_path" and capability ~= "win"
+                    and capability ~= "defeat")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -145,4 +146,22 @@ function RW_PropertiesSelfTest()
         return false, "Unresolved/duplicate target accepted"
     end
     return true, "Concrete effects and isolated behavior registration passed"
+end
+
+-- Current-level properties are ordered rule-derived properties, not flags on a
+-- specially named entity. The first terminal capability settles the outcome.
+function RW_ResolveLevelPropertyOutcome(world, traits)
+    local registry = world.behavior_registry or BEHAVIORS
+    if not valid_behaviors(registry) or not dense_list(traits) then
+        return nil, "invalid_level_properties"
+    end
+    for _, trait in ipairs(traits) do
+        if type(trait) ~= "string" or trait == "" then return nil,"invalid_level_property" end
+    end
+    for _, trait in ipairs(traits) do
+        local capabilities = registry[trait] or {}
+        if capabilities.win then return "win" end
+        if capabilities.defeat then return "defeat" end
+    end
+    return nil
 end

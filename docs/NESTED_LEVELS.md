@@ -1,5 +1,7 @@
 # M9.3L：SELECT、确认与跨层原子撤销
 
+后续修订：关卡指向/转换和有序终局属性以 LEVEL_SEMANTICS.md（M9.3M）为准。
+
 本文件取代 M9.3K 的局部撤销/自动踩格进入约定。用户真机测试指出其语义
 错误，本步按用户修订和本地原版代码修正，不能将 K 视为玩法已验收。
 
@@ -23,8 +25,8 @@ SELECT 的移动独立于 YOU：沿具有 select_path 的实体或有效关卡�
 当前未实现原版地图的完整解锁/可见性/路径限定符。
 
 关卡块是实际实体，其 level_link 含 source_type、target=child/parent、
-child 的 definition_id 与可选 label；仅 archetype 等于 source_type 时有效。
-转换为别的类型后不再可选。父关卡块用 parent 指向当前栈顶父实例。
+child 的 definition_id 与可选 label。M9.3M 修正：指向绑定实体 ID，
+转换为别的外形后仍然可选；source_type 只用于显示原外形。父关卡块用 parent 指向当前栈顶父实例。
 同一父实例内以关卡块 entity_id 作为 slot，反复进入复用子实例。
 
 仅有 SELECT 与块重叠才产生候选，确认动作才进入。无候选拒绝；多个候选
@@ -85,7 +87,7 @@ T 内从 (9,10) 向上推词可组成 LEVEL IS CRATE，退出并转换根地图�
    T 变成箱子；Z 回到转换前的子关卡，再 Z 回 MAP，T 恢复为关卡块。
 
 新增启动日志：SELECT independent of YOU ...；pipeline SELECT confirm / parent /
-win / level transform / tree Undo。版本 M9.3L initialized。
+win / level transform / tree Undo。版本标记见后续 M9.3M（LEVEL_SEMANTICS.md）。
 离线 tests/level_transactions.lua 检查 SELECT/Text SELECT/撤回、YOU-only 拒绝、
 三种退出、整树撤销/重放、坏计划/过期计划/投影失败整步拒绝。
 原生输入测试通过 F 对应的已注册输入回调确认，覆盖上述三组手测流程。

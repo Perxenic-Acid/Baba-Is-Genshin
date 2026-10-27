@@ -162,6 +162,7 @@ end
 -- This parser does not execute rules.
 
 local AST_VERBS = {
+    write = {phase="conversion",rhs={noun=true,property=true,special=true}},
     is = {
         phase = "relation",
         rhs = {
@@ -593,6 +594,16 @@ function RW_ParseRuleAST(lines, language)
             end
         end
 
+        -- Original calculatesentences bounds physical sentence variants at 5000,
+        -- before allocating each AST path. Keep extreme stacks out of Lua cloning.
+        local variants,span=1,0
+        for _,cell in ipairs(cells) do
+            if #cell == 0 then variants,span=1,0
+            else
+                variants=math.min(5000,variants*#cell);span=span+1
+                if span >= 3 and variants >= 5000 then return nil,"rule_complexity_limit" end
+            end
+        end
         local budget=0
         for start=1,#cells do
             local chosen={}

@@ -247,6 +247,18 @@ listeners.right();listeners.confirm()
 assert(rendered.entities[24].archetype == "cursor" and rendered.entities[1].x == 6 and rendered.entities[1].y == 11)
 assert(rendered.entities[1].behaviors.control and rendered.entities[3].behaviors.push)
 print("PASS: native NAT entry and independent freely movable actors")
+while history_depth > 0 do listeners.undo() end
+for _=1,4 do listeners.right() end
+listeners.confirm() -- TC: no rule at entry, W completes the stacked sentence.
+assert(not rendered.too_complex and rendered.entities[1].y == 8)
+listeners.up()
+assert(rendered.too_complex and not rendered.infinite_loop and navigation.title:find("TOO COMPLEX"))
+local complex_depth=history_depth
+listeners.confirm();listeners.right();listeners.up()
+assert(history_depth == complex_depth and rendered.entities[1].y == 7)
+listeners.undo()
+assert(not rendered.too_complex and rendered.entities[1].y == 8 and history_depth == complex_depth-1)
+print("PASS: native Too Complex triggering move/status, SELECT/F/movement lock and whole-tree Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -276,3 +288,5 @@ dofile("tests/contact_words.lua")
 dofile("tests/text_word.lua")
 
 dofile("tests/special_nouns.lua")
+
+dofile("tests/terminal_words.lua")

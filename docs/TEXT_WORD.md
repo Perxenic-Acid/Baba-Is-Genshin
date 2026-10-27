@@ -49,7 +49,7 @@ M9.3T 改为最多 200 轮；超限停止解析并进入 Infinite Loop，仅允�
 IS NOT 名词/IS NOT TEXT 阻止对应对象转换。正负规则顺序不改变覆盖结果。
 Text 类的属性否定也可用，例如 TEXT IS NOT PUSH。
 自定义关系须显式注册 negative_property / negative_noun 才执行否定，保持已有语言隔离。
-M9.3T 已支持主语 NOT、重复 NOT 与 ALL/EMPTY/TEXT 组合；NOT HAS、复杂条件仍保留 deferred。
+M9.3T 已支持主语 NOT、重复 NOT 与 ALL/EMPTY/TEXT 组合；NOT HAS 已在 M9.3T.3 接入；复杂条件仍保留 deferred。
 WORD 自否定循环按上面的 Infinite Loop 锁局处理，详见 SPECIAL_NOUNS.md。
 
 ## TXT 自由测试关卡

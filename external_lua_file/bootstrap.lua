@@ -76,9 +76,14 @@ end
 -- M9.3F: host-independent turn planning. Services adapt mapped scripts;
 -- no UI calls, logging, session ownership or Commit occur in this function.
 -- Services must treat world/context inputs as read-only.
+local function lock_compile_failure(plan, reason)
+    if reason == "rule_complexity_limit" then plan.too_complex=true;plan.reason="too_complex"
+    else plan.infinite_loop=true;plan.reason="infinite_loop" end
+end
 function RW_PlanTurn(world, action, services)
     local trace = {}
     if type(world) == "table" and world.infinite_loop then return nil,{stage="input",reason="infinite_loop_undo_only"} end
+    if type(world) == "table" and world.too_complex then return nil,{stage="input",reason="too_complex_undo_only"} end
     local function fail(stage, reason, phase)
         return nil, {stage = stage, reason = reason or "stage_failed", phase=phase,trace = trace}
     end
@@ -117,7 +122,7 @@ function RW_PlanTurn(world, action, services)
     local post_effects, post_error, conversions = services.evaluate(preview)
     if not post_effects then
         if post_error == "word_rule_limit" or post_error == "word_rule_cycle" or post_error == "rule_complexity_limit" then
-            movement.infinite_loop=true; movement.reason="infinite_loop"
+            lock_compile_failure(movement,post_error)
             return movement,nil,trace
         end
         return fail("rules_after", post_error)
@@ -169,7 +174,7 @@ function RW_PlanTurn(world, action, services)
         local frozen_effects,why,frozen_relations,frozen_rules=services.evaluate(complete)
         if not frozen_effects then
             if why == "word_rule_limit" or why == "word_rule_cycle" or why == "rule_complexity_limit" then
-                plan.infinite_loop=true; plan.reason="infinite_loop"; return plan,nil,trace
+                lock_compile_failure(plan,why); return plan,nil,trace
             end
             return fail("contact_rules",why)
         end
@@ -194,6 +199,14 @@ function RW_PlanTurn(world, action, services)
             for _,change in ipairs(contact.changes) do plan.changes[#plan.changes+1]=change end
             complete=next_world
         end
+        -- CRASH is checked on surviving units after destruction, against the frozen rules.
+        local crash_effects,crash_error=services.refresh(complete,frozen_rules)
+        if not crash_effects then return fail("crash",crash_error) end
+        local crash_world,crash_projection_error=services.project(complete,crash_effects,plan.level_traits)
+        if not crash_world then return fail("crash",crash_projection_error) end
+        for _,entity in pairs(crash_world.entities) do
+            if entity.behaviors.crash then plan.infinite_loop=true;plan.reason="infinite_loop";return plan,nil,trace end
+        end
         trace[#trace+1]="preview_contacts"
         local final,why,phase=services.preview(world,plan)
         if not final then return fail("preview_contacts",why,phase) end
@@ -202,7 +215,7 @@ function RW_PlanTurn(world, action, services)
         local checked,check_error=services.evaluate(final)
         if not checked then
             if check_error == "word_rule_limit" or check_error == "word_rule_cycle" or check_error == "rule_complexity_limit" then
-                plan.infinite_loop=true; plan.reason="infinite_loop"
+                lock_compile_failure(plan,check_error)
             else return fail("rules_final",check_error) end
         end
     else
@@ -219,6 +232,7 @@ function RW_PlanLevelAction(tree, action, services)
     if type(action) ~= "table" then return fail("invalid_action") end
     local session = services.active(tree)
     if session.world.infinite_loop then return fail("infinite_loop_undo_only") end
+    if session.world.too_complex then return fail("too_complex_undo_only") end
     local effects, err, initial_conversions = services.evaluate(session.world)
     if not effects then return fail(err) end
     local effective, project_error = services.project(session.world,effects,level_traits_from(initial_conversions))
@@ -277,8 +291,8 @@ function RW_PlanLevelAction(tree, action, services)
     if not accepted.accepted then return fail(accepted.reason) end
     local next_tree, update_error = services.update(tree,completed)
     if not next_tree then return fail(update_error) end
-    if turn.infinite_loop then
-        return {before=tree,after=next_tree,reason="infinite_loop",changes=turn.changes}
+    if turn.infinite_loop or turn.too_complex then
+        return {before=tree,after=next_tree,reason=turn.too_complex and "too_complex" or "infinite_loop",changes=turn.changes}
     end
     local post_effects, post_error, post_traits
     if turn.contact_frame then
@@ -1177,6 +1191,8 @@ local function start(run_self_tests)
         local defeated = session.defeated == true
         if session.world.infinite_loop then return {title="INFINITE LOOP / " .. session.instance_id,
             hint="INFINITE LOOP: Z Undo",portals={}} end
+        if session.world.too_complex then return {title="TOO COMPLEX / " .. session.instance_id,
+            hint="TOO COMPLEX: Z Undo",portals={}} end
         local choice
         if pending_selection then
             choice = {items={},index=pending_selection.index,error=pending_selection.error}
@@ -1195,7 +1211,7 @@ local function start(run_self_tests)
     local previous_deferred_count = nil
 
     local function render()
-        if session.world.infinite_loop then
+        if session.world.infinite_loop or session.world.too_complex then
             renderer_api:Invoke("RW_Render",session.world,#level_tree.history,0,navigation_view())
             return
         end
@@ -1323,7 +1339,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.3T.3.1 initialized")
+    print("[RuleWorld] M9.3U initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

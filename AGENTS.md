@@ -71,3 +71,13 @@
   instructions), and test real input/navigation with diagnostics disabled.
   Player-constructed in-level undefined/extreme behavior is not a reason to
   expand normal-startup defensive work. Preserve the agreed Infinite Loop rule.
+
+- TOO COMPLEX is separate from INFINITE LOOP: physical sentence variants >=5000,
+  parser traversal/output limits produce world.too_complex; WORD recursion and
+  surviving CRASH produce world.infinite_loop. Both commit the triggering phases,
+  block movement/SELECT/F/direct Commit and permit only Undo; render without recompile.
+- WRITE uses explicit text products, preserves conversion multiplicity/identity/direction/links,
+  respects IS identity protection and IS NOT TEXT plus WRITE NOT targets. SAFE protects
+  each SINK/DEFEAT victim independently, never conversions or CRASH. Check CRASH on
+  surviving real units after destruction using the frozen rule frame (EMPTY excluded).
+  See docs/TERMINAL_WORDS.md for source references, tests and manual routes.

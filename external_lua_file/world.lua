@@ -496,7 +496,7 @@ local function default_world()
                 -- New typed AST vocabulary. The legacy copula
                 -- remains until its compiler is retired.
                 verbs = {
-                    IS = "is", HAS = "has"
+                    IS = "is", HAS = "has", WRITE = "write"
                 },
 
                 copulas = {
@@ -506,7 +506,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", WIN="win"
+                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 operators = {AND="and",NOT="not"}
@@ -516,7 +516,7 @@ end
 
 -- Level definitions are reusable data; sessions own independent runtime snapshots.
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
-local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, infinite_loop=true,
+local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, infinite_loop=true, too_complex=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
     behavior_registry=true,board_offset=true}
 
@@ -549,6 +549,8 @@ local function validate_definition(definition)
         or not is_integer(world.height) or world.height < 1
         or type(world.entities) ~= "table" or not valid_frontier(world) then return false end
     if world.infinite_loop ~= nil and world.infinite_loop ~= true then return false end
+    if world.too_complex ~= nil and world.too_complex ~= true then return false end
+    if world.too_complex and world.infinite_loop then return false end
     if world.board_offset ~= nil and not valid_board_offset(world.board_offset) then return false end
     for id, entity in pairs(world.entities) do
         if not valid_new_entity(world, entity, id) then return false end
@@ -614,15 +616,19 @@ end
 -- keep their original simultaneous-operation contract; nested sequences are rejected.
 local function preview_transaction(world, plan)
     if world.infinite_loop then return nil,"infinite_loop_undo_only" end
+    if world.too_complex then return nil,"too_complex_undo_only" end
     if type(plan) ~= "table" then return nil,"invalid_plan" end
     if plan.infinite_loop ~= nil and plan.infinite_loop ~= true then return nil,"invalid_infinite_loop" end
+    if plan.too_complex ~= nil and plan.too_complex ~= true then return nil,"invalid_too_complex" end
+    if plan.too_complex and plan.infinite_loop then return nil,"conflicting_terminal_states" end
     if plan.stages == nil then
         local valid, reason = validate_plan(world,plan)
         if not valid then return nil,reason end
         if not plan.consumes_turn then return nil,plan.reason or "no_turn" end
         local result=apply_plan(world,plan)
         if plan.infinite_loop then result.infinite_loop=true end
-        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.infinite_loop == true
+        if plan.too_complex then result.too_complex=true end
+        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.infinite_loop == true or plan.too_complex == true
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
         or plan.id_allocation ~= nil or plan.board_shift ~= nil
@@ -645,6 +651,7 @@ local function preview_transaction(world, plan)
     end
     if not same_state(plan.changes,summary) then return nil,"stage_summary_mismatch" end
     if plan.infinite_loop then current.infinite_loop=true; changed=true end
+    if plan.too_complex then current.too_complex=true; changed=true end
     return current,nil,changed
 end
 
@@ -1211,6 +1218,7 @@ end
 -- The planner produces a complete candidate. Commit owns the only history write.
 function RW_CommitLevelTree(tree, plan)
     if RW_GetActiveLevel(tree).world.infinite_loop then return tree,rejected("infinite_loop_undo_only") end
+    if RW_GetActiveLevel(tree).world.too_complex then return tree,rejected("too_complex_undo_only") end
     if RW_GetActiveLevel(tree).defeated and not (type(plan) == "table" and plan.select_after_defeat) then
         return tree,rejected("level_defeated_undo_only")
     end
@@ -1426,6 +1434,12 @@ function RW_GetNavigationDefinitions()
             x=8+index*2,y=2,direction="None"}
         combos.next_entity_id=id+1
     end
+    for index,token in ipairs({"WRITE","SAFE","CRASH"}) do
+        local id=28+index
+        combos.entities[id]={id=id,kind="object",class="text",text={name=token},
+            x=index*3,y=12,direction="None"}
+        combos.next_entity_id=id+1
+    end
     definitions["navigation.specials"]={id="navigation.specials",initial_world=combos}
     portal(root,51,3,2,"NAT","navigation.specials")
     local loop=clone(lab)
@@ -1443,6 +1457,23 @@ function RW_GetNavigationDefinitions()
     object(loop,11,"line",1,1)
     definitions["navigation.infinite"]={id="navigation.infinite",initial_world=loop}
     portal(root,52,5,2,"LOOP","navigation.infinite")
+    local complex=clone(lab)
+    complex.entities={};complex.next_entity_id=1
+    object(complex,1,"avatar",4,8)
+    object(complex,2,"cursor",1,1)
+    portal(complex,3,2,1,"PARENT")
+    object(complex,4,"line",1,1)
+    -- Separated stacks are harmless at entry; W completes 40^3 token paths.
+    for _,spec in ipairs({{"ROCK",2,6},{"IS",3,6},{"CRATE",4,7}}) do
+        for index=1,40 do
+            local id=complex.next_entity_id
+            complex.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},
+                x=spec[2],y=spec[3],direction="None"}
+            complex.next_entity_id=id+1
+        end
+    end
+    definitions["navigation.complex"]={id="navigation.complex",initial_world=complex}
+    portal(root,53,6,2,"TC","navigation.complex")
     -- WIN is authored visibly in these two victory fixtures, never a Flag default.
     for _,world in ipairs({puzzle,transform}) do
         for offset,token in ipairs({"FLAG","IS","WIN"}) do

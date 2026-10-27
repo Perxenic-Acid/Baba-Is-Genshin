@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -36,7 +36,8 @@ local function valid_behaviors(registry)
         for capability, enabled in pairs(spec) do
             if (capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
                     and capability ~= "select" and capability ~= "select_path" and capability ~= "win"
-                    and capability ~= "defeat" and capability ~= "sink" and capability ~= "word")
+                    and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
+                    and capability ~= "safe" and capability ~= "crash")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -229,7 +230,7 @@ function RW_ResolveLevelPropertyOutcome(world, traits)
     for _, trait in ipairs(traits) do
         local capabilities = registry[trait] or {}
         if capabilities.win and has_you then return "win" end
-        if capabilities.defeat then return "defeat" end
+        if capabilities.defeat and not (world.level_behaviors and world.level_behaviors.safe) then return "defeat" end
     end
     return nil
 end
@@ -255,8 +256,8 @@ function RW_ResolveContactVictims(world, kind)
                 local sunk=false
                 for _,other_id in ipairs(ids) do
                     if other_id ~= id and not removed[other_id] and overlap(source,world.entities[other_id]) then
-                        removed[other_id]=true
-                        sunk=true
+                        if not world.entities[other_id].behaviors.safe then removed[other_id]=true end
+                        if not source.behaviors.safe then sunk=true end
                     end
                 end
                 if sunk then removed[id]=true end
@@ -265,7 +266,7 @@ function RW_ResolveContactVictims(world, kind)
     else
         for _,id in ipairs(ids) do
             local actor=world.entities[id]
-            if actor.behaviors.control then
+            if actor.behaviors.control and not actor.behaviors.safe then
                 for _,other_id in ipairs(ids) do
                     if world.entities[other_id].behaviors.defeat
                         and overlap(actor,world.entities[other_id]) then removed[id]=true; break end

@@ -337,7 +337,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}}
+local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -351,9 +351,9 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and (operation == "transform" or operation == "contain"))
+                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text"))
                 or (category == "negative_property" and operation == "deny_trait")
-                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain"))) then return false end
+                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write"))) then return false end
         end
     end
     return true
@@ -585,6 +585,9 @@ function RW_PlanConversions(world, conversions)
         if relation.op == "protect_transform" then protected[source]=true
         elseif relation.op == "forbid_transform" and type(relation.target_type) == "string" then
             forbidden[source]=forbidden[source] or {}; forbidden[source][relation.target_type]=true
+        elseif relation.op == "write_text" and type(relation.target_text) == "string" and relation.target_text ~= "" then
+            targets[source]=targets[source] or {}
+            targets[source][#targets[source]+1]={text_name=relation.target_text}
         elseif relation.op == "transform_text" or relation.op == "transform_all" or
             (relation.op == "transform" and type(relation.target_type) == "string" and relation.target_type ~= "" and relation.target_type ~= source) then
             targets[source]=targets[source] or {}
@@ -615,7 +618,7 @@ function RW_PlanConversions(world, conversions)
         if protected[source] or not targets[source] then return true end
         local products,retain,remove={},false,false
         for _,target in ipairs(targets[source]) do
-            if not bans[target] then
+            if not bans[target] and not (type(target) == "table" and bans["@text"]) then
                 if target == "@all" then
                     if not virtual and entity.class ~= "text" then retain=true end
                     for _,name in ipairs(RW_NounPalette(world)) do
@@ -635,11 +638,14 @@ function RW_PlanConversions(world, conversions)
         for _,target in ipairs(products) do
             local product=query_clone(entity)
             product.traits,product.behaviors,product.symbol=nil,nil,nil
-            if target == "@text" then
-                product.class,product.archetype,product.text="text",nil,{name=virtual and "EMPTY" or RW_NounTextName(world,entity)}
+            if target == "@text" or type(target) == "table" then
+                product.class,product.archetype,product.text="text",nil,
+                    {name=type(target) == "table" and target.text_name or (virtual and "EMPTY" or RW_NounTextName(world,entity))}
             else product.class,product.archetype,product.text="object",target,nil end
             if not virtual and not retain and not used then
-                if entity.class == "text" or target == "@text" then
+                if entity.class == "text" and product.class == "text" and entity.text.name == product.text.name then
+                    -- WRITE may target this very Text; retain its first identity product.
+                elseif entity.class == "text" or target == "@text" or type(target) == "table" then
                     changes[#changes+1]={kind="retype",entity_id=entity.id,from=query_clone(entity),to=product}
                 else changes[#changes+1]={kind="transform",entity_id=entity.id,from=entity.archetype,to=target} end
                 used=true
@@ -688,6 +694,19 @@ local function unwrap(term)
     return nil
 end
 local function noun_term(name) return {tag="noun",type={tag="object",name=name}} end
+local function written_token(world,term)
+    local vocabulary=term.tag == "property" and world.language.properties
+        or term.tag == "special" and world.language.specials or world.language.nouns
+    local matches={}
+    for token,value in pairs(vocabulary or {}) do
+        if (type(value) == "string" and value == (term.name or (term.type and term.type.name)))
+            or (type(value) == "table" and term.type and value.tag == term.type.tag and value.block_type == term.type.block_type and value.name == term.type.name) then
+            matches[#matches+1]=token
+        end
+    end
+    table.sort(matches)
+    return matches[1]
+end
 local function subject_key(term)
     if term.tag == "noun" and term.type and term.type.tag == "object" then return term.type.name end
     if term.tag == "special" and (term.name == "text" or term.name == "empty") then return "@" .. term.name end
@@ -698,6 +717,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     if not valid_semantics(registry) or not dense_list(ast_rules) then return nil,"invalid_ast_rules" end
     local generated,deferred,relations={},{},{}
     local contain_bans,contain_origins,contain_verbs={},{},{}
+    local write_bans,write_origins,write_verbs={},{},{}
     local function append(list,items) for _,item in ipairs(items) do list[#list+1]=item end end
     for _,ast in ipairs(ast_rules) do
         if type(ast) ~= "table" or type(ast.when) ~= "table" then return nil,"invalid_ast_rule" end
@@ -724,7 +744,32 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local key=subject_key(subject)
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
-            if sem and key and ast.when.op == "always" and sem.noun == "contain"
+            if sem and key and ast.when.op == "always" and sem.noun == "write_text"
+                and (not objnot or sem.negative_noun == "forbid_write") then
+                local token=written_token(world,obj)
+                if token then
+                    if objnot then
+                        write_bans[ast.verb]=write_bans[ast.verb] or {}
+                        local bans=write_bans[ast.verb];bans[key]=bans[key] or {};bans[key][token]=true
+                    else
+                        local products={token}
+                        if obj.tag == "special" and obj.name == "all" then
+                            products={}
+                            for _,name in ipairs(RW_NounPalette(world)) do products[#products+1]=written_token(world,noun_term(name)) end
+                        end
+                        for _,name in ipairs(products) do
+                            relations[#relations+1]={op="write_text",source_type=key,target_text=name,source=ast.source}
+                            write_origins[#relations]=token;write_verbs[#relations]=ast.verb
+                            if subj.tag == "special" and subj.name == "all" and not subnot
+                                and obj.tag == "special" and obj.name == "all" then
+                                relations[#relations+1]=query_clone(relations[#relations])
+                                write_origins[#relations]=token;write_verbs[#relations]=ast.verb
+                            end
+                        end
+                    end
+                    supported=true
+                end
+            elseif sem and key and ast.when.op == "always" and sem.noun == "contain"
                 and objnot and sem.negative_noun == "forbid_contain" then
                 local target=subject_key(obj)
                 if obj.tag == "special" and obj.name == "all" then target="@all" end
@@ -801,6 +846,10 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local bans=(contain_bans[contain_verbs[index]] or {})[key] or {}
             local product=relation.product.kind == "text" and "@text" or relation.product.archetype
             blocked=bans[product] or (contain_origins[index] == "@all" and bans["@all"])
+        end
+        if relation.op == "write_text" then
+            local bans=(write_bans[write_verbs[index]] or {})[relation.source_type] or {}
+            blocked=bans[relation.target_text] or bans[write_origins[index]]
         end
         if not blocked then filtered[#filtered+1]=relation end
     end

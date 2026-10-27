@@ -1293,5 +1293,5 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3T initialized")
+    print("[RuleWorld] M9.3T.1 initialized")
 end

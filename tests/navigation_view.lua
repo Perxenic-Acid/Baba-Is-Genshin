@@ -63,6 +63,16 @@ rows.RW_Choice_44.click()
 assert(chosen == 44)
 rows.RW_ChoiceCancel.click()
 assert(chosen == 0)
+-- The native control may have no cursor-listener method: W/S/F remains usable.
+local mouse_listener=methods.AddCursorEventListener
+methods.AddCursorEventListener=false
+assert(RW_Render(typed,0,1,{choice={index=1,items={{entity_id=44,label="P",available=true}}}}))
+local keyboard_row
+for _,control in ipairs(controls) do
+    if control.alive and control.name == "RW_Choice_44" then keyboard_row=control end
+end
+assert(keyboard_row and rawget(keyboard_row,"click") == nil)
+methods.AddCursorEventListener=mouse_listener
 assert(RW_RendererSelfTest())
 assert(RW_Render(typed,0,1))
 assert(not rows.RW_Choice_44.alive)

@@ -407,19 +407,20 @@ local function draw_level_choice(choice)
         control.fontSize = 18
         control.fontColor = Color(255,255,255,255)
         control.bgColor = selected and Color(90,80,155,255) or Color(24,30,48,255)
-        if id and Enum.CursorEventType and Enum.CursorEventType.CursorClick then
+        if id and type(control.AddCursorEventListener) == "function"
+            and Enum.CursorEventType and Enum.CursorEventType.CursorClick then
             control:AddCursorEventListener(Enum.CursorEventType.CursorClick,function() choose_level(id); return true end)
         end
     end
     panel("RW_ChoiceBackground","",0,640,height,false)
-    panel("RW_ChoiceTitle","Choose level: W/S + F, or click",height/2-24,620,44,false)
+    panel("RW_ChoiceTitle","Choose level: W/S + F",height/2-24,620,44,false)
     for index=first,last do
         local item = choice.items[index]
         panel("RW_Choice_" .. tostring(item.entity_id),
             (index == choice.index and "> " or "  ") .. item.label .. (item.available and "" or " (unavailable)"),
             height/2-24-(index-first+1)*48,620,44,index == choice.index,item.entity_id)
     end
-    panel("RW_ChoiceCancel",choice.error or "Z / click to cancel",-height/2+24,620,44,false,0)
+    panel("RW_ChoiceCancel",choice.error or "Z: Cancel",-height/2+24,620,44,false,0)
 end
 
 function RW_Render(world, history_depth, active_effects, navigation)

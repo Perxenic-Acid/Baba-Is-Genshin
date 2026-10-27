@@ -126,3 +126,7 @@ tests/reference_multiplicity.lua 可独立运行以对照本机原版源码。
 TEXT 反向类转换、EMPTY 生成/保护/STOP/PUSH/YOU/WIN、HAS ALL 和 deferred 边界。
 `tests/text_word.lua` 改测 Infinite Loop 提交/锁局/撤销；`tests/run.lua` 通过真实按键
 回调走 LOOP/NAT，验证 SELECT/F 也锁住、Z 恢复和重放。详见 docs/SPECIAL_NOUNS.md。
+
+M9.3T.1：启动阶段加入 3000 万 Lua 指令预算，捕捉真机日志暴露的解析成本回归；
+当前约 1998 万，旧解析器约 7534 万。此指标不替代原生执行时限的真机验收。
+`navigation_view.lua` 同时验证控件不提供 AddCursorEventListener 时仍可显示选择菜单。

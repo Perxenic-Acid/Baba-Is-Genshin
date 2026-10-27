@@ -59,3 +59,8 @@
   deletes via conversion without HAS. EMPTY is virtual occupancy, not persistent
   entities/IDs; current EMPTY lifecycle/HAS remains deferred. Preserve cell-based
   effects and never commit the negative-ID movement proxies.
+
+- Parse actual token/role paths and real NOT prefixes. Never enumerate all possible
+  prefix counts across the full grid: native startup hit the Lua time watchdog.
+  Keep tests/run.lua's startup instruction budget. Optional UI event methods must
+  be checked before binding; native controls can omit AddCursorEventListener.

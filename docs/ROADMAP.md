@@ -153,3 +153,6 @@ WORD 超限进入可撤销的 Infinite Loop，锁住包括 SELECT/F 的全部后
 新增 NOT 主语/重复 NOT、ALL/NOT ALL 展开、TEXT 反向转换、EMPTY 转换与虚拟属性，
 以及 NOUN IS ALL 的保留源对象语义。新增 NAT 组合关卡、LOOP 一步循环关卡。
 原版依据、试玩路线、EMPTY 生命周期等剩余范围见 SPECIAL_NOUNS.md。
+
+M9.3T.1 修复真机启动解析超时：按实际词流而非所有 NOT 长度枚举；启动指令回归
+预算与重复/语序/堆叠测试通过。选关 UI 缺少鼠标事件方法时继续支持键盘选关。

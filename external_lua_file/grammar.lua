@@ -594,46 +594,37 @@ function RW_ParseRuleAST(lines, language)
         end
 
         local budget=0
-        for start = 1, #cells do
-            for sub_not = 0, #cells-3 do
-                for obj_not = 0, #cells-3-sub_not do
-                    local span = 3 + sub_not + obj_not
-                    local finish = start + span - 1
-
-                    if finish <= #cells then
-                        local chosen = {}
-
-                        -- Enumerate stacked text alternatives
-                        -- in each cell.
-                        local function enumerate(offset)
-                            budget=budget+1
-                            if budget > 50000 or #output > 50000 then return end
-                            if offset > span then
-                                ast_parse_candidate(
-                                    chosen,
-                                    sub_not,
-                                    obj_not,
-                                    language,
-                                    line,
-                                    start,
-                                    output
-                                )
-                                return
-                            end
-
-                            local cell =
-                                cells[start + offset - 1]
-
-                            for _, word in ipairs(cell) do
-                                chosen[offset] = word
-                                enumerate(offset + 1)
-                            end
+        for start=1,#cells do
+            local chosen={}
+            -- Follow only real role/token paths. Trying every possible NOT count
+            -- rescans empty cells quadratically and trips the native Lua watchdog.
+            local function role_at(role_index,position,sub_count,obj_count)
+                budget=budget+1
+                if budget > 50000 or #output > 50000 then return end
+                if role_index > 3 then
+                    ast_parse_candidate(chosen,sub_count,obj_count,language,line,start,output)
+                    return
+                end
+                local role=order[role_index]
+                local function term_at(cursor,count)
+                    budget=budget+1
+                    if budget > 50000 or #output > 50000 then return end
+                    for _,word in ipairs(cells[cursor] or {}) do
+                        chosen[#chosen+1]=word
+                        if role ~= "verb" and ast_is_not(word,language) then term_at(cursor+1,count+1) end
+                        local valid
+                        if role == "verb" then valid=registry[language.verbs[word.token]] ~= nil
+                        else valid=#ast_term_options(word.token,language,role == "object") > 0 end
+                        if valid then
+                            role_at(role_index+1,cursor+1,role == "subject" and count or sub_count,
+                                role == "object" and count or obj_count)
                         end
-
-                        enumerate(1)
+                        chosen[#chosen]=nil
                     end
                 end
+                term_at(position,0)
             end
+            role_at(1,start,0,0)
         end
         if budget > 50000 or #output > 50000 then return nil,"rule_complexity_limit" end
     end

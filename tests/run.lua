@@ -23,7 +23,16 @@ script = {object = {
     AddKeyEventListener = function(_, key, callback) listeners[key] = callback end
 }}
 dofile("external_lua_file/bootstrap.lua")
+-- Native Lua has a watchdog; an unboundedly expensive startup can pass semantic
+-- tests yet fail before the board appears. Keep instruction work bounded too.
+local startup_instructions=0
+debug.sethook(function()
+    startup_instructions=startup_instructions+1000
+    if startup_instructions > 30000000 then error("Startup exceeded Lua instruction budget") end
+end,"",1000)
 OnStart()
+debug.sethook()
+print("Startup Lua instructions: " .. startup_instructions)
 assert(rendered and listeners.right and listeners.undo, "Bootstrap did not initialize")
 local initial = rendered
 listeners.right()

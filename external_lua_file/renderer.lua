@@ -439,6 +439,12 @@ function RW_Render(world, history_depth, active_effects, navigation)
         cell:SetAnchoredPosition(display_position(x,y,world.width,world.height))
         cell.text = ""
         cell.bgColor = Color(43, 55, 75, 255)
+        local empty=world.empty_cells and world.empty_cells[x .. ":" .. y]
+        if empty then
+            cell.text="E"; cell.fontSize=12; cell.fontColor=Color(130,150,175,255)
+            if empty.behaviors.control then cell.bgColor=Color(75,100,125,255) end
+            if empty.behaviors.block_entry then cell.bgColor=Color(65,65,85,255) end
+        end
     end
     for _, entity in pairs(world.entities) do
         if entity.archetype == "line" then

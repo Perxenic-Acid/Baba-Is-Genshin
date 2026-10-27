@@ -342,14 +342,9 @@ local function ast_is_not(word, language)
 end
 
 local function ast_wrap_not(term, enabled)
-    if not enabled then
-        return term
-    end
-
-    return {
-        tag = "not",
-        operand = term
-    }
+    local count=type(enabled) == "number" and enabled or (enabled and 1 or 0)
+    for _=1,count do term={tag="not",operand=term} end
+    return term
 end
 
 -- Enumerate complete physical RHS paths before lowering their terms. A stacked
@@ -360,11 +355,12 @@ local function ast_extend_rhs(base, chosen, language, line, start, output)
     local operators = language.operators or {}
     local registry = language.verb_registry or AST_VERBS
     local function extend(previous, finish, chain)
+        if #output > 50000 then return end
         local continued = false
         local conjunctions = line.cells[finish+1] or {}
         for _, conjunction in ipairs(conjunctions) do
             if operators[conjunction.token] == "and" then
-                local function term_at(position, negated, prefix)
+                local function term_at(position, negated, prefixes)
                     for _, word in ipairs(line.cells[position] or {}) do
                         for _, object in ipairs(ast_term_options(word.token,language,true)) do
                             if registry[base.verb].rhs[object.tag] then
@@ -373,7 +369,7 @@ local function ast_extend_rhs(base, chosen, language, line, start, output)
                                 rule.object = ast_wrap_not(object,negated)
                                 rule.source.entity_ids = ast_clone(previous.source.entity_ids)
                                 rule.source.entity_ids[#rule.source.entity_ids+1] = conjunction.id
-                                if prefix then rule.source.entity_ids[#rule.source.entity_ids+1] = prefix.id end
+                                for _,prefix in ipairs(prefixes or {}) do rule.source.entity_ids[#rule.source.entity_ids+1]=prefix.id end
                                 rule.source.entity_ids[#rule.source.entity_ids+1] = word.id
                                 rule.source.finish = position
                                 rule.source.rhs_index = (previous.source.rhs_index or 1)+1
@@ -385,10 +381,17 @@ local function ast_extend_rhs(base, chosen, language, line, start, output)
                         end
                     end
                 end
-                term_at(finish+2,false)
-                for _, word in ipairs(line.cells[finish+2] or {}) do
-                    if ast_is_not(word,language) then term_at(finish+3,true,word) end
+                local function prefixes_at(position,prefixes)
+                    if #output > 50000 then return end
+                    term_at(position,#prefixes,prefixes)
+                    for _,word in ipairs(line.cells[position] or {}) do
+                        if ast_is_not(word,language) then
+                            local more=ast_clone(prefixes); more[#more+1]=word
+                            prefixes_at(position+1,more)
+                        end
+                    end
                 end
+                prefixes_at(finish+2,{})
             end
         end
         if not continued then
@@ -413,9 +416,8 @@ local function ast_parse_candidate(
     local registry = language.verb_registry or AST_VERBS
     local positions, cursor = {}, 1
     for _, role in ipairs(order) do
-        local negated = (role == "subject" and sub_not == 1)
-            or (role == "object" and obj_not == 1)
-        if negated then
+        local count=role == "subject" and sub_not or (role == "object" and obj_not or 0)
+        for _=1,count do
             if not ast_is_not(chosen[cursor], language) then return end
             cursor = cursor + 1
         end
@@ -455,13 +457,13 @@ local function ast_parse_candidate(
 
                 local rule = {
                     subject = ast_wrap_not(
-                        subject, sub_not == 1
+                        subject, sub_not
                     ),
 
                     verb = verb,
 
                     object = ast_wrap_not(
-                        object, obj_not == 1
+                        object, obj_not
                     ),
 
                     when = {
@@ -471,8 +473,8 @@ local function ast_parse_candidate(
                     source = {
                         axis = line.axis,
                         line = line.index,
-                        leading_not = (order[1] == "subject" and sub_not == 1)
-                            or (order[1] == "object" and obj_not == 1),
+                        leading_not = (order[1] == "subject" and sub_not > 0)
+                            or (order[1] == "object" and obj_not > 0),
                         start = start,
                         finish = start + #chosen - 1,
                         entity_ids = ids
@@ -488,48 +490,23 @@ end
 -- a valid leading NOT expression and shares exactly the same
 -- physical word instances. Other overlaps are legitimate.
 local function ast_filter_shadowed(rules)
-    local hidden = {}
-
-    for _, longer in ipairs(rules) do
-        if longer.source.leading_not then
-            local a = longer.source
-
-            for j, shorter in ipairs(rules) do
-                local b = shorter.source
-
-                if longer.verb == shorter.verb
-                    and a.axis == b.axis
-                    and a.line == b.line
-                    and b.start == a.start + 1
-                    and b.finish == a.finish
-                    and #a.entity_ids == #b.entity_ids + 1 then
-
-                    local identical_suffix = true
-
-                    for k = 1, #b.entity_ids do
-                        if b.entity_ids[k]
-                            ~= a.entity_ids[k + 1] then
-                            identical_suffix = false
-                            break
-                        end
-                    end
-
-                    if identical_suffix then
-                        hidden[j] = true
-                    end
-                end
-            end
+    local function key(rule,start,ids)
+        local src=rule.source
+        return rule.verb .. ":" .. tostring(src.axis) .. ":" .. tostring(src.line) .. ":"
+            .. start .. ":" .. src.finish .. ":" .. table.concat(ids,",")
+    end
+    local hidden={}
+    for _,rule in ipairs(rules) do
+        if rule.source.leading_not then
+            local suffix={}
+            for i=2,#rule.source.entity_ids do suffix[#suffix+1]=rule.source.entity_ids[i] end
+            hidden[key(rule,rule.source.start+1,suffix)]=true
         end
     end
-
-    local filtered = {}
-
-    for i, rule in ipairs(rules) do
-        if not hidden[i] then
-            filtered[#filtered + 1] = rule
-        end
+    local filtered={}
+    for _,rule in ipairs(rules) do
+        if not hidden[key(rule,rule.source.start,rule.source.entity_ids)] then filtered[#filtered+1]=rule end
     end
-
     return filtered
 end
 
@@ -616,9 +593,10 @@ function RW_ParseRuleAST(lines, language)
             end
         end
 
+        local budget=0
         for start = 1, #cells do
-            for sub_not = 0, 1 do
-                for obj_not = 0, 1 do
+            for sub_not = 0, #cells-3 do
+                for obj_not = 0, #cells-3-sub_not do
                     local span = 3 + sub_not + obj_not
                     local finish = start + span - 1
 
@@ -628,6 +606,8 @@ function RW_ParseRuleAST(lines, language)
                         -- Enumerate stacked text alternatives
                         -- in each cell.
                         local function enumerate(offset)
+                            budget=budget+1
+                            if budget > 50000 or #output > 50000 then return end
                             if offset > span then
                                 ast_parse_candidate(
                                     chosen,
@@ -655,6 +635,7 @@ function RW_ParseRuleAST(lines, language)
                 end
             end
         end
+        if budget > 50000 or #output > 50000 then return nil,"rule_complexity_limit" end
     end
 
     return ast_filter_shadowed(output)

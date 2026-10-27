@@ -131,7 +131,7 @@ assert(step(negative_noun,right).world.entities[1].archetype == "rock")
 local deny_push=simple({{"TEXT","IS","NOT","PUSH"}})
 local denied=frame(deny_push.world)
 assert(not RW_ProjectWorld(deny_push.world,denied.effects).entities[10].behaviors.push)
--- A self-negating WORD loop is rejected atomically, with no retained readability.
+-- A self-negating WORD loop commits the triggering move and locks until Undo.
 local cycle=simple({{"ROCK","IS","WORD"}})
 cycle.world.entities[2]={id=2,kind="object",class="object",archetype="avatar",x=4,y=4,direction="None"}
 cycle.world.rule_sources[#cycle.world.rule_sources+1]={when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="avatar"},trait="you"}}}
@@ -141,13 +141,18 @@ for _,spec in ipairs({{"IS",3,2},{"NOT",4,3},{"WORD",5,2}}) do
     cycle.world.next_entity_id=id+1
 end
 assert(frame(cycle.world).word_tokens[1])
-local no_plan,problem=RW_PlanTurn(cycle.world,up,services)
-assert(not no_plan and problem.stage == "rules_after" and problem.reason == "word_rule_cycle")
-assert(cycle.world.entities[2].y == 4 and #cycle.history == 0)
--- Unsupported subject NOT remains explicit deferred syntax.
+local terminal,terminal_plan=step(cycle,up)
+assert(terminal_plan.infinite_loop and terminal.world.infinite_loop and terminal.world.entities[2].y == 3)
+assert(#terminal.history == 1 and not cycle.world.infinite_loop and cycle.world.entities[2].y == 4)
+local locked,why=RW_PlanTurn(terminal.world,up,services)
+assert(not locked and why.reason == "infinite_loop_undo_only")
+local rejected,result=RW_Commit(terminal,{consumes_turn=true,changes={}})
+assert(rejected == terminal and not result.accepted)
+assert(RW_Undo(terminal).world == cycle.world)
+-- Subject NOT now expands over the authored ordinary noun palette.
 local subject_not=simple({{"NOT","ROCK","IS","WORD"}})
-assert(#frame(subject_not.world).deferred == 1 and not frame(subject_not.world).word_tokens[1])
+assert(#frame(subject_not.world).deferred == 0 and not frame(subject_not.world).word_tokens[1])
 -- Malformed lexical overlays are rejected at the Reader boundary.
 assert(not RW_ReadLines(lab.world,{[999]="ROCK"}))
 assert(not RW_ReadLines(lab.world,{[2]="ROCK"}))
-print("PASS: IS TEXT retype/identity/multiplicity, WORD grounded reading/retraction, RHS NOT, cycle rejection and Undo")
+print("PASS: IS TEXT retype/identity/multiplicity, WORD grounded reading/retraction, RHS NOT, Infinite Loop lock and Undo")

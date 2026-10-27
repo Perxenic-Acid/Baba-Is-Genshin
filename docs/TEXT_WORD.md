@@ -20,7 +20,7 @@ A IS A 仍保护 A，A IS NOT TEXT 阻止对应 TEXT 转换。
 校验类别数据、位置/方向/指向保持和快照是否过期；同一 flat 阶段不能再对该 ID
 同时写位置或别的操作。跨阶段修改仍允许。Text 现在可保留原有明确关卡指向，
 不会因类别改变丢失入口身份。Undo 同时恢复原类型与本回合其他变化。
-本步不实现 TEXT IS NOUN 的反向类转换、任意深度 Meta 或当前 LEVEL 作用域的 TEXT 转换。
+M9.3T 已补 TEXT IS NOUN 的反向类转换；任意深度 Meta 与当前 LEVEL 作用域的 TEXT 转换仍未实现。
 
 ## WORD 编译
 
@@ -39,8 +39,8 @@ WORD 词流，直到 WORD 映射稳定。每次编译重新建立有根据的集
 生产宿主所有移动前后、转换后、进入/返回和显示规则读取都使用该编译入口。
 接触阶段仍冻结编译后的声明，不因销毁文字而在半轮重新读句。
 
-有界求解最多 64 轮，重复映射产生 word_rule_cycle，超限产生 word_rule_limit。
-目前这些失败拒绝整个动作并保持世界/撤销栈，不复刻原版 infinity 的整关销毁。
+M9.3T 改为最多 200 轮；超限停止解析并进入 Infinite Loop，仅允许撤销。
+保留触发这一步的棋盘，不复刻原版 infinity 的整关销毁动画。
 完整的条件 WORD、GROUP/MIMIC/NOT 主语递归等复杂语义仍待对应词实现。
 
 ## NOT 的本步范围
@@ -49,8 +49,8 @@ WORD 词流，直到 WORD 映射稳定。每次编译重新建立有根据的集
 IS NOT 名词/IS NOT TEXT 阻止对应对象转换。正负规则顺序不改变覆盖结果。
 Text 类的属性否定也可用，例如 TEXT IS NOT PUSH。
 自定义关系须显式注册 negative_property / negative_noun 才执行否定，保持已有语言隔离。
-NOT 主语、NOT HAS、复杂条件否定仍保留 AST/deferred，不伪装为已执行。
-WORD 自否定造成的循环按上面的原子拒绝处理。
+M9.3T 已支持主语 NOT、重复 NOT 与 ALL/EMPTY/TEXT 组合；NOT HAS、复杂条件仍保留 deferred。
+WORD 自否定循环按上面的 Infinite Loop 锁局处理，详见 SPECIAL_NOUNS.md。
 
 ## TXT 自由测试关卡
 

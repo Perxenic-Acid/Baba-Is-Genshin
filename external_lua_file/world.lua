@@ -505,9 +505,10 @@ local function default_world()
 
                 properties = {
                     PUSH = "pushable",
-                    YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word"
+                    YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
+                    STOP="block_entry", WIN="win"
                 },
-                specials = {TEXT="text"},
+                specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 operators = {AND="and",NOT="not"}
             }
     }
@@ -515,7 +516,7 @@ end
 
 -- Level definitions are reusable data; sessions own independent runtime snapshots.
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
-local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true,
+local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, infinite_loop=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
     behavior_registry=true,board_offset=true}
 
@@ -547,6 +548,7 @@ local function validate_definition(definition)
     if not is_integer(world.width) or world.width < 1
         or not is_integer(world.height) or world.height < 1
         or type(world.entities) ~= "table" or not valid_frontier(world) then return false end
+    if world.infinite_loop ~= nil and world.infinite_loop ~= true then return false end
     if world.board_offset ~= nil and not valid_board_offset(world.board_offset) then return false end
     for id, entity in pairs(world.entities) do
         if not valid_new_entity(world, entity, id) then return false end
@@ -611,12 +613,16 @@ end
 -- A phase sequence is validated against successive private snapshots. Flat plans
 -- keep their original simultaneous-operation contract; nested sequences are rejected.
 local function preview_transaction(world, plan)
+    if world.infinite_loop then return nil,"infinite_loop_undo_only" end
     if type(plan) ~= "table" then return nil,"invalid_plan" end
+    if plan.infinite_loop ~= nil and plan.infinite_loop ~= true then return nil,"invalid_infinite_loop" end
     if plan.stages == nil then
         local valid, reason = validate_plan(world,plan)
         if not valid then return nil,reason end
         if not plan.consumes_turn then return nil,plan.reason or "no_turn" end
-        return apply_plan(world,plan),nil,#plan.changes > 0 or plan.board_shift ~= nil
+        local result=apply_plan(world,plan)
+        if plan.infinite_loop then result.infinite_loop=true end
+        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.infinite_loop == true
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
         or plan.id_allocation ~= nil or plan.board_shift ~= nil
@@ -638,6 +644,7 @@ local function preview_transaction(world, plan)
         changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil
     end
     if not same_state(plan.changes,summary) then return nil,"stage_summary_mismatch" end
+    if plan.infinite_loop then current.infinite_loop=true; changed=true end
     return current,nil,changed
 end
 
@@ -1203,6 +1210,7 @@ end
 
 -- The planner produces a complete candidate. Commit owns the only history write.
 function RW_CommitLevelTree(tree, plan)
+    if RW_GetActiveLevel(tree).world.infinite_loop then return tree,rejected("infinite_loop_undo_only") end
     if RW_GetActiveLevel(tree).defeated and not (type(plan) == "table" and plan.select_after_defeat) then
         return tree,rejected("level_defeated_undo_only")
     end
@@ -1389,6 +1397,41 @@ function RW_GetNavigationDefinitions()
     object(lab,14,"line",1,1)
     definitions["navigation.text_word"]={id="navigation.text_word",initial_world=lab}
     portal(root,50,1,1,"TXT","navigation.text_word")
+    local combos=clone(lab)
+    combos.entities={}
+    combos.next_entity_id=1
+    object(combos,1,"avatar",6,11)
+    object(combos,2,"rock",4,2)
+    object(combos,3,"crate",8,2)
+    local tokens={"ROCK","CRATE","AVATAR","ALL","EMPTY","TEXT","IS","IS","IS",
+        "IS","NOT","NOT","NOT","NOT","WORD","WORD","PUSH","YOU","AND","WIN"}
+    for index,token in ipairs(tokens) do
+        local id=3+index
+        combos.entities[id]={id=id,kind="object",class="text",text={name=token},
+            x=2+((index-1)%5)*2,y=4+2*math.floor((index-1)/5),direction="None"}
+        combos.next_entity_id=id+1
+    end
+    grant(combos,"crate","pushable")
+    object(combos,24,"cursor",1,1)
+    portal(combos,25,2,1,"PARENT")
+    object(combos,26,"line",1,1)
+    definitions["navigation.specials"]={id="navigation.specials",initial_world=combos}
+    portal(root,51,3,2,"NAT","navigation.specials")
+    local loop=clone(lab)
+    loop.entities={};loop.next_entity_id=1
+    object(loop,1,"avatar",4,4)
+    object(loop,2,"rock",2,2)
+    for index,spec in ipairs({{"ROCK",1,6},{"IS",2,6},{"WORD",3,6},
+        {"IS",3,2},{"NOT",4,3},{"WORD",5,2}}) do
+        local id=index+2
+        loop.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},x=spec[2],y=spec[3],direction="None"}
+        loop.next_entity_id=id+1
+    end
+    object(loop,9,"cursor",1,1)
+    portal(loop,10,2,1,"PARENT")
+    object(loop,11,"line",1,1)
+    definitions["navigation.infinite"]={id="navigation.infinite",initial_world=loop}
+    portal(root,52,5,2,"LOOP","navigation.infinite")
     -- WIN is authored visibly in these two victory fixtures, never a Flag default.
     for _,world in ipairs({puzzle,transform}) do
         for offset,token in ipairs({"FLAG","IS","WIN"}) do

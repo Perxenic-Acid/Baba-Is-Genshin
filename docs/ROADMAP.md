@@ -146,3 +146,10 @@ Commit/Undo。允许后续阶段修改本回合新对象，晚失败整步拒绝
 编译器从物理文字重新建立稳定 WORD 集合。新增默认 IS 的右侧属性/名词否定，
 循环编译原子拒绝。根 TXT 入口提供用户要求的自由对象及额外 TEXT，Rock 配置 PUSH。
 启动自测与实际 F/移动路线离线回归通过，详见 TEXT_WORD.md。
+
+## M9.3T
+
+WORD 超限进入可撤销的 Infinite Loop，锁住包括 SELECT/F 的全部后续动作。
+新增 NOT 主语/重复 NOT、ALL/NOT ALL 展开、TEXT 反向转换、EMPTY 转换与虚拟属性，
+以及 NOUN IS ALL 的保留源对象语义。新增 NAT 组合关卡、LOOP 一步循环关卡。
+原版依据、试玩路线、EMPTY 生命周期等剩余范围见 SPECIAL_NOUNS.md。

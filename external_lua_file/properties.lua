@@ -85,6 +85,20 @@ function RW_ProjectWorld(world, effects, level_traits)
             return nil, "invalid_effect"
         end
         if not dense_list(effect.entity_ids) then return nil, "unresolved_effect" end
+        if effect.cells ~= nil then
+            if type(world.width) ~= "number" or type(world.height) ~= "number" then return nil,"invalid_empty_grid" end
+            if not dense_list(effect.cells) or #effect.entity_ids > 0 then return nil,"invalid_empty_effect" end
+            local seen_cells={}
+            for _,cell in ipairs(effect.cells) do
+                if type(cell) ~= "table" or type(cell.x) ~= "number" or type(cell.y) ~= "number"
+                    or cell.x % 1 ~= 0 or cell.y % 1 ~= 0 or cell.x < 1 or cell.y < 1
+                    or cell.x > world.width or cell.y > world.height or seen_cells[cell.x .. ":" .. cell.y] then return nil,"invalid_empty_cell" end
+                for _,entity in pairs(world.entities) do
+                    if entity.x == cell.x and entity.y == cell.y then return nil,"occupied_empty_cell" end
+                end
+                seen_cells[cell.x .. ":" .. cell.y]=true
+            end
+        end
         local seen = {}
         for _, id in ipairs(effect.entity_ids) do
             if type(id) ~= "number" or id % 1 ~= 0 or id < 1
@@ -98,6 +112,7 @@ function RW_ProjectWorld(world, effects, level_traits)
         if type(trait) ~= "string" or trait == "" then return nil,"invalid_level_property" end
     end
     local projected = clone(world)
+    projected.empty_cells={}
     projected.level_traits, projected.level_behaviors = {}, {}
     for _, trait in ipairs(level_traits) do
         projected.level_traits[#projected.level_traits+1] = trait
@@ -109,15 +124,27 @@ function RW_ProjectWorld(world, effects, level_traits)
         entity.traits = nil
         entity.behaviors = {} -- Explicit empty capabilities disable legacy fallback.
     end
-    local denied={}
+    local denied,empty_denied={},{}
     for _,effect in ipairs(effects) do
         if effect.op == "deny_trait" then
             for _,id in ipairs(effect.entity_ids) do denied[id]=denied[id] or {}; denied[id][effect.trait]=true end
+            for _,cell in ipairs(effect.cells or {}) do
+                local key=cell.x .. ":" .. cell.y; empty_denied[key]=empty_denied[key] or {}; empty_denied[key][effect.trait]=true
+            end
         end
     end
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
+            for _,cell in ipairs(effect.cells or {}) do
+                local key=cell.x .. ":" .. cell.y
+                if not (empty_denied[key] and empty_denied[key][effect.trait]) then
+                    local empty=projected.empty_cells[key] or {x=cell.x,y=cell.y,traits={},behaviors={}}
+                    empty.traits[effect.trait]=true
+                    for capability,enabled in pairs(behavior) do if enabled then empty.behaviors[capability]=true end end
+                    projected.empty_cells[key]=empty
+                end
+            end
             for _, id in ipairs(effect.entity_ids) do
                 if not (denied[id] and denied[id][effect.trait]) then
                     local entity = projected.entities[id]
@@ -127,6 +154,18 @@ function RW_ProjectWorld(world, effects, level_traits)
                         if enabled then entity.behaviors[capability] = true end
                     end
                 end
+            end
+        end
+    end
+    projected.empty_behaviors={}
+    local globally_denied={}
+    for _,effect in ipairs(effects) do
+        if effect.target and effect.target.kind == "empty" and effect.op == "deny_trait" then globally_denied[effect.trait]=true end
+    end
+    for _,effect in ipairs(effects) do
+        if effect.target and effect.target.kind == "empty" and effect.op == "grant_trait" and not globally_denied[effect.trait] then
+            for capability,enabled in pairs(registry[effect.trait] or {}) do
+                if enabled then projected.empty_behaviors[capability]=true end
             end
         end
     end
@@ -183,6 +222,9 @@ function RW_ResolveLevelPropertyOutcome(world, traits)
     local has_you = world.level_behaviors and world.level_behaviors.control == true
     for _, entity in pairs(world.entities or {}) do
         if entity.behaviors and entity.behaviors.control then has_you = true end
+    end
+    for _,cell in pairs(world.empty_cells or {}) do
+        if cell.behaviors.control then has_you=true end
     end
     for _, trait in ipairs(traits) do
         local capabilities = registry[trait] or {}

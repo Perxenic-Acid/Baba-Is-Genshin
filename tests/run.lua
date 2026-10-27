@@ -197,6 +197,27 @@ assert(rendered.entities[3].behaviors.push and not rendered.entities[3].archetyp
 listeners.undo()
 assert(rendered.entities[3].class == "object" and rendered.entities[3].behaviors.word)
 print("PASS: native TXT sandbox WORD activation, pushed IS TEXT class conversion and whole-tree Undo")
+-- Drive the real host into an Infinite Loop, including a SELECT still present.
+while history_depth > 0 do listeners.undo() end
+for _=1,3 do listeners.right() end
+listeners.confirm()
+assert(rendered.entities[1].x == 4 and rendered.entities[7].y == 3)
+listeners.up()
+assert(rendered.infinite_loop and rendered.entities[7].y == 2 and navigation.title:find("INFINITE LOOP"))
+local loop_depth=history_depth
+listeners.right();listeners.confirm();listeners.up()
+assert(history_depth == loop_depth and rendered.infinite_loop and rendered.entities[1].y == 3)
+listeners.undo()
+assert(not rendered.infinite_loop and rendered.entities[7].y == 3 and history_depth == loop_depth-1)
+listeners.up()
+assert(rendered.infinite_loop and history_depth == loop_depth)
+listeners.undo()
+print("PASS: native Infinite Loop board/status, SELECT/F/movement lock, whole-tree Undo and replay")
+while history_depth > 0 do listeners.undo() end
+listeners.right();listeners.confirm()
+assert(rendered.entities[24].archetype == "cursor" and rendered.entities[1].x == 6 and rendered.entities[1].y == 11)
+assert(rendered.entities[1].behaviors.control and rendered.entities[3].behaviors.push)
+print("PASS: native NAT entry and independent freely movable actors")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -224,3 +245,5 @@ dofile("tests/stage_transactions.lua")
 dofile("tests/contact_words.lua")
 
 dofile("tests/text_word.lua")
+
+dofile("tests/special_nouns.lua")

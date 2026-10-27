@@ -2,9 +2,12 @@
 -- RuleWorld M7: Runtime coordination
 
 local function level_traits_from(conversions)
-    local traits = {}
-    for _, command in ipairs(conversions or {}) do
-        if command.op == "level_trait" then traits[#traits+1] = command.trait end
+    local traits,denied={},{}
+    for _,command in ipairs(conversions or {}) do
+        if command.op == "deny_level_trait" then denied[command.trait]=true end
+    end
+    for _,command in ipairs(conversions or {}) do
+        if command.op == "level_trait" and not denied[command.trait] then traits[#traits+1]=command.trait end
     end
     return traits
 end
@@ -15,7 +18,7 @@ function RW_CompileWorld(world, services)
     for _,name in ipairs({"read","parse","lower","evaluate","project","words"}) do
         if type(services[name]) ~= "function" then return nil,{stage="compile",reason="missing_" .. name} end
     end
-    local tokens,seen={},{}
+    local tokens={}
     local function signature(map)
         if type(map) ~= "table" then return nil end
         local ids={}
@@ -27,13 +30,12 @@ function RW_CompileWorld(world, services)
         local items={}; for _,id in ipairs(ids) do items[#items+1]=tostring(id) .. ":" .. #map[id] .. ":" .. map[id] end
         return table.concat(items,"|")
     end
-    seen[signature(tokens)]=true
-    for iteration=1,64 do
+    for iteration=1,200 do
         local lines,err=services.read(world,tokens)
         if not lines then return nil,{stage="reader",reason=err} end
         local ast,why=services.parse(lines,world.language)
         if not ast then return nil,{stage="grammar",reason=why} end
-        local generated,deferred,relations=services.lower(ast,world.semantics)
+        local generated,deferred,relations=services.lower(ast,world.semantics,world)
         if not generated then return nil,{stage="lower",reason=deferred} end
         local effects,rule_error=services.evaluate(world,generated)
         if not effects then return nil,{stage="evaluate",reason=rule_error} end
@@ -47,8 +49,8 @@ function RW_CompileWorld(world, services)
             return {effects=effects,ast=ast,rules=generated,deferred=deferred,relations=relations,
                 word_tokens=tokens,iterations=iteration}
         end
-        if seen[next_key] then return nil,{stage="word",reason="word_rule_cycle"} end
-        seen[next_key]=true; tokens=next_tokens
+        -- Stay bounded without recursively calling the parser, even on oscillation.
+        tokens=next_tokens
     end
     return nil,{stage="word",reason="word_rule_limit"}
 end
@@ -76,6 +78,7 @@ end
 -- Services must treat world/context inputs as read-only.
 function RW_PlanTurn(world, action, services)
     local trace = {}
+    if type(world) == "table" and world.infinite_loop then return nil,{stage="input",reason="infinite_loop_undo_only"} end
     local function fail(stage, reason, phase)
         return nil, {stage = stage, reason = reason or "stage_failed", phase=phase,trace = trace}
     end
@@ -112,17 +115,24 @@ function RW_PlanTurn(world, action, services)
 
     trace[#trace + 1] = "rules_after"
     local post_effects, post_error, conversions = services.evaluate(preview)
-    if not post_effects then return fail("rules_after", post_error) end
+    if not post_effects then
+        if post_error == "word_rule_limit" or post_error == "word_rule_cycle" or post_error == "rule_complexity_limit" then
+            movement.infinite_loop=true; movement.reason="infinite_loop"
+            return movement,nil,trace
+        end
+        return fail("rules_after", post_error)
+    end
 
     trace[#trace + 1] = "conversions"
     local entity_conversions, level_targets, protected, level_traits = {}, {}, false, {}
     for _, conversion in ipairs(conversions or {}) do
         if conversion.op == "transform_level" then level_targets[conversion.target_type] = true
         elseif conversion.op == "protect_level" then protected = true
-        elseif conversion.op == "level_trait" then level_traits[#level_traits+1] = conversion.trait
+        elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
         elseif conversion.op == "has" then -- Consumed by the destruction phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
+    level_traits=level_traits_from(conversions)
     local target_type
     if not protected then
         for target in pairs(level_targets) do
@@ -157,7 +167,12 @@ function RW_PlanTurn(world, action, services)
         end
         trace[#trace+1]="contact_rules"
         local frozen_effects,why,frozen_relations,frozen_rules=services.evaluate(complete)
-        if not frozen_effects then return fail("contact_rules",why) end
+        if not frozen_effects then
+            if why == "word_rule_limit" or why == "word_rule_cycle" or why == "rule_complexity_limit" then
+                plan.infinite_loop=true; plan.reason="infinite_loop"; return plan,nil,trace
+            end
+            return fail("contact_rules",why)
+        end
         if type(frozen_rules) ~= "table" then return fail("contact_rules","missing_contact_rule_frame") end
         local contents={}
         for _,relation in ipairs(frozen_relations or {}) do
@@ -182,6 +197,14 @@ function RW_PlanTurn(world, action, services)
         trace[#trace+1]="preview_contacts"
         local final,why,phase=services.preview(world,plan)
         if not final then return fail("preview_contacts",why,phase) end
+        -- Contacts can remove the grounding Text of a WORD rule. Detect a loop
+        -- in the final board before Commit/render, without changing frozen contacts.
+        local checked,check_error=services.evaluate(final)
+        if not checked then
+            if check_error == "word_rule_limit" or check_error == "word_rule_cycle" or check_error == "rule_complexity_limit" then
+                plan.infinite_loop=true; plan.reason="infinite_loop"
+            else return fail("rules_final",check_error) end
+        end
     else
         for _,relation in ipairs(conversions or {}) do
             if relation.op == "has" then return fail("contacts","missing_contact_services") end
@@ -195,6 +218,7 @@ function RW_PlanLevelAction(tree, action, services)
     local function fail(reason) return nil, {stage="level_action",reason=reason} end
     if type(action) ~= "table" then return fail("invalid_action") end
     local session = services.active(tree)
+    if session.world.infinite_loop then return fail("infinite_loop_undo_only") end
     local effects, err, initial_conversions = services.evaluate(session.world)
     if not effects then return fail(err) end
     local effective, project_error = services.project(session.world,effects,level_traits_from(initial_conversions))
@@ -253,6 +277,9 @@ function RW_PlanLevelAction(tree, action, services)
     if not accepted.accepted then return fail(accepted.reason) end
     local next_tree, update_error = services.update(tree,completed)
     if not next_tree then return fail(update_error) end
+    if turn.infinite_loop then
+        return {before=tree,after=next_tree,reason="infinite_loop",changes=turn.changes}
+    end
     local post_effects, post_error, post_traits
     if turn.contact_frame then
         post_effects,post_error=services.refresh(completed.world,turn.contact_frame)
@@ -698,7 +725,7 @@ function OnStart()
     local compile_services = {
         read=function(world,tokens) return reader_api:Invoke("RW_ReadLines",world,tokens) end,
         parse=function(lines,language) return grammar_api:Invoke("RW_ParseRuleAST",lines,language) end,
-        lower=function(ast,semantics) return rules_api:Invoke("RW_LowerRuleAST",ast,semantics) end,
+        lower=function(ast,semantics,world) return rules_api:Invoke("RW_LowerRuleAST",ast,semantics,world) end,
         evaluate=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end,
         project=function(world,effects,traits) return properties_api:Invoke("RW_ProjectWorld",world,effects,traits) end,
         words=function(world,effective) return rules_api:Invoke("RW_WordTokenMap",world,effective) end
@@ -743,6 +770,32 @@ function OnStart()
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services)
     end
     turn_services.refresh=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end
+
+    do
+        local definitions=world_api:Invoke("RW_GetNavigationDefinitions")
+        local probe=world_api:Invoke("RW_InstantiateLevel",definitions["navigation.text_word"],"probe:specials")
+        probe.world.entities[2].text.name="ALL"
+        probe.world.entities[6].y=5
+        local frame,why=RW_CompileWorld(probe.world,compile_services)
+        if not frame or not frame.word_tokens[1] or not frame.word_tokens[3] or frame.word_tokens[2] then
+            printerr("[RuleWorld] TEST FAILED: ALL WORD palette",why and why.reason); return
+        end
+        probe.world.entities[2].text.name="EMPTY"
+        probe.world.entities[6].text.name="TEXT"
+        local e,_,_,relations=evaluate(probe.world)
+        local changes,err,allocation=rules_api:Invoke("RW_PlanConversions",probe.world,relations)
+        if not e or not changes then printerr("[RuleWorld] TEST FAILED: EMPTY TEXT plan",err); return end
+        local completed,status=world_api:Invoke("RW_Commit",probe,{consumes_turn=true,changes=changes,id_allocation=allocation})
+        if not status.accepted or not completed.world.entities[probe.world.next_entity_id]
+            or completed.world.entities[probe.world.next_entity_id].text.name ~= "EMPTY" then
+            printerr("[RuleWorld] TEST FAILED: EMPTY TEXT births"); return
+        end
+        local restored=world_api:Invoke("RW_Undo",completed)
+        if restored.world.next_entity_id ~= probe.world.next_entity_id or restored.world.entities[probe.world.next_entity_id] then
+            printerr("[RuleWorld] TEST FAILED: EMPTY TEXT Undo"); return
+        end
+        print("[RuleWorld] TEST PASSED: pipeline ALL WORD / EMPTY TEXT / Undo")
+    end
 
     do
         local definitions=world_api:Invoke("RW_GetNavigationDefinitions")
@@ -1093,6 +1146,8 @@ function OnStart()
     local function navigation_view()
         local outcome = level_tree.outcomes[level_tree.active_id]
         local defeated = session.defeated == true
+        if session.world.infinite_loop then return {title="INFINITE LOOP / " .. session.instance_id,
+            hint="INFINITE LOOP: Z Undo",portals={}} end
         local choice
         if pending_selection then
             choice = {items={},index=pending_selection.index,error=pending_selection.error}
@@ -1111,6 +1166,10 @@ function OnStart()
     local previous_deferred_count = nil
 
     local function render()
+        if session.world.infinite_loop then
+            renderer_api:Invoke("RW_Render",session.world,#level_tree.history,0,navigation_view())
+            return
+        end
         local effects, rule_count, deferred_count, scope_commands = evaluate()
         if not effects then return end
 
@@ -1234,5 +1293,5 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3S initialized")
+    print("[RuleWorld] M9.3T initialized")
 end

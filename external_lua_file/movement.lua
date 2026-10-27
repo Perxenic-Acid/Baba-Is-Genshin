@@ -143,7 +143,36 @@ function RW_ResolveMovement(world, action)
     local visiting = {}
     local changes = {}
 
-    local function try_move(id)
+    local function empty_at(x,y)
+        for id,entity in pairs(world.entities) do
+            if id > 0 and entity.x == x and entity.y == y then return nil end
+        end
+        local cell=world.empty_cells and world.empty_cells[x .. ":" .. y]
+        return cell and cell.behaviors or world.empty_behaviors
+    end
+    local try_move
+    local function push_empty(x,y)
+        local nx,ny=x+dx,y+dy
+        if get_environment(world,nx,ny) == "edge" then return false,"blocked_by_edge" end
+        local empty=empty_at(nx,ny)
+        if empty and empty.push then
+            local ok,err=push_empty(nx,ny); if not ok then return false,err end
+        elseif empty and empty.block_entry then return false,"blocked_by_empty" end
+        local occupants={}
+        for id,entity in pairs(world.entities) do
+            if id > 0 and entity.x == nx and entity.y == ny then occupants[#occupants+1]=id end
+        end
+        table.sort(occupants)
+        for _,id in ipairs(occupants) do
+            if not planned[id] then
+                if has_capability(world,world.entities[id],"push") then
+                    local ok,err=try_move(id); if not ok then return false,err end
+                elseif has_capability(world,world.entities[id],"block_entry") then return false,"blocked_by_entity" end
+            end
+        end
+        return true
+    end
+    try_move=function(id)
         -- An entity can participate only once in this plan.
         if planned[id] then
             return true
@@ -164,6 +193,13 @@ function RW_ResolveMovement(world, action)
             return false, "blocked_by_edge"
         end
 
+        local empty=empty_at(nx,ny)
+        if empty and empty.push then
+            local ok,err=push_empty(nx,ny)
+            if not ok then visiting[id]=nil; return false,err end
+        elseif empty and empty.block_entry then
+            visiting[id]=nil; return false,"blocked_by_empty"
+        end
         -- Gather occupants deterministically.
         local occupants = {}
 
@@ -668,7 +704,25 @@ end
 
 -- SELECT is not YOU: it follows traversable map objects without pushing them.
 function RW_ResolveTurn(world, action)
-    local plan = resolve_you_turn(world, action)
+    local movement_world=world
+    if world.empty_cells then
+        -- Ephemeral movement agents, never part of a Plan/Commit or allocator.
+        movement_world={}; for k,v in pairs(world) do movement_world[k]=v end
+        movement_world.entities={}; for id,e in pairs(world.entities) do movement_world.entities[id]=e end
+        local next_virtual=-1
+        local keys={}; for key in pairs(world.empty_cells) do keys[#keys+1]=key end; table.sort(keys)
+        for _,key in ipairs(keys) do
+            local cell=world.empty_cells[key]
+            if cell.behaviors.control then
+                movement_world.entities[next_virtual]={id=next_virtual,kind="object",class="object",
+                    x=cell.x,y=cell.y,direction="None",behaviors={control=true}}
+                next_virtual=next_virtual-1
+            end
+        end
+    end
+    local plan = resolve_you_turn(movement_world, action)
+    local real={}; for _,change in ipairs(plan.changes) do if change.entity_id > 0 then real[#real+1]=change end end
+    plan.changes=real
     if not plan.consumes_turn then return plan end
     local writes = {}
     for index, change in ipairs(plan.changes) do writes[change.entity_id] = index end
@@ -728,6 +782,9 @@ function RW_LevelSelectionCandidates(world)
 end
 
 function RW_HasWinContact(world)
+    for _,cell in pairs(world.empty_cells or {}) do
+        if cell.behaviors.control and cell.behaviors.win and not cell.behaviors.defeat then return true end
+    end
     for _, actor in pairs(world.entities) do
         if has_capability(world, actor, "control") then
             for _, target in pairs(world.entities) do

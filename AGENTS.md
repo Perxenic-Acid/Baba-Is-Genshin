@@ -47,5 +47,15 @@
   never inherited from last-frame entity behaviors. Reader receives an explicit
   word_tokens overlay. Contact phases still reuse the frozen compiled frame.
 - NOUN IS TEXT uses identity-preserving retype, not destroy/HAS. Text may retain
-  level_link metadata. RHS NOT overrides grants/selected conversions; subject NOT
-  remains deferred. See docs/TEXT_WORD.md for solver limits and TXT test route.
+  level_link metadata. RHS NOT overrides grants/selected conversions.
+  See docs/TEXT_WORD.md and docs/SPECIAL_NOUNS.md for current scope/test routes.
+
+- WORD compilation is bounded to 200 iterations; loops commit the triggering board
+  into world.infinite_loop and permit ONLY Undo (including SELECT/F lockout).
+  Check after movement, conversion and contact deletion; render terminal boards
+  without compiling them again. Do not regress this to rejecting the triggering move.
+- ALL uses the authored ordinary noun vocabulary, excluding TEXT/EMPTY/LEVEL;
+  NOT ALL expands to TEXT plus EMPTY. Ordinary A IS ALL retains A. A IS NOT A
+  deletes via conversion without HAS. EMPTY is virtual occupancy, not persistent
+  entities/IDs; current EMPTY lifecycle/HAS remains deferred. Preserve cell-based
+  effects and never commit the negative-ID movement proxies.

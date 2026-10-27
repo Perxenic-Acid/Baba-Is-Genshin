@@ -119,3 +119,10 @@ tests/reference_multiplicity.lua 可独立运行以对照本机原版源码。
 `tests/text_word.lua` 覆盖 IS TEXT 类转换、方向/ID/指向、重复混合转换、WORD 的
 主宾语读取/来源撤回、右侧 NOT、循环原子拒绝及 Undo。`tests/run.lua` 用实际输入
 走 TXT 自由关卡的 WORD→TEXT 推动路线。手测地图与当前范围见 docs/TEXT_WORD.md。
+
+## M9.3T
+
+`tests/special_nouns.lua` 验证 NOT 奇偶、物理重复、ALL/NOT ALL 范围与产物、
+TEXT 反向类转换、EMPTY 生成/保护/STOP/PUSH/YOU/WIN、HAS ALL 和 deferred 边界。
+`tests/text_word.lua` 改测 Infinite Loop 提交/锁局/撤销；`tests/run.lua` 通过真实按键
+回调走 LOOP/NAT，验证 SELECT/F 也锁住、Z 恢复和重放。详见 docs/SPECIAL_NOUNS.md。

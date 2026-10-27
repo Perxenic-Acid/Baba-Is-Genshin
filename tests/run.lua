@@ -172,3 +172,5 @@ dofile("tests/navigation_view.lua")
 dofile("tests/level_boundaries.lua")
 
 dofile("tests/conversion_split.lua")
+
+dofile("tests/rule_multiplicity.lua")

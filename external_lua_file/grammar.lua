@@ -352,14 +352,15 @@ local function ast_wrap_not(term, enabled)
     }
 end
 
--- Expand configured RHS AND in physical order. Each term remains a typed rule,
--- with the complete prefix's word IDs retained for provenance and ordered effects.
+-- Enumerate complete physical RHS paths before lowering their terms. A stacked
+-- continuation multiplies EVERY term in that sentence, not only the last term.
 local function ast_extend_rhs(base, chosen, language, line, start, output)
     local order = language.order or DEFAULT_ORDER
-    if order[3] ~= "object" then return end
+    if order[3] ~= "object" then output[#output+1]=base; return end
     local operators = language.operators or {}
     local registry = language.verb_registry or AST_VERBS
-    local function extend(previous, finish)
+    local function extend(previous, finish, chain)
+        local continued = false
         local conjunctions = line.cells[finish+1] or {}
         for _, conjunction in ipairs(conjunctions) do
             if operators[conjunction.token] == "and" then
@@ -367,6 +368,7 @@ local function ast_extend_rhs(base, chosen, language, line, start, output)
                     for _, word in ipairs(line.cells[position] or {}) do
                         for _, object in ipairs(ast_term_options(word.token,language,true)) do
                             if registry[base.verb].rhs[object.tag] then
+                                continued = true
                                 local rule = ast_clone(base)
                                 rule.object = ast_wrap_not(object,negated)
                                 rule.source.entity_ids = ast_clone(previous.source.entity_ids)
@@ -375,8 +377,10 @@ local function ast_extend_rhs(base, chosen, language, line, start, output)
                                 rule.source.entity_ids[#rule.source.entity_ids+1] = word.id
                                 rule.source.finish = position
                                 rule.source.rhs_index = (previous.source.rhs_index or 1)+1
-                                output[#output+1] = rule
-                                extend(rule,position)
+                                local next_chain = {}
+                                for i, item in ipairs(chain) do next_chain[i]=item end
+                                next_chain[#next_chain+1] = rule
+                                extend(rule,position,next_chain)
                             end
                         end
                     end
@@ -387,8 +391,15 @@ local function ast_extend_rhs(base, chosen, language, line, start, output)
                 end
             end
         end
+        if not continued then
+            for _, item in ipairs(chain) do
+                local rule = ast_clone(item)
+                rule.source.sentence_entity_ids = ast_clone(previous.source.entity_ids)
+                output[#output+1] = rule
+            end
+        end
     end
-    extend(base,start+#chosen-1)
+    extend(base,start+#chosen-1,{base})
 end
 
 -- Parse one candidate token sequence.
@@ -467,7 +478,6 @@ local function ast_parse_candidate(
                         entity_ids = ids
                     }
                 }
-                output[#output+1] = rule
                 ast_extend_rhs(rule,chosen,language,line,start,output)
             end
         end

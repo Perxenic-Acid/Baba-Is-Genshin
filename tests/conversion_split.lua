@@ -51,13 +51,13 @@ for _, entity in pairs(separate_result.world.entities) do
     if entity.class == "object" and counts[entity.archetype] then counts[entity.archetype]=counts[entity.archetype]+1 end
 end
 assert(counts.rock == 2 and counts.level_block == 3) -- Includes the existing parent block.
--- Separate rules, duplicate targets, identity protection and no within-turn cascade.
+-- Separate rules, duplicate rule instances, identity protection and no within-turn cascade.
 local rules = {{op="transform",source_type="crate",target_type="rock"},
     {op="transform",source_type="crate",target_type="level_block"},
     {op="transform",source_type="crate",target_type="rock"},
     {op="transform",source_type="rock",target_type="avatar"}}
 local operations,why,allocation=RW_PlanConversions(session.world,rules)
-assert(operations and not why and #operations == 4 and allocation.to == first_id+2)
+assert(operations and not why and #operations == 6 and allocation.to == first_id+4)
 assert(operations[1].to == "rock" and operations[2].to.archetype == "level_block")
 rules[#rules+1] = {op="protect_transform",source_type="crate"}
 local guarded,_,guard_allocation=RW_PlanConversions(session.world,rules)
@@ -68,4 +68,4 @@ exhausted.world.next_entity_id=9007199254740991
 local rejected,failure=RW_PlanTurn(exhausted.world,{type="move",dx=0,dy=-1},services)
 assert(not rejected and failure.reason == "entity_id_exhausted")
 assert(exhausted.world.entities[4].archetype == "crate" and #exhausted.history == 0)
-print("PASS: simultaneous noun conversion products, copied links/directions, dedup, protection, allocation/Undo/replay")
+print("PASS: simultaneous noun conversion products, copied links/directions, multiplicity, protection, allocation/Undo/replay")

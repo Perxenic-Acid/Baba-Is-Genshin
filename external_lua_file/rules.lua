@@ -505,7 +505,7 @@ end
 
 -- Pure conversion planner: never mutates the world.
 -- A IS A protects A from all ordinary IS conversions.
--- One target keeps the source ID; additional distinct targets receive fresh IDs.
+-- One rule instance keeps the source ID; every additional instance gets a fresh ID.
 -- All products use the same pre-conversion snapshot (no within-turn cascade).
 function RW_PlanConversions(world, conversions)
     if type(world) ~= "table" or type(world.entities) ~= "table"
@@ -519,11 +519,7 @@ function RW_PlanConversions(world, conversions)
         elseif relation.op == "transform" and type(relation.target_type) == "string"
             and relation.target_type ~= "" and relation.target_type ~= source then
             targets[source] = targets[source] or {}
-            local found = false
-            for _, target in ipairs(targets[source]) do
-                if target == relation.target_type then found = true end
-            end
-            if not found then targets[source][#targets[source]+1] = relation.target_type end
+            targets[source][#targets[source]+1] = relation.target_type
         else return nil,"invalid_conversion_relation" end
     end
     local ids = {}
@@ -680,6 +676,13 @@ function RW_ASTLoweringSelfTest()
         or conflict[2].kind ~= "create" or conflict[2].entity_id ~= 6
         or conflict[4].entity_id ~= 7 then
         return false, "One-to-many conversion planning failed"
+    end
+
+    local repeated, repeated_error, allocation = RW_PlanConversions(test_world, {
+        conversions[1],conversions[1],conversions[1]})
+    if not repeated or repeated_error or #repeated ~= 6
+        or not allocation or allocation.to ~= 10 then
+        return false,"Repeated conversion instances collapsed"
     end
 
     local protected_conflict = RW_PlanConversions(

@@ -95,3 +95,9 @@ manual test sequences. Native rendering tests also verify property-based WIN col
 
 普通名词一对多转换：同格产物、目标去重、身份保护、原子 ID 分配/撤销。
 详见 docs/CONVERSION_SPLIT.md，回归 tests/conversion_split.lua，真机入口 SPL。
+
+## M9.3P
+
+修正上一版按目标名词去重的错误：重复规则逐条生成，完整 AND 路径乘到所有项。
+用户重叠示例为 24 条完整句子、48 个 Rock。tests/rule_multiplicity.lua 覆盖实际管线；
+tests/reference_multiplicity.lua 可独立运行以对照本机原版源码。

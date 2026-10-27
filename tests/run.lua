@@ -2,10 +2,14 @@
 -- Core Lua tests plus real bootstrap pipelines with only host UI/input mocked.
 local modules = {"world", "reader", "grammar", "rules", "properties", "movement", "renderer"}
 local scripts, listeners = {}, {}
+local self_test_calls=0
 for _, name in ipairs(modules) do
     dofile("external_lua_file/" .. name .. ".lua")
     scripts[#scripts + 1] = {path = name, alive = true,
-        Invoke = function(_, method, ...) return assert(_G[method], method)(...) end}
+        Invoke = function(_, method, ...)
+            if method:find("SelfTest") then self_test_calls=self_test_calls+1 end
+            return assert(_G[method], method)(...)
+        end}
 end
 local rendered, history_depth, navigation
 RW_Render = function(world, depth, _, context)
@@ -28,11 +32,27 @@ dofile("external_lua_file/bootstrap.lua")
 local startup_instructions=0
 debug.sethook(function()
     startup_instructions=startup_instructions+1000
-    if startup_instructions > 30000000 then error("Startup exceeded Lua instruction budget") end
+    if startup_instructions > 2000000 then error("Production startup exceeded Lua instruction budget") end
 end,"",1000)
 OnStart()
 debug.sethook()
-print("Startup Lua instructions: " .. startup_instructions)
+print("Normal startup Lua instructions: " .. startup_instructions)
+assert(self_test_calls == 0, "Production startup invoked regression self-tests")
+assert(rendered and history_depth == 0 and rendered.entities[12].x == 2)
+-- Exercise production closures with diagnostics disabled, including tree navigation.
+listeners.right();assert(history_depth == 1 and rendered.entities[1].x == 7)
+listeners.undo();assert(history_depth == 0 and rendered.entities[12].x == 2)
+listeners.up();listeners.confirm()
+assert(navigation.title:find("PUZZLE") and history_depth == 2)
+listeners.right();listeners.confirm()
+assert(navigation.title:find("MAP"))
+while history_depth > 0 do listeners.undo() end
+assert(self_test_calls == 0 and rendered.entities[12].x == 2 and rendered.entities[12].y == 2)
+print("PASS: production boot/navigation/movement/Undo without diagnostics")
+-- Diagnostics get a fresh mocked binding surface. Production never calls them.
+listeners={}
+RW_StartWithSelfTests()
+assert(self_test_calls >= 20, "Explicit diagnostics skipped module self-tests")
 assert(rendered and listeners.right and listeners.undo, "Bootstrap did not initialize")
 local initial = rendered
 listeners.right()

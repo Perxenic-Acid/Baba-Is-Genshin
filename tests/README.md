@@ -130,3 +130,7 @@ TEXT 反向类转换、EMPTY 生成/保护/STOP/PUSH/YOU/WIN、HAS ALL 和 defer
 M9.3T.1：启动阶段加入 3000 万 Lua 指令预算，捕捉真机日志暴露的解析成本回归；
 当前约 1998 万，旧解析器约 7534 万。此指标不替代原生执行时限的真机验收。
 `navigation_view.lua` 同时验证控件不提供 AddCursorEventListener 时仍可显示选择菜单。
+
+M9.3T.2：tests/run.lua 先测试真实 OnStart（禁止调用自测，200 万指令预算；当前约72万），
+验证移动/导航/撤销，再用新的模拟绑定环境调用 RW_StartWithSelfTests 跑完整旧回归。
+原 3000 万预算是旧的“启动含所有自测”上限，已由上述生产启动预算取代。

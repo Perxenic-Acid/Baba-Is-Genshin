@@ -320,7 +320,7 @@ function RW_ChooseSelectedLevel(entity_id)
     return choose_selected_level(entity_id)
 end
 
-function OnStart()
+local function start(run_self_tests)
     local root = script.object
 
     if not root then
@@ -378,6 +378,8 @@ function OnStart()
     local movement_api = scripts.movement
     local renderer_api = scripts.renderer
 
+    if run_self_tests then
+    -- Explicit diagnostics only; never execute regression fixtures on normal startup.
     -- Module self-tests.
     local tests = {
         { "world",      "RW_SelfTest" },
@@ -714,6 +716,8 @@ function OnStart()
 
     print("[RuleWorld] TEST PASSED: pipeline CRATE IS AVATAR / Undo")
 
+    end -- module and legacy pipeline diagnostics
+
     local session =
         world_api:Invoke("RW_CreateSession")
 
@@ -770,6 +774,8 @@ function OnStart()
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services)
     end
     turn_services.refresh=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end
+
+    if run_self_tests then
 
     do
         local definitions=world_api:Invoke("RW_GetNavigationDefinitions")
@@ -1024,6 +1030,8 @@ function OnStart()
     end
     print("[RuleWorld] TEST PASSED: pipeline created/deleted Text rules / Undo")
 
+    end -- turn pipeline diagnostics
+
     local demo_definitions, root_definition_id = world_api:Invoke("RW_GetNavigationDefinitions")
     local level_tree = world_api:Invoke("RW_CreateLevelTree",demo_definitions,root_definition_id)
     session = world_api:Invoke("RW_GetActiveLevel",level_tree)
@@ -1046,6 +1054,7 @@ function OnStart()
         return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",world,traits)
     end
 
+    if run_self_tests then
     -- Real mapped pipeline probe; never change the live tree during self-tests.
     do
         local probe = level_tree
@@ -1141,6 +1150,8 @@ function OnStart()
         print("[RuleWorld] TEST PASSED: SELECT-only WIN keeps level active")
         print("[RuleWorld] TEST PASSED: pipeline ordered LEVEL WIN/DEFEAT/transform and Noun IS LEVEL / Undo")
     end
+
+    end -- navigation diagnostics
 
     local pending_selection = nil
     local function navigation_view()
@@ -1293,5 +1304,17 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3T.1 initialized")
+    print("[RuleWorld] M9.3T.2 initialized")
+end
+
+-- Production entry point: build the authored world, bind controls and render only.
+-- Engine-provided callback arguments cannot enable diagnostics accidentally.
+function OnStart()
+    return start(false)
+end
+
+-- Explicit offline/fresh-host diagnostic entry point. Not bound to gameplay keys.
+-- The test harness invokes this in isolation, never on top of a running game.
+function RW_StartWithSelfTests()
+    return start(true)
 end

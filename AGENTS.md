@@ -64,3 +64,10 @@
   prefix counts across the full grid: native startup hit the Lua time watchdog.
   Keep tests/run.lua's startup instruction budget. Optional UI event methods must
   be checked before binding; native controls can omit AddCursorEventListener.
+
+- Normal OnStart must never run regression self-tests. RW_StartWithSelfTests is
+  an explicit offline/fresh-host diagnostic entry only; never bind it to normal
+  boot or a gameplay event. Keep the production startup budget (2M offline Lua
+  instructions), and test real input/navigation with diagnostics disabled.
+  Player-constructed in-level undefined/extreme behavior is not a reason to
+  expand normal-startup defensive work. Preserve the agreed Infinite Loop rule.

@@ -100,3 +100,16 @@ RW_ParseRuleAST 触发 `Lua execution took too long`，尚未创建棋盘。
 Cursor 转成 text_Cursor、父关卡块不转换、Z 恢复 SELECT 与 WORD。
 LEVEL 是特殊名词，不在 NOT ROCK 或 ALL 的展开范围；不会借该句得到 WORD。
 这是与 Cursor 配置遗漏不同的情况；原版依据见 rules.lua:addoption 与 syntax.lua:setupnounlists。
+
+## M9.3T.2 正常开局与完整诊断分离
+
+按用户要求，正常开局不能被回归自测拖到爆栈/超时。OnStart 固定走无自测路径，
+仅检查映射依赖、创建实际关卡树、绑定输入并显示棋盘。模块自测、转换/接触/
+多语言/LEVEL 等管线回归只在显式 RW_StartWithSelfTests 入口运行；此入口供离线
+或全新诊断宿主使用，不绑定游戏键，不应在正在运行的游戏上重复调用。
+
+离线正常 OnStart 约 723,000 条指令，增加 2,000,000 条预算防止回归；
+完整诊断仍在 tests/run.lua 单独执行。另验证关闭自测的移动、进入/退出关卡和 Undo。
+数字不包含原生 UI 调用的宿主成本，不是对游戏计时器的替代。
+局内玩家构造的极端/未定义行为不扩展开局的兜底要求；已有 Infinite Loop 约定保留。
+启动版本为 M9.3T.2，不再在普通启动打印 TEST PASSED 测试串。

@@ -506,7 +506,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak"
+                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {ON="on",NEAR="near"},
@@ -1447,7 +1447,7 @@ function RW_GetNavigationDefinitions()
             x=spec[2],y=spec[3],direction="None"}
         combos.next_entity_id=id+1
     end
-    for index,spec in ipairs({{"HOT",1,4},{"MELT",1,6},{"OPEN",1,8},{"SHUT",1,10},{"WEAK",1,12}}) do
+    for index,spec in ipairs({{"HOT",1,4},{"MELT",1,6},{"OPEN",1,8},{"SHUT",1,10},{"WEAK",12,6},{"FLOAT",12,8}}) do
         local id=34+index
         combos.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},
             x=spec[2],y=spec[3],direction="None"}
@@ -1595,6 +1595,33 @@ function RW_GetNavigationDefinitions()
     definitions["navigation.weak"]={id="navigation.weak",initial_world=fragile}
     portal(root,60,11,1,"WEAK","navigation.weak")
     object(root,61,"line",11,1)
+    local floating=clone(unlocking)
+    floating.entities={};floating.next_entity_id=1
+    object(floating,1,"avatar",4,5)
+    object(floating,2,"rock",4,4)
+    object(floating,3,"cursor",1,1)
+    portal(floating,4,2,1,"PARENT")
+    object(floating,5,"line",1,1)
+    object(floating,6,"crate",5,5)
+    object(floating,7,"flag",3,5)
+    for row,words in ipairs({{"AVATAR","IS","FLOAT","AND","MELT"},{"ROCK","IS","HOT"},
+        {"CRATE","IS","STOP"},{"FLAG","IS","PUSH"}}) do
+        for offset,token in ipairs(words) do
+            local id=floating.next_entity_id
+            floating.entities[id]={id=id,kind="object",class="text",text={name=token},
+                x=offset+1,y=4+row*2,direction="None"}
+            floating.next_entity_id=id+1
+        end
+    end
+    for _,spec in ipairs({{"FLOAT",10,4},{"NOT",10,6},{"AND",10,8}}) do
+        local id=floating.next_entity_id
+        floating.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},
+            x=spec[2],y=spec[3],direction="None"}
+        floating.next_entity_id=id+1
+    end
+    definitions["navigation.float"]={id="navigation.float",initial_world=floating}
+    portal(root,62,12,1,"FLOAT","navigation.float")
+    object(root,63,"line",12,1)
     -- WIN is authored visibly in these two victory fixtures, never a Flag default.
     for _,world in ipairs({puzzle,transform}) do
         for offset,token in ipairs({"FLAG","IS","WIN"}) do

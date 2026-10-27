@@ -113,3 +113,9 @@
   STOP solidity independently of SAFE). HAS newborns skip WEAK contact for the
   current turn; conversions do not receive that grace. Keep the transient newborn
   set outside persisted world state. See docs/WEAK.md.
+
+- FLOAT is a binary rule-derived contact layer. SINK/WEAK/MELT/DEFEAT/OPEN-SHUT
+  contacts and ordinary WIN require matching layers, including movement unlock.
+  STOP/PUSH remain solid across layers. WEAK STOP bypasses solidity only on the
+  mover's layer. FLOAT does not filter ON/NEAR, text reading, SELECT or CRASH.
+  See docs/FLOAT.md for the current projection timing and scope boundaries.

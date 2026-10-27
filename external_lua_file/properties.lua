@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -39,7 +39,7 @@ local function valid_behaviors(registry)
                     and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
                     and capability ~= "safe" and capability ~= "crash"
                     and capability ~= "hot" and capability ~= "melt"
-                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak")
+                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak" and capability ~= "float")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -250,7 +250,9 @@ function RW_ResolveContactVictims(world, kind)
         ids[#ids+1]=id
     end
     table.sort(ids)
-    local function overlap(a,b) return a.x == b.x and a.y == b.y end
+    local function overlap(a,b)
+        return a.x == b.x and a.y == b.y and (a.behaviors.float == true)==(b.behaviors.float == true)
+    end
     if kind == "sink" then
         for _,id in ipairs(ids) do
             local source=world.entities[id]

@@ -313,6 +313,19 @@ assert(rendered.entities[1].x==6 and not rendered.entities[6] and rendered.entit
 listeners.undo();listeners.undo()
 assert(rendered.entities[1].x==4 and rendered.entities[6].x==6)
 print("PASS: native WEAK entry, blocked YOU/HAS, blocked PUSH break and whole-tree Undo")
+while history_depth > 0 do listeners.undo() end
+for _=1,5 do listeners.right() end
+listeners.up();for _=1,5 do listeners.right() end;listeners.confirm()
+assert(rendered.entities[1].behaviors.float and rendered.entities[1].behaviors.melt)
+listeners.up()
+assert(rendered.entities[1].y==4 and rendered.entities[2].y==4)
+listeners.undo();listeners.right()
+assert(rendered.entities[1].x==4 and rendered.entities[6].x==5)
+listeners.undo();listeners.left()
+assert(rendered.entities[1].x==3 and rendered.entities[7].x==2)
+listeners.undo()
+assert(rendered.entities[1].x==4 and rendered.entities[7].x==3)
+print("PASS: native FLOAT entry, cross-layer HOT immunity, STOP/PUSH collisions and Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -350,3 +363,5 @@ dofile("tests/hot_melt.lua")
 dofile("tests/open_shut.lua")
 
 dofile("tests/weak.lua")
+
+dofile("tests/float.lua")

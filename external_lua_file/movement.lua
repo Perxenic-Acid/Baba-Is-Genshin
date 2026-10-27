@@ -11,8 +11,12 @@ local function has_capability(world, entity, capability)
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", select = "select", select_path = "path",
         win = "win", push = "pushable", block_entry = "block_entry",
-        open="open",shut="shut",safe="safe",weak="weak"}
+        open="open",shut="shut",safe="safe",weak="weak",float="float"}
     return entity.traits and entity.traits[legacy[capability]] == true
+end
+
+local function same_layer(world,a,b)
+    return has_capability(world,a,"float")==has_capability(world,b,"float")
 end
 
 local function level_surface(world,entity)
@@ -238,7 +242,7 @@ function RW_ResolveMovement(world, action)
             if not planned[other_id] then
                 local other = world.entities[other_id]
 
-                if partner and id > 0 and other_id > 0 and has_capability(world,other,partner)
+                if partner and id > 0 and other_id > 0 and same_layer(world,entity,other) and has_capability(world,other,partner)
                     and (not has_capability(world,entity,"safe") or not has_capability(world,other,"safe")) then
                     locks[#locks+1]=other_id -- Unlock takes precedence over PUSH/STOP.
                 elseif has_capability(world, other, "push") then
@@ -250,7 +254,8 @@ function RW_ResolveMovement(world, action)
                         return false, reason
                     end
 
-                elseif has_capability(world, other, "block_entry") and not has_capability(world,other,"weak") then
+                elseif has_capability(world, other, "block_entry")
+                    and (not has_capability(world,other,"weak") or not same_layer(world,entity,other)) then
                     visiting[id] = nil
                     return false, "blocked_by_entity"
                 end
@@ -850,7 +855,7 @@ function RW_HasWinContact(world)
     for _, actor in pairs(world.entities) do
         if has_capability(world, actor, "control") then
             for _, target in pairs(world.entities) do
-                if actor.x == target.x and actor.y == target.y
+                if actor.x == target.x and actor.y == target.y and same_layer(world,actor,target)
                     and has_capability(world, target, "win") then return true end
             end
         end

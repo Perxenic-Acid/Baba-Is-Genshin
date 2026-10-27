@@ -2,6 +2,17 @@
 -- movement.lua
 -- RuleWorld M2: Movement intentions and constraints
 
+-- Projected capability sets are authoritative for movement. Raw trait fixtures
+-- retain a default-only compatibility path; custom registries require projection.
+local function has_capability(world, entity, capability)
+    if entity.behaviors ~= nil then
+        return type(entity.behaviors) == "table" and entity.behaviors[capability] == true
+    end
+    if world.behavior_registry ~= nil then return false end
+    local legacy = {control = "you", push = "pushable", block_entry = "block_entry"}
+    return entity.traits and entity.traits[legacy[capability]] == true
+end
+
 local function direction_for(dx, dy)
     if dx == -1 then return "Left" end
     if dx == 1 then return "Right" end
@@ -162,9 +173,8 @@ function RW_ResolveMovement(world, action)
         for _, other_id in ipairs(occupants) do
             if not planned[other_id] then
                 local other = world.entities[other_id]
-                local traits = other.traits or {}
 
-                if traits.pushable then
+                if has_capability(world, other, "push") then
                     -- Push takes priority over STOP-like blocking.
                     local ok, reason = try_move(other_id)
 
@@ -173,7 +183,7 @@ function RW_ResolveMovement(world, action)
                         return false, reason
                     end
 
-                elseif traits.block_entry then
+                elseif has_capability(world, other, "block_entry") then
                     visiting[id] = nil
                     return false, "blocked_by_entity"
                 end
@@ -382,8 +392,7 @@ function RW_ResolveTurn(world, action)
     local controllers = {}
 
     for id, entity in pairs(world.entities) do
-        if entity.traits
-            and entity.traits.you == true then
+        if has_capability(world, entity, "control") then
             controllers[#controllers + 1] = id
         end
     end

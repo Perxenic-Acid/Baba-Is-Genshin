@@ -2,52 +2,157 @@
 -- rules.lua
 -- RuleWorld M6: Rule IR evaluation
 
-local function valid_selector(s)
-    if type(s) ~= "table" then
-        return false
+-- One selector implementation serves condition queries and effect targeting.
+local SELECTORS = {
+    id = {mode = "field", path = {"id"}, value_type = "integer"},
+    archetype = {mode = "field", path = {"archetype"}, value_type = "string"},
+    class = {mode = "object_class", value_type = "string"}
+}
+local function query_clone(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, item in pairs(value) do result[key] = query_clone(item) end
+    return result
+end
+local function dense_list(value)
+    if type(value) ~= "table" then return false end
+    local count = 0
+    for key in pairs(value) do
+        if type(key) ~= "number" or key % 1 ~= 0 or key < 1 then return false end
+        count = count + 1
     end
-
-    if s.kind == "id" then
-        return type(s.value) == "number"
-            and s.value % 1 == 0
+    return count == #value
+end
+local function valid_selectors(registry)
+    if type(registry) ~= "table" then return false end
+    for name, spec in pairs(registry) do
+        if type(name) ~= "string" or name == "" or type(spec) ~= "table"
+            or (spec.value_type ~= "string" and spec.value_type ~= "integer") then return false end
+        for key in pairs(spec) do
+            if key ~= "mode" and key ~= "path" and key ~= "value_type" then return false end
+        end
+        if spec.mode == "field" then
+            if not dense_list(spec.path) or #spec.path == 0 then return false end
+            for _, field in ipairs(spec.path) do
+                if type(field) ~= "string" or field == "" then return false end
+            end
+        elseif spec.mode ~= "object_class" or spec.path ~= nil
+            or spec.value_type ~= "string" then return false end
     end
-
-    if s.kind == "archetype"
-        or s.kind == "class" then
-        return type(s.value) == "string"
-            and s.value ~= ""
+    return true
+end
+local function selector_registry(world)
+    if world and world.selectors ~= nil then return world.selectors end
+    return SELECTORS
+end
+function RW_GetSelectorRegistry() return query_clone(SELECTORS) end
+function RW_RegisterSelector(registry, name, specification)
+    if registry == nil then registry = SELECTORS end
+    if not valid_selectors(registry) or type(name) ~= "string" or name == ""
+        or type(specification) ~= "table"
+        or not valid_selectors({[name] = specification}) then
+        return nil, "invalid_selector_registration"
     end
-
-    return false
+    if registry[name] ~= nil then return nil, "duplicate_selector" end
+    local result = query_clone(registry)
+    result[name] = query_clone(specification)
+    return result
 end
 
-local function matches(entity, selector)
-    if selector.kind == "id" then
-        return entity.id == selector.value
+function RW_SelectorSelfTest()
+    local spec = {mode = "field", path = {"direction"}, value_type = "string"}
+    local registry = RW_RegisterSelector(nil, "facing", spec)
+    if not registry then return false, "Selector registration failed" end
+    spec.path[1] = "archetype"
+    if registry.facing.path[1] ~= "direction" or RW_GetSelectorRegistry().facing ~= nil
+        or RW_RegisterSelector(registry, "facing", registry.facing) ~= nil then
+        return false, "Selector registration isolation/duplicate failed"
     end
-
-    if selector.kind == "archetype" then
-        return entity.archetype == selector.value
+    local world = {selectors = registry, entities = {
+        [3] = {id = 3, kind = "object", class = "text", x = 2, y = 2, direction = "Left"},
+        [1] = {id = 1, kind = "object", class = "object", x = 2, y = 2, direction = "Left"},
+        [2] = {id = 2, kind = "object", class = "object", x = 4, y = 2, direction = "Right"}
+    }, rule_sources = {{when = {op = "overlap",
+        left = {kind = "facing", value = "Left"}, right = {kind = "class", value = "text"}},
+        effects = {{op = "grant_trait", target = {kind = "facing", value = "Left"}, trait = "drive"}}}}}
+    local ids = RW_SelectEntities(world, {kind = "facing", value = "Left"})
+    local effects = RW_EvaluateRules(world)
+    if not ids or #ids ~= 2 or ids[1] ~= 1 or ids[2] ~= 3
+        or not effects or #effects ~= 1 or effects[1].entity_ids[1] ~= 1
+        or effects[1].entity_ids[2] ~= 3 then
+        return false, "Shared conditional/effect selection failed"
     end
-
-    if selector.kind == "class" then
-        if selector.value == "object" then
-            return entity.kind == "object"
-        end
-
+    world.entities[1].x = 3
+    if #RW_EvaluateRules(world) ~= 0 then return false, "Self-overlap activated rule" end
+    local objects = RW_SelectEntities(world, {kind = "class", value = "object"})
+    if #objects ~= 3 then return false, "Object superclass selection lost Text" end
+    world.selectors = false
+    if RW_SelectEntities(world, {kind = "id", value = 1}) ~= nil
+        or RW_EvaluateRules(world) ~= nil then return false, "Invalid selector registry accepted" end
+    return true, "Shared selector registration, conditions and concrete effect targets passed"
+end
+local function valid_selector(selector, world)
+    if type(selector) ~= "table" or type(selector.kind) ~= "string" then return false end
+    local spec = selector_registry(world)[selector.kind]
+    if not spec then return false end
+    if spec.value_type == "integer" then
+        return type(selector.value) == "number" and selector.value == selector.value
+            and selector.value % 1 == 0
+    end
+    return type(selector.value) == "string" and selector.value ~= ""
+end
+local function matches(entity, selector, world)
+    local spec = selector_registry(world)[selector.kind]
+    if spec.mode == "object_class" then
         return entity.kind == "object"
-            and entity.class == selector.value
+            and (selector.value == "object" or entity.class == selector.value)
     end
+    local value = entity
+    for _, field in ipairs(spec.path) do
+        if type(value) ~= "table" then return false end
+        value = value[field]
+    end
+    return value == selector.value
+end
+function RW_SelectEntities(world, selector)
+    if type(world) ~= "table" or type(world.entities) ~= "table" then return nil, "invalid_world" end
+    if not valid_selectors(selector_registry(world)) then return nil, "invalid_selector_registry" end
+    if not valid_selector(selector, world) then return nil, "invalid_selector" end
+    local ids = {}
+    for id, entity in pairs(world.entities) do
+        if type(id) ~= "number" or id % 1 ~= 0 or id < 1 or type(entity) ~= "table"
+            or entity.id ~= id then return nil, "invalid_entity_identity" end
+        if matches(entity, selector, world) then ids[#ids + 1] = id end
+    end
+    table.sort(ids)
+    return ids
+end
 
-    return false
+-- Concrete effects are short-lived results for this world, not saved rules.
+function RW_ResolveEffects(world, effects)
+    if type(world) ~= "table" or type(world.entities) ~= "table" then return nil, "invalid_world" end
+    if not valid_selectors(selector_registry(world)) then return nil, "invalid_selector_registry" end
+    if not dense_list(effects) then return nil, "invalid_effects" end
+    local result = {}
+    for _, effect in ipairs(effects) do
+        if type(effect) ~= "table" or effect.op ~= "grant_trait"
+            or type(effect.trait) ~= "string" or effect.trait == "" then
+            return nil, "invalid_rule_effect"
+        end
+        local ids, err = RW_SelectEntities(world, effect.target)
+        if not ids then return nil, err end
+        result[#result + 1] = {op = effect.op, trait = effect.trait,
+            target = {kind = effect.target.kind, value = effect.target.value}, entity_ids = ids}
+    end
+    return result
 end
 
 local function overlaps(world, left, right)
     for id_a, a in pairs(world.entities) do
-        if matches(a, left) then
+        if matches(a, left, world) then
             for id_b, b in pairs(world.entities) do
                 if id_a ~= id_b
-                    and matches(b, right)
+                    and matches(b, right, world)
                     and a.x == b.x
                     and a.y == b.y then
                     return true
@@ -81,8 +186,8 @@ local function evaluate_condition(world, node, stack)
         result = true
 
     elseif node.op == "overlap" then
-        if not valid_selector(node.left)
-            or not valid_selector(node.right) then
+        if not valid_selector(node.left, world)
+            or not valid_selector(node.right, world) then
             err = "invalid_selector"
         else
             result = overlaps(
@@ -138,10 +243,10 @@ local function evaluate_condition(world, node, stack)
     return result, err
 end
 
-local function valid_effect(effect)
+local function valid_effect(effect, world)
     return type(effect) == "table"
         and effect.op == "grant_trait"
-        and valid_selector(effect.target)
+        and valid_selector(effect.target, world)
         and type(effect.trait) == "string"
         and effect.trait ~= ""
 end
@@ -153,6 +258,8 @@ function RW_EvaluateRules(world, generated_rules)
         or type(world.entities) ~= "table" then
         return nil, "invalid_world"
     end
+
+    if not valid_selectors(selector_registry(world)) then return nil, "invalid_selector_registry" end
 
     local active = {}
 
@@ -170,7 +277,7 @@ function RW_EvaluateRules(world, generated_rules)
             -- Validate effects regardless of whether
             -- the rule's condition currently holds.
             for _, effect in ipairs(rule.effects) do
-                if not valid_effect(effect) then
+                if not valid_effect(effect, world) then
                     return false, "invalid_rule_effect"
                 end
             end
@@ -211,7 +318,7 @@ function RW_EvaluateRules(world, generated_rules)
         end
     end
 
-    return active
+    return RW_ResolveEffects(world, active)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.

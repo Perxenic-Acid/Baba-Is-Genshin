@@ -1,4 +1,4 @@
-# RuleWorld checks (M9.3H)
+# RuleWorld checks (M9.3I)
 
 Run from the repository root with Lua 5.1+ (or TeX Live's Lua):
 
@@ -26,7 +26,8 @@ pre-turn state. Coordinate-only legacy movement plans remain supported.
 In-game startup should report both new direction self-tests as passed and
 `pipeline atomic turn scheduler`, `Atomic create/delete, ID allocation and Undo passed`,
 `pipeline created/deleted Text rules / Undo`,
-`pipeline alternate grammar/semantics behavior / Undo`, and `M9.3H initialized`.
+`pipeline alternate grammar/semantics behavior / Undo`,
+`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3I initialized`.
 Native rendering/input still require an in-game check.
 
 The runner also loads `tests/scheduler.lua`, which checks the extracted turn
@@ -49,3 +50,10 @@ canonical IR parity, physical source IDs, independently registered parse/semanti
 capabilities, deferred fallback, and invalid/duplicate/cyclic configuration rejection.
 Startup compares the actual default and alternate spatial language pipelines for
 PUSH, multiple YOU, conversion and Undo. No new script mapping is needed.
+
+M9.3I centralizes selector interpretation in rules.lua; EvaluateRules now emits
+concrete entity_ids for projection. Raw external effects need RW_ResolveEffects
+before RW_ProjectWorld. The new tests/selectors_behaviors.lua checks selector
+coverage and isolated registries, capability mapping/retraction, explicit empty
+registries, and invalid data rejection. Startup also exercises custom selectors
+and behavior names through blocking, pushing, condition changes and atomic Undo.

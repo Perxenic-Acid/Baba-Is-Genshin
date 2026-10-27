@@ -90,7 +90,7 @@ local function valid_new_entity(world, entity, id)
         or not is_integer(entity.x) or not is_integer(entity.y)
         or entity.x < 1 or entity.x > world.width
         or entity.y < 1 or entity.y > world.height
-        or entity.traits ~= nil or entity.symbol ~= nil then
+        or entity.traits ~= nil or entity.behaviors ~= nil or entity.symbol ~= nil then
         return false
     end
     if entity.class == "text" then
@@ -667,6 +667,7 @@ function RW_SelfTest()
             or (entity.class ~= "object"
                 and entity.class ~= "text")
             or entity.traits ~= nil
+            or entity.behaviors ~= nil
             or not valid_direction(entity.direction) then
             return false, "Invalid authored Object state"
         end

@@ -135,6 +135,7 @@ function OnStart()
         { "grammar",    "RW_GrammarASTSelfTest" },
         { "grammar",    "RW_GrammarRegistrationSelfTest" },
         { "rules",      "RW_SemanticRegistrationSelfTest" },
+        { "rules",      "RW_SelectorSelfTest" },
         { "rules",      "RW_ASTLoweringSelfTest" },
         { "world",      "RW_DirectionStateSelfTest" },
         { "world",      "RW_LifecycleSelfTest" },
@@ -598,6 +599,78 @@ function OnStart()
     end
     print("[RuleWorld] TEST PASSED: pipeline alternate grammar/semantics behavior / Undo")
 
+    -- Custom selectors and trait names feed the SAME solver and atomic world API.
+    local selectors = rules_api:Invoke("RW_RegisterSelector",
+        rules_api:Invoke("RW_GetSelectorRegistry"), "type_name",
+        {mode = "field", path = {"archetype"}, value_type = "string"})
+    selectors = rules_api:Invoke("RW_RegisterSelector", selectors, "named",
+        {mode = "field", path = {"text", "name"}, value_type = "string"})
+    local behaviors = {}
+    for _, item in ipairs({{"drive", {control = true}}, {"shove", {push = true}},
+        {"solid", {block_entry = true}}}) do
+        behaviors = properties_api:Invoke("RW_RegisterBehavior", behaviors, item[1], item[2])
+        if not behaviors then
+            printerr("[RuleWorld] TEST FAILED: behavior registration")
+            return
+        end
+    end
+    if not selectors then
+        printerr("[RuleWorld] TEST FAILED: selector registration")
+        return
+    end
+    local custom = world_api:Invoke("RW_CreateSession")
+    custom.world.width, custom.world.height = 6, 4
+    custom.world.selectors, custom.world.behavior_registry = selectors, behaviors
+    custom.world.entities = {
+        [1] = {id = 1, kind = "object", class = "object", archetype = "avatar",
+            x = 2, y = 2, direction = "Mid"},
+        [2] = {id = 2, kind = "object", class = "object", archetype = "crate",
+            x = 3, y = 2, direction = "None"},
+        [3] = {id = 3, kind = "object", class = "text", text = {name = "BOX"},
+            x = 4, y = 2, direction = "Left"},
+        [4] = {id = 4, kind = "object", class = "object", archetype = "wall",
+            x = 5, y = 2, direction = "None"},
+        [5] = {id = 5, kind = "object", class = "text", text = {name = "SIGN"},
+            x = 2, y = 2, direction = "None"}
+    }
+    local function grant(target, trait, when)
+        return {when = when or {op = "always"}, effects = {
+            {op = "grant_trait", target = target, trait = trait}}}
+    end
+    custom.world.rule_sources = {
+        grant({kind = "type_name", value = "avatar"}, "drive", {op = "overlap",
+            left = {kind = "type_name", value = "avatar"}, right = {kind = "named", value = "SIGN"}}),
+        grant({kind = "type_name", value = "crate"}, "shove"),
+        grant({kind = "class", value = "text"}, "shove"),
+        grant({kind = "type_name", value = "wall"}, "solid")
+    }
+    local right = {type = "move", dx = 1, dy = 0}
+    local blocked = RW_PlanTurn(custom.world, right, turn_services)
+    if not blocked or #blocked.changes ~= 1 or blocked.changes[1].kind ~= "direction"
+        or blocked.changes[1].to ~= "Right" then
+        printerr("[RuleWorld] TEST FAILED: custom behavior blocking")
+        return
+    end
+    local deletion = world_api:Invoke("RW_PlanDelete", custom.world, {4})
+    local opened, opened_result = world_api:Invoke("RW_Commit", custom, deletion)
+    local push = RW_PlanTurn(opened.world, right, turn_services)
+    if not opened_result.accepted or not push or #push.changes ~= 3 then
+        printerr("[RuleWorld] TEST FAILED: custom selector PUSH chain")
+        return
+    end
+    local moved, move_result = world_api:Invoke("RW_Commit", opened, push)
+    local inactive = RW_PlanTurn(moved.world, right, turn_services)
+    local restored, undo_result = world_api:Invoke("RW_Undo", moved)
+    if not move_result.accepted or moved.world.entities[1].x ~= 3
+        or moved.world.entities[3].x ~= 5 or moved.world.entities[3].direction ~= "Right"
+        or moved.world.entities[1].traits or moved.world.entities[1].behaviors
+        or not inactive or inactive.reason ~= "no_you" or #inactive.changes ~= 0
+        or not undo_result.accepted or not same_data(restored.world, opened.world) then
+        printerr("[RuleWorld] TEST FAILED: custom behavior retraction / Undo")
+        return
+    end
+    print("[RuleWorld] TEST PASSED: pipeline custom selectors/behaviors / atomic Undo")
+
     -- Exercise the same scheduler the input adapter will use, without a Commit.
     local probe, probe_error = RW_PlanTurn(session.world,
         {type = "move", dx = 1, dy = 0}, turn_services)
@@ -808,5 +881,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3H initialized")
+    print("[RuleWorld] M9.3I initialized")
 end

@@ -26,6 +26,7 @@ for _, mutation in ipairs({
     function(e) e.class = "other" end,
     function(e) e.text.name = "" end,
     function(e) e.traits = {pushable = true} end,
+    function(e) e.behaviors = {control = true} end,
     function(e) e.symbol = "IS" end,
     function(e) e.archetype = "crate" end
 }) do

@@ -23,202 +23,124 @@ local function clone(value, seen)
     return result
 end
 
-local function valid_selector(s)
-    if type(s) ~= "table" then
-        return false
-    end
-
-    if s.kind == "id" then
-        return type(s.value) == "number"
-            and s.value % 1 == 0
-    end
-
-    if s.kind == "archetype"
-        or s.kind == "class" then
-        return type(s.value) == "string"
-            and s.value ~= ""
-    end
-
-    return false
-end
-
-local function matches(entity, selector)
-    if selector.kind == "id" then
-        return entity.id == selector.value
-    end
-
-    if selector.kind == "archetype" then
-        return entity.archetype == selector.value
-    end
-
-    if selector.kind == "class" then
-        if selector.value == "object" then
-            return entity.kind == "object"
+-- Registry entries map rule-derived trait names to implemented capabilities.
+local BEHAVIORS = {
+    you = {control = true}, pushable = {push = true}, block_entry = {block_entry = true}
+}
+local function valid_behaviors(registry)
+    if type(registry) ~= "table" then return false end
+    for name, spec in pairs(registry) do
+        if type(name) ~= "string" or name == "" or type(spec) ~= "table" then return false end
+        local count = 0
+        for capability, enabled in pairs(spec) do
+            if (capability ~= "control" and capability ~= "push" and capability ~= "block_entry")
+                or type(enabled) ~= "boolean" then return false end
+            if enabled then count = count + 1 end
         end
-
-        return entity.kind == "object"
-            and entity.class == selector.value
+        if count == 0 then return false end
     end
-
-    return false
+    return true
+end
+function RW_GetBehaviorRegistry() return clone(BEHAVIORS) end
+function RW_RegisterBehavior(registry, name, specification)
+    if registry == nil then registry = BEHAVIORS end
+    if not valid_behaviors(registry) or type(name) ~= "string" or name == ""
+        or type(specification) ~= "table"
+        or not valid_behaviors({[name] = specification}) then
+        return nil, "invalid_behavior_registration"
+    end
+    if registry[name] ~= nil then return nil, "duplicate_behavior" end
+    local result = clone(registry)
+    result[name] = clone(specification)
+    return result
+end
+local function dense_list(value)
+    if type(value) ~= "table" then return false end
+    local count = 0
+    for key in pairs(value) do
+        if type(key) ~= "number" or key % 1 ~= 0 or key < 1 then return false end
+        count = count + 1
+    end
+    return count == #value
 end
 
--- Apply effects to a separate world view.
--- Never modify the authoritative world.
+-- Consume concrete effects resolved by rules.RW_ResolveEffects/EvaluateRules.
+-- Selection semantics belong to the query module, never to the projector.
 function RW_ProjectWorld(world, effects)
-    if type(world) ~= "table"
-        or type(world.entities) ~= "table" then
-        return nil, "invalid_world"
+    if type(world) ~= "table" or type(world.entities) ~= "table" then return nil, "invalid_world" end
+    if effects == nil then effects = {} end
+    if not dense_list(effects) then return nil, "invalid_effects" end
+    local registry = world.behavior_registry
+    if registry == nil then registry = BEHAVIORS end
+    if not valid_behaviors(registry) then return nil, "invalid_behavior_registry" end
+    for id, entity in pairs(world.entities) do
+        if type(entity) ~= "table" or entity.id ~= id then return nil, "invalid_entity_identity" end
     end
-
-    effects = effects or {}
-
-    if type(effects) ~= "table" then
-        return nil, "invalid_effects"
-    end
-
-    -- Validate all effects before applying any.
     for _, effect in ipairs(effects) do
-        if type(effect) ~= "table"
-            or effect.op ~= "grant_trait"
-            or not valid_selector(effect.target)
-            or type(effect.trait) ~= "string"
-            or effect.trait == "" then
+        if type(effect) ~= "table" or effect.op ~= "grant_trait"
+            or type(effect.trait) ~= "string" or effect.trait == "" then
             return nil, "invalid_effect"
         end
+        if not dense_list(effect.entity_ids) then return nil, "unresolved_effect" end
+        local seen = {}
+        for _, id in ipairs(effect.entity_ids) do
+            if type(id) ~= "number" or id % 1 ~= 0 or id < 1
+                or not world.entities[id] or seen[id] then return nil, "invalid_effect_target" end
+            seen[id] = true
+        end
     end
-
     local projected = clone(world)
-
+    for _, entity in pairs(projected.entities) do
+        entity.traits = nil
+        entity.behaviors = {} -- Explicit empty capabilities disable legacy fallback.
+    end
     for _, effect in ipairs(effects) do
-        for id, entity in pairs(projected.entities) do
-            if matches(world.entities[id], effect.target) then
-                entity.traits = entity.traits or {}
-                entity.traits[effect.trait] = true
+        local behavior = registry[effect.trait] or {}
+        for _, id in ipairs(effect.entity_ids) do
+            local entity = projected.entities[id]
+            entity.traits = entity.traits or {}
+            entity.traits[effect.trait] = true
+            for capability, enabled in pairs(behavior) do
+                if enabled then entity.behaviors[capability] = true end
             end
         end
     end
-
     return projected
 end
 
 function RW_PropertiesSelfTest()
-    local original = {
-        entities = {
-            [1] = {
-                id = 1,
-                archetype = "crate",
-                kind = "object",
-                class = "object"
-            },
-            [2] = {
-                id = 2,
-                archetype = "crate",
-                kind = "object",
-                class = "object"
-            },
-            [3] = {
-                id = 3,
-                archetype = "other",
-                kind = "object",
-                class = "object"
-            },
-            [4] = {
-                id = 4,
-                kind = "object", class = "text",
-                text = { name = "BOX" }
-            }
-        }
-    }
-
-    local effects = {{
-        op = "grant_trait",
-        target = {
-            kind = "archetype",
-            value = "crate"
-        },
-        trait = "pushable"
+    local original = {entities = {
+        [1] = {id = 1, kind = "object", class = "object", direction = "Mid"},
+        [2] = {id = 2, kind = "object", class = "text", text = {name = "BOX"}}
     }}
-
-    local active = RW_ProjectWorld(
-        original, effects
-    )
-
-    if not active
-        or not active.entities[1].traits.pushable
-        or not active.entities[2].traits.pushable
-        or active.entities[3].traits then
-        return false, "Trait grant failed"
+    local effects = {{op = "grant_trait", entity_ids = {1, 2}, trait = "pushable"}}
+    local projected = RW_ProjectWorld(original, effects)
+    if not projected or not projected.entities[1].behaviors.push
+        or not projected.entities[2].traits.pushable or original.entities[1].traits
+        or original.entities[1].behaviors or projected.entities[1].direction ~= "Mid" then
+        return false, "Concrete effect projection/isolation failed"
     end
-
-    -- Source world must remain unchanged.
-    if original.entities[1].traits ~= nil
-        or original.entities[2].traits ~= nil then
-        return false, "Projection mutated world"
+    local inactive = RW_ProjectWorld(projected, {})
+    if inactive.entities[1].traits or inactive.entities[1].behaviors.push then
+        return false, "Derived behavior retraction failed"
     end
-
-    -- Empty effect list retracts derived traits.
-    local inactive = RW_ProjectWorld(original, {})
-
-    if inactive.entities[1].traits ~= nil
-        or inactive.entities[2].traits ~= nil then
-        return false, "Effect retraction failed"
+    local spec = {control = true, push = true}
+    local registry = RW_RegisterBehavior({}, "drive", spec)
+    spec.control = false
+    if not registry or not registry.drive.control or RW_GetBehaviorRegistry().drive ~= nil
+        or RW_RegisterBehavior(registry, "drive", registry.drive) ~= nil then
+        return false, "Behavior registration isolation/duplicate failed"
     end
-
-    -- Select an individual entity.
-    local individual = RW_ProjectWorld(
-        original,
-        {{
-            op = "grant_trait",
-            target = { kind = "id", value = 3 },
-            trait = "pushable"
-        }}
-    )
-
-    if not individual.entities[3].traits.pushable
-        or individual.entities[2].traits then
-        return false, "ID targeting failed"
+    original.behavior_registry = registry
+    local custom = RW_ProjectWorld(original, {{op = "grant_trait", entity_ids = {2}, trait = "drive"}})
+    if not custom or not custom.entities[2].behaviors.control or not custom.entities[2].behaviors.push then
+        return false, "Custom behavior capability mapping failed"
     end
-
-    -- A class selector matches text and its Object superclass.
-    local text_only = RW_ProjectWorld(original, {{
-        op = "grant_trait",
-        target = { kind = "class", value = "text" },
-        trait = "pushable"
-    }})
-
-    if not text_only
-        or not text_only.entities[4].traits.pushable
-        or text_only.entities[1].traits ~= nil
-        or original.entities[4].traits ~= nil then
-        return false, "Text class projection failed"
+    local bad, err = RW_ProjectWorld(original, {{op = "unknown"}})
+    if bad ~= nil or err ~= "invalid_effect" then return false, "Effect validation failed" end
+    if RW_ProjectWorld(original, {{op = "grant_trait", trait = "you", target = {kind = "id", value = 1}}}) ~= nil
+        or RW_ProjectWorld(original, {{op = "grant_trait", trait = "you", entity_ids = {1, 1}}}) ~= nil then
+        return false, "Unresolved/duplicate target accepted"
     end
-
-    local all_objects = RW_ProjectWorld(original, {{
-        op = "grant_trait",
-        target = { kind = "class", value = "object" },
-        trait = "you"
-    }})
-
-    if not all_objects then
-        return false, "Object class projection failed"
-    end
-
-    for _, entity in pairs(all_objects.entities) do
-        if not entity.traits or not entity.traits.you then
-            return false, "Superclass inheritance failed"
-        end
-    end
-
-    -- Invalid effects must not be applied.
-    local bad, err = RW_ProjectWorld(
-        original,
-        {{ op = "unknown" }}
-    )
-
-    if bad ~= nil or err ~= "invalid_effect" then
-        return false, "Effect validation failed"
-    end
-
-    return true, "Effect projection passed"
+    return true, "Concrete effects and isolated behavior registration passed"
 end

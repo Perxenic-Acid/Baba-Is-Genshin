@@ -132,3 +132,13 @@ NOT ALL IS NOT PUSH 不抑制普通 ALL IS PUSH，两者作用于不同类型范
 真机仍 D、F 进入 NAT，新增 HAS、SINK 文字在顶行右侧，可自由构造
 ROCK HAS ALL + ROCK HAS NOT ALL / NOT ROCK，或 TEXT HAS ROCK + NOT ALL HAS NOT ROCK，
 再通过 SINK 销毁相应对象检查产物，并用 Z 撤销。正常开局仍不跑完整自测。
+
+
+## AVATAR IS NOT ALL 退出调查（M9.3T.3.1）
+
+14:41:36_77 日志记录退出原因为 Tree action win，而非 transform。
+单独 AVATAR IS NOT ALL 的物理文字回归验证：只生成 forbid_transform(avatar,@all)，
+Avatar 保留，不分配新实体、不产生 WIN。原作 convert.lua 也不会把 not all 作为转换产物。
+现有日志没有保存当时布局，尚无法归因于某条其他规则或判胜错误。
+补充 WIN evidence 日志，仅胜利时记录当前 LEVEL 属性、Text 坐标、YOU/WIN 对象及空格；
+下次复现可据此定位，不改变目前判胜语义。

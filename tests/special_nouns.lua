@@ -182,3 +182,13 @@ s=fixture({{"TEXT","IS","ROCK"},{"NOT","ALL","IS","NOT","ROCK"}})
 converted=convert(s);assert(converted.world.entities[4].class == "text")
 assert(RW_Undo(converted).world == s.world)
 print("PASS: ALL/EMPTY/TEXT cross-family left/right NOT conversions and Undo")
+
+-- User regression: AVATAR IS NOT ALL alone must never create victory or conversions.
+s=fixture({{"AVATAR","IS","NOT","ALL"}})
+p,f=projected(s);assert(not RW_HasWinContact(p))
+assert(#f.relations == 1 and f.relations[1].op == "forbid_transform"
+    and f.relations[1].source_type == "avatar" and f.relations[1].target_type == "@all")
+converted=convert(s);assert(converted.world.entities[2].archetype == "avatar")
+assert(converted.world.next_entity_id == s.world.next_entity_id)
+assert(not RW_HasWinContact(projected(converted)))
+print("PASS: AVATAR IS NOT ALL preserves Avatar and cannot trigger WIN by itself")

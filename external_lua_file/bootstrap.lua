@@ -297,6 +297,23 @@ function RW_PlanLevelAction(tree, action, services)
     local outcome = turn.level_transform and "transform" or level_outcome
         or (services.win(post) and "win" or nil)
     if select_after_defeat and outcome == "defeat" then outcome = nil end
+    local outcome_diagnostic
+    if outcome == "win" then
+        local entries={"LEVEL traits=" .. table.concat(turn.level_traits or {},",")}
+        local ids={};for id in pairs(post.entities) do ids[#ids+1]=id end;table.sort(ids)
+        for _,id in ipairs(ids) do
+            local e=post.entities[id];local b=e.behaviors or {}
+            if e.class == "text" or b.control or b.win then
+                entries[#entries+1]=string.format("%d:%s@%s,%s YOU=%s WIN=%s",id,
+                    e.text and e.text.name or e.archetype or "?",tostring(e.x),tostring(e.y),
+                    tostring(b.control == true),tostring(b.win == true))
+            end
+        end
+        for key,cell in pairs(post.empty_cells or {}) do
+            if cell.behaviors.control and cell.behaviors.win then entries[#entries+1]="EMPTY YOU+WIN@" .. key end
+        end
+        outcome_diagnostic=table.concat(entries,"; ")
+    end
     if outcome then
         next_tree, update_error = services.outcome(next_tree,outcome,turn.level_transform)
         if not next_tree then return fail(update_error) end
@@ -305,7 +322,8 @@ function RW_PlanLevelAction(tree, action, services)
             if not next_tree then return fail(update_error) end
         end
     end
-    return {before=tree,after=next_tree,reason=outcome or turn.reason,changes=turn.changes,select_after_defeat=select_after_defeat}
+    return {before=tree,after=next_tree,reason=outcome or turn.reason,changes=turn.changes,select_after_defeat=select_after_defeat,
+        outcome_diagnostic=outcome_diagnostic}
 end
 
 -- Host confirmation entry point, shared with the F interaction binding.
@@ -1222,6 +1240,7 @@ local function start(run_self_tests)
         end
         local next_tree, result = world_api:Invoke("RW_CommitLevelTree",level_tree,plan)
         if not result.accepted then printerr("[RuleWorld] Tree commit rejected:",result.reason); return false, result.reason end
+        if plan.outcome_diagnostic then print("[RuleWorld] WIN evidence: " .. plan.outcome_diagnostic) end
         level_tree = next_tree
         pending_selection = nil
         session = world_api:Invoke("RW_GetActiveLevel",level_tree)
@@ -1304,7 +1323,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.3T.3 initialized")
+    print("[RuleWorld] M9.3T.3.1 initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

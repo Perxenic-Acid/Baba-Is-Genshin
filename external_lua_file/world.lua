@@ -1267,5 +1267,14 @@ function RW_GetNavigationDefinitions()
     selector_win.entities[11].text.name = "PUSH" -- No YOU: WIN must leave SELECT usable.
     definitions["navigation.selector_win"] = {id="navigation.selector_win",initial_world=selector_win}
     portal(root,45,7,1,"SW","navigation.selector_win")
+    local split = clone(definitions["navigation.noun_level"].initial_world)
+    for offset, token in ipairs({"AND","ROCK"}) do
+        local token_id = split.next_entity_id
+        split.entities[token_id] = {id=token_id,kind="object",class="text",direction="None",
+            x=6+offset,y=8,text={name=token}}
+        split.next_entity_id = token_id+1
+    end
+    definitions["navigation.split"] = {id="navigation.split",initial_world=split}
+    portal(root,46,6,1,"SPL","navigation.split")
     return definitions, "navigation.root"
 end

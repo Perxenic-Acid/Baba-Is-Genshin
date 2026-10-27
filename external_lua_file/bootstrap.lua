@@ -67,12 +67,12 @@ function RW_PlanTurn(world, action, services)
             target_type = target
         end
     end
-    local operations, conversion_error = services.convert(preview, entity_conversions)
+    local operations, conversion_error, allocation = services.convert(preview, entity_conversions)
     if not operations then return fail("conversions", conversion_error) end
 
     -- Own the combined list: never append into another planner's result.
     local plan = {consumes_turn = true, reason = movement.reason, changes = {},
-        level_transform = target_type, level_traits = level_traits,board_shift=movement.board_shift}
+        level_transform = target_type, level_traits = level_traits,board_shift=movement.board_shift,id_allocation=allocation}
     for _, change in ipairs(movement.changes) do
         plan.changes[#plan.changes + 1] = change
     end
@@ -1103,5 +1103,5 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3N initialized")
+    print("[RuleWorld] M9.3O initialized")
 end

@@ -505,84 +505,58 @@ end
 
 -- Pure conversion planner: never mutates the world.
 -- A IS A protects A from all ordinary IS conversions.
--- Multiple distinct targets currently require a later,
--- explicit one-to-many conversion implementation.
+-- One target keeps the source ID; additional distinct targets receive fresh IDs.
+-- All products use the same pre-conversion snapshot (no within-turn cascade).
 function RW_PlanConversions(world, conversions)
-    if type(world) ~= "table"
-        or type(world.entities) ~= "table"
-        or type(conversions) ~= "table" then
-        return nil, "invalid_conversion_input"
-    end
-
-    local targets = {}
-    local protected = {}
-    local conflicts = {}
-
+    if type(world) ~= "table" or type(world.entities) ~= "table"
+        or not dense_list(conversions) then return nil,"invalid_conversion_input" end
+    local targets, protected = {}, {}
     for _, relation in ipairs(conversions) do
-        if type(relation) ~= "table"
-            or type(relation.source_type) ~= "string"
-            or relation.source_type == "" then
-            return nil, "invalid_conversion_relation"
-        end
-
-        local source_type = relation.source_type
-
-        if relation.op == "protect_transform" then
-            protected[source_type] = true
-        elseif relation.op == "transform"
-            and type(relation.target_type) == "string"
-            and relation.target_type ~= ""
-            and relation.target_type ~= source_type then
-            local previous = targets[source_type]
-
-            if previous ~= nil
-                and previous ~= relation.target_type then
-                conflicts[source_type] = true
-            else
-                targets[source_type] = relation.target_type
+        if type(relation) ~= "table" or type(relation.source_type) ~= "string"
+            or relation.source_type == "" then return nil,"invalid_conversion_relation" end
+        local source = relation.source_type
+        if relation.op == "protect_transform" then protected[source] = true
+        elseif relation.op == "transform" and type(relation.target_type) == "string"
+            and relation.target_type ~= "" and relation.target_type ~= source then
+            targets[source] = targets[source] or {}
+            local found = false
+            for _, target in ipairs(targets[source]) do
+                if target == relation.target_type then found = true end
             end
-        else
-            return nil, "invalid_conversion_relation"
-        end
+            if not found then targets[source][#targets[source]+1] = relation.target_type end
+        else return nil,"invalid_conversion_relation" end
     end
-
-    -- A IS A shields its source from conflicting conversions
-    -- independently of the textual rule enumeration order.
-    for source_type in pairs(conflicts) do
-        if not protected[source_type] then
-            return nil, "multiple_conversion_targets"
-        end
-    end
-
     local ids = {}
-
-    for id in pairs(world.entities) do
-        ids[#ids + 1] = id
-    end
-
+    for id in pairs(world.entities) do ids[#ids+1] = id end
     table.sort(ids)
-
-    local changes = {}
-
+    local changes, next_id = {}, world.next_entity_id
+    local created = 0
     for _, id in ipairs(ids) do
         local entity = world.entities[id]
-        local source_type = entity.archetype
-
-        if entity.kind == "object"
-            and entity.class ~= "text"
-            and type(source_type) == "string"
-            and targets[source_type] ~= nil
-            and not protected[source_type] then
-            changes[#changes + 1] = {
-                kind = "transform",
-                entity_id = id,
-                from = source_type,
-                to = targets[source_type]
-            }
+        local source = entity.archetype
+        if entity.kind == "object" and entity.class ~= "text"
+            and targets[source] and not protected[source] then
+            for index, target in ipairs(targets[source]) do
+                if index == 1 then
+                    changes[#changes+1] = {kind="transform",entity_id=id,from=source,to=target}
+                else
+                    if type(next_id) ~= "number" or next_id % 1 ~= 0 or next_id < 1 then
+                        return nil,"invalid_conversion_frontier"
+                    end
+                    if next_id >= 9007199254740991 then return nil,"entity_id_exhausted" end
+                    if world.entities[next_id] then return nil,"invalid_conversion_frontier" end
+                    local product = query_clone(entity)
+                    product.id,product.archetype = next_id,target
+                    product.traits,product.behaviors,product.symbol = nil,nil,nil
+                    changes[#changes+1] = {kind="create",entity_id=next_id,to=product}
+                    next_id,created = next_id+1,created+1
+                end
+            end
         end
     end
-
-    return changes
+    local allocation
+    if created > 0 then allocation = {from=world.next_entity_id,to=next_id} end
+    return changes,nil,allocation
 end
 
 function RW_ASTLoweringSelfTest()
@@ -668,6 +642,7 @@ function RW_ASTLoweringSelfTest()
     end
 
     local test_world = {
+        next_entity_id = 6,
         entities = {
             [2] = { id = 2, kind = "object", archetype = "crate" },
             [3] = { id = 3, kind = "object", archetype = "crate" },
@@ -701,9 +676,10 @@ function RW_ASTLoweringSelfTest()
         }
     )
 
-    if conflict ~= nil
-        or conflict_error ~= "multiple_conversion_targets" then
-        return false, "Conflicting conversions not rejected"
+    if not conflict or #conflict ~= 4 or conflict_error
+        or conflict[2].kind ~= "create" or conflict[2].entity_id ~= 6
+        or conflict[4].entity_id ~= 7 then
+        return false, "One-to-many conversion planning failed"
     end
 
     local protected_conflict = RW_PlanConversions(

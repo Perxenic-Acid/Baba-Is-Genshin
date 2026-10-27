@@ -90,3 +90,8 @@ manual test sequences. Native rendering tests also verify property-based WIN col
 关卡边界重置、持久 LEVEL 转换/结果、LEVEL IS YOU 地图偏移、多目标选关 UI、
 四条预设规则，以及 SELECT-only WIN 不退出/DEFEAT 允许 SELECT。
 详见 docs/LEVEL_BOUNDARIES.md；离线新增 tests/level_boundaries.lua 与宿主/渲染回归。
+
+## M9.3O
+
+普通名词一对多转换：同格产物、目标去重、身份保护、原子 ID 分配/撤销。
+详见 docs/CONVERSION_SPLIT.md，回归 tests/conversion_split.lua，真机入口 SPL。

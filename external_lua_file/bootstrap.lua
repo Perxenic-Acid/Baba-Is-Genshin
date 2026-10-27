@@ -46,8 +46,16 @@ function RW_CompileWorld(world, services)
         local previous,next_key=signature(tokens),signature(next_tokens)
         if not next_key then return nil,{stage="word",reason="invalid_word_tokens"} end
         if previous == next_key then
+            -- Activation describes sentence membership, not whether a rule finds a target.
+            local active_text_ids={}
+            for _,rule in ipairs(ast) do
+                local source=rule.source or {}
+                for _,id in ipairs(source.sentence_entity_ids or source.entity_ids or {}) do
+                    if world.entities[id] and world.entities[id].class == "text" then active_text_ids[id]=true end
+                end
+            end
             return {effects=effects,ast=ast,rules=generated,deferred=deferred,relations=relations,
-                word_tokens=tokens,iterations=iteration}
+                active_text_ids=active_text_ids,word_tokens=tokens,iterations=iteration}
         end
         -- Stay bounded without recursively calling the parser, even on oscillation.
         tokens=next_tokens
@@ -825,7 +833,7 @@ local function start(run_self_tests)
             print("[RuleWorld] Rule compilation rejected:",problem.stage,problem.reason)
             return nil,nil,nil,nil,nil,problem.reason
         end
-        return frame.effects,#frame.ast,#frame.deferred,frame.relations,frame.rules
+        return frame.effects,#frame.ast,#frame.deferred,frame.relations,frame.rules,nil,frame.active_text_ids
     end
 
     -- Mapped script calls stay in the host adapter, outside the scheduler.
@@ -1271,7 +1279,7 @@ local function start(run_self_tests)
             renderer_api:Invoke("RW_Render",session.world,#level_tree.history,0,navigation_view())
             return
         end
-        local effects, rule_count, deferred_count, scope_commands = evaluate()
+        local effects, rule_count, deferred_count, scope_commands, _, _, active_text_ids = evaluate()
         if not effects then return end
 
         if previous_rule_count ~= rule_count
@@ -1289,6 +1297,7 @@ local function start(run_self_tests)
 
         local display_world, projection_error = properties_api:Invoke("RW_ProjectWorld",session.world,effects,level_traits_from(scope_commands))
         if not display_world then printerr("[RuleWorld] View projection failed:",projection_error); return end
+        display_world.active_text_ids=active_text_ids
         renderer_api:Invoke(
             "RW_Render",
             display_world,
@@ -1395,7 +1404,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.3Z initialized")
+    print("[RuleWorld] M9.4A initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

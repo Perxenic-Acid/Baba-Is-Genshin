@@ -326,6 +326,37 @@ assert(rendered.entities[1].x==3 and rendered.entities[7].x==2)
 listeners.undo()
 assert(rendered.entities[1].x==4 and rendered.entities[7].x==3)
 print("PASS: native FLOAT entry, cross-layer HOT immunity, STOP/PUSH collisions and Undo")
+while history_depth > 0 do listeners.undo() end
+local function press(sequence)
+ local map={D="right",A="left",W="up",S="down",F="confirm",Z="undo"}
+ for key in sequence:gmatch(".") do listeners[map[key]]() end
+end
+press("DDDDDDDDDDFDF")
+assert(rendered.width==33 and rendered.height==18)
+local function avatar(world)
+ for _,e in pairs(world.entities) do if e.archetype=="avatar" then return e end end
+end
+assert(avatar(rendered).x==13)
+for _,e in pairs(rendered.entities) do if e.class=="text" then assert(rendered.active_text_ids[e.id]) end end
+press("DDDDDDDD")
+assert(rendered.width==12 and rendered.entities[2].level_link.label=="BIY")
+press("Z");assert(rendered.width==33 and avatar(rendered).x==20)
+press("D");assert(rendered.width==12)
+-- Enter WHERE from the restored reference map cursor (3,2).
+press("DF");assert(rendered.width==24 and avatar(rendered).x==15)
+press("AAA")
+for _,e in pairs(rendered.entities) do if e.archetype=="wall" then assert(not e.behaviors.block_entry) end end
+local inactive=0
+for _,e in pairs(rendered.entities) do if e.class=="text" and not rendered.active_text_ids[e.id] then inactive=inactive+1 end end
+assert(inactive>=6)
+press("Z")
+for _,e in pairs(rendered.entities) do if e.text and e.text.name=="STOP" then assert(rendered.active_text_ids[e.id]) end end
+press("A")
+press("DWWWWWWWWWWASSDSAAA")
+press("SSSAAWWDDDDDDDDWAAAAASSD")
+assert(rendered.width==12 and rendered.entities[3].level_link.label=="WHERE")
+press("Z");assert(rendered.width==24 and avatar(rendered).x==11)
+print("PASS: official BIY and WHERE solutions, boundary WIN/Undo, rule break/rebuild and activation")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -365,3 +396,5 @@ dofile("tests/open_shut.lua")
 dofile("tests/weak.lua")
 
 dofile("tests/float.lua")
+
+dofile("tests/text_activation.lua")

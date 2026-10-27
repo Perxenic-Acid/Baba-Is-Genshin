@@ -4,6 +4,7 @@ local controls = {}
 local board, status = {alive=true}, {alive=true}
 local methods = setmetatable({}, {__index=function() return function() end end})
 methods.SetAnchoredPosition = function(control,x,y) control.px,control.py=x,y end
+methods.SetSizeDelta = function(control,w,h) control.width,control.height=w,h end
 methods.AddCursorEventListener = function(control,event,callback) control.click=callback end
 local old_cursor_events = Enum.CursorEventType
 Enum.CursorEventType = {CursorClick="click"}
@@ -76,6 +77,29 @@ methods.AddCursorEventListener=mouse_listener
 assert(RW_RendererSelfTest())
 assert(RW_Render(typed,0,1))
 assert(not rows.RW_Choice_44.alive)
+local words={width=5,height=2,active_text_ids={[1]=true},entities={
+ [1]={id=1,kind="object",class="text",text={name="IS"},x=2,y=1,behaviors={}},
+ [2]={id=2,kind="object",class="text",text={name="WIN"},x=4,y=1,behaviors={win=true,defeat=true}}
+}}
+assert(RW_Render(words,0,0))
+local tiles={};for _,c in ipairs(controls) do if c.alive and c.name then tiles[c.name]=c end end
+local first,second=tiles.RW_Entity_1,tiles.RW_Entity_2
+assert(first.bgColor[1]==205 and second.bgColor[1]==82)
+assert(second.fontColor[1]==156) -- Text palette overrides object WIN/DEFEAT palettes.
+words.active_text_ids={[2]=true};assert(RW_Render(words,0,0))
+assert(first.bgColor[1]==82 and second.bgColor[1]==205)
+words.width=33;words.height=18;assert(RW_Render(words,0,0))
+local scaled
+for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then scaled=c end end
+assert(scaled.width<24 and scaled.height<24 and scaled.fontSize>=7)
+for _,c in ipairs(controls) do if c.alive and c.name and c.name:find("RW_Cell_") then
+ assert(math.abs(c.px)+c.width/2<=408 and math.abs(c.py)+c.height/2<=408)
+end end
+words.width=5;words.height=2;assert(RW_Render(words,0,0))
+local restored
+for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then restored=c end end
+assert(restored.height==58 and restored.bgColor[1]==82)
+print("PASS: native inactive/active Text colours, same-view refresh and large-board scaling/reset")
 Enum.CursorEventType = old_cursor_events
 game, script, Color, RW_Render = old_game, old_script, old_color, old_render
 print("PASS: native renderer portal labels, status and same-size instance refresh")

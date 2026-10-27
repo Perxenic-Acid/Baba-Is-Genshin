@@ -6,6 +6,7 @@ local TILE_TEMPLATE_INDEX = 1073741851
 
 local CELL_STEP = 68
 local CELL_SIZE = 64
+local board_scale = 1
 
 local board_root = nil
 local status_text = nil
@@ -200,6 +201,8 @@ local function get_label(entity)
     if entity.archetype == "skull" then return "SKULL" end
     if entity.archetype == "water" then return "WATER" end
     if entity.archetype == "rock" then return "ROCK" end
+    if entity.archetype == "wall" then return "WALL" end
+    if entity.archetype == "crate" then return "CRATE" end
     if entity.class == "text" then
         return entity.text and entity.text.name or "?"
     end
@@ -211,7 +214,11 @@ local function get_label(entity)
     return tostring(entity.id)
 end
 
-local function get_colors(entity)
+local function get_colors(entity,active)
+    if entity.class == "text" then
+        if active then return Color(205,159,89,255),Color(36,26,15,255) end
+        return Color(82,68,49,255),Color(156,133,99,255)
+    end
     local capabilities = entity.behaviors or {}
     if capabilities.defeat then return Color(170,65,80,255),Color(255,255,255,255) end
     if capabilities.sink then return Color(45,130,185,255),Color(255,255,255,255) end
@@ -223,11 +230,6 @@ local function get_colors(entity)
     end
     if entity.archetype == "cursor" then return Color(220,220,230,255), Color(20,20,30,255) end
     if entity.archetype == "line" then return Color(43,55,75,255), Color(90,110,140,255) end
-    if entity.class == "text" then
-        return
-            Color(205, 159, 89, 255),
-            Color(36, 26, 15, 255)
-    end
 
     if entity.archetype == "avatar" then
         return
@@ -320,8 +322,8 @@ local function draw_entities(world)
                     x, y, world.width, world.height
                 )
 
-                local span = (CELL_SIZE - 4) / count
-                local tile_width = math.max(12, span - 2)
+                local span = (CELL_SIZE - 4*board_scale) / count
+                local tile_width = math.max(5, span - 2*board_scale)
 
                 for i, item in ipairs(slot) do
                     local control = ensure_view(item.id)
@@ -329,7 +331,7 @@ local function draw_entities(world)
                     if control then
                         local entity = item.entity
                         local label = get_label(entity)
-                        local bg, fg = get_colors(entity)
+                        local bg, fg = get_colors(entity,world.active_text_ids and world.active_text_ids[item.id])
 
                         if count > 1 and #label > 2 then
                             label = label:sub(1, 1)
@@ -356,11 +358,11 @@ local function draw_entities(world)
 
                         control:SetSizeDelta(
                             tile_width,
-                            CELL_SIZE - 6
+                            CELL_SIZE - 6*board_scale
                         )
 
                         control.text = label
-                        control.fontSize = font_size
+                        control.fontSize = math.max(7,font_size*board_scale)
                         control.fontColor = fg
                         control.bgColor = bg
                         control:SetVisible(true)
@@ -428,6 +430,8 @@ function RW_Render(world, history_depth, active_effects, navigation)
         return false
     end
 
+    board_scale=math.min(1,12/world.width,12/world.height)
+    CELL_STEP=68*board_scale;CELL_SIZE=64*board_scale
     board_dx = world.board_offset and world.board_offset.x or 0
     board_dy = world.board_offset and world.board_offset.y or 0
     if not ensure_grid(world) then

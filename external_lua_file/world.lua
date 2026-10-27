@@ -1622,6 +1622,147 @@ function RW_GetNavigationDefinitions()
     definitions["navigation.float"]={id="navigation.float",initial_world=floating}
     portal(root,62,12,1,"FLOAT","navigation.float")
     object(root,63,"line",12,1)
+    -- BEGIN OFFICIAL REFERENCE LAYOUTS
+    local function official_world(width,height,entries)
+        local world=RW_CreateSession().world
+        world.width=width;world.height=height;world.entities={};world.next_entity_id=1
+        world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall"}
+        for _,spec in ipairs(entries) do
+            local id=world.next_entity_id
+            if spec[1]:sub(1,5) == "text_" then
+                world.entities[id]={id=id,kind="object",class="text",text={name=spec[1]:sub(6):upper()},
+                    x=spec[2],y=spec[3],direction=spec[4]}
+                world.next_entity_id=id+1
+            else object(world,id,spec[1],spec[2],spec[3]);world.entities[id].direction=spec[4] end
+        end
+        local id=world.next_entity_id
+        object(world,id,"cursor",1,1);portal(world,id+1,2,1,"PARENT");object(world,id+2,"line",1,1)
+        return world
+    end
+    -- Original 0level: baba is you; .l SHA256 4762df8b454da9a790f7e0ecd99bf2b6270b056c27bd12a855b2c09ea6507c7c
+    definitions["reference.0"]={id="reference.0",initial_world=official_world(33,18,{
+        {"text_avatar",12,7,"Down"},
+        {"text_is",13,7,"Down"},
+        {"text_you",14,7,"Down"},
+        {"text_flag",20,7,"Down"},
+        {"text_is",21,7,"Down"},
+        {"text_win",22,7,"Down"},
+        {"wall",12,9,"Down"},
+        {"wall",13,9,"Down"},
+        {"wall",14,9,"Down"},
+        {"wall",15,9,"Down"},
+        {"wall",16,9,"Down"},
+        {"wall",17,9,"Down"},
+        {"wall",18,9,"Right"},
+        {"wall",19,9,"Right"},
+        {"wall",20,9,"Down"},
+        {"wall",21,9,"Down"},
+        {"wall",22,9,"Down"},
+        {"rock",17,10,"Right"},
+        {"avatar",13,11,"Right"},
+        {"rock",17,11,"Right"},
+        {"flag",21,11,"Down"},
+        {"rock",17,12,"Right"},
+        {"wall",12,13,"Right"},
+        {"wall",13,13,"Right"},
+        {"wall",14,13,"Right"},
+        {"wall",15,13,"Down"},
+        {"wall",16,13,"Down"},
+        {"wall",17,13,"Down"},
+        {"wall",18,13,"Down"},
+        {"wall",19,13,"Down"},
+        {"wall",20,13,"Right"},
+        {"wall",21,13,"Right"},
+        {"wall",22,13,"Right"},
+        {"text_wall",12,15,"Down"},
+        {"text_is",13,15,"Down"},
+        {"text_stop",14,15,"Down"},
+        {"text_rock",20,15,"Down"},
+        {"text_is",21,15,"Down"},
+        {"text_push",22,15,"Down"},
+    })}
+    -- Original 1level: where do i go?; .l SHA256 b60694f974c94dab56e9a9768f1ee5e86f9fdf4ee73baf26ab9eb7dca4acdd95
+    definitions["reference.1"]={id="reference.1",initial_world=official_world(24,18,{
+        {"wall",10,3,"Right"},
+        {"wall",11,3,"Down"},
+        {"wall",12,3,"Down"},
+        {"wall",13,3,"Down"},
+        {"wall",14,3,"Down"},
+        {"wall",15,3,"Down"},
+        {"wall",16,3,"Down"},
+        {"wall",17,3,"Down"},
+        {"wall",10,4,"Right"},
+        {"wall",17,4,"Down"},
+        {"wall",10,5,"Right"},
+        {"text_is",12,5,"Right"},
+        {"wall",17,5,"Right"},
+        {"wall",10,6,"Right"},
+        {"wall",17,6,"Right"},
+        {"wall",6,7,"Down"},
+        {"wall",7,7,"Down"},
+        {"wall",8,7,"Down"},
+        {"wall",9,7,"Down"},
+        {"wall",10,7,"Down"},
+        {"text_win",15,7,"Right"},
+        {"wall",17,7,"Right"},
+        {"wall",6,8,"Right"},
+        {"wall",17,8,"Right"},
+        {"wall",6,9,"Right"},
+        {"text_flag",8,9,"Right"},
+        {"flag",12,9,"Right"},
+        {"wall",17,9,"Right"},
+        {"wall",6,10,"Right"},
+        {"wall",17,10,"Right"},
+        {"wall",6,11,"Right"},
+        {"wall",7,11,"Down"},
+        {"wall",8,11,"Down"},
+        {"wall",9,11,"Down"},
+        {"wall",10,11,"Down"},
+        {"wall",11,11,"Down"},
+        {"wall",12,11,"Down"},
+        {"wall",13,11,"Down"},
+        {"wall",14,11,"Down"},
+        {"wall",15,11,"Down"},
+        {"wall",16,11,"Down"},
+        {"wall",17,11,"Down"},
+        {"wall",10,12,"Right"},
+        {"wall",17,12,"Right"},
+        {"text_avatar",7,13,"Right"},
+        {"wall",10,13,"Right"},
+        {"text_wall",12,13,"Right"},
+        {"wall",17,13,"Right"},
+        {"text_is",7,14,"Right"},
+        {"wall",10,14,"Right"},
+        {"text_is",12,14,"Right"},
+        {"avatar",15,14,"Right"},
+        {"wall",17,14,"Right"},
+        {"text_you",7,15,"Down"},
+        {"wall",10,15,"Down"},
+        {"text_stop",12,15,"Down"},
+        {"wall",17,15,"Down"},
+        {"wall",10,16,"Down"},
+        {"wall",17,16,"Down"},
+        {"wall",10,17,"Down"},
+        {"wall",11,17,"Down"},
+        {"wall",12,17,"Down"},
+        {"wall",13,17,"Down"},
+        {"wall",14,17,"Down"},
+        {"wall",15,17,"Down"},
+        {"wall",16,17,"Down"},
+        {"wall",17,17,"Down"},
+    })}
+    local reference_map=RW_CreateSession().world
+    reference_map.entities={};reference_map.next_entity_id=1
+    object(reference_map,1,"cursor",2,2)
+    portal(reference_map,2,3,2,"BIY","reference.0")
+    portal(reference_map,3,4,2,"WHERE","reference.1")
+    portal(reference_map,4,1,2,"PARENT")
+    for x=1,4 do object(reference_map,4+x,"line",x,2) end
+    definitions["navigation.reference"]={id="navigation.reference",initial_world=reference_map}
+    portal(root,64,12,2,"REF","navigation.reference")
+    object(root,65,"line",12,2)
+    for x=8,11 do object(root,58+x,"line",x,2) end
+    -- END OFFICIAL REFERENCE LAYOUTS
     -- WIN is authored visibly in these two victory fixtures, never a Flag default.
     for _,world in ipairs({puzzle,transform}) do
         for offset,token in ipairs({"FLAG","IS","WIN"}) do

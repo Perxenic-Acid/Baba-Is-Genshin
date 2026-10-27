@@ -56,8 +56,10 @@ end
 local d=make({{"avatar",2,2},{"skull",3,2},{"avatar",6,2},{"cursor",3,2}},basic_rules("defeat"))
 local dead,death_plan=step(d)
 assert(not dead.world.entities[1] and dead.world.entities[2] and dead.world.entities[3] and dead.world.entities[4])
-assert(not dead.defeated and #death_plan.stages[4].plan.events == 1)
-assert(death_plan.stages[4].plan.events[1].cause == "defeat")
+local defeat_stage
+for _,stage in ipairs(death_plan.stages) do if stage.name == "defeat" then defeat_stage=stage.plan end end
+assert(not dead.defeated and #defeat_stage.events == 1)
+assert(defeat_stage.events[1].cause == "defeat")
 assert(RW_Undo(dead).world == d.world)
 local self_defeat=make({{"avatar",2,2}},{{"AVATAR","IS","YOU","AND","DEFEAT"}})
 local self_dead=step(self_defeat)

@@ -273,6 +273,18 @@ assert(rendered.entities[2].y == 3 and rendered.entities[2].behaviors.word)
 listeners.undo()
 assert(rendered.entities[2].y == 4 and not rendered.entities[2].behaviors.word)
 print("PASS: native COND ON WORD activation/retraction, NEAR and subject AND, whole-tree Undo")
+while history_depth > 0 do listeners.undo() end
+for _=1,5 do listeners.right() end
+listeners.up();listeners.right();listeners.right();listeners.confirm() -- MELT
+assert(rendered.entities[1].y==5 and rendered.entities[2].behaviors.hot)
+local melt_frontier=rendered.next_entity_id
+listeners.up()
+assert(not rendered.entities[1] and rendered.entities[2].y==4)
+assert(rendered.entities[melt_frontier].archetype=="crate" and rendered.entities[melt_frontier].y==4
+    and rendered.entities[melt_frontier].direction=="Up")
+listeners.undo()
+assert(rendered.entities[1].y==5 and not rendered.entities[melt_frontier] and rendered.next_entity_id==melt_frontier)
+print("PASS: native MELT contact, retained HOT source, HAS crate, allocator/direction and whole-tree Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -305,3 +317,4 @@ dofile("tests/special_nouns.lua")
 
 dofile("tests/terminal_words.lua")
 dofile("tests/spatial_words.lua")
+dofile("tests/hot_melt.lua")

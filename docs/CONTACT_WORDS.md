@@ -82,3 +82,5 @@ WIN 顺序、分配器耗尽、各服务失败边界和 Undo/重放。
 tests/run.lua 通过 F 宿主入口验证三张样例、最后 YOU 死亡后的 SELECT 返回和跨层撤销。
 原有方向、文字推动、转换、重复规则、Level 语义及原生渲染适配器回归均通过。
 离线通过，真机手测待用户验证。
+
+M9.3W 已加入 HOT/MELT，接触阶段更新为 SINK → MELT → DEFEAT；详见 [HOT_MELT.md](HOT_MELT.md)。

@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -37,7 +37,8 @@ local function valid_behaviors(registry)
             if (capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
                     and capability ~= "select" and capability ~= "select_path" and capability ~= "win"
                     and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
-                    and capability ~= "safe" and capability ~= "crash")
+                    and capability ~= "safe" and capability ~= "crash"
+                    and capability ~= "hot" and capability ~= "melt")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -238,7 +239,7 @@ end
 -- Ordered contacts on a rule-projected snapshot. Identity is distinct from type.
 function RW_ResolveContactVictims(world, kind)
     if type(world) ~= "table" or type(world.entities) ~= "table" then return nil,"invalid_contact_world" end
-    if kind ~= "sink" and kind ~= "defeat" then return nil,"invalid_contact_kind" end
+    if kind ~= "sink" and kind ~= "melt" and kind ~= "defeat" then return nil,"invalid_contact_kind" end
     local ids, removed = {}, {}
     for id,entity in pairs(world.entities) do
         if type(id) ~= "number" or id % 1 ~= 0 or id < 1
@@ -261,6 +262,18 @@ function RW_ResolveContactVictims(world, kind)
                     end
                 end
                 if sunk then removed[id]=true end
+            end
+        end
+    elseif kind == "melt" then
+        -- Simultaneous victim selection: self-HOT is valid, SAFE guards the victim.
+        for _,id in ipairs(ids) do
+            local actor=world.entities[id]
+            if actor.behaviors.melt and not actor.behaviors.safe then
+                for _,other_id in ipairs(ids) do
+                    if world.entities[other_id].behaviors.hot and overlap(actor,world.entities[other_id]) then
+                        removed[id]=true;break
+                    end
+                end
             end
         end
     else

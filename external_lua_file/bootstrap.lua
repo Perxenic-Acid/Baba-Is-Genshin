@@ -185,7 +185,7 @@ function RW_PlanTurn(world, action, services)
         end
         plan.level_traits=level_traits_from(frozen_relations)
         plan.contact_frame=frozen_rules -- Freeze declarations, re-evaluate conditions/targets.
-        for _,kind in ipairs({"sink","defeat"}) do
+        for _,kind in ipairs({"sink","melt","defeat"}) do
             trace[#trace+1]=kind
             local refreshed,refresh_error=services.refresh(complete,frozen_rules)
             if not refreshed then return fail(kind,refresh_error) end
@@ -1339,7 +1339,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.3V initialized")
+    print("[RuleWorld] M9.3W initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

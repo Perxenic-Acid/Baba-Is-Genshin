@@ -34,7 +34,7 @@
   summary, never flatten it into a simultaneous plan. Child preconditions refer
   to the previous phase snapshot. See docs/PHASE_TRANSACTIONS.md.
 
-- Ordinary contacts use a frozen post-conversion rule frame: SINK then DEFEAT,
+- Ordinary contacts use a frozen post-conversion rule frame: SINK then MELT then DEFEAT,
   re-evaluating conditions and resolving targets for births/deletions. Do not recompile deleted
   Text halfway through these phases. HAS is triggered by destruction, not IS
   conversion; duplicate HAS instances must generate duplicate products.
@@ -92,3 +92,10 @@
   Existing alternate role orders keep their prior simple/RHS-AND behavior.
   WRITE syntax-word literals are an intentional extension requested by the user;
   do not accidentally accept them as IS/HAS noun arguments. See docs/SPATIAL_WORDS.md.
+
+- HOT/MELT contact uses simultaneous victim selection within the MELT phase:
+  only unsafe MELT entities die, self-HOT counts, HOT sources need not be YOU and
+  may be SAFE. HAS runs once per victim using frozen declarations; keep MELT after
+  SINK and before DEFEAT. Newly born products do not recursively melt in that phase.
+  Movement-based WEAK and OPEN/SHUT destruction remain the next milestone;
+  do not add contact-only approximations for those words. See docs/HOT_MELT.md.

@@ -506,7 +506,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash"
+                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {ON="on",NEAR="near"},
@@ -1447,6 +1447,12 @@ function RW_GetNavigationDefinitions()
             x=spec[2],y=spec[3],direction="None"}
         combos.next_entity_id=id+1
     end
+    for index,spec in ipairs({{"HOT",1,4},{"MELT",1,6}}) do
+        local id=34+index
+        combos.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},
+            x=spec[2],y=spec[3],direction="None"}
+        combos.next_entity_id=id+1
+    end
     definitions["navigation.specials"]={id="navigation.specials",initial_world=combos}
     portal(root,51,3,2,"NAT","navigation.specials")
     local loop=clone(lab)
@@ -1505,6 +1511,37 @@ function RW_GetNavigationDefinitions()
     definitions["navigation.conditions"]={id="navigation.conditions",initial_world=conditions}
     portal(root,54,8,1,"COND","navigation.conditions")
     object(root,55,"line",8,1)
+    local melting=clone(lab)
+    melting.entities={};melting.next_entity_id=1
+    object(melting,1,"avatar",4,5)
+    object(melting,2,"rock",4,4)
+    object(melting,3,"cursor",1,1)
+    portal(melting,4,2,1,"PARENT")
+    object(melting,5,"line",1,1)
+    for row,words in ipairs({{"ROCK","IS","HOT"},{"AVATAR","IS","MELT"},{"AVATAR","HAS","CRATE"}}) do
+        for offset,token in ipairs(words) do
+            local id=melting.next_entity_id
+            melting.entities[id]={id=id,kind="object",class="text",text={name=token},
+                x=offset+1,y=5+row*2,direction="None"}
+            melting.next_entity_id=id+1
+        end
+    end
+    for _,spec in ipairs({{"AND",6,9},{"SAFE",8,9},{"NOT",10,9}}) do
+        local id=melting.next_entity_id
+        melting.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},
+            x=spec[2],y=spec[3],direction="None"}
+        melting.next_entity_id=id+1
+    end
+    -- Rock is HOT but not PUSH, so W makes actual contact instead of pushing it away.
+    for index=#melting.rule_sources,1,-1 do
+        local effect=melting.rule_sources[index].effects[1]
+        if effect.target.kind == "archetype" and effect.target.value == "rock" and effect.trait == "pushable" then
+            table.remove(melting.rule_sources,index)
+        end
+    end
+    definitions["navigation.melt"]={id="navigation.melt",initial_world=melting}
+    portal(root,56,9,1,"MELT","navigation.melt")
+    object(root,57,"line",9,1)
     -- WIN is authored visibly in these two victory fixtures, never a Flag default.
     for _,world in ipairs({puzzle,transform}) do
         for offset,token in ipairs({"FLAG","IS","WIN"}) do

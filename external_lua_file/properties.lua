@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -39,7 +39,7 @@ local function valid_behaviors(registry)
                     and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
                     and capability ~= "safe" and capability ~= "crash"
                     and capability ~= "hot" and capability ~= "melt"
-                    and capability ~= "open" and capability ~= "shut")
+                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -240,7 +240,7 @@ end
 -- Ordered contacts on a rule-projected snapshot. Identity is distinct from type.
 function RW_ResolveContactVictims(world, kind)
     if type(world) ~= "table" or type(world.entities) ~= "table" then return nil,"invalid_contact_world" end
-    if kind ~= "sink" and kind ~= "melt" and kind ~= "defeat" and kind ~= "unlock" then return nil,"invalid_contact_kind" end
+    if kind ~= "sink" and kind ~= "melt" and kind ~= "defeat" and kind ~= "unlock" and kind ~= "weak" then return nil,"invalid_contact_kind" end
     local ids, removed = {}, {}
     for id,entity in pairs(world.entities) do
         if type(id) ~= "number" or id % 1 ~= 0 or id < 1
@@ -263,6 +263,18 @@ function RW_ResolveContactVictims(world, kind)
                     end
                 end
                 if sunk then removed[id]=true end
+            end
+        end
+    elseif kind == "weak" then
+        for _,id in ipairs(ids) do
+            local actor=world.entities[id]
+            if actor.behaviors.weak and not actor.behaviors.safe
+                and not (world.weak_new_ids and world.weak_new_ids[id]) then
+                for _,other_id in ipairs(ids) do
+                    if other_id ~= id and overlap(actor,world.entities[other_id]) then
+                        removed[id]=true;break
+                    end
+                end
             end
         end
     elseif kind == "unlock" then

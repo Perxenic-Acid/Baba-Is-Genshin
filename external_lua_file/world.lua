@@ -506,7 +506,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut"
+                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {ON="on",NEAR="near"},
@@ -1447,7 +1447,7 @@ function RW_GetNavigationDefinitions()
             x=spec[2],y=spec[3],direction="None"}
         combos.next_entity_id=id+1
     end
-    for index,spec in ipairs({{"HOT",1,4},{"MELT",1,6},{"OPEN",1,8},{"SHUT",1,10}}) do
+    for index,spec in ipairs({{"HOT",1,4},{"MELT",1,6},{"OPEN",1,8},{"SHUT",1,10},{"WEAK",1,12}}) do
         local id=34+index
         combos.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},
             x=spec[2],y=spec[3],direction="None"}
@@ -1568,6 +1568,33 @@ function RW_GetNavigationDefinitions()
     definitions["navigation.unlock"]={id="navigation.unlock",initial_world=unlocking}
     portal(root,58,10,1,"LOCK","navigation.unlock")
     object(root,59,"line",10,1)
+    local fragile=clone(unlocking)
+    fragile.entities={};fragile.next_entity_id=1
+    object(fragile,1,"avatar",4,5)
+    object(fragile,2,"rock",4,4)
+    object(fragile,3,"cursor",1,1)
+    portal(fragile,4,2,1,"PARENT")
+    object(fragile,5,"line",1,1)
+    object(fragile,6,"crate",6,5)
+    object(fragile,7,"rock",7,5)
+    for row,words in ipairs({{"AVATAR","IS","WEAK"},{"ROCK","IS","STOP"},
+        {"AVATAR","HAS","CRATE"},{"CRATE","IS","WEAK","AND","PUSH"}}) do
+        for offset,token in ipairs(words) do
+            local id=fragile.next_entity_id
+            fragile.entities[id]={id=id,kind="object",class="text",text={name=token},
+                x=offset+1,y=4+row*2,direction="None"}
+            fragile.next_entity_id=id+1
+        end
+    end
+    for _,spec in ipairs({{"SAFE",10,4},{"NOT",10,6},{"AND",10,8}}) do
+        local id=fragile.next_entity_id
+        fragile.entities[id]={id=id,kind="object",class="text",text={name=spec[1]},
+            x=spec[2],y=spec[3],direction="None"}
+        fragile.next_entity_id=id+1
+    end
+    definitions["navigation.weak"]={id="navigation.weak",initial_world=fragile}
+    portal(root,60,11,1,"WEAK","navigation.weak")
+    object(root,61,"line",11,1)
     -- WIN is authored visibly in these two victory fixtures, never a Flag default.
     for _,world in ipairs({puzzle,transform}) do
         for offset,token in ipairs({"FLAG","IS","WIN"}) do

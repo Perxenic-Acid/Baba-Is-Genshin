@@ -298,6 +298,21 @@ assert(rendered.entities[unlock_frontier+1].archetype=="crate" and rendered.enti
 listeners.undo()
 assert(rendered.entities[1].y==5 and rendered.entities[2].y==4 and rendered.next_entity_id==unlock_frontier)
 print("PASS: native LOCK entry, movement unlock, source/destination HAS, directions and whole-tree Undo")
+while history_depth > 0 do listeners.undo() end
+for _=1,5 do listeners.right() end
+listeners.up();for _=1,4 do listeners.right() end;listeners.confirm()
+assert(rendered.entities[1].behaviors.weak and rendered.entities[6].behaviors.push)
+local weak_frontier=rendered.next_entity_id
+listeners.up()
+assert(not rendered.entities[1] and rendered.entities[weak_frontier].archetype=="crate"
+    and rendered.entities[weak_frontier].y==5 and rendered.entities[weak_frontier].direction=="Up")
+listeners.undo()
+assert(rendered.entities[1].y==5 and rendered.next_entity_id==weak_frontier)
+listeners.right();listeners.right()
+assert(rendered.entities[1].x==6 and not rendered.entities[6] and rendered.entities[7].x==7)
+listeners.undo();listeners.undo()
+assert(rendered.entities[1].x==4 and rendered.entities[6].x==6)
+print("PASS: native WEAK entry, blocked YOU/HAS, blocked PUSH break and whole-tree Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -333,3 +348,5 @@ dofile("tests/spatial_words.lua")
 dofile("tests/hot_melt.lua")
 
 dofile("tests/open_shut.lua")
+
+dofile("tests/weak.lua")

@@ -19,7 +19,7 @@ Identity order within a type is deterministic ID order in RuleWorld.
 ## Transactions
 
 Movement produces ordered death records with immutable position/direction frames.
-The scheduler applies movement then movement_unlock destruction/HAS before parsing
+The scheduler applies movement then movement_destruction destruction/HAS before parsing
 post-movement rules and conversion. Door HAS appears at the destination, key HAS
 at its source. Conditional HAS sees the death frame and earlier HAS products.
 Contact phases freeze declarations in order SINK, MELT, DEFEAT, unlock, then CRASH.

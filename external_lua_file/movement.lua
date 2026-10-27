@@ -11,7 +11,7 @@ local function has_capability(world, entity, capability)
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", select = "select", select_path = "path",
         win = "win", push = "pushable", block_entry = "block_entry",
-        open="open",shut="shut",safe="safe"}
+        open="open",shut="shut",safe="safe",weak="weak"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -143,7 +143,7 @@ function RW_ResolveMovement(world, action)
     local planned,removed,destructions = {},{},{}
     local visiting = {}
     local changes = {}
-    local function destroy(id,direction)
+    local function destroy(id,direction,cause)
         if removed[id] then return end
         local entity=world.entities[id]
         local frame={}
@@ -157,7 +157,7 @@ function RW_ResolveMovement(world, action)
         dying.direction=direction or entity.direction or "None";frame[id]=dying
         removed[id]=true;planned[id]=true
         destructions[#destructions+1]={entity_id=id,x=entity.x,y=entity.y,
-            direction=dying.direction,cause="unlock",frame=frame}
+            direction=dying.direction,cause=cause or "unlock",frame=frame}
     end
 
     local function empty_at(x,y)
@@ -167,7 +167,7 @@ function RW_ResolveMovement(world, action)
         local cell=world.empty_cells and world.empty_cells[x .. ":" .. y]
         return cell and cell.behaviors or world.empty_behaviors
     end
-    local try_move
+    local try_move,attempt_move
     local function push_empty(x,y)
         local nx,ny=x+dx,y+dy
         if get_environment(world,nx,ny) == "edge" then return false,"blocked_by_edge" end
@@ -189,7 +189,7 @@ function RW_ResolveMovement(world, action)
         end
         return true
     end
-    try_move=function(id)
+    attempt_move=function(id)
         -- An entity can participate only once in this plan.
         if planned[id] then
             return true
@@ -250,7 +250,7 @@ function RW_ResolveMovement(world, action)
                         return false, reason
                     end
 
-                elseif has_capability(world, other, "block_entry") then
+                elseif has_capability(world, other, "block_entry") and not has_capability(world,other,"weak") then
                     visiting[id] = nil
                     return false, "blocked_by_entity"
                 end
@@ -284,6 +284,25 @@ function RW_ResolveMovement(world, action)
             }
         }
 
+        return true
+    end
+
+    try_move=function(id)
+        local entity=world.entities[id]
+        if id < 1 or not has_capability(world,entity,"weak") or has_capability(world,entity,"safe") then
+            return attempt_move(id)
+        end
+        -- A failed weak subtree shatters only its root, not speculative pushes.
+        local old_planned,old_removed={},{}
+        for k,v in pairs(planned) do old_planned[k]=v end
+        for k,v in pairs(removed) do old_removed[k]=v end
+        local change_count,death_count=#changes,#destructions
+        local ok,reason=attempt_move(id)
+        if ok then return true end
+        planned,removed=old_planned,old_removed;visiting[id]=nil
+        while #changes>change_count do table.remove(changes) end
+        while #destructions>death_count do table.remove(destructions) end
+        destroy(id,direction_for(dx,dy),"weak")
         return true
     end
 

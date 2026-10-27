@@ -34,7 +34,7 @@
   summary, never flatten it into a simultaneous plan. Child preconditions refer
   to the previous phase snapshot. See docs/PHASE_TRANSACTIONS.md.
 
-- Ordinary contacts use a frozen post-conversion rule frame: SINK then MELT then DEFEAT then OPEN/SHUT,
+- Ordinary contacts use a frozen post-conversion rule frame: SINK then WEAK then MELT then DEFEAT then OPEN/SHUT,
   re-evaluating conditions and resolving targets for births/deletions. Do not recompile deleted
   Text halfway through these phases. HAS is triggered by destruction, not IS
   conversion; duplicate HAS instances must generate duplicate products.
@@ -97,7 +97,6 @@
   only unsafe MELT entities die, self-HOT counts, HOT sources need not be YOU and
   may be SAFE. HAS runs once per victim using frozen declarations; keep MELT after
   SINK and before DEFEAT. Newly born products do not recursively melt in that phase.
-  Movement-based WEAK remains pending; do not add a contact-only approximation.
   See docs/HOT_MELT.md.
 
 - OPEN/SHUT unlock during movement before conversion and again after DEFEAT for
@@ -106,3 +105,11 @@
   death frame and source position, not the final movement snapshot. Keep these
   deletions/births in sequential atomic stages and whole-tree Undo. Both SAFE
   participants retain normal collision rules. See docs/OPEN_SHUT.md.
+
+- WEAK has both blocked-movement destruction and contact destruction (after SINK,
+  before MELT). Unsafe blocked YOU/PUSH shatters at its source with HAS; discard
+  speculative dependency moves when that weak subtree fails. Free PUSH still moves.
+  Bare WEAK STOP is permeable even when SAFE (original check excludes WEAK from
+  STOP solidity independently of SAFE). HAS newborns skip WEAK contact for the
+  current turn; conversions do not receive that grace. Keep the transient newborn
+  set outside persisted world state. See docs/WEAK.md.

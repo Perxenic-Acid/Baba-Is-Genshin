@@ -85,7 +85,7 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths)
     local plan={consumes_turn=true,changes={},id_allocation=creation.id_allocation,events={}}
     for _,change in ipairs(removal.changes) do plan.changes[#plan.changes+1]=change end
     for _,change in ipairs(creation.changes) do plan.changes[#plan.changes+1]=change end
-    for _,id in ipairs(ids) do plan.events[#plan.events+1]={kind="destroy",cause=kind,entity_id=id} end
+    for index,id in ipairs(ids) do plan.events[#plan.events+1]={kind="destroy",cause=(deaths and deaths[index] and deaths[index].cause) or kind,entity_id=id} end
     return plan
 end
 
@@ -142,18 +142,18 @@ function RW_PlanTurn(world, action, services)
 
     local movement_prefix=movement
     if #(movement.destructions or {}) > 0 then
-        if type(services.destroy) ~= "function" then return fail("movement_unlock","missing_destruction_service") end
+        if type(services.destroy) ~= "function" then return fail("movement_destruction","missing_destruction_service") end
         local victims,contents={},{}
         for _,death in ipairs(movement.destructions) do victims[#victims+1]=death.entity_id end
         for _,relation in ipairs(before_conversions or {}) do if relation.op == "has" then contents[#contents+1]=relation end end
-        trace[#trace+1]="movement_unlock"
-        local destruction,why=services.destroy(preview,victims,contents,"unlock_movement",movement.destructions)
-        if not destruction then return fail("movement_unlock",why) end
+        trace[#trace+1]="movement_destruction"
+        local destruction,why=services.destroy(preview,victims,contents,"movement",movement.destructions)
+        if not destruction then return fail("movement_destruction",why) end
         local after,err=services.preview(preview,destruction)
-        if not after then return fail("movement_unlock",err) end
+        if not after then return fail("movement_destruction",err) end
         local move_stage={consumes_turn=true,changes=movement.changes,board_shift=movement.board_shift}
         movement_prefix={consumes_turn=true,reason=movement.reason,changes={},stages={
-            {name="movement",plan=move_stage},{name="movement_unlock",plan=destruction}}}
+            {name="movement",plan=move_stage},{name="movement_destruction",plan=destruction}}}
         for _,stage in ipairs(movement_prefix.stages) do
             for _,change in ipairs(stage.plan.changes) do movement_prefix.changes[#movement_prefix.changes+1]=change end
         end
@@ -227,18 +227,29 @@ function RW_PlanTurn(world, action, services)
         end
         plan.level_traits=level_traits_from(frozen_relations)
         plan.contact_frame=frozen_rules -- Freeze declarations, re-evaluate conditions/targets.
-        for _,kind in ipairs({"sink","melt","defeat","unlock"}) do
+        local weak_new={}
+        for _,stage in ipairs(plan.stages) do
+            for _,change in ipairs(stage.plan.changes) do
+                if stage.name == "movement_destruction" and change.kind == "create" then weak_new[change.entity_id]=true
+                elseif stage.name == "conversion" then weak_new[change.entity_id]=nil end
+            end
+        end
+        for _,kind in ipairs({"sink","weak","melt","defeat","unlock"}) do
             trace[#trace+1]=kind
             local refreshed,refresh_error=services.refresh(complete,frozen_rules)
             if not refreshed then return fail(kind,refresh_error) end
             local projected,projection_error=services.project(complete,refreshed,plan.level_traits)
             if not projected then return fail(kind,projection_error) end
+            if kind == "weak" then projected.weak_new_ids=weak_new end
             local contact,contact_error=services.contact(complete,projected,kind,contents)
             if not contact then return fail(kind,contact_error) end
             local next_world,validation_error=services.preview(complete,contact)
             if not next_world then return fail(kind,validation_error) end
             plan.stages[#plan.stages+1]={name=kind,plan=contact}
             for _,change in ipairs(contact.changes) do plan.changes[#plan.changes+1]=change end
+            for _,change in ipairs(contact.changes) do
+                if change.kind == "create" then weak_new[change.entity_id]=true end
+            end
             complete=next_world
         end
         -- CRASH is checked on surviving units after destruction, against the frozen rules.
@@ -1384,7 +1395,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.3X initialized")
+    print("[RuleWorld] M9.3Y initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

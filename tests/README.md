@@ -27,7 +27,7 @@ In-game startup should report both new direction self-tests as passed and
 `pipeline atomic turn scheduler`, `Atomic create/delete, ID allocation and Undo passed`,
 `pipeline created/deleted Text rules / Undo`,
 `pipeline alternate grammar/semantics behavior / Undo`,
-`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3J initialized`.
+`pipeline custom selectors/behaviors / atomic Undo`, and `M9.3K initialized`.
 Native rendering/input still require an in-game check.
 
 The runner also loads `tests/scheduler.lua`, which checks the extracted turn
@@ -63,3 +63,8 @@ ownership, independent runtime/configuration/ID allocation/history, real rule an
 PUSH scheduling, Commit/Undo identity, invalid templates and empty levels.
 In-game startup should additionally report Level definition/runtime instance
 isolation passed. No new script mapping is needed.
+
+M9.3K adds RW_LevelTreeSelfTest and tests/level_tree.lua. The runner also exercises
+A/B/OUT through real host input callbacks: push, return, persistent re-entry,
+independent siblings, and local/empty Undo. Native manual steps are documented in
+../docs/NESTED_LEVELS.md. No additional mapping or keys are required.

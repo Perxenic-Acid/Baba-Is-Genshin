@@ -140,6 +140,7 @@ function OnStart()
         { "world",      "RW_DirectionStateSelfTest" },
         { "world",      "RW_LifecycleSelfTest" },
         { "world",      "RW_LevelInstanceSelfTest" },
+        { "world",      "RW_LevelTreeSelfTest" },
         { "movement",   "RW_DirectionMovementSelfTest" },
     }
 
@@ -720,6 +721,48 @@ function OnStart()
     end
     print("[RuleWorld] TEST PASSED: pipeline created/deleted Text rules / Undo")
 
+    -- Minimal navigation fixture: A and B instantiate the same puzzle definition.
+    -- Portals are a host interaction fixture, not new language or movement axioms.
+    local demo_definition = world_api:Invoke("RW_GetDefaultLevelDefinition")
+    local level_tree = world_api:Invoke("RW_CreateLevelTree",
+        {[demo_definition.id] = demo_definition}, demo_definition.id)
+    session = world_api:Invoke("RW_GetActiveLevel", level_tree)
+
+    local function navigation_view()
+        if #level_tree.stack == 0 then
+            return {title="MAP / " .. session.instance_id,
+                portals={{x=2,y=1,label="A"},{x=1,y=2,label="B"}}}
+        end
+        return {title="PUZZLE / " .. session.instance_id,
+            portals={{x=2,y=1,label="OUT"}}}
+    end
+
+    local function retain_session()
+        level_tree = world_api:Invoke("RW_UpdateActiveLevel", level_tree, session)
+    end
+
+    local function navigate_after_move(before)
+        local after = session.world.entities[1]
+        if not before or not after or (before.x == after.x and before.y == after.y) then return end
+        local destination, reason
+        if #level_tree.stack > 0 and after.x == 2 and after.y == 1 then
+            destination, reason = world_api:Invoke("RW_ReturnLevel", level_tree)
+        elseif #level_tree.stack == 0 then
+            local slot = after.x == 2 and after.y == 1 and "A"
+                or (after.x == 1 and after.y == 2 and "B" or nil)
+            if slot then
+                destination, reason = world_api:Invoke("RW_EnterLevel", level_tree, slot, demo_definition.id)
+            end
+        end
+        if reason then printerr("[RuleWorld] Navigation failed:", reason) end
+        if destination then
+            level_tree = destination
+            session = world_api:Invoke("RW_GetActiveLevel", level_tree)
+            print(string.format("[RuleWorld] Navigation -> %s depth=%d history=%d",
+                session.instance_id, #level_tree.stack, #session.history))
+        end
+    end
+
     local previous_rule_count = nil
     local previous_deferred_count = nil
 
@@ -744,11 +787,13 @@ function OnStart()
             "RW_Render",
             session.world,
             #session.history,
-            #effects
+            #effects,
+            navigation_view()
         )
     end
 
     local function move(dx, dy)
+        local before = session.world.entities[1]
         local action = {
             type = "move",
             dx = dx,
@@ -821,7 +866,9 @@ function OnStart()
             )
         end
 
-        -- This evaluates the NEW world.
+        retain_session()
+        navigate_after_move(before)
+        -- This evaluates the NEW active world.
         render()
     end
 
@@ -846,6 +893,7 @@ function OnStart()
         end
 
         session = next_session
+        retain_session()
 
         print(string.format(
             "[RuleWorld] Undo -> history=%d",
@@ -882,5 +930,5 @@ function OnStart()
 
     render()
 
-    print("[RuleWorld] M9.3J initialized")
+    print("[RuleWorld] M9.3K initialized")
 end

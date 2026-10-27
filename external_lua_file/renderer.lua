@@ -345,7 +345,7 @@ local function draw_entities(world)
     end
 end
 
-function RW_Render(world, history_depth, active_effects)
+function RW_Render(world, history_depth, active_effects, navigation)
     if not ensure_host() then
         return false
     end
@@ -354,11 +354,25 @@ function RW_Render(world, history_depth, active_effects)
         return false
     end
 
+    -- Repaint every cell so same-sized instance switches clear old portal labels.
+    for _, cell in ipairs(cells) do
+        cell.text = ""
+        cell.bgColor = Color(43, 55, 75, 255)
+    end
+    for _, portal in ipairs(navigation and navigation.portals or {}) do
+        local cell = cells[(portal.y-1)*world.width+portal.x]
+        if cell then
+            cell.text = portal.label
+            cell.fontSize = 18
+            cell.fontColor = Color(255, 255, 255, 255)
+            cell.bgColor = Color(112, 70, 145, 255)
+        end
+    end
     draw_entities(world)
 
     if status_text then
         status_text.text = string.format(
-            "RuleWorld M8\n" ..
+            (navigation and navigation.title or "RuleWorld") .. "\n" ..
             "Turns: %d    Active effects: %d\n" ..
             "WASD: Move    Z: Undo",
             history_depth or 0,

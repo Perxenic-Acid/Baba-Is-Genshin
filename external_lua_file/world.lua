@@ -914,3 +914,114 @@ function RW_SelfTest()
 
     return true, "World invariants passed"
 end
+
+-- M9.3K: persistent nested instances, independent of movement or presentation.
+-- Tree snapshots are immutable by convention, as are world/session snapshots.
+local function copy_map(source)
+    local result = {}
+    for key, value in pairs(source) do result[key] = value end
+    return result
+end
+
+function RW_CreateLevelTree(definitions, root_definition_id)
+    if type(definitions) ~= "table" or not plain_data(definitions) then
+        return nil, "invalid_definitions"
+    end
+    for id, definition in pairs(definitions) do
+        if type(id) ~= "string" or not validate_definition(definition)
+            or definition.id ~= id then return nil, "invalid_definitions" end
+    end
+    local definition = definitions[root_definition_id]
+    if not definition then return nil, "unknown_definition" end
+    local root = RW_InstantiateLevel(definition, "instance:1")
+    return {definitions=clone(definitions), instances={[root.instance_id]=root},
+        children={}, active_id=root.instance_id, stack={}, next_instance_id=2}
+end
+
+function RW_GetActiveLevel(tree)
+    return tree.instances[tree.active_id]
+end
+
+-- Only replace the active session; sibling and suspended parent states survive.
+function RW_UpdateActiveLevel(tree, session)
+    local current = RW_GetActiveLevel(tree)
+    if type(session) ~= "table" or session.instance_id ~= tree.active_id
+        or session.definition_id ~= current.definition_id then
+        return nil, "instance_identity_mismatch"
+    end
+    local next_tree = copy_map(tree)
+    next_tree.instances = copy_map(tree.instances)
+    next_tree.instances[tree.active_id] = session
+    return next_tree
+end
+
+-- Slot identity belongs to a parent INSTANCE. Same slot under two parents differs.
+-- Definition is checked again on re-entry; a slot cannot silently change meaning.
+function RW_EnterLevel(tree, slot, definition_id)
+    if type(slot) ~= "string" or slot == "" then return nil, "invalid_slot" end
+    if type(definition_id) ~= "string" or not tree.definitions[definition_id] then
+        return nil, "unknown_definition"
+    end
+    local existing = (tree.children[tree.active_id] or {})[slot]
+    if existing and tree.instances[existing].definition_id ~= definition_id then
+        return nil, "slot_definition_mismatch"
+    end
+    if not existing and (not valid_id(tree.next_instance_id)
+        or tree.next_instance_id >= MAX_ID) then return nil, "instance_id_exhausted" end
+    local result = copy_map(tree)
+    result.stack = copy_map(tree.stack)
+    result.stack[#result.stack+1] = tree.active_id
+    if existing then
+        result.active_id = existing
+    else
+        local id = "instance:" .. tostring(tree.next_instance_id)
+        result.instances = copy_map(tree.instances)
+        result.instances[id] = RW_InstantiateLevel(tree.definitions[definition_id], id)
+        result.children = copy_map(tree.children)
+        result.children[tree.active_id] = copy_map(tree.children[tree.active_id] or {})
+        result.children[tree.active_id][slot] = id
+        result.active_id = id
+        result.next_instance_id = tree.next_instance_id + 1
+    end
+    return result
+end
+
+function RW_ReturnLevel(tree)
+    if #tree.stack == 0 then return nil, "at_root" end
+    local result = copy_map(tree)
+    result.stack = copy_map(tree.stack)
+    result.active_id = result.stack[#result.stack]
+    result.stack[#result.stack] = nil
+    return result
+end
+
+function RW_LevelTreeSelfTest()
+    local d = RW_GetDefaultLevelDefinition()
+    local root = RW_CreateLevelTree({[d.id]=d}, d.id)
+    local a = RW_EnterLevel(root, "A", d.id)
+    local session = RW_GetActiveLevel(a)
+    local moved, accepted = RW_Commit(session, {consumes_turn=true, changes={
+        {kind="direction",entity_id=1,from="None",to="Left"}}})
+    if not accepted.accepted then return false, "Child Commit failed" end
+    a = RW_UpdateActiveLevel(a, moved)
+    local returned = RW_ReturnLevel(a)
+    local b = RW_EnterLevel(returned, "B", d.id)
+    local again = RW_EnterLevel(RW_ReturnLevel(b), "A", d.id)
+    local nested = RW_EnterLevel(again, "A", d.id)
+    if RW_GetActiveLevel(again) ~= moved or #moved.history ~= 1
+        or RW_GetActiveLevel(b).world.entities[1].direction ~= "None"
+        or RW_GetActiveLevel(nested).instance_id == moved.instance_id
+        or RW_GetActiveLevel(root).world.entities[1].direction ~= "None"
+        or RW_GetActiveLevel(RW_ReturnLevel(nested)) ~= moved
+        or #root.stack ~= 0 or root.next_instance_id ~= 2
+        or RW_ReturnLevel(root) ~= nil then
+        return false, "Nested state retention or parent/slot isolation failed"
+    end
+    local undone = RW_Undo(RW_GetActiveLevel(again))
+    local restored = RW_UpdateActiveLevel(again, undone)
+    if RW_GetActiveLevel(restored).world ~= session.world
+        or RW_GetActiveLevel(a).world.entities[1].direction ~= "Left" then
+        return false, "Local child Undo mutated retained snapshot"
+    end
+    return true, "Nested enter/return, retained instances and local Undo passed"
+end

@@ -43,6 +43,12 @@ for _, control in ipairs(controls) do if control.name then views[control.name] =
 assert(views.RW_Entity_1.text == "FLAG" and views.RW_Entity_1.bgColor[1] ~= 238)
 assert(views.RW_Entity_2.bgColor[1] == 238)
 assert(views.RW_Entity_3.text == "LEVEL?" and views.RW_Entity_4.text == "A:crate")
+typed.entities[5]={id=5,kind="object",class="object",archetype="skull",x=1,y=1,behaviors={defeat=true}}
+typed.entities[6]={id=6,kind="object",class="object",archetype="water",x=2,y=2,behaviors={sink=true}}
+assert(RW_Render(typed,0,1))
+for _, control in ipairs(controls) do if control.name then views[control.name] = control end end
+assert(views.RW_Entity_5.text == "S" and views.RW_Entity_5.bgColor[1] == 170)
+assert(views.RW_Entity_6.text == "W" and views.RW_Entity_6.bgColor[3] == 185)
 local before_x,before_y = views.RW_Entity_1.px,views.RW_Entity_1.py
 local cell_x,cell_y = controls[1].px,controls[1].py
 typed.board_offset = {x=1,y=2,direction="Right"}

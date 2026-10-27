@@ -9,6 +9,24 @@ local function level_traits_from(conversions)
     return traits
 end
 
+-- Contact destruction and HAS share one flat phase: births use the pre-delete
+-- snapshot, and IDs are allocated only in the returned plan.
+function RW_PlanContactPhase(world, effective, kind, contents, services)
+    local ids,why=services.victims(effective,kind)
+    if not ids then return nil,why end
+    local specifications,err=services.births(world,ids,contents)
+    if not specifications then return nil,err end
+    local removal,remove_error=services.delete(world,ids)
+    if not removal then return nil,remove_error end
+    local creation,create_error=services.create(world,specifications)
+    if not creation then return nil,create_error end
+    local plan={consumes_turn=true,changes={},id_allocation=creation.id_allocation,events={}}
+    for _,change in ipairs(removal.changes) do plan.changes[#plan.changes+1]=change end
+    for _,change in ipairs(creation.changes) do plan.changes[#plan.changes+1]=change end
+    for _,id in ipairs(ids) do plan.events[#plan.events+1]={kind="destroy",cause=kind,entity_id=id} end
+    return plan
+end
+
 -- M9.3F: host-independent turn planning. Services adapt mapped scripts;
 -- no UI calls, logging, session ownership or Commit occur in this function.
 -- Services must treat world/context inputs as read-only.
@@ -58,6 +76,7 @@ function RW_PlanTurn(world, action, services)
         if conversion.op == "transform_level" then level_targets[conversion.target_type] = true
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" then level_traits[#level_traits+1] = conversion.trait
+        elseif conversion.op == "has" then -- Consumed by the destruction phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     local target_type
@@ -88,6 +107,42 @@ function RW_PlanTurn(world, action, services)
     trace[#trace + 1] = "preview_complete"
     local complete, complete_error, phase = services.preview(world, plan)
     if not complete then return fail("preview_complete", complete_error,phase) end
+    if services.contact ~= nil or services.refresh ~= nil then
+        if type(services.contact) ~= "function" or type(services.refresh) ~= "function" then
+            return fail("contacts","invalid_contact_services")
+        end
+        trace[#trace+1]="contact_rules"
+        local frozen_effects,why,frozen_relations,frozen_rules=services.evaluate(complete)
+        if not frozen_effects then return fail("contact_rules",why) end
+        if type(frozen_rules) ~= "table" then return fail("contact_rules","missing_contact_rule_frame") end
+        local contents={}
+        for _,relation in ipairs(frozen_relations or {}) do
+            if relation.op == "has" then contents[#contents+1]=relation end
+        end
+        plan.level_traits=level_traits_from(frozen_relations)
+        plan.contact_frame=frozen_rules -- Freeze declarations, re-evaluate conditions/targets.
+        for _,kind in ipairs({"sink","defeat"}) do
+            trace[#trace+1]=kind
+            local refreshed,refresh_error=services.refresh(complete,frozen_rules)
+            if not refreshed then return fail(kind,refresh_error) end
+            local projected,projection_error=services.project(complete,refreshed,plan.level_traits)
+            if not projected then return fail(kind,projection_error) end
+            local contact,contact_error=services.contact(complete,projected,kind,contents)
+            if not contact then return fail(kind,contact_error) end
+            local next_world,validation_error=services.preview(complete,contact)
+            if not next_world then return fail(kind,validation_error) end
+            plan.stages[#plan.stages+1]={name=kind,plan=contact}
+            for _,change in ipairs(contact.changes) do plan.changes[#plan.changes+1]=change end
+            complete=next_world
+        end
+        trace[#trace+1]="preview_contacts"
+        local final,why,phase=services.preview(world,plan)
+        if not final then return fail("preview_contacts",why,phase) end
+    else
+        for _,relation in ipairs(conversions or {}) do
+            if relation.op == "has" then return fail("contacts","missing_contact_services") end
+        end
+    end
     return plan, nil, trace
 end
 
@@ -154,9 +209,17 @@ function RW_PlanLevelAction(tree, action, services)
     if not accepted.accepted then return fail(accepted.reason) end
     local next_tree, update_error = services.update(tree,completed)
     if not next_tree then return fail(update_error) end
-    local post_effects, post_error, post_conversions = services.evaluate(completed.world)
+    local post_effects, post_error, post_traits
+    if turn.contact_frame then
+        post_effects,post_error=services.refresh(completed.world,turn.contact_frame)
+        post_traits=turn.level_traits
+    else
+        local commands
+        post_effects,post_error,commands=services.evaluate(completed.world)
+        post_traits=level_traits_from(commands)
+    end
     if not post_effects then return fail(post_error) end
-    local post, projection_error = services.project(completed.world,post_effects,level_traits_from(post_conversions))
+    local post, projection_error = services.project(completed.world,post_effects,post_traits)
     if not post then return fail(projection_error) end
     local level_outcome, outcome_error = services.level_outcome(post,turn.level_traits)
     if outcome_error then return fail(outcome_error) end
@@ -648,15 +711,15 @@ function OnStart()
             return nil
         end
 
-        return effects, #ast, #deferred, conversions
+        return effects, #ast, #deferred, conversions, generated
     end
 
     -- Mapped script calls stay in the host adapter, outside the scheduler.
     local turn_services = {
         evaluate = function(world_state)
-            local effects, rule_count, deferred_count, conversions = evaluate(world_state)
+            local effects, rule_count, deferred_count, conversions, generated = evaluate(world_state)
             if not effects then return nil, "evaluation_failed" end
-            return effects, nil, conversions
+            return effects, nil, conversions, generated
         end,
         project = function(world_state, effects, traits)
             return properties_api:Invoke("RW_ProjectWorld", world_state, effects, traits)
@@ -671,6 +734,40 @@ function OnStart()
             return rules_api:Invoke("RW_PlanConversions", world_state, conversions)
         end
     }
+
+    local contact_services = {
+        victims=function(world,kind) return properties_api:Invoke("RW_ResolveContactVictims",world,kind) end,
+        births=function(world,ids,contents) return rules_api:Invoke("RW_PlanHasBirths",world,ids,contents) end,
+        delete=function(world,ids) return world_api:Invoke("RW_PlanDelete",world,ids) end,
+        create=function(world,specifications) return world_api:Invoke("RW_PlanCreate",world,specifications) end
+    }
+    turn_services.contact=function(world,effective,kind,contents)
+        return RW_PlanContactPhase(world,effective,kind,contents,contact_services)
+    end
+    turn_services.refresh=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end
+
+    do
+        local definitions=world_api:Invoke("RW_GetNavigationDefinitions")
+        for _,kind in ipairs({"defeat","sink","has"}) do
+            local initial=world_api:Invoke("RW_InstantiateLevel",definitions["navigation.contact_" .. kind],"probe:" .. kind)
+            local turn,why=RW_PlanTurn(initial.world,{type="move",dx=1,dy=0},turn_services)
+            if not turn then printerr("[RuleWorld] TEST FAILED: contact planning",kind,why and why.reason); return end
+            local completed,result=world_api:Invoke("RW_Commit",initial,turn)
+            local rocks=0
+            for _,entity in pairs(completed.world.entities) do if entity.archetype == "rock" then rocks=rocks+1 end end
+            if not result.accepted or #completed.history ~= 1
+                or (kind == "defeat" and (completed.world.entities[1] or not completed.world.entities[15]))
+                or (kind ~= "defeat" and (completed.world.entities[4] or completed.world.entities[15]))
+                or (kind == "has" and rocks ~= 2) then
+                printerr("[RuleWorld] TEST FAILED: contact outcome",kind); return
+            end
+            local restored=world_api:Invoke("RW_Undo",completed)
+            if restored.world.next_entity_id ~= initial.world.next_entity_id or not restored.world.entities[1] then
+                printerr("[RuleWorld] TEST FAILED: contact Undo",kind); return
+            end
+        end
+        print("[RuleWorld] TEST PASSED: pipeline DEFEAT / SINK / repeated HAS / atomic Undo")
+    end
 
     -- Two physical languages, one semantic IR and one atomic turn behavior.
     local function same_data(left, right)
@@ -711,7 +808,9 @@ function OnStart()
         local plan_a = RW_PlanTurn(standard.world, action, turn_services)
         local plan_b = RW_PlanTurn(alternate.world, action, turn_services)
         if not effects_a or not effects_b or not same_data(effects_a, effects_b)
-            or not plan_a or not plan_b or not same_data(plan_a, plan_b) then
+            or not plan_a or not plan_b or not same_data(plan_a.stages, plan_b.stages)
+            or plan_a.reason ~= plan_b.reason or plan_a.level_transform ~= plan_b.level_transform
+            or not same_data(plan_a.level_traits,plan_b.level_traits) then
             printerr("[RuleWorld] TEST FAILED: alternate language behavior", case[1])
             return
         end
@@ -1108,5 +1207,5 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3Q initialized")
+    print("[RuleWorld] M9.3R initialized")
 end

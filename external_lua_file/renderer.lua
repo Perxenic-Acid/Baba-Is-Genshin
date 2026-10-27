@@ -196,6 +196,9 @@ local function get_label(entity)
     if entity.archetype == "cursor" then return "SEL" end
     if entity.archetype == "line" then return "." end
     if entity.archetype == "flag" then return "FLAG" end
+    if entity.archetype == "skull" then return "SKULL" end
+    if entity.archetype == "water" then return "WATER" end
+    if entity.archetype == "rock" then return "ROCK" end
     if entity.class == "text" then
         return entity.text and entity.text.name or "?"
     end
@@ -209,6 +212,8 @@ end
 
 local function get_colors(entity)
     local capabilities = entity.behaviors or {}
+    if capabilities.defeat then return Color(170,65,80,255),Color(255,255,255,255) end
+    if capabilities.sink then return Color(45,130,185,255),Color(255,255,255,255) end
     if capabilities.win then return Color(238,206,88,255), Color(30,24,10,255) end
     if capabilities.select then return Color(220,220,230,255), Color(20,20,30,255) end
     if entity.level_link then

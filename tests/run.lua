@@ -153,6 +153,36 @@ assert(not RW_ChooseSelectedLevel(999) and navigation.choice)
 assert(RW_ChooseSelectedLevel(44)) -- Click/API choice of second overlapping block.
 assert(not navigation.choice and rendered.entities[1].x == 2)
 print("PASS: modal choice open/cycle/cancel/explicit target and LEVEL IS YOU scroll/Undo")
+while history_depth > 0 do listeners.undo() end
+listeners.right(); listeners.right(); listeners.up(); listeners.confirm() -- DF
+local df_depth=history_depth
+listeners.right()
+assert(not rendered.entities[1] and rendered.entities[15].archetype == "skull")
+assert(navigation.title:find("PUZZLE") and not navigation.title:find("DEFEAT"))
+listeners.confirm() -- SELECT remains able to return after the last YOU dies.
+assert(navigation.title:find("MAP"))
+listeners.undo()
+assert(navigation.title:find("PUZZLE") and not rendered.entities[1])
+listeners.undo()
+assert(rendered.entities[1].x == 2 and history_depth == df_depth)
+while history_depth > 0 do listeners.undo() end
+for _=1,3 do listeners.right() end
+listeners.up(); listeners.confirm(); listeners.right() -- SK
+assert(rendered.entities[1].x == 3 and not rendered.entities[4] and not rendered.entities[15])
+listeners.undo()
+assert(rendered.entities[4].x == 3 and rendered.entities[15].archetype == "water")
+while history_depth > 0 do listeners.undo() end
+listeners.right(); listeners.right(); listeners.confirm() -- HAS
+local frontier=rendered.next_entity_id
+listeners.right()
+assert(not rendered.entities[4] and not rendered.entities[15] and rendered.next_entity_id == frontier+2)
+assert(rendered.entities[frontier].archetype == "rock" and rendered.entities[frontier+1].behaviors.control)
+listeners.right()
+assert(rendered.entities[frontier].x == 5 and rendered.entities[frontier+1].x == 5)
+listeners.undo(); listeners.undo()
+assert(rendered.entities[4].x == 3 and rendered.entities[15] and rendered.next_entity_id == frontier)
+assert(not rendered.entities[frontier])
+print("PASS: native F fixtures DEFEAT/SINK/HAS, new YOU control, last-YOU death/SELECT return and whole-tree Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -176,3 +206,5 @@ dofile("tests/conversion_split.lua")
 dofile("tests/rule_multiplicity.lua")
 
 dofile("tests/stage_transactions.lua")
+
+dofile("tests/contact_words.lua")

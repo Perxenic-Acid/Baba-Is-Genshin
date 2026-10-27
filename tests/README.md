@@ -106,3 +106,10 @@ tests/reference_multiplicity.lua 可独立运行以对照本机原版源码。
 
 `tests/stage_transactions.lua` 验证顺序阶段的生命周期、规则重求值、错误阶段、
 晚失败回滚、分配器与单次 Undo；原有宿主移动/转换回归也通过阶段计划执行。
+
+## M9.3R
+
+`tests/contact_words.lua` 使用实际物理词句与阶段调度器验证 DEFEAT/SINK/HAS，
+包括冻结接触规则帧、重复/48 产物、同格方向/关卡指向、Text/Level 内容物、
+新生 YOU、胜负顺序、故障注入和撤销。`tests/run.lua` 验证三个新入口的 F 回调。
+真机路线见 `docs/CONTACT_WORDS.md`。

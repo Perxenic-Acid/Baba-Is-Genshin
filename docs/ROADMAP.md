@@ -93,7 +93,7 @@ instance_id。原有无参 CreateSession 保持兼容。定义数据、实例配
 ## 后续顺序
 
 1. 回合内顺序阶段事务（M9.3Q 已完成），支持本回合新对象被后续阶段处理。
-2. 接触/销毁/出生最小闭环，以普通 DEFEAT、SINK/HAS 驱动实现。
+2. 接触/销毁/出生最小闭环：普通 DEFEAT、SINK/HAS 已在 M9.3R 完成。
 3. 主体上下文条件、否定规则、主体 AND，与对应词一起推进。
 4. 自主移动、随机状态、特殊主语、多目标 LEVEL 等按词的需求补齐。
 5. 地图揭示/通行/进度和长期保存单独建设，不阻塞第一批普通词。
@@ -132,3 +132,10 @@ tests/reference_multiplicity.lua 可独立运行以对照本机原版源码。
 Commit/Undo。允许后续阶段修改本回合新对象，晚失败整步拒绝并报告 phase。
 启动自测与 tests/stage_transactions.lua 通过；不改变当前地图的预期玩法。
 详见 PHASE_TRANSACTIONS.md。
+
+## M9.3R
+
+普通实体 DEFEAT、SINK 与 HAS 已接入。SINK 先于 DEFEAT，接触规则帧在本轮固定，
+重复 HAS 逐条出生，销毁/生成/移动共享一次原子 Undo。新增 DF/SK/HAS 三个入口，
+启动自测、F 宿主管线、48 产物和失败回滚等离线回归通过。见 CONTACT_WORDS.md。
+下一步优先补逐实体条件与否定/主体 AND，之后按词推进自主移动等剩余基础。

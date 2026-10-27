@@ -33,3 +33,9 @@
 - Scheduled turns use sequential stages. Top-level changes is a checked diagnostic
   summary, never flatten it into a simultaneous plan. Child preconditions refer
   to the previous phase snapshot. See docs/PHASE_TRANSACTIONS.md.
+
+- Ordinary contacts use a frozen post-conversion rule frame: SINK then DEFEAT,
+  re-evaluating conditions and resolving targets for births/deletions. Do not recompile deleted
+  Text halfway through these phases. HAS is triggered by destruction, not IS
+  conversion; duplicate HAS instances must generate duplicate products.
+  See docs/CONTACT_WORDS.md for source references, limits and manual routes.

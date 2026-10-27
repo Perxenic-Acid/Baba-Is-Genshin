@@ -322,7 +322,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform"}}
+local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform"}, has = {noun="contain"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -336,7 +336,7 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and operation == "transform")) then return false end
+                or (category == "noun" and (operation == "transform" or operation == "contain"))) then return false end
         end
     end
     return true
@@ -359,7 +359,7 @@ function RW_RegisterSemantics(registry, name, specification)
 end
 
 -- M9.3C: typed Rule AST -> property IR + conversion declarations.
--- Default IS semantics execute positive properties and simple conversions.
+-- Default IS executes positive properties/conversions; HAS declares contents.
 -- A level registry may assign those capabilities to a different relation ID.
 function RW_LowerRuleAST(ast_rules, registry)
     if type(ast_rules) ~= "table" then
@@ -414,7 +414,22 @@ function RW_LowerRuleAST(ast_rules, registry)
 
         local level_subject = subject.tag == "noun" and type(subject_type) == "table"
             and subject_type.tag == "level" and ast.when.op == "always"
-        if level_subject and semantics and semantics.property == "grant_trait"
+        local has_subject
+        if simple_subject then has_subject={kind="archetype",value=subject_type.name}
+        elseif level_subject then has_subject={kind="archetype",value=subject_type.block_type or "level_block"}
+        elseif subject.tag == "special" and subject.name == "text" then has_subject={kind="class",value="text"} end
+        local has_product
+        if object.tag == "noun" and type(target_type) == "table" then
+            if target_type.tag == "object" and type(target_type.name) == "string" and target_type.name ~= "" then
+                has_product={kind="object",archetype=target_type.name}
+            elseif target_type.tag == "level" then has_product={kind="object",archetype=target_type.block_type or "level_block"} end
+        elseif object.tag == "special" and object.name == "text" then has_product={kind="text"} end
+        if semantics and semantics.noun == "contain" and has_subject and has_product and ast.when.op == "always" then
+            conversions[#conversions+1]={op="has",target=has_subject,product=has_product,source=ast.source}
+        elseif subject.tag == "special" and subject.name == "text" and semantics and semantics.property == "grant_trait"
+            and object.tag == "property" and type(object.name) == "string" and object.name ~= "" then
+            generated[#generated+1]={when=ast.when,effects={{op="grant_trait",target={kind="class",value="text"},trait=object.name}},source=ast.source}
+        elseif level_subject and semantics and semantics.property == "grant_trait"
             and object.tag == "property" and type(object.name) == "string" and object.name ~= "" then
             conversions[#conversions+1] = {op="level_trait",trait=object.name,source=ast.source}
             generated[#generated+1] = {when=ast.when,effects={{op="grant_trait",
@@ -595,8 +610,8 @@ function RW_ASTLoweringSelfTest()
     })
 
     if not executable or not deferred or not conversions
-        or #executable ~= 1 or #deferred ~= 3
-        or #conversions ~= 2 then
+        or #executable ~= 1 or #deferred ~= 2
+        or #conversions ~= 3 then
         return false, "Executable/deferred partition failed"
     end
 
@@ -611,13 +626,13 @@ function RW_ASTLoweringSelfTest()
     end
 
     -- Unsupported syntax is preserved, not executed.
-    if deferred[1] ~= has
-        or deferred[2] ~= negation
-        or deferred[3] ~= special
+    if deferred[1] ~= negation
+        or deferred[2] ~= special
         or conversions[1].op ~= "transform"
         or conversions[1].source_type ~= "crate"
         or conversions[1].target_type ~= "rock"
-        or conversions[2].op ~= "protect_transform" then
+        or conversions[2].op ~= "has"
+        or conversions[3].op ~= "protect_transform" then
         return false, "Deferred AST provenance lost"
     end
 
@@ -658,7 +673,7 @@ function RW_ASTLoweringSelfTest()
         return false, "IS NOUN conversion planning failed"
     end
 
-    local guarded = RW_PlanConversions(test_world, conversions)
+    local guarded = RW_PlanConversions(test_world, {conversions[1],conversions[3]})
 
     if not guarded or #guarded ~= 0 then
         return false, "IS identity protection failed"
@@ -690,7 +705,7 @@ function RW_ASTLoweringSelfTest()
         {
             conversions[1],
             { op = "transform", source_type = "crate", target_type = "avatar" },
-            conversions[2]
+            conversions[3]
         }
     )
 
@@ -859,4 +874,51 @@ function RW_RulesSelfTest()
     end
 
     return true, "Rule IR evaluation passed"
+end
+
+-- HAS products are planned from the destruction snapshot, never from conversion.
+-- Repeated relations remain repeated products. Newly born objects are not destroyed
+-- recursively by this helper; later contact phases decide what happens to them.
+function RW_PlanHasBirths(world, victims, relations)
+    if type(world) ~= "table" or type(world.entities) ~= "table" or not dense_list(victims)
+        or not dense_list(relations) then return nil,"invalid_has_input" end
+    for _,relation in ipairs(relations) do
+        if type(relation) ~= "table" or relation.op ~= "has" or not valid_selector(relation.target,world)
+            or type(relation.product) ~= "table" or (relation.product.kind ~= "object" and relation.product.kind ~= "text")
+            or (relation.product.kind == "object" and (type(relation.product.archetype) ~= "string" or relation.product.archetype == "")) then
+            return nil,"invalid_has_relation"
+        end
+    end
+    local function text_name(entity)
+        if entity.class == "text" then return "TEXT" end
+        local names={}
+        for name,value in pairs((world.language or {}).nouns or {}) do
+            if value == entity.archetype or (type(value) == "table" and
+                ((value.tag == "object" and value.name == entity.archetype) or
+                 (value.tag == "level" and (value.block_type or "level_block") == entity.archetype))) then
+                names[#names+1]=name
+            end
+        end
+        table.sort(names)
+        return names[1] or string.upper(entity.archetype or "OBJECT")
+    end
+    local specifications, seen = {}, {}
+    for _,id in ipairs(victims) do
+        local entity=world.entities[id]
+        if not entity or seen[id] then return nil,"invalid_has_victim" end
+        seen[id]=true
+        for _,relation in ipairs(relations) do
+            if matches(entity,relation.target,world) then
+                local product={kind="object",class=relation.product.kind == "text" and "text" or "object",
+                    x=entity.x,y=entity.y,direction=entity.direction}
+                if product.class == "text" then product.text={name=text_name(entity)}
+                else
+                    product.archetype=relation.product.archetype
+                    product.level_link=query_clone(entity.level_link)
+                end
+                specifications[#specifications+1]=product
+            end
+        end
+    end
+    return specifications
 end

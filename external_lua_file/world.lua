@@ -483,7 +483,7 @@ local function default_world()
                 -- New typed AST vocabulary. The legacy copula
                 -- remains until its compiler is retired.
                 verbs = {
-                    IS = "is"
+                    IS = "is", HAS = "has"
                 },
 
                 copulas = {
@@ -492,8 +492,10 @@ local function default_world()
 
                 properties = {
                     PUSH = "pushable",
-                    YOU = "you"
-                }
+                    YOU = "you", DEFEAT = "defeat", SINK = "sink"
+                },
+                specials = {TEXT="text"},
+                operators = {AND="and"}
             }
     }
 end
@@ -1321,5 +1323,38 @@ function RW_GetNavigationDefinitions()
     end
     definitions["navigation.split"] = {id="navigation.split",initial_world=split}
     portal(root,46,6,1,"SPL","navigation.split")
+    local function contact_fixture(kind)
+        local world=clone(puzzle)
+        world.entities[1].x,world.entities[1].y=2,3
+        world.entities[2],world.entities[3],world.entities[4],world.entities[5],world.entities[15]=nil,nil,nil,nil,nil
+        world.language.nouns.ROCK="rock"
+        world.language.nouns.SKULL="skull"
+        world.language.nouns.WATER="water"
+        local function sentence(words,y)
+            for offset,word in ipairs(words) do
+                local id=world.next_entity_id
+                world.entities[id]={id=id,kind="object",class="text",direction="None",x=offset,y=y,text={name=word}}
+                world.next_entity_id=id+1
+            end
+        end
+        if kind == "defeat" then
+            object(world,15,"skull",3,3)
+            sentence({"SKULL","IS","DEFEAT"},7)
+        else
+            object(world,4,"crate",3,3)
+            object(world,15,"water",4,3)
+            sentence({"WATER","IS","SINK"},7)
+            if kind == "has" then
+                sentence({"CRATE","HAS","ROCK","AND","ROCK"},8)
+                sentence({"ROCK","IS","YOU"},9)
+            end
+        end
+        return world
+    end
+    for _,case in ipairs({{47,4,1,"DF","defeat"},{48,5,1,"SK","sink"},{49,4,2,"HAS","has"}}) do
+        local id="navigation.contact_" .. case[5]
+        definitions[id]={id=id,initial_world=contact_fixture(case[5])}
+        portal(root,case[1],case[2],case[3],case[4],id)
+    end
     return definitions, "navigation.root"
 end

@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    win = {win = true}, defeat = {defeat = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -36,7 +36,7 @@ local function valid_behaviors(registry)
         for capability, enabled in pairs(spec) do
             if (capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
                     and capability ~= "select" and capability ~= "select_path" and capability ~= "win"
-                    and capability ~= "defeat")
+                    and capability ~= "defeat" and capability ~= "sink")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -180,4 +180,48 @@ function RW_ResolveLevelPropertyOutcome(world, traits)
         if capabilities.defeat then return "defeat" end
     end
     return nil
+end
+
+-- Ordered contacts on a rule-projected snapshot. Identity is distinct from type.
+function RW_ResolveContactVictims(world, kind)
+    if type(world) ~= "table" or type(world.entities) ~= "table" then return nil,"invalid_contact_world" end
+    if kind ~= "sink" and kind ~= "defeat" then return nil,"invalid_contact_kind" end
+    local ids, removed = {}, {}
+    for id,entity in pairs(world.entities) do
+        if type(id) ~= "number" or id % 1 ~= 0 or id < 1
+            or type(entity) ~= "table" or entity.id ~= id or type(entity.behaviors) ~= "table" then
+            return nil,"unprojected_contact_entity"
+        end
+        ids[#ids+1]=id
+    end
+    table.sort(ids)
+    local function overlap(a,b) return a.x == b.x and a.y == b.y end
+    if kind == "sink" then
+        for _,id in ipairs(ids) do
+            local source=world.entities[id]
+            if source.behaviors.sink and not removed[id] then
+                local sunk=false
+                for _,other_id in ipairs(ids) do
+                    if other_id ~= id and not removed[other_id] and overlap(source,world.entities[other_id]) then
+                        removed[other_id]=true
+                        sunk=true
+                    end
+                end
+                if sunk then removed[id]=true end
+            end
+        end
+    else
+        for _,id in ipairs(ids) do
+            local actor=world.entities[id]
+            if actor.behaviors.control then
+                for _,other_id in ipairs(ids) do
+                    if other_id ~= id and world.entities[other_id].behaviors.defeat
+                        and overlap(actor,world.entities[other_id]) then removed[id]=true; break end
+                end
+            end
+        end
+    end
+    local victims={}
+    for _,id in ipairs(ids) do if removed[id] then victims[#victims+1]=id end end
+    return victims
 end

@@ -14,7 +14,7 @@ M9.3Q 补齐回合内多阶段快照，在不增加历史帧的情况下允许�
 
 | 优先级 | 缺口 | 原版参考 | 后续落地方式 |
 | --- | --- | --- | --- |
-| 1 | 接触效果与销毁/出生原因、同批次删除、HAS 内容物 | blocks.lua 的 block/handledels；tools.lua 的 handleinside/delete/inside | 接触规划产生删除和出生阶段；先实现普通对象 DEFEAT，再 SINK/HAS，逐词核对顺序 |
+| 1 | 接触效果与销毁/出生原因、同批次删除、HAS 内容物 | blocks.lua 的 block/handledels；tools.lua 的 handleinside/delete/inside | M9.3R 已实现普通 DEFEAT/SINK/HAS 与冻结接触规则帧；SAFE/FLOAT 等过滤随词扩展 |
 | 2 | 实体上下文条件、否定效果与冲突裁决 | conditions.lua 的 testcond/condlist；rules.lua 的 postrules | 当前条件只支持全局布尔/重叠；补每个主体求值，接 ON/NEAR 与 NOT，不能用全局命中替代逐实体条件 |
 | 3 | 语法覆盖 | rules.lua 的 docode/calculatesentences | 目前主要单主体、RHS AND；补主体 AND、条件短语等，继续保留物理 ID 与重复次数 |
 | 4 | 自主移动、多轮意图与冲突顺序 | movement.lua 的 movecommand/check、blocks.lua 的 moveblock/fallblock | 跟随 MOVE/PULL/SHIFT 等词逐项扩展，不能把所有动作直接当 YOU 输入 |
@@ -29,6 +29,5 @@ M9.3Q 补齐回合内多阶段快照，在不增加历史帧的情况下允许�
 
 ## 下一步
 
-不预建覆盖全部词的万能框架。先利用顺序阶段事务实现“接触规划 → 删除 →
-出生”的最小闭环，再用普通 DEFEAT、SINK/HAS 驱动其测试；条件、语法与
+不预建覆盖全部词的万能框架。“接触规划 → 删除/出生”的最小闭环及普通 DEFEAT、SINK/HAS 已在 M9.3R 落地；条件、语法与
 自主移动分别随对应词扩展。每次明确已实现与 deferred，保持八个映射脚本。

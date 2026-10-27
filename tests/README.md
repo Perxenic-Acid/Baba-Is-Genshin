@@ -113,3 +113,9 @@ tests/reference_multiplicity.lua 可独立运行以对照本机原版源码。
 包括冻结接触规则帧、重复/48 产物、同格方向/关卡指向、Text/Level 内容物、
 新生 YOU、胜负顺序、故障注入和撤销。`tests/run.lua` 验证三个新入口的 F 回调。
 真机路线见 `docs/CONTACT_WORDS.md`。
+
+## M9.3S
+
+`tests/text_word.lua` 覆盖 IS TEXT 类转换、方向/ID/指向、重复混合转换、WORD 的
+主宾语读取/来源撤回、右侧 NOT、循环原子拒绝及 Undo。`tests/run.lua` 用实际输入
+走 TXT 自由关卡的 WORD→TEXT 推动路线。手测地图与当前范围见 docs/TEXT_WORD.md。

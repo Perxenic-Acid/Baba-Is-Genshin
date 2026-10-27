@@ -14,7 +14,7 @@ end
 
 -- World -> ordered spatial lines
 -- No knowledge of vocabulary or grammar.
-function RW_ReadLines(world)
+function RW_ReadLines(world, word_tokens)
     if type(world) ~= "table"
         or type(world.entities) ~= "table"
         or not is_integer(world.width)
@@ -24,11 +24,17 @@ function RW_ReadLines(world)
         return nil, "invalid_world"
     end
 
+    word_tokens = word_tokens or {}
+    if type(word_tokens) ~= "table" then return nil,"invalid_word_tokens" end
+    for id,token in pairs(word_tokens) do
+        if not is_integer(id) or not world.entities[id] or world.entities[id].class == "text"
+            or type(token) ~= "string" or token == "" then return nil,"invalid_word_token" end
+    end
     local positions = {}
 
     for id, entity in pairs(world.entities) do
-        if entity.class == "text" then
-            local text_data = entity.text
+        if entity.class == "text" or word_tokens[id] then
+            local text_data = entity.class == "text" and entity.text or {name=word_tokens[id]}
 
             if entity.kind ~= "object"
                 or type(text_data) ~= "table"

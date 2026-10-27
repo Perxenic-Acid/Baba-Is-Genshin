@@ -9,6 +9,50 @@ local function level_traits_from(conversions)
     return traits
 end
 
+-- WORD is a grounded least expansion from physical Text on EVERY compilation.
+-- No previous frame can keep an object readable after its independent seed breaks.
+function RW_CompileWorld(world, services)
+    for _,name in ipairs({"read","parse","lower","evaluate","project","words"}) do
+        if type(services[name]) ~= "function" then return nil,{stage="compile",reason="missing_" .. name} end
+    end
+    local tokens,seen={},{}
+    local function signature(map)
+        if type(map) ~= "table" then return nil end
+        local ids={}
+        for id,token in pairs(map) do
+            if type(id) ~= "number" or id % 1 ~= 0 or type(token) ~= "string" or token == "" then return nil end
+            ids[#ids+1]=id
+        end
+        table.sort(ids)
+        local items={}; for _,id in ipairs(ids) do items[#items+1]=tostring(id) .. ":" .. #map[id] .. ":" .. map[id] end
+        return table.concat(items,"|")
+    end
+    seen[signature(tokens)]=true
+    for iteration=1,64 do
+        local lines,err=services.read(world,tokens)
+        if not lines then return nil,{stage="reader",reason=err} end
+        local ast,why=services.parse(lines,world.language)
+        if not ast then return nil,{stage="grammar",reason=why} end
+        local generated,deferred,relations=services.lower(ast,world.semantics)
+        if not generated then return nil,{stage="lower",reason=deferred} end
+        local effects,rule_error=services.evaluate(world,generated)
+        if not effects then return nil,{stage="evaluate",reason=rule_error} end
+        local effective,projection_error=services.project(world,effects,level_traits_from(relations))
+        if not effective then return nil,{stage="project",reason=projection_error} end
+        local next_tokens,word_error=services.words(world,effective)
+        if not next_tokens then return nil,{stage="word",reason=word_error} end
+        local previous,next_key=signature(tokens),signature(next_tokens)
+        if not next_key then return nil,{stage="word",reason="invalid_word_tokens"} end
+        if previous == next_key then
+            return {effects=effects,ast=ast,rules=generated,deferred=deferred,relations=relations,
+                word_tokens=tokens,iterations=iteration}
+        end
+        if seen[next_key] then return nil,{stage="word",reason="word_rule_cycle"} end
+        seen[next_key]=true; tokens=next_tokens
+    end
+    return nil,{stage="word",reason="word_rule_limit"}
+end
+
 -- Contact destruction and HAS share one flat phase: births use the pre-delete
 -- snapshot, and IDs are allocated only in the returned plan.
 function RW_PlanContactPhase(world, effective, kind, contents, services)
@@ -651,74 +695,28 @@ function OnStart()
         return
     end
 
-    -- World -> spatial lines -> generated IR
-    -- -> active effects.
+    local compile_services = {
+        read=function(world,tokens) return reader_api:Invoke("RW_ReadLines",world,tokens) end,
+        parse=function(lines,language) return grammar_api:Invoke("RW_ParseRuleAST",lines,language) end,
+        lower=function(ast,semantics) return rules_api:Invoke("RW_LowerRuleAST",ast,semantics) end,
+        evaluate=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end,
+        project=function(world,effects,traits) return properties_api:Invoke("RW_ProjectWorld",world,effects,traits) end,
+        words=function(world,effective) return rules_api:Invoke("RW_WordTokenMap",world,effective) end
+    }
     local function evaluate(world_state)
-        world_state = world_state or session.world
-
-        local lines, read_error =
-            reader_api:Invoke(
-                "RW_ReadLines",
-                world_state
-            )
-
-        if not lines then
-            printerr(
-                "[RuleWorld] Reader failed:",
-                read_error
-            )
-            return nil
+        local frame,problem=RW_CompileWorld(world_state or session.world,compile_services)
+        if not frame then
+            print("[RuleWorld] Rule compilation rejected:",problem.stage,problem.reason)
+            return nil,nil,nil,nil,nil,problem.reason
         end
-
-        local ast, grammar_error =
-            grammar_api:Invoke(
-                "RW_ParseRuleAST",
-                lines,
-                world_state.language
-            )
-
-        if not ast then
-            printerr(
-                "[RuleWorld] AST grammar failed:",
-                grammar_error
-            )
-            return nil
-        end
-
-        local generated, deferred, conversions =
-            rules_api:Invoke("RW_LowerRuleAST", ast, world_state.semantics)
-
-        if not generated then
-            printerr(
-                "[RuleWorld] AST lowering failed:",
-                deferred
-            )
-            return nil
-        end
-
-        local effects, rule_error =
-            rules_api:Invoke(
-                "RW_EvaluateRules",
-                world_state,
-                generated
-            )
-
-        if not effects then
-            printerr(
-                "[RuleWorld] Rule evaluation failed:",
-                rule_error
-            )
-            return nil
-        end
-
-        return effects, #ast, #deferred, conversions, generated
+        return frame.effects,#frame.ast,#frame.deferred,frame.relations,frame.rules
     end
 
     -- Mapped script calls stay in the host adapter, outside the scheduler.
     local turn_services = {
         evaluate = function(world_state)
-            local effects, rule_count, deferred_count, conversions, generated = evaluate(world_state)
-            if not effects then return nil, "evaluation_failed" end
+            local effects, rule_count, deferred_count, conversions, generated, why = evaluate(world_state)
+            if not effects then return nil, why or "evaluation_failed" end
             return effects, nil, conversions, generated
         end,
         project = function(world_state, effects, traits)
@@ -767,6 +765,35 @@ function OnStart()
             end
         end
         print("[RuleWorld] TEST PASSED: pipeline DEFEAT / SINK / repeated HAS / atomic Undo")
+    end
+
+    do
+        local definitions=world_api:Invoke("RW_GetNavigationDefinitions")
+        local definition=definitions["navigation.text_word"]
+        local initial=world_api:Invoke("RW_InstantiateLevel",definition,"probe:text_word")
+        local current=initial
+        for _=1,2 do
+            local plan,why=RW_PlanTurn(current.world,{type="move",dx=0,dy=-1},turn_services)
+            if not plan then printerr("[RuleWorld] TEST FAILED: WORD plan",why and why.reason); return end
+            current=world_api:Invoke("RW_Commit",current,plan)
+        end
+        local effects=evaluate(current.world)
+        local projected=properties_api:Invoke("RW_ProjectWorld",current.world,effects)
+        if not projected.entities[3].behaviors.word or projected.entities[3].class ~= "object" then
+            printerr("[RuleWorld] TEST FAILED: WORD object reading"); return
+        end
+        local text=world_api:Invoke("RW_InstantiateLevel",definition,"probe:is_text")
+        text.world.entities[8].x,text.world.entities[8].y=6,5
+        local plan,why=RW_PlanTurn(text.world,{type="move",dx=0,dy=1},turn_services)
+        if not plan then printerr("[RuleWorld] TEST FAILED: IS TEXT plan",why and why.reason); return end
+        local converted,result=world_api:Invoke("RW_Commit",text,plan)
+        if not result.accepted or converted.world.entities[3].class ~= "text"
+            or converted.world.entities[3].text.name ~= "ROCK" then
+            printerr("[RuleWorld] TEST FAILED: IS TEXT class conversion"); return
+        end
+        local restored=world_api:Invoke("RW_Undo",converted)
+        if restored.world.entities[3].class ~= "object" then printerr("[RuleWorld] TEST FAILED: IS TEXT Undo"); return end
+        print("[RuleWorld] TEST PASSED: pipeline IS TEXT / WORD object reading / Undo")
     end
 
     -- Two physical languages, one semantic IR and one atomic turn behavior.
@@ -1207,5 +1234,5 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3R initialized")
+    print("[RuleWorld] M9.3S initialized")
 end

@@ -183,6 +183,20 @@ listeners.undo(); listeners.undo()
 assert(rendered.entities[4].x == 3 and rendered.entities[15] and rendered.next_entity_id == frontier)
 assert(not rendered.entities[frontier])
 print("PASS: native F fixtures DEFEAT/SINK/HAS, new YOU control, last-YOU death/SELECT return and whole-tree Undo")
+while history_depth > 0 do listeners.undo() end
+listeners.left(); listeners.up(); listeners.confirm() -- TXT sandbox.
+assert(rendered.entities[1].x == 6 and rendered.entities[1].y == 8)
+assert(rendered.entities[2].text.name == "ROCK" and rendered.entities[7].text.name == "NOT")
+listeners.up(); listeners.up()
+assert(rendered.entities[3].class == "object" and rendered.entities[3].behaviors.word)
+for _=1,3 do listeners.right() end
+listeners.down(); listeners.left(); listeners.left(); listeners.down(); listeners.left()
+listeners.up(); listeners.up()
+assert(rendered.entities[3].class == "text" and rendered.entities[3].text.name == "ROCK")
+assert(rendered.entities[3].behaviors.push and not rendered.entities[3].archetype)
+listeners.undo()
+assert(rendered.entities[3].class == "object" and rendered.entities[3].behaviors.word)
+print("PASS: native TXT sandbox WORD activation, pushed IS TEXT class conversion and whole-tree Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -208,3 +222,5 @@ dofile("tests/rule_multiplicity.lua")
 dofile("tests/stage_transactions.lua")
 
 dofile("tests/contact_words.lua")
+
+dofile("tests/text_word.lua")

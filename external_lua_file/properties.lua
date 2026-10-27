@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -36,7 +36,7 @@ local function valid_behaviors(registry)
         for capability, enabled in pairs(spec) do
             if (capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
                     and capability ~= "select" and capability ~= "select_path" and capability ~= "win"
-                    and capability ~= "defeat" and capability ~= "sink")
+                    and capability ~= "defeat" and capability ~= "sink" and capability ~= "word")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -80,7 +80,7 @@ function RW_ProjectWorld(world, effects, level_traits)
         if type(entity) ~= "table" or entity.id ~= id then return nil, "invalid_entity_identity" end
     end
     for _, effect in ipairs(effects) do
-        if type(effect) ~= "table" or effect.op ~= "grant_trait"
+        if type(effect) ~= "table" or (effect.op ~= "grant_trait" and effect.op ~= "deny_trait")
             or type(effect.trait) ~= "string" or effect.trait == "" then
             return nil, "invalid_effect"
         end
@@ -109,14 +109,24 @@ function RW_ProjectWorld(world, effects, level_traits)
         entity.traits = nil
         entity.behaviors = {} -- Explicit empty capabilities disable legacy fallback.
     end
+    local denied={}
+    for _,effect in ipairs(effects) do
+        if effect.op == "deny_trait" then
+            for _,id in ipairs(effect.entity_ids) do denied[id]=denied[id] or {}; denied[id][effect.trait]=true end
+        end
+    end
     for _, effect in ipairs(effects) do
-        local behavior = registry[effect.trait] or {}
-        for _, id in ipairs(effect.entity_ids) do
-            local entity = projected.entities[id]
-            entity.traits = entity.traits or {}
-            entity.traits[effect.trait] = true
-            for capability, enabled in pairs(behavior) do
-                if enabled then entity.behaviors[capability] = true end
+        if effect.op == "grant_trait" then
+            local behavior = registry[effect.trait] or {}
+            for _, id in ipairs(effect.entity_ids) do
+                if not (denied[id] and denied[id][effect.trait]) then
+                    local entity = projected.entities[id]
+                    entity.traits = entity.traits or {}
+                    entity.traits[effect.trait] = true
+                    for capability, enabled in pairs(behavior) do
+                        if enabled then entity.behaviors[capability] = true end
+                    end
+                end
             end
         end
     end

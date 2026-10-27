@@ -42,3 +42,10 @@
 
 - YOU + DEFEAT on the same entity causes destruction and HAS births. Original
   blocks.lua explicitly sets doit=true in the self-ID else branch; do not omit it.
+
+- WORD readability is derived by RW_CompileWorld from grounded physical Text,
+  never inherited from last-frame entity behaviors. Reader receives an explicit
+  word_tokens overlay. Contact phases still reuse the frozen compiled frame.
+- NOUN IS TEXT uses identity-preserving retype, not destroy/HAS. Text may retain
+  level_link metadata. RHS NOT overrides grants/selected conversions; subject NOT
+  remains deferred. See docs/TEXT_WORD.md for solver limits and TXT test route.

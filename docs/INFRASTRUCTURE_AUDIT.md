@@ -18,7 +18,7 @@ M9.3Q 补齐回合内多阶段快照，在不增加历史帧的情况下允许�
 | 2 | 实体上下文条件、否定效果与冲突裁决 | conditions.lua 的 testcond/condlist；rules.lua 的 postrules | 当前条件只支持全局布尔/重叠；补每个主体求值，接 ON/NEAR 与 NOT，不能用全局命中替代逐实体条件 |
 | 3 | 语法覆盖 | rules.lua 的 docode/calculatesentences | 目前主要单主体、RHS AND；补主体 AND、条件短语等，继续保留物理 ID 与重复次数 |
 | 4 | 自主移动、多轮意图与冲突顺序 | movement.lua 的 movecommand/check、blocks.lua 的 moveblock/fallblock | 跟随 MOVE/PULL/SHIFT 等词逐项扩展，不能把所有动作直接当 YOU 输入 |
-| 5 | 规则重求值和上下文特殊主语 | rules.lua；convert.lua | TEXT/ALL/EMPTY/WORD 等分别需要类选择、空格上下文或可读对象；现有 deferred 不代表已可执行 |
+| 5 | 规则重求值和上下文特殊主语 | rules.lua；convert.lua | M9.3S 已有普通 IS TEXT、WORD 稳定重读和右侧否定；ALL/EMPTY/深层 Meta/复杂 WORD 仍需扩展 |
 | 6 | 随机状态与回放 | blocks.lua 的随机处理；原版撤销数据 | 第一个随机词引入时，把 PRNG 状态纳入权威快照；禁止取宿主时间决定结果 |
 | 7 | 多目标 LEVEL 转换与地图进度 | convert.lua 的 dolevelconversions/convertlevel；map.lua/mapcursor.lua | 普通实体已支持多目标，当前关卡作用域仍拒绝多个不同转换目标；需要持久父块增殖及身份约定 |
 

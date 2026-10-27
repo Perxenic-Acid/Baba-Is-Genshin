@@ -135,7 +135,7 @@ function RW_ResolveEffects(world, effects)
     if not dense_list(effects) then return nil, "invalid_effects" end
     local result = {}
     for _, effect in ipairs(effects) do
-        if type(effect) ~= "table" or effect.op ~= "grant_trait"
+        if type(effect) ~= "table" or (effect.op ~= "grant_trait" and effect.op ~= "deny_trait")
             or type(effect.trait) ~= "string" or effect.trait == "" then
             return nil, "invalid_rule_effect"
         end
@@ -245,7 +245,7 @@ end
 
 local function valid_effect(effect, world)
     return type(effect) == "table"
-        and effect.op == "grant_trait"
+        and (effect.op == "grant_trait" or effect.op == "deny_trait")
         and valid_selector(effect.target, world)
         and type(effect.trait) == "string"
         and effect.trait ~= ""
@@ -322,7 +322,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform"}, has = {noun="contain"}}
+local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -336,7 +336,9 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and (operation == "transform" or operation == "contain"))) then return false end
+                or (category == "noun" and (operation == "transform" or operation == "contain"))
+                or (category == "negative_property" and operation == "deny_trait")
+                or (category == "negative_noun" and operation == "forbid_transform")) then return false end
         end
     end
     return true
@@ -424,7 +426,19 @@ function RW_LowerRuleAST(ast_rules, registry)
                 has_product={kind="object",archetype=target_type.name}
             elseif target_type.tag == "level" then has_product={kind="object",archetype=target_type.block_type or "level_block"} end
         elseif object.tag == "special" and object.name == "text" then has_product={kind="text"} end
-        if semantics and semantics.noun == "contain" and has_subject and has_product and ast.when.op == "always" then
+        local negated=object.tag == "not" and object.operand or nil
+        if semantics and semantics.negative_property == "deny_trait" and has_subject
+            and negated and negated.tag == "property" and type(negated.name) == "string" then
+            generated[#generated+1]={when=ast.when,effects={{op="deny_trait",target=has_subject,trait=negated.name}},source=ast.source}
+        elseif semantics and semantics.negative_noun == "forbid_transform" and simple_subject and negated
+            and ast.when.op == "always" and ((negated.tag == "special" and negated.name == "text")
+                or (negated.tag == "noun" and type(negated.type) == "table" and negated.type.tag == "object")) then
+            conversions[#conversions+1]={op="forbid_transform",source_type=subject_type.name,
+                target_type=negated.tag == "special" and "@text" or negated.type.name,source=ast.source}
+        elseif simple_subject and semantics and semantics.noun == "transform"
+            and object.tag == "special" and object.name == "text" and ast.when.op == "always" then
+            conversions[#conversions+1]={op="transform_text",source_type=subject_type.name,source=ast.source}
+        elseif semantics and semantics.noun == "contain" and has_subject and has_product and ast.when.op == "always" then
             conversions[#conversions+1]={op="has",target=has_subject,product=has_product,source=ast.source}
         elseif subject.tag == "special" and subject.name == "text" and semantics and semantics.property == "grant_trait"
             and object.tag == "property" and type(object.name) == "string" and object.name ~= "" then
@@ -522,51 +536,77 @@ end
 -- A IS A protects A from all ordinary IS conversions.
 -- One rule instance keeps the source ID; every additional instance gets a fresh ID.
 -- All products use the same pre-conversion snapshot (no within-turn cascade).
+-- Canonical physical noun token, shared by WORD, IS TEXT and HAS TEXT.
+function RW_NounTextName(world, entity)
+    if entity.class == "text" then return "TEXT" end
+    local names={}
+    for name,value in pairs((world.language or {}).nouns or {}) do
+        if value == entity.archetype or (type(value) == "table" and
+            ((value.tag == "object" and value.name == entity.archetype) or
+             (value.tag == "level" and (value.block_type or "level_block") == entity.archetype))) then names[#names+1]=name end
+    end
+    table.sort(names)
+    return names[1] or string.upper(entity.archetype or "OBJECT")
+end
+function RW_WordTokenMap(world, effective)
+    local tokens={}
+    for id,entity in pairs(effective.entities) do
+        if entity.class ~= "text" and entity.behaviors and entity.behaviors.word then
+            tokens[id]=RW_NounTextName(world,entity)
+        end
+    end
+    return tokens
+end
 function RW_PlanConversions(world, conversions)
     if type(world) ~= "table" or type(world.entities) ~= "table"
         or not dense_list(conversions) then return nil,"invalid_conversion_input" end
-    local targets, protected = {}, {}
+    local targets, protected, forbidden = {}, {}, {}
     for _, relation in ipairs(conversions) do
         if type(relation) ~= "table" or type(relation.source_type) ~= "string"
             or relation.source_type == "" then return nil,"invalid_conversion_relation" end
         local source = relation.source_type
         if relation.op == "protect_transform" then protected[source] = true
-        elseif relation.op == "transform" and type(relation.target_type) == "string"
-            and relation.target_type ~= "" and relation.target_type ~= source then
+        elseif relation.op == "forbid_transform" and type(relation.target_type) == "string" then
+            forbidden[source]=forbidden[source] or {}; forbidden[source][relation.target_type]=true
+        elseif relation.op == "transform_text" or (relation.op == "transform" and type(relation.target_type) == "string"
+            and relation.target_type ~= "" and relation.target_type ~= source) then
             targets[source] = targets[source] or {}
-            targets[source][#targets[source]+1] = relation.target_type
+            targets[source][#targets[source]+1] = relation.op == "transform_text" and "@text" or relation.target_type
         else return nil,"invalid_conversion_relation" end
     end
     local ids = {}
     for id in pairs(world.entities) do ids[#ids+1] = id end
     table.sort(ids)
-    local changes, next_id = {}, world.next_entity_id
-    local created = 0
+    local changes, next_id, created = {}, world.next_entity_id,0
     for _, id in ipairs(ids) do
         local entity = world.entities[id]
         local source = entity.archetype
-        if entity.kind == "object" and entity.class ~= "text"
-            and targets[source] and not protected[source] then
-            for index, target in ipairs(targets[source]) do
-                if index == 1 then
-                    changes[#changes+1] = {kind="transform",entity_id=id,from=source,to=target}
-                else
-                    if type(next_id) ~= "number" or next_id % 1 ~= 0 or next_id < 1 then
-                        return nil,"invalid_conversion_frontier"
+        if entity.kind == "object" and entity.class ~= "text" and targets[source] and not protected[source] then
+            local index=0
+            for _,target in ipairs(targets[source]) do
+                if not (forbidden[source] and forbidden[source][target]) then
+                    index=index+1
+                    local product=query_clone(entity)
+                    product.traits,product.behaviors,product.symbol=nil,nil,nil
+                    if target == "@text" then
+                        product.class,product.archetype,product.text="text",nil,{name=RW_NounTextName(world,entity)}
+                    else product.archetype=target end
+                    if index == 1 then
+                        if target == "@text" then changes[#changes+1]={kind="retype",entity_id=id,from=query_clone(entity),to=product}
+                        else changes[#changes+1]={kind="transform",entity_id=id,from=source,to=target} end
+                    else
+                        if type(next_id) ~= "number" or next_id % 1 ~= 0 or next_id < 1 or world.entities[next_id] then return nil,"invalid_conversion_frontier" end
+                        if next_id >= 9007199254740991 then return nil,"entity_id_exhausted" end
+                        product.id=next_id
+                        changes[#changes+1]={kind="create",entity_id=next_id,to=product}
+                        next_id,created=next_id+1,created+1
                     end
-                    if next_id >= 9007199254740991 then return nil,"entity_id_exhausted" end
-                    if world.entities[next_id] then return nil,"invalid_conversion_frontier" end
-                    local product = query_clone(entity)
-                    product.id,product.archetype = next_id,target
-                    product.traits,product.behaviors,product.symbol = nil,nil,nil
-                    changes[#changes+1] = {kind="create",entity_id=next_id,to=product}
-                    next_id,created = next_id+1,created+1
                 end
             end
         end
     end
     local allocation
-    if created > 0 then allocation = {from=world.next_entity_id,to=next_id} end
+    if created > 0 then allocation={from=world.next_entity_id,to=next_id} end
     return changes,nil,allocation
 end
 
@@ -610,14 +650,14 @@ function RW_ASTLoweringSelfTest()
     })
 
     if not executable or not deferred or not conversions
-        or #executable ~= 1 or #deferred ~= 2
+        or #executable ~= 2 or #deferred ~= 1
         or #conversions ~= 3 then
         return false, "Executable/deferred partition failed"
     end
 
     local effect = executable[1].effects[1]
 
-    if effect.op ~= "grant_trait"
+    if (effect.op ~= "grant_trait" and effect.op ~= "deny_trait")
         or effect.target.kind ~= "archetype"
         or effect.target.value ~= "crate"
         or effect.trait ~= "pushable"
@@ -626,8 +666,8 @@ function RW_ASTLoweringSelfTest()
     end
 
     -- Unsupported syntax is preserved, not executed.
-    if deferred[1] ~= negation
-        or deferred[2] ~= special
+    if deferred[1] ~= special
+        or executable[2].effects[1].op ~= "deny_trait"
         or conversions[1].op ~= "transform"
         or conversions[1].source_type ~= "crate"
         or conversions[1].target_type ~= "rock"
@@ -889,19 +929,6 @@ function RW_PlanHasBirths(world, victims, relations)
             return nil,"invalid_has_relation"
         end
     end
-    local function text_name(entity)
-        if entity.class == "text" then return "TEXT" end
-        local names={}
-        for name,value in pairs((world.language or {}).nouns or {}) do
-            if value == entity.archetype or (type(value) == "table" and
-                ((value.tag == "object" and value.name == entity.archetype) or
-                 (value.tag == "level" and (value.block_type or "level_block") == entity.archetype))) then
-                names[#names+1]=name
-            end
-        end
-        table.sort(names)
-        return names[1] or string.upper(entity.archetype or "OBJECT")
-    end
     local specifications, seen = {}, {}
     for _,id in ipairs(victims) do
         local entity=world.entities[id]
@@ -911,7 +938,7 @@ function RW_PlanHasBirths(world, victims, relations)
             if matches(entity,relation.target,world) then
                 local product={kind="object",class=relation.product.kind == "text" and "text" or "object",
                     x=entity.x,y=entity.y,direction=entity.direction}
-                if product.class == "text" then product.text={name=text_name(entity)}
+                if product.class == "text" then product.text={name=RW_NounTextName(world,entity)}
                 else
                     product.archetype=relation.product.archetype
                     product.level_link=query_clone(entity.level_link)

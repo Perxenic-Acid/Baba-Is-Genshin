@@ -95,7 +95,7 @@ local function valid_new_entity(world, entity, id)
     end
     if entity.level_link ~= nil then
         local link = entity.level_link
-        if entity.class ~= "object" or type(link) ~= "table"
+        if type(link) ~= "table"
             or (link.source_type ~= nil and (type(link.source_type) ~= "string" or link.source_type == ""))
             or (link.target ~= "child" and link.target ~= "parent")
             or (link.target == "child" and (type(link.definition_id) ~= "string"
@@ -157,7 +157,7 @@ local function validate_plan(world, plan)
         if type(change) ~= "table"
             or (change.kind ~= "move" and change.kind ~= "transform"
                 and change.kind ~= "direction" and change.kind ~= "create"
-                and change.kind ~= "delete") then
+                and change.kind ~= "delete" and change.kind ~= "retype") then
             return false, "invalid_operation"
         end
         local id = change.entity_id
@@ -185,7 +185,13 @@ local function validate_plan(world, plan)
                 seen[id].direction_write = true
             end
 
-            if change.kind == "delete" then
+            if change.kind == "retype" then
+                if not same_state(entity,change.from) or not valid_new_entity(world,change.to,id)
+                    or same_state(change.from,change.to) or change.to.x ~= entity.x or change.to.y ~= entity.y
+                    or change.to.direction ~= entity.direction or not same_state(change.to.level_link,entity.level_link) then
+                    return false,"invalid_or_stale_retype"
+                end
+            elseif change.kind == "delete" then
                 if type(change.from) ~= "table" or change.to ~= nil then
                     return false, "invalid_deletion"
                 end
@@ -231,6 +237,11 @@ local function validate_plan(world, plan)
         end
     end
 
+    for _,operations in pairs(seen) do
+        if operations.retype then
+            for kind in pairs(operations) do if kind ~= "retype" then return false,"conflicting_retype" end end
+        end
+    end
     if create_count == 0 then
         if plan.id_allocation ~= nil then return false, "invalid_id_allocation" end
     else
@@ -257,6 +268,8 @@ local function apply_plan(world, plan)
     for _, change in ipairs(plan.changes) do
         local entity = projected.entities[change.entity_id]
         if change.kind == "create" then
+            projected.entities[change.entity_id] = clone(change.to)
+        elseif change.kind == "retype" then
             projected.entities[change.entity_id] = clone(change.to)
         elseif change.kind == "move" then
             entity.x, entity.y = change.to.x, change.to.y
@@ -492,10 +505,10 @@ local function default_world()
 
                 properties = {
                     PUSH = "pushable",
-                    YOU = "you", DEFEAT = "defeat", SINK = "sink"
+                    YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word"
                 },
                 specials = {TEXT="text"},
-                operators = {AND="and"}
+                operators = {AND="and",NOT="not"}
             }
     }
 end
@@ -1356,5 +1369,25 @@ function RW_GetNavigationDefinitions()
         definitions[id]={id=id,initial_world=contact_fixture(case[5])}
         portal(root,case[1],case[2],case[3],case[4],id)
     end
+    local lab=default_world()
+    lab.entities={
+        [1]={id=1,kind="object",class="object",archetype="avatar",x=6,y=8,direction="None"},
+        [2]={id=2,kind="object",class="text",text={name="ROCK"},x=4,y=5,direction="None"},
+        [3]={id=3,kind="object",class="object",archetype="rock",x=4,y=3,direction="None"},
+        [4]={id=4,kind="object",class="text",text={name="IS"},x=5,y=5,direction="None"},
+        [5]={id=5,kind="object",class="text",text={name="IS"},x=5,y=3,direction="None"},
+        [6]={id=6,kind="object",class="text",text={name="WORD"},x=6,y=6,direction="None"},
+        [7]={id=7,kind="object",class="text",text={name="NOT"},x=8,y=4,direction="None"},
+        [8]={id=8,kind="object",class="text",text={name="TEXT"},x=8,y=7,direction="None"}
+    }
+    lab.next_entity_id=9
+    lab.language.nouns.ROCK="rock"
+    grant(lab,"avatar","you")
+    grant(lab,"rock","pushable") -- Makes the requested object freely movable.
+    object(lab,12,"cursor",1,1)
+    portal(lab,13,2,1,"PARENT")
+    object(lab,14,"line",1,1)
+    definitions["navigation.text_word"]={id="navigation.text_word",initial_world=lab}
+    portal(root,50,1,1,"TXT","navigation.text_word")
     return definitions, "navigation.root"
 end

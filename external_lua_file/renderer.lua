@@ -185,6 +185,7 @@ local function ensure_grid(world)
 end
 
 local function get_label(entity)
+    if entity.class == "text" then return entity.text and entity.text.name or "?" end
     if entity.level_link then
         local label = entity.level_link.label or "LEVEL"
         if entity.level_link.source_type and entity.archetype ~= entity.level_link.source_type then
@@ -216,6 +217,7 @@ local function get_colors(entity)
     if capabilities.sink then return Color(45,130,185,255),Color(255,255,255,255) end
     if capabilities.win then return Color(238,206,88,255), Color(30,24,10,255) end
     if capabilities.select then return Color(220,220,230,255), Color(20,20,30,255) end
+    if capabilities.word then return Color(112,90,170,255), Color(255,255,255,255) end
     if entity.level_link then
         return Color(112,70,145,255), Color(255,255,255,255)
     end

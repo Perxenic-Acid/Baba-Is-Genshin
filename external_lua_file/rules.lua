@@ -337,7 +337,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain"}}
+local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -353,7 +353,7 @@ local function valid_semantics(registry)
             if not ((category == "property" and operation == "grant_trait")
                 or (category == "noun" and (operation == "transform" or operation == "contain"))
                 or (category == "negative_property" and operation == "deny_trait")
-                or (category == "negative_noun" and operation == "forbid_transform")) then return false end
+                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain"))) then return false end
         end
     end
     return true
@@ -697,6 +697,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     registry=registry or DEFAULT_SEMANTICS
     if not valid_semantics(registry) or not dense_list(ast_rules) then return nil,"invalid_ast_rules" end
     local generated,deferred,relations={},{},{}
+    local contain_bans,contain_origins,contain_verbs={},{},{}
     local function append(list,items) for _,item in ipairs(items) do list[#list+1]=item end end
     for _,ast in ipairs(ast_rules) do
         if type(ast) ~= "table" or type(ast.when) ~= "table" then return nil,"invalid_ast_rule" end
@@ -722,7 +723,19 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local rule=query_clone(ast); rule.subject=subject; rule.object=objnot and {tag="not",operand=obj} or obj
             local key=subject_key(subject)
             local special=key == "@text" or key == "@empty"
-            if sem and key and obj.tag == "property" and sem.property == "grant_trait"
+            local has_start=#relations+1
+            if sem and key and ast.when.op == "always" and sem.noun == "contain"
+                and objnot and sem.negative_noun == "forbid_contain" then
+                local target=subject_key(obj)
+                if obj.tag == "special" and obj.name == "all" then target="@all" end
+                if obj.tag == "noun" and obj.type and obj.type.tag == "level" then target=obj.type.block_type or "level_block" end
+                if target and key ~= "@empty" then
+                    contain_bans[ast.verb]=contain_bans[ast.verb] or {}
+                    local bans=contain_bans[ast.verb]
+                    bans[key]=bans[key] or {};bans[key][target]=true
+                    supported=true
+                end
+            elseif sem and key and obj.tag == "property" and sem.property == "grant_trait"
                 and (not objnot or sem.negative_property == "deny_trait") then
                 generated[#generated+1]={when=ast.when,source=ast.source,effects={{
                     op=objnot and "deny_trait" or "grant_trait",trait=obj.name,
@@ -765,10 +778,33 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 if not g then return nil,d end
                 append(generated,g);append(relations,r);supported=supported or #d == 0
             end
+            -- Original subrules reaches ALL HAS ALL through both expansion axes.
+            local has_end=#relations
+            for index=has_start,has_end do
+                if relations[index].op == "has" then
+                    contain_verbs[index]=ast.verb
+                    contain_origins[index]=obj.tag == "special" and obj.name == "all" and "@all" or false
+                    if subj.tag == "special" and subj.name == "all" and not subnot
+                        and obj.tag == "special" and obj.name == "all" and not objnot then
+                        relations[#relations+1]=query_clone(relations[index]);contain_origins[#relations]="@all";contain_verbs[#relations]=ast.verb
+                    end
+                end
+            end
         end
         if not supported and #subjects > 0 then deferred[#deferred+1]=ast end
     end
-    return generated,deferred,relations
+    local filtered={}
+    for index,relation in ipairs(relations) do
+        local blocked=false
+        if relation.op == "has" then
+            local key=relation.target.kind == "class" and "@text" or relation.target.value
+            local bans=(contain_bans[contain_verbs[index]] or {})[key] or {}
+            local product=relation.product.kind == "text" and "@text" or relation.product.archetype
+            blocked=bans[product] or (contain_origins[index] == "@all" and bans["@all"])
+        end
+        if not blocked then filtered[#filtered+1]=relation end
+    end
+    return generated,deferred,filtered
 end
 
 function RW_ASTLoweringSelfTest()

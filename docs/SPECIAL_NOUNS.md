@@ -61,7 +61,7 @@ EMPTY 是当前没有任何实体的格子，不是隐藏实体；文字、Line�
 - EMPTY 的持久逐格方向、销毁/HAS 生命周期尚未实现；EMPTY HAS … 明确保留 deferred。
   EMPTY YOU + DEFEAT 的逐格销毁效果和与作用域 LEVEL 的所有交互尚未全面复刻。
 - 当前 LEVEL 作用域的 ALL/TEXT/EMPTY 转换、多个不同 LEVEL 转换目标仍未实现。
-- 主体 AND、实体上下文条件、GROUP/MIMIC、任意 Meta 深度仍在后续范围；NOT HAS 不执行。
+- 主体 AND、实体上下文条件、GROUP/MIMIC、任意 Meta 深度仍在后续范围。
 - WORD 仍使用物理 Text 冷启动的有界求解，不声称覆盖原版所有递归来源判断。
 
 ## 真机测试
@@ -69,7 +69,7 @@ EMPTY 是当前没有任何实体的格子，不是隐藏实体；文字、Line�
 从重新试玩的根地图开始：
 
 - **D、F → NAT**：开放组合关卡。提供 ROCK、CRATE、AVATAR、ALL、EMPTY、TEXT，
-  四块 IS、四块 NOT、两块 WORD、PUSH、YOU、AND、WIN。文字按间隔摆放，开局不形成句子；
+  四块 IS、四块 NOT、两块 WORD、PUSH、YOU、AND、WIN，另有 HAS、SINK。文字按间隔摆放，开局不形成句子；
   Avatar IS YOU、Rock/Crate IS PUSH 是关卡配置，便于自由实验。
 - **D、D、D、F → LOOP**：再按一次 **W** 推入 NOT，触发 WORD 自否定循环。
   移动/F 均应失效，标题变成 INFINITE LOOP；**Z** 恢复，再 W 可重现。
@@ -113,3 +113,22 @@ LEVEL 是特殊名词，不在 NOT ROCK 或 ALL 的展开范围；不会借该�
 数字不包含原生 UI 调用的宿主成本，不是对游戏计时器的替代。
 局内玩家构造的极端/未定义行为不扩展开局的兜底要求；已有 Infinite Loop 约定保留。
 启动版本为 M9.3T.2，不再在普通启动打印 TEST PASSED 测试串。
+
+
+## M9.3T.3 ALL 与左右 NOT 联动
+
+对照本机原作 rules.lua 的 addoption/subrules/postrules，补充 HAS 的 RHS NOT：
+先展开主语，再取消相同来源类型的对应产物；HAS NOT ALL 只取消 HAS ALL 的展开，
+保留独立的 HAS ROCK。HAS ALL 展开后仍受 HAS NOT ROCK 的单项否定。
+NOT ALL HAS NOT ROCK 可取消 TEXT HAS ROCK；EMPTY 的销毁/HAS 生命周期仍 deferred。
+显式自定义语义表须注册 negative_noun="forbid_contain" 才启用 HAS 右否定。
+
+原作 ALL HAS ALL 从左右两条展开路径各生成一套结果，三种普通名词为 18 条，
+并非 9 条；保留重复声明供 HAS 销毁产物生成。独立原作 oracle：
+`luatex --luaonly tests/reference_special_nouns.lua`；不加载进项目测试进程。
+组合回归覆盖 NOT TEXT/NOT ALL 对 TEXT、EMPTY 转换的抑制及 Undo。
+NOT ALL IS NOT PUSH 不抑制普通 ALL IS PUSH，两者作用于不同类型范围。
+
+真机仍 D、F 进入 NAT，新增 HAS、SINK 文字在顶行右侧，可自由构造
+ROCK HAS ALL + ROCK HAS NOT ALL / NOT ROCK，或 TEXT HAS ROCK + NOT ALL HAS NOT ROCK，
+再通过 SINK 销毁相应对象检查产物，并用 Z 撤销。正常开局仍不跑完整自测。

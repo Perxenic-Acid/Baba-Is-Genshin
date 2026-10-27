@@ -103,7 +103,7 @@ local id=s.world.next_entity_id;s.world.next_entity_id=id+1
 s.world.entities[id]=copy(s.world.entities[4]);s.world.entities[id].id=id
 f=compile(s.world);assert(#f.ast == 2)
 -- ALL HAS ALL expands one relation per palette member, and Empty HAS stays deferred.
-s=fixture({{"ALL","HAS","ALL"}});f=compile(s.world);assert(#f.relations == 9)
+s=fixture({{"ALL","HAS","ALL"}});f=compile(s.world);assert(#f.relations == 18)
 s=fixture({{"EMPTY","HAS","TEXT"}});f=compile(s.world);assert(#f.deferred == 1)
 -- Negative self-conversion applies to members expanded from ALL.
 s=fixture({{"ALL","IS","NOT","ROCK"}});converted=convert(s)
@@ -154,3 +154,31 @@ local restored=RW_Undo(changed);assert(restored.world == w)
 p=projected(restored);assert(p.entities[12].behaviors.select and p.entities[12].behaviors.word)
 print("PASS: screenshot Cursor WORD/IS TEXT conversion on overlapping parent Level and Undo; LEVEL exclusion")
 print("PASS: NOT parity/complements, ALL palette/products, TEXT retype, virtual EMPTY conversion/STOP/YOU/WIN, sandbox")
+
+-- Right NOT filters HAS after subject expansion, without erasing independent products.
+s=fixture({{"ROCK","HAS","ALL"},{"ROCK","HAS","NOT","ROCK"}})
+f=compile(s.world);assert(#f.relations == 2 and #f.deferred == 0)
+for _,r in ipairs(f.relations) do assert(r.product.archetype ~= "rock") end
+s=fixture({{"ROCK","HAS","ALL"},{"ROCK","HAS","NOT","ALL"},{"ROCK","HAS","CRATE"}})
+f=compile(s.world);assert(#f.relations == 1 and f.relations[1].product.archetype == "crate")
+s=fixture({{"NOT","ROCK","HAS","TEXT"},{"ALL","HAS","NOT","TEXT"}})
+f=compile(s.world);assert(#f.relations == 0 and #f.deferred == 0)
+s=fixture({{"TEXT","HAS","ROCK"},{"NOT","ALL","HAS","NOT","ROCK"}})
+f=compile(s.world);assert(#f.relations == 0)
+s=fixture({{"ALL","IS","PUSH"},{"NOT","ALL","IS","NOT","PUSH"}})
+p=projected(s);assert(p.entities[1].behaviors.push and p.entities[2].behaviors.push)
+assert(not p.entities[4].behaviors.push)
+print("PASS: ALL HAS ALL original multiplicity; left/right NOT HAS, TEXT and ALL expansion provenance")
+
+-- Cross-family conversion vetoes: negative ALL does not mean every individual noun.
+s=fixture({{"ROCK","IS","ALL"},{"ROCK","IS","NOT","TEXT"}})
+converted=convert(s);assert(converted.world.entities[1].archetype == "rock")
+assert(converted.world.next_entity_id == s.world.next_entity_id+2)
+s=fixture({{"ROCK","IS","TEXT"},{"NOT","TEXT","IS","NOT","TEXT"}})
+converted=convert(s);assert(converted.world.entities[1].archetype == "rock")
+s=fixture({{"EMPTY","IS","TEXT"},{"NOT","ALL","IS","NOT","TEXT"}})
+converted=convert(s);assert(converted.world.next_entity_id == s.world.next_entity_id)
+s=fixture({{"TEXT","IS","ROCK"},{"NOT","ALL","IS","NOT","ROCK"}})
+converted=convert(s);assert(converted.world.entities[4].class == "text")
+assert(RW_Undo(converted).world == s.world)
+print("PASS: ALL/EMPTY/TEXT cross-family left/right NOT conversions and Undo")

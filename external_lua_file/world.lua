@@ -1420,6 +1420,12 @@ function RW_GetNavigationDefinitions()
     object(combos,24,"cursor",1,1)
     portal(combos,25,2,1,"PARENT")
     object(combos,26,"line",1,1)
+    for index,token in ipairs({"HAS","SINK"}) do
+        local id=26+index
+        combos.entities[id]={id=id,kind="object",class="text",text={name=token},
+            x=8+index*2,y=2,direction="None"}
+        combos.next_entity_id=id+1
+    end
     definitions["navigation.specials"]={id="navigation.specials",initial_world=combos}
     portal(root,51,3,2,"NAT","navigation.specials")
     local loop=clone(lab)

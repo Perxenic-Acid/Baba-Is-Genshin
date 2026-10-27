@@ -1,5 +1,7 @@
 # M9.3M：关卡指向、转换与有序终局属性
 
+后续边界/选择器修订见 [LEVEL_BOUNDARIES.md](LEVEL_BOUNDARIES.md)。
+
 本步按用户修订，替换 M9.3L 中“外形改变就不可进入”的错误限制。
 
 ## 本机原版源码依据
@@ -36,15 +38,15 @@ LEVEL 的词汇定义为 {tag="level", block_type="level_block"}。
 
 | 规则 | 结果 |
 | --- | --- |
-| LEVEL IS WIN | 直接记录获胜并返回父级；不要求另有旗帜或 YOU |
-| LEVEL IS DEFEAT | 留在当前实例，进入失败态，仅允许 Undo |
+| LEVEL IS WIN | 存在 YOU 时获胜并返回父级；只有 SELECT 不获胜 |
+| LEVEL IS DEFEAT | 留在当前实例，YOU 停止；SELECT 仍可移动/确认 |
 | LEVEL IS WIN AND DEFEAT | 获胜 |
-| LEVEL IS DEFEAT AND WIN | 失败，仅允许 Undo |
+| LEVEL IS DEFEAT AND WIN | 失败；SELECT 仍可操作 |
 | LEVEL IS ROCK AND WIN | 转换父级中的对应关卡块，不获胜 |
 
 阶段上先完成实体/关卡转换，再处理当前关卡有序属性，最后检查普通 WIN 接触。
 终局属性按顺序取第一个 win/defeat 能力。LEVEL IS LEVEL 仍保护转换。
-失败态在规划和树 Commit 两层阻止普通操作，不消耗额外历史；Undo 恢复失败前
+失败态在规划和树 Commit 两层阻止 YOU 操作，允许 SELECT；无 SELECT 时只可撤销。Undo 恢复失败前
 整个树快照。根关卡获胜只记录结果；根的外层转换仍因没有父块而整步拒绝。
 普通对象 DEFEAT 的完整碰撞/删除机制不在本步范围内。
 
@@ -69,14 +71,14 @@ SELECT 可以移动到其上，F 返回 unavailable_level；不凭 archetype、�
 | 根入口 | 到入口的按键 | 进入后 | 应观察到 |
 | --- | --- | --- | --- |
 | W | A、S、F | W | 获胜回 MAP；Z 回到规则形成前 |
-| D | S、F | W | DEFEAT，移动/F 无效；仅 Z 可恢复 |
+| D | S、F | W | DEFEAT，YOU 停止；D 移动 SELECT，F 返回 |
 | WD | D、S、F | W | 获胜回 MAP |
-| DW | D、D、S、F | W | DEFEAT；仅 Z 可恢复 |
+| DW | D、D、S、F | W | DEFEAT，SELECT 仍可移动和确认 |
 | RW | D、D、D、S、F | W | 回 MAP，RW 变 Rock（重叠时 RW*）；F 仍能再次进入 |
 | N | D、D、D、D、S、F | W | 两箱都变 Level，仅原 ID 4 有指向 |
 
 N 组继续：S、D、D 把 SEL 移到绑定块，F 可进入内层关卡；D、F 通过父块
-返回 N。再 D 把 SEL 移到另一块，F 应拒绝（没有新历史）。
+返回 N 后普通箱子转换已重置；不可用块应在退出 N 前测试。
 失败与获胜/转换都在原子树历史中，Z 要同时恢复所在层和相关对象/结果。
 A/B/T 原入口仍保留用于前一轮回归。
 

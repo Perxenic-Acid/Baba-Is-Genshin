@@ -695,6 +695,12 @@ function RW_ResolveTurn(world, action)
             end
         end
     end
+    if world.level_behaviors and world.level_behaviors.control then
+        local current = world.board_offset or {x=0,y=0,direction="None"}
+        plan.board_shift = {from={x=current.x,y=current.y,direction=current.direction},
+            to={x=current.x+action.dx,y=current.y+action.dy,direction=direction_for(action.dx,action.dy)}}
+        plan.reason = nil
+    end
     if selected then
         table.sort(plan.changes, function(a,b) return a.entity_id < b.entity_id end)
         if #plan.changes > 0 then plan.reason = nil
@@ -758,4 +764,13 @@ function RW_LevelSelectionSelfTest()
     world.entities[7].behaviors = {} -- Rule retraction disables raw legacy traits.
     if #RW_LevelSelectionCandidates(world) ~= 0 then return false, "Retracted SELECT still active" end
     return true, "SELECT independent of YOU, path movement and entry authority passed"
+end
+
+function RW_LevelSelectorIDs(world)
+    local ids = {}
+    for id, entity in pairs(world.entities) do
+        if has_capability(world,entity,"select") then ids[#ids+1] = id end
+    end
+    table.sort(ids)
+    return ids
 end

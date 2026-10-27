@@ -1,6 +1,14 @@
 -- bootstrap.lua
 -- RuleWorld M7: Runtime coordination
 
+local function level_traits_from(conversions)
+    local traits = {}
+    for _, command in ipairs(conversions or {}) do
+        if command.op == "level_trait" then traits[#traits+1] = command.trait end
+    end
+    return traits
+end
+
 -- M9.3F: host-independent turn planning. Services adapt mapped scripts;
 -- no UI calls, logging, session ownership or Commit occur in this function.
 -- Services must treat world/context inputs as read-only.
@@ -22,11 +30,11 @@ function RW_PlanTurn(world, action, services)
     end
 
     trace[#trace + 1] = "rules_before"
-    local effects, rule_error = services.evaluate(world)
+    local effects, rule_error, before_conversions = services.evaluate(world)
     if not effects then return fail("rules_before", rule_error) end
 
     trace[#trace + 1] = "project"
-    local effective, projection_error = services.project(world, effects)
+    local effective, projection_error = services.project(world, effects, level_traits_from(before_conversions))
     if not effective then return fail("project", projection_error) end
 
     trace[#trace + 1] = "movement"
@@ -64,7 +72,7 @@ function RW_PlanTurn(world, action, services)
 
     -- Own the combined list: never append into another planner's result.
     local plan = {consumes_turn = true, reason = movement.reason, changes = {},
-        level_transform = target_type, level_traits = level_traits}
+        level_transform = target_type, level_traits = level_traits,board_shift=movement.board_shift}
     for _, change in ipairs(movement.changes) do
         plan.changes[#plan.changes + 1] = change
     end
@@ -84,27 +92,56 @@ function RW_PlanLevelAction(tree, action, services)
     local function fail(reason) return nil, {stage="level_action",reason=reason} end
     if type(action) ~= "table" then return fail("invalid_action") end
     local session = services.active(tree)
-    local previous_outcome = tree.outcomes[tree.active_id]
-    if previous_outcome and previous_outcome.kind == "defeat" then return fail("level_defeated_undo_only") end
-    local effects, err = services.evaluate(session.world)
+    local effects, err, initial_conversions = services.evaluate(session.world)
     if not effects then return fail(err) end
-    local effective, project_error = services.project(session.world,effects)
+    local effective, project_error = services.project(session.world,effects,level_traits_from(initial_conversions))
     if not effective then return fail(project_error) end
+    local select_after_defeat = session.defeated == true
+    if select_after_defeat then
+        if #services.selectors(effective) == 0 then return fail("level_defeated_undo_only") end
+        local adapted, original_project = {}, services.project
+        for key, value in pairs(services) do adapted[key] = value end
+        adapted.project = function(world,active_effects,traits)
+            local projected, why = original_project(world,active_effects,traits)
+            if not projected then return nil,why end
+            for _, entity in pairs(projected.entities) do entity.behaviors.control = nil end
+            projected.level_behaviors.control = nil
+            return projected
+        end
+        services = adapted
+    end
+    local function return_to_parent(current)
+        local entry = current.entry_links[current.active_id]
+        local returned, reason = services.return_level(current)
+        if not returned or not entry then return returned,reason end
+        local parent = services.active(returned)
+        local e, why, commands = services.evaluate(parent.world)
+        if not e then return nil,why end
+        local projected, projection_error = services.project(parent.world,e,level_traits_from(commands))
+        if not projected then return nil,projection_error end
+        return services.place_selectors(returned,services.selectors(projected),entry.entity_id)
+    end
     if action.type == "confirm" then
         local candidates = services.candidates(effective)
         if #candidates == 0 then return fail("no_selected_level") end
-        if #candidates > 1 then return fail("ambiguous_selected_levels") end
-        local entity_id = candidates[1]
+        local entity_id = action.entity_id
+        if entity_id ~= nil then
+            local found = false
+            for _, id in ipairs(candidates) do if id == entity_id then found = true end end
+            if not found then return fail("selected_level_changed") end
+        elseif #candidates > 1 then
+            return nil,{stage="level_action",reason="choose_level",candidates=candidates}
+        else entity_id = candidates[1] end
         local link = session.world.entities[entity_id].level_link
         if not link then return fail("unavailable_level") end
         local next_tree, reason
-        if link.target == "parent" then next_tree, reason = services.return_level(tree)
+        if link.target == "parent" then next_tree, reason = return_to_parent(tree)
         else
             next_tree, reason = services.enter(tree,tostring(entity_id),link.definition_id)
             if next_tree then next_tree, reason = services.bind_entry(next_tree,entity_id) end
         end
         if not next_tree then return fail(reason) end
-        return {before=tree,after=next_tree,reason="confirm_level",changes={}}
+        return {before=tree,after=next_tree,reason="confirm_level",changes={},select_after_defeat=select_after_defeat}
     end
     local turn, planning_error = RW_PlanTurn(session.world,action,services)
     if not turn then return nil, planning_error end
@@ -113,26 +150,36 @@ function RW_PlanLevelAction(tree, action, services)
     if not accepted.accepted then return fail(accepted.reason) end
     local next_tree, update_error = services.update(tree,completed)
     if not next_tree then return fail(update_error) end
-    local post_effects, post_error = services.evaluate(completed.world)
+    local post_effects, post_error, post_conversions = services.evaluate(completed.world)
     if not post_effects then return fail(post_error) end
-    local post, projection_error = services.project(completed.world,post_effects)
+    local post, projection_error = services.project(completed.world,post_effects,level_traits_from(post_conversions))
     if not post then return fail(projection_error) end
     local level_outcome, outcome_error = services.level_outcome(post,turn.level_traits)
     if outcome_error then return fail(outcome_error) end
     local outcome = turn.level_transform and "transform" or level_outcome
         or (services.win(post) and "win" or nil)
+    if select_after_defeat and outcome == "defeat" then outcome = nil end
     if outcome then
         next_tree, update_error = services.outcome(next_tree,outcome,turn.level_transform)
         if not next_tree then return fail(update_error) end
+        if outcome ~= "defeat" and #next_tree.stack > 0 then
+            next_tree,update_error = return_to_parent(next_tree)
+            if not next_tree then return fail(update_error) end
+        end
     end
-    return {before=tree,after=next_tree,reason=outcome or turn.reason,changes=turn.changes}
+    return {before=tree,after=next_tree,reason=outcome or turn.reason,changes=turn.changes,select_after_defeat=select_after_defeat}
 end
 
 -- Host confirmation entry point, shared with the F interaction binding.
-local confirm_selected_level = nil
+local confirm_selected_level, choose_selected_level = nil, nil
 function RW_ConfirmSelectedLevel()
     if not confirm_selected_level then return false, "not_initialized" end
     return confirm_selected_level()
+end
+
+function RW_ChooseSelectedLevel(entity_id)
+    if not choose_selected_level then return false,"not_initialized" end
+    return choose_selected_level(entity_id)
 end
 
 function OnStart()
@@ -362,7 +409,7 @@ function OnStart()
 
     local base_valid =
         effective ~= nil
-        and #base_effects == 3
+        and #base_effects == 6
         -- No rule-derived traits may leak into authored state.
         and base_world.world.entities[6].traits == nil
         and base_world.world.entities[1].traits == nil
@@ -407,7 +454,7 @@ function OnStart()
     )
 
     if not broken_effective
-        or #broken_effects ~= 2
+        or #broken_effects ~= 5
         or has_trait(broken_effective, 4, "pushable")
         or has_trait(broken_effective, 5, "pushable")
         or not has_trait(broken_effective, 6, "pushable")
@@ -606,8 +653,8 @@ function OnStart()
             if not effects then return nil, "evaluation_failed" end
             return effects, nil, conversions
         end,
-        project = function(world_state, effects)
-            return properties_api:Invoke("RW_ProjectWorld", world_state, effects)
+        project = function(world_state, effects, traits)
+            return properties_api:Invoke("RW_ProjectWorld", world_state, effects, traits)
         end,
         resolve = function(world_state, action)
             return movement_api:Invoke("RW_ResolveTurn", world_state, action)
@@ -805,6 +852,10 @@ function OnStart()
     level_services.bind_entry = function(tree,id) return world_api:Invoke("RW_BindLevelEntry",tree,id) end
     level_services.commit_session = function(value,plan) return world_api:Invoke("RW_Commit",value,plan) end
     level_services.outcome = function(tree,kind,target) return world_api:Invoke("RW_RecordLevelOutcome",tree,kind,target) end
+    level_services.selectors = function(world) return movement_api:Invoke("RW_LevelSelectorIDs",world) end
+    level_services.place_selectors = function(tree,ids,block)
+        return world_api:Invoke("RW_PlaceLevelSelectors",tree,ids,block)
+    end
     level_services.candidates = function(world) return movement_api:Invoke("RW_LevelSelectionCandidates",world) end
     level_services.win = function(world) return movement_api:Invoke("RW_HasWinContact",world) end
     level_services.level_outcome = function(world,traits)
@@ -873,8 +924,11 @@ function OnStart()
                 or (test[2] ~= "defeat" and completed.active_id ~= level_tree.active_id) then
                 printerr("[RuleWorld] TEST FAILED: ordered LEVEL outcome",test[1]); return
             end
-            if test[2] == "defeat" and RW_PlanLevelAction(completed,{type="confirm"},level_services) then
-                printerr("[RuleWorld] TEST FAILED: defeated level accepted input"); return
+            if test[2] == "defeat" then
+                local selected = apply(completed,{type="move",dx=1,dy=0})
+                if not selected or level_services.active(selected).world.entities[12].x ~= 2 then
+                    printerr("[RuleWorld] TEST FAILED: defeat disabled SELECT"); return
+                end
             end
             local undone = world_api:Invoke("RW_UndoLevelTree",completed)
             if undone.active_id ~= child_id or undone.outcomes[child_id]
@@ -891,21 +945,42 @@ function OnStart()
             or world.entities[5].level_link then
             printerr("[RuleWorld] TEST FAILED: Noun IS LEVEL identity-bound destinations"); return
         end
+        local selector_only = apply(level_tree,{type="move",dx=1,dy=0})
+        for _=1,4 do selector_only = apply(selector_only,{type="move",dx=1,dy=0}) end
+        selector_only = apply(selector_only,{type="move",dx=0,dy=-1})
+        selector_only = apply(selector_only,{type="confirm"})
+        local selector_id = selector_only.active_id
+        selector_only = apply(selector_only,{type="move",dx=1,dy=0})
+        if not selector_only or selector_only.active_id ~= selector_id or selector_only.outcomes[selector_id] then
+            printerr("[RuleWorld] TEST FAILED: SELECT-only WIN exited level"); return
+        end
+        print("[RuleWorld] TEST PASSED: SELECT-only WIN keeps level active")
         print("[RuleWorld] TEST PASSED: pipeline ordered LEVEL WIN/DEFEAT/transform and Noun IS LEVEL / Undo")
     end
 
+    local pending_selection = nil
     local function navigation_view()
         local outcome = level_tree.outcomes[level_tree.active_id]
-        local defeated = outcome and outcome.kind == "defeat"
-        return {title=(defeated and "DEFEAT / " or (#level_tree.stack == 0 and "MAP / " or "PUZZLE / ")) .. session.instance_id,
-            hint=defeated and "DEFEAT: Z Undo only" or "WASD: YOU + SELECT   F: Confirm   Z: Whole-tree Undo",portals={}}
+        local defeated = session.defeated == true
+        local choice
+        if pending_selection then
+            choice = {items={},index=pending_selection.index,error=pending_selection.error}
+            for _, id in ipairs(pending_selection.ids) do
+                local entity = session.world.entities[id]
+                choice.items[#choice.items+1] = {entity_id=id,
+                    label=entity.level_link and entity.level_link.label or "LEVEL",
+                    available=entity.level_link ~= nil}
+            end
+        end
+        return {choice=choice,title=(defeated and "DEFEAT / " or (#level_tree.stack == 0 and "MAP / " or "PUZZLE / ")) .. session.instance_id,
+            hint=defeated and "DEFEAT: SELECT remains active; Z Undo" or "WASD: YOU + SELECT   F: Confirm   Z: Whole-tree Undo",portals={}}
     end
 
     local previous_rule_count = nil
     local previous_deferred_count = nil
 
     local function render()
-        local effects, rule_count, deferred_count = evaluate()
+        local effects, rule_count, deferred_count, scope_commands = evaluate()
         if not effects then return end
 
         if previous_rule_count ~= rule_count
@@ -921,7 +996,7 @@ function OnStart()
             previous_deferred_count = deferred_count
         end
 
-        local display_world, projection_error = properties_api:Invoke("RW_ProjectWorld",session.world,effects)
+        local display_world, projection_error = properties_api:Invoke("RW_ProjectWorld",session.world,effects,level_traits_from(scope_commands))
         if not display_world then printerr("[RuleWorld] View projection failed:",projection_error); return end
         renderer_api:Invoke(
             "RW_Render",
@@ -935,12 +1010,19 @@ function OnStart()
     local function act(action)
         local plan, planning_error = RW_PlanLevelAction(level_tree,action,level_services)
         if not plan then
+            if planning_error.reason == "choose_level" then
+                pending_selection = {tree=level_tree,ids=planning_error.candidates,index=1}
+                render()
+                return true,"choice_opened"
+            end
+            if pending_selection then pending_selection.error = planning_error.reason; render() end
             print("[RuleWorld] Action rejected:",planning_error.stage,planning_error.reason)
             return false, planning_error.reason
         end
         local next_tree, result = world_api:Invoke("RW_CommitLevelTree",level_tree,plan)
         if not result.accepted then printerr("[RuleWorld] Tree commit rejected:",result.reason); return false, result.reason end
         level_tree = next_tree
+        pending_selection = nil
         session = world_api:Invoke("RW_GetActiveLevel",level_tree)
         print(string.format("[RuleWorld] Tree action %s -> %s depth=%d history=%d",
             result.reason or action.type,session.instance_id,#level_tree.stack,#level_tree.history))
@@ -948,9 +1030,19 @@ function OnStart()
         return true
     end
 
-    local function move(dx,dy) act({type="move",dx=dx,dy=dy}) end
+    local function move(dx,dy)
+        if pending_selection then
+            if dy ~= 0 then
+                pending_selection.index = (pending_selection.index-1+dy)%#pending_selection.ids+1
+                render()
+            end
+            return
+        end
+        act({type="move",dx=dx,dy=dy})
+    end
 
     local function undo()
+        if pending_selection then pending_selection = nil; render(); return end
         local next_tree, result = world_api:Invoke("RW_UndoLevelTree",level_tree)
         if not result.accepted then print("[RuleWorld] Undo rejected:",result.reason); return end
         level_tree = next_tree
@@ -985,7 +1077,21 @@ function OnStart()
         print("[RuleWorld] Undo registered (Z)")
     end
 
-    confirm_selected_level = function() return act({type="confirm"}) end
+    choose_selected_level = function(entity_id)
+        if not pending_selection then return false,"no_level_choice" end
+        if entity_id == 0 then pending_selection = nil; render(); return true end
+        if pending_selection.tree ~= level_tree then
+            pending_selection = nil; render(); return false,"stale_level_choice"
+        end
+        local listed = false
+        for _, id in ipairs(pending_selection.ids) do if id == entity_id then listed = true end end
+        if not listed then return false,"invalid_level_choice" end
+        return act({type="confirm",entity_id=entity_id})
+    end
+    confirm_selected_level = function()
+        if pending_selection then return choose_selected_level(pending_selection.ids[pending_selection.index]) end
+        return act({type="confirm"})
+    end
     if key.KeyboardInteractKeyDown then
         root:AddKeyEventListener(key.KeyboardInteractKeyDown,function()
             RW_ConfirmSelectedLevel()
@@ -997,5 +1103,5 @@ function OnStart()
     end
     render()
 
-    print("[RuleWorld] M9.3M initialized")
+    print("[RuleWorld] M9.3N initialized")
 end

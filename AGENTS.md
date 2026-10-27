@@ -20,5 +20,12 @@
   Never disable SELECT entry just because a linked object has a different archetype.
   Noun IS Level may create unusable level shapes without configured destinations.
 - Preserve ordered LEVEL terminal properties: WIN then DEFEAT wins, the reverse
-  defeats; conversion precedes terminal properties. Defeat accepts only Undo.
+  defeats; conversion precedes terminal properties. Scoped WIN requires YOU, never SELECT.
+  Defeat freezes YOU; SELECT can still move/confirm. Without SELECT only Undo.
   See docs/LEVEL_SEMANTICS.md for source locations and the exact test matrix.
+
+- Boundaries reload authored runtime plus persistent scoped LEVEL transformations
+  and results. Whole-tree Undo restores the pre-boundary runtime snapshot.
+- Defaults: Text IS Push, Cursor IS Select, Line IS Path, Level IS Stop.
+  Line/Path is our explicit abstraction over the original authored map paths.
+- See docs/LEVEL_BOUNDARIES.md for M9.3N menus, scroll and test routes.

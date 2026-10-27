@@ -123,6 +123,12 @@ local function valid_frontier(world)
     return true
 end
 
+local function valid_board_offset(value)
+    return type(value) == "table" and is_integer(value.x) and is_integer(value.y)
+        and math.abs(value.x) <= MAX_ID and math.abs(value.y) <= MAX_ID
+        and valid_direction(value.direction)
+end
+
 -- Validate against the ORIGINAL world, independently of operation order.
 -- Existing move/direction/transform writes may coexist with one terminal delete.
 local function validate_plan(world, plan)
@@ -131,8 +137,15 @@ local function validate_plan(world, plan)
         or not is_list(plan.changes) then
         return false, "invalid_plan"
     end
+    if plan.board_shift ~= nil then
+        local shift = plan.board_shift
+        local current = world.board_offset or {x=0,y=0,direction="None"}
+        if type(shift) ~= "table" or not valid_board_offset(shift.from)
+            or not valid_board_offset(shift.to) then return false,"invalid_board_shift" end
+        if not same_state(current,shift.from) then return false,"stale_board_shift" end
+    end
     if not plan.consumes_turn then
-        if #plan.changes ~= 0 or plan.id_allocation ~= nil then
+        if #plan.changes ~= 0 or plan.id_allocation ~= nil or plan.board_shift ~= nil then
             return false, "invalid_no_turn_plan"
         end
         return true
@@ -258,6 +271,7 @@ local function apply_plan(world, plan)
         if change.kind == "delete" then projected.entities[change.entity_id] = nil end
     end
     if plan.id_allocation then projected.next_entity_id = plan.id_allocation.to end
+    if plan.board_shift then projected.board_offset = clone(plan.board_shift.to) end
     return projected
 end
 
@@ -451,6 +465,12 @@ local function default_world()
                     target = { kind = "class", value = "text" },
                     trait = "pushable"
                 }}
+            }, {
+                when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="cursor"},trait="select"}}
+            }, {
+                when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="line"},trait="path"}}
+            }, {
+                when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="level_block"},trait="block_entry"}}
             }},
 
             -- Level-selected vocabulary.
@@ -482,7 +502,7 @@ end
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
 local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
-    behavior_registry=true}
+    behavior_registry=true,board_offset=true}
 
 local function plain_data(value, visiting)
     local kind = type(value)
@@ -512,6 +532,7 @@ local function validate_definition(definition)
     if not is_integer(world.width) or world.width < 1
         or not is_integer(world.height) or world.height < 1
         or type(world.entities) ~= "table" or not valid_frontier(world) then return false end
+    if world.board_offset ~= nil and not valid_board_offset(world.board_offset) then return false end
     for id, entity in pairs(world.entities) do
         if not valid_new_entity(world, entity, id) then return false end
     end
@@ -603,7 +624,7 @@ function RW_Commit(session, plan)
         )
     end
 
-    local changed = #plan.changes > 0
+    local changed = #plan.changes > 0 or plan.board_shift ~= nil
 
     local next_world = session.world
 
@@ -625,6 +646,7 @@ function RW_Commit(session, plan)
         world = next_world,
         definition_id = session.definition_id,
         instance_id = session.instance_id,
+        defeated = session.defeated,
         history = history
     }, {
         accepted = true,
@@ -652,6 +674,7 @@ function RW_Undo(session)
         world = previous_world,
         definition_id = session.definition_id,
         instance_id = session.instance_id,
+        defeated = session.defeated,
         history = history
     }, {
         accepted = true,
@@ -786,7 +809,7 @@ function RW_SelfTest()
 
     local base = s0.world.rule_sources[1]
 
-    if #s0.world.rule_sources ~= 1
+    if #s0.world.rule_sources ~= 4
         or not base
         or base.effects[1].target.kind ~= "class"
         or base.effects[1].target.value ~= "text"
@@ -943,7 +966,7 @@ function RW_CreateLevelTree(definitions, root_definition_id)
     if not definition then return nil, "unknown_definition" end
     local root = RW_InstantiateLevel(definition, "instance:1")
     return {definitions=clone(definitions), instances={[root.instance_id]=root},
-        children={}, active_id=root.instance_id, stack={}, entry_links={}, outcomes={},
+        children={}, active_id=root.instance_id, stack={}, entry_links={}, outcomes={}, level_transforms={},
         history={}, next_instance_id=2}
 end
 
@@ -962,6 +985,34 @@ function RW_UpdateActiveLevel(tree, session)
     next_tree.instances = copy_map(tree.instances)
     next_tree.instances[tree.active_id] = session
     return next_tree
+end
+
+-- Boundaries reload authored data plus persistent LEVEL transformations.
+function RW_ReloadLevel(tree,id)
+    local old = tree.instances[id]
+    if not old then return nil,"unknown_instance" end
+    local session = RW_InstantiateLevel(tree.definitions[old.definition_id],id)
+    for entity_id, archetype in pairs(tree.level_transforms[id] or {}) do
+        if not session.world.entities[entity_id] then return nil,"persistent_level_block_missing" end
+        session.world.entities[entity_id].archetype = archetype
+    end
+    local result = copy_map(tree)
+    result.instances = copy_map(tree.instances)
+    result.instances[id] = session
+    return result
+end
+
+function RW_PlaceLevelSelectors(tree,ids,block_id)
+    local session = RW_GetActiveLevel(tree)
+    local block = session.world.entities[block_id]
+    if not block or not is_list(ids) then return nil,"invalid_selector_spawn" end
+    local world = clone(session.world)
+    for _, id in ipairs(ids) do
+        if not world.entities[id] then return nil,"invalid_selector_spawn" end
+        world.entities[id].x,world.entities[id].y = block.x,block.y
+    end
+    return RW_UpdateActiveLevel(tree,{definition_id=session.definition_id,instance_id=session.instance_id,
+        world=world,history={}})
 end
 
 -- Slot identity belongs to a parent INSTANCE. Same slot under two parents differs.
@@ -992,7 +1043,9 @@ function RW_EnterLevel(tree, slot, definition_id)
         result.active_id = id
         result.next_instance_id = tree.next_instance_id + 1
     end
-    return result
+    local reloaded, err = RW_ReloadLevel(result,tree.active_id)
+    if not reloaded then return nil,err end
+    return RW_ReloadLevel(reloaded,result.active_id)
 end
 
 function RW_ReturnLevel(tree)
@@ -1001,38 +1054,24 @@ function RW_ReturnLevel(tree)
     result.stack = copy_map(tree.stack)
     result.active_id = result.stack[#result.stack]
     result.stack[#result.stack] = nil
-    return result
+    local reloaded, err = RW_ReloadLevel(result,tree.active_id)
+    if not reloaded then return nil,err end
+    return RW_ReloadLevel(reloaded,result.active_id)
 end
 
 function RW_LevelTreeSelfTest()
     local d = RW_GetDefaultLevelDefinition()
-    local root = RW_CreateLevelTree({[d.id]=d}, d.id)
-    local a = RW_EnterLevel(root, "A", d.id)
-    local session = RW_GetActiveLevel(a)
-    local moved, accepted = RW_Commit(session, {consumes_turn=true, changes={
+    local root = RW_CreateLevelTree({[d.id]=d},d.id)
+    local child = RW_EnterLevel(root,"A",d.id)
+    local moved = RW_Commit(RW_GetActiveLevel(child),{consumes_turn=true,changes={
         {kind="direction",entity_id=1,from="None",to="Left"}}})
-    if not accepted.accepted then return false, "Child Commit failed" end
-    a = RW_UpdateActiveLevel(a, moved)
-    local returned = RW_ReturnLevel(a)
-    local b = RW_EnterLevel(returned, "B", d.id)
-    local again = RW_EnterLevel(RW_ReturnLevel(b), "A", d.id)
-    local nested = RW_EnterLevel(again, "A", d.id)
-    if RW_GetActiveLevel(again) ~= moved or #moved.history ~= 1
-        or RW_GetActiveLevel(b).world.entities[1].direction ~= "None"
-        or RW_GetActiveLevel(nested).instance_id == moved.instance_id
-        or RW_GetActiveLevel(root).world.entities[1].direction ~= "None"
-        or RW_GetActiveLevel(RW_ReturnLevel(nested)) ~= moved
-        or #root.stack ~= 0 or root.next_instance_id ~= 2
-        or RW_ReturnLevel(root) ~= nil then
-        return false, "Nested state retention or parent/slot isolation failed"
-    end
-    local undone = RW_Undo(RW_GetActiveLevel(again))
-    local restored = RW_UpdateActiveLevel(again, undone)
-    if RW_GetActiveLevel(restored).world ~= session.world
-        or RW_GetActiveLevel(a).world.entities[1].direction ~= "Left" then
-        return false, "Local child Undo mutated retained snapshot"
-    end
-    return true, "Nested enter/return, retained instances and local Undo passed"
+    child = RW_UpdateActiveLevel(child,moved)
+    local again = RW_EnterLevel(RW_ReturnLevel(child),"A",d.id)
+    if RW_GetActiveLevel(again).world.entities[1].direction ~= "None"
+        or #RW_GetActiveLevel(again).history ~= 0 or again.active_id ~= child.active_id
+        or RW_GetActiveLevel(child).world.entities[1].direction ~= "Left"
+        or RW_ReturnLevel(root) ~= nil then return false,"Level boundary reset failed" end
+    return true,"Level boundary reload, stable identity and snapshot isolation passed"
 end
 
 function RW_BindLevelEntry(tree, entity_id)
@@ -1051,6 +1090,11 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
     local result = copy_map(tree)
     result.outcomes = copy_map(tree.outcomes)
     result.outcomes[tree.active_id] = {kind=kind,target_type=target_type}
+    if kind == "defeat" then
+        result.instances = copy_map(tree.instances)
+        result.instances[tree.active_id] = copy_map(tree.instances[tree.active_id])
+        result.instances[tree.active_id].defeated = true
+    end
     if kind == "transform" then
         local entry = tree.entry_links[tree.active_id]
         if not entry then return nil, "no_parent_level_block" end
@@ -1062,8 +1106,10 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
         if not accepted.accepted then return nil, accepted.reason end
         result.instances = copy_map(tree.instances)
         result.instances[entry.parent_id] = changed
+        result.level_transforms = copy_map(tree.level_transforms)
+        result.level_transforms[entry.parent_id] = copy_map(tree.level_transforms[entry.parent_id] or {})
+        result.level_transforms[entry.parent_id][block.id] = target_type
     end
-    if kind ~= "defeat" and #tree.stack > 0 then return RW_ReturnLevel(result) end
     return result
 end
 
@@ -1071,6 +1117,7 @@ local function valid_tree_candidate(tree)
     if type(tree) ~= "table" or type(tree.instances) ~= "table"
         or type(tree.definitions) ~= "table" or type(tree.children) ~= "table"
         or type(tree.entry_links) ~= "table" or type(tree.outcomes) ~= "table"
+        or type(tree.level_transforms) ~= "table"
         or not is_list(tree.stack) or not valid_id(tree.next_instance_id)
         or not tree.instances[tree.active_id] then return false end
     for id, session in pairs(tree.instances) do
@@ -1096,8 +1143,9 @@ end
 
 -- The planner produces a complete candidate. Commit owns the only history write.
 function RW_CommitLevelTree(tree, plan)
-    local outcome = tree.outcomes[tree.active_id]
-    if outcome and outcome.kind == "defeat" then return tree,rejected("level_defeated_undo_only") end
+    if RW_GetActiveLevel(tree).defeated and not (type(plan) == "table" and plan.select_after_defeat) then
+        return tree,rejected("level_defeated_undo_only")
+    end
     if type(plan) ~= "table" or plan.before ~= tree or type(plan.after) ~= "table"
         or not valid_tree_candidate(plan.after) or plan.after.history ~= tree.history then
         return tree, rejected("invalid_or_stale_tree_plan")
@@ -1136,10 +1184,11 @@ function RW_GetNavigationDefinitions()
             definition_id=definition_id,label=name})
     end
     local function configure(world)
-        grant(world,"cursor","select")
-        grant(world,"path","path")
         grant(world,"flag","win")
         world.language.nouns.CURSOR = "cursor"
+        world.language.nouns.LINE = "line"
+        world.language.properties.PATH = "path"
+        world.language.properties.STOP = "block_entry"
         world.language.nouns.FLAG = "flag"
         world.language.nouns.LEVEL = {tag="level",block_type="level_block"}
         world.language.operators = {AND="and"}
@@ -1157,14 +1206,14 @@ function RW_GetNavigationDefinitions()
     portal(root,15,3,1,"T","navigation.transform")
     local id = 16
     for y=1,3 do for x=1,7 do
-        object(root,id,"path",x,y)
+        object(root,id,"line",x,y)
         id = id+1
     end end
     local puzzle = default_world()
     configure(puzzle)
     object(puzzle,12,"cursor",1,1)
     portal(puzzle,13,2,1,"PARENT")
-    object(puzzle,14,"path",1,1)
+    object(puzzle,14,"line",1,1)
     object(puzzle,15,"flag",2,3)
     local transform = clone(puzzle)
     transform.entities[1].x, transform.entities[1].y = 9,10
@@ -1201,12 +1250,22 @@ function RW_GetNavigationDefinitions()
         world.next_entity_id = 16+#test.words
         if test.id == "noun_level" then
             world.entities[4].level_link = {source_type="crate",target="child",definition_id="navigation.puzzle",label="C"}
-            object(world,world.next_entity_id,"path",1,2)
-            object(world,world.next_entity_id,"path",2,2)
+            object(world,world.next_entity_id,"line",1,2)
+            object(world,world.next_entity_id,"line",2,2)
         end
         local definition_id = "navigation." .. test.id
         definitions[definition_id] = {id=definition_id,initial_world=world}
         portal(root,36+column,column,3,test.label,definition_id)
     end
+    local map_you = clone(definitions["navigation.win"].initial_world)
+    map_you.entities[18].text.name = "YOU"
+    definitions["navigation.level_you"] = {id="navigation.level_you",initial_world=map_you}
+    portal(root,43,7,3,"YOU","navigation.level_you")
+    portal(root,44,7,3,"P","navigation.puzzle")
+    local selector_win = clone(definitions["navigation.win"].initial_world)
+    selector_win.entities[16].y = 8
+    selector_win.entities[11].text.name = "PUSH" -- No YOU: WIN must leave SELECT usable.
+    definitions["navigation.selector_win"] = {id="navigation.selector_win",initial_world=selector_win}
+    portal(root,45,7,1,"SW","navigation.selector_win")
     return definitions, "navigation.root"
 end

@@ -15,6 +15,8 @@ local views = {}
 local board_width = 0
 local board_height = 0
 local last_error = nil
+local board_dx, board_dy = 0, 0
+local choice_controls = {}
 
 local function report_error(message)
     if last_error ~= message then
@@ -28,6 +30,11 @@ local function grid_position(x, y, width, height)
     return
         (x - (width + 1) / 2) * CELL_STEP,
         ((height + 1) / 2 - y) * CELL_STEP
+end
+
+local function display_position(x,y,width,height)
+    local px,py = grid_position(x,y,width,height)
+    return px+board_dx*CELL_STEP,py-board_dy*CELL_STEP
 end
 
 local function configure_control(control)
@@ -148,7 +155,7 @@ local function ensure_grid(world)
                 return false
             end
 
-            local px, py = grid_position(
+            local px, py = display_position(
                 x, y, world.width, world.height
             )
 
@@ -187,7 +194,7 @@ local function get_label(entity)
     end
     if entity.archetype == "level_block" then return "LEVEL?" end
     if entity.archetype == "cursor" then return "SEL" end
-    if entity.archetype == "path" then return "." end
+    if entity.archetype == "line" then return "." end
     if entity.archetype == "flag" then return "FLAG" end
     if entity.class == "text" then
         return entity.text and entity.text.name or "?"
@@ -208,7 +215,7 @@ local function get_colors(entity)
         return Color(112,70,145,255), Color(255,255,255,255)
     end
     if entity.archetype == "cursor" then return Color(220,220,230,255), Color(20,20,30,255) end
-    if entity.archetype == "path" then return Color(43,55,75,255), Color(90,110,140,255) end
+    if entity.archetype == "line" then return Color(43,55,75,255), Color(90,110,140,255) end
     if entity.class == "text" then
         return
             Color(205, 159, 89, 255),
@@ -302,7 +309,7 @@ local function draw_entities(world)
             local count = #slot
 
             if count > 0 then
-                local cx, cy = grid_position(
+                local cx, cy = display_position(
                     x, y, world.width, world.height
                 )
 
@@ -366,22 +373,68 @@ local function draw_entities(world)
     end
 end
 
+local function choose_level(entity_id)
+    for _, candidate in ipairs(script.object:GetScripts()) do
+        local name = (candidate.path or ""):gsub("\\","/"):match("([^/]+)$")
+        if name == "bootstrap" then candidate:Invoke("RW_ChooseSelectedLevel",entity_id); return end
+    end
+end
+
+local function draw_level_choice(choice)
+    for _, control in ipairs(choice_controls) do
+        if control.alive then game.DestroyClientUIControl(control) end
+    end
+    choice_controls = {}
+    if not choice then return end
+    local first = math.floor((choice.index-1)/8)*8+1
+    local last = math.min(#choice.items,first+7)
+    local height = (last-first+3)*48
+    local function panel(name,text,y,width,h,selected,id)
+        local control = instantiate(board_root)
+        if not control then report_error("Cannot instantiate level choice"); return end
+        choice_controls[#choice_controls+1] = control
+        control.name = name
+        control:SetAnchoredPosition(0,y)
+        control:SetSizeDelta(width,h)
+        control.text = text
+        control.fontSize = 18
+        control.fontColor = Color(255,255,255,255)
+        control.bgColor = selected and Color(90,80,155,255) or Color(24,30,48,255)
+        if id and Enum.CursorEventType and Enum.CursorEventType.CursorClick then
+            control:AddCursorEventListener(Enum.CursorEventType.CursorClick,function() choose_level(id); return true end)
+        end
+    end
+    panel("RW_ChoiceBackground","",0,640,height,false)
+    panel("RW_ChoiceTitle","Choose level: W/S + F, or click",height/2-24,620,44,false)
+    for index=first,last do
+        local item = choice.items[index]
+        panel("RW_Choice_" .. tostring(item.entity_id),
+            (index == choice.index and "> " or "  ") .. item.label .. (item.available and "" or " (unavailable)"),
+            height/2-24-(index-first+1)*48,620,44,index == choice.index,item.entity_id)
+    end
+    panel("RW_ChoiceCancel",choice.error or "Z / click to cancel",-height/2+24,620,44,false,0)
+end
+
 function RW_Render(world, history_depth, active_effects, navigation)
     if not ensure_host() then
         return false
     end
 
+    board_dx = world.board_offset and world.board_offset.x or 0
+    board_dy = world.board_offset and world.board_offset.y or 0
     if not ensure_grid(world) then
         return false
     end
 
     -- Repaint every cell so same-sized instance switches clear old portal labels.
-    for _, cell in ipairs(cells) do
+    for index, cell in ipairs(cells) do
+        local x,y = (index-1)%world.width+1,math.floor((index-1)/world.width)+1
+        cell:SetAnchoredPosition(display_position(x,y,world.width,world.height))
         cell.text = ""
         cell.bgColor = Color(43, 55, 75, 255)
     end
     for _, entity in pairs(world.entities) do
-        if entity.archetype == "path" then
+        if entity.archetype == "line" then
             local cell = cells[(entity.y-1)*world.width+entity.x]
             if cell then cell.text = "."; cell.fontSize = 18; cell.fontColor = Color(90,110,140,255) end
         end
@@ -396,6 +449,7 @@ function RW_Render(world, history_depth, active_effects, navigation)
         end
     end
     draw_entities(world)
+    draw_level_choice(navigation and navigation.choice)
 
     if status_text then
         status_text.text = string.format(

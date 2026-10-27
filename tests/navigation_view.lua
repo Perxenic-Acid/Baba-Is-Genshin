@@ -3,8 +3,13 @@ local old_game, old_script, old_color, old_render = game, script, Color, RW_Rend
 local controls = {}
 local board, status = {alive=true}, {alive=true}
 local methods = setmetatable({}, {__index=function() return function() end end})
+methods.SetAnchoredPosition = function(control,x,y) control.px,control.py=x,y end
+methods.AddCursorEventListener = function(control,event,callback) control.click=callback end
+local old_cursor_events = Enum.CursorEventType
+Enum.CursorEventType = {CursorClick="click"}
+local chosen
 Color = function(r,g,b,a) return {r,g,b,a} end
-script = {object={GetChild=function(_,name)
+script = {object={GetScripts=function() return {{path="bootstrap",Invoke=function(_,name,id) chosen=id; return true end}} end,GetChild=function(_,name)
     if name == "BoardRoot" then return board end
     if name == "StatusText" then return status end
 end}}
@@ -38,5 +43,23 @@ for _, control in ipairs(controls) do if control.name then views[control.name] =
 assert(views.RW_Entity_1.text == "FLAG" and views.RW_Entity_1.bgColor[1] ~= 238)
 assert(views.RW_Entity_2.bgColor[1] == 238)
 assert(views.RW_Entity_3.text == "LEVEL?" and views.RW_Entity_4.text == "A:crate")
+local before_x,before_y = views.RW_Entity_1.px,views.RW_Entity_1.py
+local cell_x,cell_y = controls[1].px,controls[1].py
+typed.board_offset = {x=1,y=2,direction="Right"}
+assert(RW_Render(typed,0,1,{choice={index=1,items={
+    {entity_id=43,label="YOU",available=true},{entity_id=44,label="P",available=true}}}}))
+assert(views.RW_Entity_1.px == before_x+68 and views.RW_Entity_1.py == before_y-136)
+assert(controls[1].px == cell_x+68 and controls[1].py == cell_y-136)
+local rows = {}
+for _, control in ipairs(controls) do if control.name then rows[control.name]=control end end
+assert(rows.RW_Choice_44 and rows.RW_Choice_44.click)
+rows.RW_Choice_44.click()
+assert(chosen == 44)
+rows.RW_ChoiceCancel.click()
+assert(chosen == 0)
+assert(RW_RendererSelfTest())
+assert(RW_Render(typed,0,1))
+assert(not rows.RW_Choice_44.alive)
+Enum.CursorEventType = old_cursor_events
 game, script, Color, RW_Render = old_game, old_script, old_color, old_render
 print("PASS: native renderer portal labels, status and same-size instance refresh")

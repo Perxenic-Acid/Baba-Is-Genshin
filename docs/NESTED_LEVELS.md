@@ -1,5 +1,7 @@
 # M9.3L：SELECT、确认与跨层原子撤销
 
+M9.3N 的边界重置、地图移动和多目标菜单以 [LEVEL_BOUNDARIES.md](LEVEL_BOUNDARIES.md) 为准。
+
 后续修订：关卡指向/转换和有序终局属性以 LEVEL_SEMANTICS.md（M9.3M）为准。
 
 本文件取代 M9.3K 的局部撤销/自动踩格进入约定。用户真机测试指出其语义
@@ -30,7 +32,7 @@ child 的 definition_id 与可选 label。M9.3M 修正：指向绑定实体 ID�
 同一父实例内以关卡块 entity_id 作为 slot，反复进入复用子实例。
 
 仅有 SELECT 与块重叠才产生候选，确认动作才进入。无候选拒绝；多个候选
-暂拒绝 ambiguous_selected_levels，尚未实现原版多目标选择菜单。
+打开选择界面，W/S 切换、F 确认，也可点击；Z 取消且不写历史。
 候选按 ID 排序，同一关卡块不会因多个 SELECT 重复计数。
 
 ## 确认入口与键位

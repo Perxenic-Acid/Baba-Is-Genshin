@@ -1,7 +1,7 @@
 -- Real modules, independent of the native fixture and input binding.
 local services = {
     active=RW_GetActiveLevel, update=RW_UpdateActiveLevel, enter=RW_EnterLevel,
-    return_level=RW_ReturnLevel, bind_entry=RW_BindLevelEntry,
+    return_level=RW_ReturnLevel, selectors=RW_LevelSelectorIDs, place_selectors=RW_PlaceLevelSelectors, bind_entry=RW_BindLevelEntry,
     commit_session=RW_Commit, outcome=RW_RecordLevelOutcome,
     candidates=RW_LevelSelectionCandidates, win=RW_HasWinContact,
     level_outcome=RW_ResolveLevelPropertyOutcome,
@@ -58,7 +58,7 @@ assert(RW_GetActiveLevel(unwin).world.entities[1].y == 2)
 local pushed = step(entered,right)
 local returned = step(pushed,confirm)
 local revisited = step(returned,confirm)
-assert(revisited.active_id == entered.active_id and RW_GetActiveLevel(revisited).world.entities[4].x == 4)
+assert(revisited.active_id == entered.active_id and RW_GetActiveLevel(revisited).world.entities[4].x == 3)
 local undo_return = RW_UndoLevelTree(returned)
 assert(undo_return.active_id == entered.active_id and #undo_return.stack == 1)
 -- Conversion atomically writes a suspended parent's block and exits the child.
@@ -107,7 +107,7 @@ world.rule_sources[#world.rule_sources+1] = {when={op="always"},effects={
 local d = assert(RW_CreateLevelDefinition("ambiguous",world))
 local ambiguous = assert(RW_CreateLevelTree({ambiguous=d},"ambiguous"))
 local bad, failure = RW_PlanLevelAction(ambiguous,confirm,services)
-assert(not bad and failure.reason == "ambiguous_selected_levels" and #ambiguous.history == 0)
+assert(not bad and failure.reason == "choose_level" and #ambiguous.history == 0)
 -- Any post-movement failure rejects the complete tree transaction.
 local project = services.project
 local calls = 0

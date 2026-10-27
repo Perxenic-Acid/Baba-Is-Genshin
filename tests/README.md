@@ -84,3 +84,9 @@ AND provenance, LEVEL WIN/DEFEAT ordering, conversion priority, and defeat-only 
 The mapped startup probe and F callback tests exercise all five terminal fixtures;
 N checks configured versus unconfigured IDs. See ../docs/LEVEL_SEMANTICS.md for
 manual test sequences. Native rendering tests also verify property-based WIN color.
+
+## M9.3N
+
+关卡边界重置、持久 LEVEL 转换/结果、LEVEL IS YOU 地图偏移、多目标选关 UI、
+四条预设规则，以及 SELECT-only WIN 不退出/DEFEAT 允许 SELECT。
+详见 docs/LEVEL_BOUNDARIES.md；离线新增 tests/level_boundaries.lua 与宿主/渲染回归。

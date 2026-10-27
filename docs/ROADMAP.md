@@ -104,3 +104,9 @@ instance_id。原有无参 CreateSession 保持兼容。定义数据、实例配
 真机日志可直接从 BeyondLocal/<account>/Beyond_Debug_Log 中按修改时间读取
 最新 .gia，提取可读脚本消息；.gia/.gil 均含二进制和文本，不能按普通文本
 覆盖保存。日志只读，不加入游戏源码提交。
+
+## M9.3N
+
+关卡边界重置、持久 LEVEL 转换/结果、LEVEL IS YOU 地图偏移、多目标选关 UI、
+四条预设规则，以及 SELECT-only WIN 不退出/DEFEAT 允许 SELECT。
+详见 docs/LEVEL_BOUNDARIES.md；离线新增 tests/level_boundaries.lua 与宿主/渲染回归。

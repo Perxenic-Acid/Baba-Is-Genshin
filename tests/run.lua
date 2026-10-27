@@ -86,7 +86,7 @@ assert(navigation.title == child_b_title and rendered.entities[1].y == 2)
 listeners.right(); listeners.confirm() -- parent block
 assert(navigation.title:find("MAP"))
 listeners.confirm() -- Re-enter the same retained B instance.
-assert(navigation.title == child_b_title and rendered.entities[4].x == 4)
+assert(navigation.title == child_b_title and rendered.entities[4].x == 3)
 while history_depth > 0 do listeners.undo() end
 listeners.up(); listeners.right(); listeners.confirm() -- T
 assert(navigation.title:find("PUZZLE") and rendered.entities[1].x == 9)
@@ -105,10 +105,11 @@ for column, expected in ipairs({"win","defeat","win","defeat","transform"}) do
     for _=3,column do listeners.right() end
     listeners.down(); listeners.confirm(); listeners.up()
     if expected == "defeat" then
-        assert(navigation.title:find("DEFEAT") and navigation.hint:find("Z Undo only"))
-        local depth = history_depth
-        listeners.right(); listeners.confirm()
-        assert(history_depth == depth and navigation.title:find("DEFEAT"))
+        assert(navigation.title:find("DEFEAT") and navigation.hint:find("SELECT remains active"))
+        local before_x = rendered.entities[1].x
+        listeners.right()
+        assert(rendered.entities[12].x == 2 and rendered.entities[1].x == before_x)
+        listeners.undo()
     else
         assert(navigation.title:find("MAP"))
         if expected == "transform" then assert(rendered.entities[41].archetype == "rock") end
@@ -126,11 +127,32 @@ listeners.down(); listeners.right(); listeners.right(); listeners.confirm()
 assert(navigation.title ~= noun_title and navigation.title:find("PUZZLE"))
 listeners.right(); listeners.confirm() -- Nested parent block returns to N.
 assert(navigation.title == noun_title)
-listeners.right()
-local unavailable_depth = history_depth
+assert(rendered.entities[4].archetype == "crate" and rendered.entities[5].archetype == "crate")
+print("PASS: F enters the configured converted ID; return reloads ordinary conversions")
+while history_depth > 0 do listeners.undo() end
+for _=1,5 do listeners.right() end
+listeners.down()
+local choice_depth = history_depth
 listeners.confirm()
-assert(navigation.title == noun_title and history_depth == unavailable_depth)
-print("PASS: F enters the configured converted ID and rejects the unconfigured LEVEL ID")
+assert(navigation.choice and #navigation.choice.items == 2 and history_depth == choice_depth)
+local cursor_y = rendered.entities[12].y
+listeners.down()
+assert(navigation.choice.index == 2 and rendered.entities[12].y == cursor_y and history_depth == choice_depth)
+listeners.undo()
+assert(not navigation.choice and history_depth == choice_depth)
+listeners.confirm(); listeners.confirm() -- First overlapping block: LEVEL IS YOU fixture.
+assert(rendered.entities[1].x == 4 and not navigation.choice)
+listeners.up(); listeners.right()
+assert(rendered.board_offset.x == 1 and rendered.board_offset.direction == "Right")
+listeners.undo()
+assert(not rendered.board_offset or rendered.board_offset.x == 0)
+listeners.undo(); listeners.undo()
+listeners.confirm()
+assert(navigation.choice)
+assert(not RW_ChooseSelectedLevel(999) and navigation.choice)
+assert(RW_ChooseSelectedLevel(44)) -- Click/API choice of second overlapping block.
+assert(not navigation.choice and rendered.entities[1].x == 2)
+print("PASS: modal choice open/cycle/cancel/explicit target and LEVEL IS YOU scroll/Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -146,3 +168,5 @@ dofile("tests/level_transactions.lua")
 dofile("tests/level_semantics.lua")
 
 dofile("tests/navigation_view.lua")
+
+dofile("tests/level_boundaries.lua")

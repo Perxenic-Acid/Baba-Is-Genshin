@@ -69,7 +69,7 @@ end
 
 -- Consume concrete effects resolved by rules.RW_ResolveEffects/EvaluateRules.
 -- Selection semantics belong to the query module, never to the projector.
-function RW_ProjectWorld(world, effects)
+function RW_ProjectWorld(world, effects, level_traits)
     if type(world) ~= "table" or type(world.entities) ~= "table" then return nil, "invalid_world" end
     if effects == nil then effects = {} end
     if not dense_list(effects) then return nil, "invalid_effects" end
@@ -92,7 +92,19 @@ function RW_ProjectWorld(world, effects)
             seen[id] = true
         end
     end
+    level_traits = level_traits or {}
+    if not dense_list(level_traits) then return nil,"invalid_level_properties" end
+    for _, trait in ipairs(level_traits) do
+        if type(trait) ~= "string" or trait == "" then return nil,"invalid_level_property" end
+    end
     local projected = clone(world)
+    projected.level_traits, projected.level_behaviors = {}, {}
+    for _, trait in ipairs(level_traits) do
+        projected.level_traits[#projected.level_traits+1] = trait
+        for capability, enabled in pairs(registry[trait] or {}) do
+            if enabled then projected.level_behaviors[capability] = true end
+        end
+    end
     for _, entity in pairs(projected.entities) do
         entity.traits = nil
         entity.behaviors = {} -- Explicit empty capabilities disable legacy fallback.
@@ -158,9 +170,13 @@ function RW_ResolveLevelPropertyOutcome(world, traits)
     for _, trait in ipairs(traits) do
         if type(trait) ~= "string" or trait == "" then return nil,"invalid_level_property" end
     end
+    local has_you = world.level_behaviors and world.level_behaviors.control == true
+    for _, entity in pairs(world.entities or {}) do
+        if entity.behaviors and entity.behaviors.control then has_you = true end
+    end
     for _, trait in ipairs(traits) do
         local capabilities = registry[trait] or {}
-        if capabilities.win then return "win" end
+        if capabilities.win and has_you then return "win" end
         if capabilities.defeat then return "defeat" end
     end
     return nil

@@ -285,6 +285,19 @@ assert(rendered.entities[melt_frontier].archetype=="crate" and rendered.entities
 listeners.undo()
 assert(rendered.entities[1].y==5 and not rendered.entities[melt_frontier] and rendered.next_entity_id==melt_frontier)
 print("PASS: native MELT contact, retained HOT source, HAS crate, allocator/direction and whole-tree Undo")
+while history_depth > 0 do listeners.undo() end
+for _=1,5 do listeners.right() end
+listeners.up();listeners.right();listeners.right();listeners.right();listeners.confirm()
+assert(rendered.entities[1].behaviors.open and rendered.entities[2].behaviors.shut)
+local unlock_frontier=rendered.next_entity_id
+listeners.up()
+assert(not rendered.entities[1] and not rendered.entities[2])
+assert(rendered.entities[unlock_frontier].archetype=="flag" and rendered.entities[unlock_frontier].y==4)
+assert(rendered.entities[unlock_frontier+1].archetype=="crate" and rendered.entities[unlock_frontier+1].y==5
+    and rendered.entities[unlock_frontier+1].direction=="Up")
+listeners.undo()
+assert(rendered.entities[1].y==5 and rendered.entities[2].y==4 and rendered.next_entity_id==unlock_frontier)
+print("PASS: native LOCK entry, movement unlock, source/destination HAS, directions and whole-tree Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -318,3 +331,5 @@ dofile("tests/special_nouns.lua")
 dofile("tests/terminal_words.lua")
 dofile("tests/spatial_words.lua")
 dofile("tests/hot_melt.lua")
+
+dofile("tests/open_shut.lua")

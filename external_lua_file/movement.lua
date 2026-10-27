@@ -10,7 +10,8 @@ local function has_capability(world, entity, capability)
     end
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", select = "select", select_path = "path",
-        win = "win", push = "pushable", block_entry = "block_entry"}
+        win = "win", push = "pushable", block_entry = "block_entry",
+        open="open",shut="shut",safe="safe"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -139,13 +140,29 @@ function RW_ResolveMovement(world, action)
         return invalid("unknown_entity")
     end
 
-    local planned = {}
+    local planned,removed,destructions = {},{},{}
     local visiting = {}
     local changes = {}
+    local function destroy(id,direction)
+        if removed[id] then return end
+        local entity=world.entities[id]
+        local frame={}
+        for other_id,other in pairs(world.entities) do
+            if other_id > 0 and not removed[other_id] then
+                local snapshot={};for key,value in pairs(other) do snapshot[key]=value end
+                frame[other_id]=snapshot
+            end
+        end
+        local dying={};for key,value in pairs(entity) do dying[key]=value end
+        dying.direction=direction or entity.direction or "None";frame[id]=dying
+        removed[id]=true;planned[id]=true
+        destructions[#destructions+1]={entity_id=id,x=entity.x,y=entity.y,
+            direction=dying.direction,cause="unlock",frame=frame}
+    end
 
     local function empty_at(x,y)
         for id,entity in pairs(world.entities) do
-            if id > 0 and entity.x == x and entity.y == y then return nil end
+            if id > 0 and not removed[id] and entity.x == x and entity.y == y then return nil end
         end
         local cell=world.empty_cells and world.empty_cells[x .. ":" .. y]
         return cell and cell.behaviors or world.empty_behaviors
@@ -160,7 +177,7 @@ function RW_ResolveMovement(world, action)
         elseif empty and empty.block_entry then return false,"blocked_by_empty" end
         local occupants={}
         for id,entity in pairs(world.entities) do
-            if id > 0 and entity.x == nx and entity.y == ny then occupants[#occupants+1]=id end
+            if id > 0 and not removed[id] and entity.x == nx and entity.y == ny then occupants[#occupants+1]=id end
         end
         table.sort(occupants)
         for _,id in ipairs(occupants) do
@@ -205,6 +222,7 @@ function RW_ResolveMovement(world, action)
 
         for other_id, other in pairs(world.entities) do
             if other_id ~= id
+                and not removed[other_id]
                 and other.x == nx
                 and other.y == ny then
                 occupants[#occupants + 1] = other_id
@@ -213,11 +231,17 @@ function RW_ResolveMovement(world, action)
 
         table.sort(occupants)
 
+        local locks={}
+        local partner=has_capability(world,entity,"open") and "shut"
+            or has_capability(world,entity,"shut") and "open" or nil
         for _, other_id in ipairs(occupants) do
             if not planned[other_id] then
                 local other = world.entities[other_id]
 
-                if has_capability(world, other, "push") then
+                if partner and id > 0 and other_id > 0 and has_capability(world,other,partner)
+                    and (not has_capability(world,entity,"safe") or not has_capability(world,other,"safe")) then
+                    locks[#locks+1]=other_id -- Unlock takes precedence over PUSH/STOP.
+                elseif has_capability(world, other, "push") then
                     -- Push takes priority over STOP-like blocking.
                     local ok, reason = try_move(other_id)
 
@@ -233,8 +257,16 @@ function RW_ResolveMovement(world, action)
             end
         end
 
+        for _,other_id in ipairs(locks) do
+            if removed[id] then break end
+            if not removed[other_id] then
+                if not has_capability(world,world.entities[other_id],"safe") then destroy(other_id) end
+                if not has_capability(world,entity,"safe") then destroy(id,direction_for(dx,dy)) end
+            end
+        end
         visiting[id] = nil
         planned[id] = true
+        if removed[id] then return true end
 
         -- Append dependencies before their mover.
         changes[#changes + 1] = {
@@ -263,7 +295,8 @@ function RW_ResolveMovement(world, action)
 
     return {
         consumes_turn = true,
-        changes = changes
+        changes = changes,
+        destructions=destructions
     }
 end
 
@@ -481,12 +514,12 @@ local function resolve_you_turn(world, action)
 
     -- Track entities moved by any previous sub-plan.
     -- A pushed YOU must not receive a second step.
-    local displaced = {}
+    local displaced,death_records,death_order = {},{},{}
     local blocked_count = 0
     local last_block_reason = nil
 
     for _, id in ipairs(controllers) do
-        if not displaced[id] then
+        if not displaced[id] and working.entities[id] then
             local part = RW_ResolveMovement(
                 working,
                 {
@@ -504,7 +537,7 @@ local function resolve_you_turn(world, action)
                 )
             end
 
-            if #part.changes == 0 then
+            if #part.changes == 0 and #(part.destructions or {}) == 0 then
                 blocked_count = blocked_count + 1
                 last_block_reason = part.reason
                 working.entities[id].direction = direction_for(dx, dy)
@@ -519,6 +552,10 @@ local function resolve_you_turn(world, action)
                     entity.direction = change.to.direction
 
                     displaced[change.entity_id] = true
+                end
+                for _,death in ipairs(part.destructions or {}) do
+                    death_records[death.entity_id]=death;death_order[#death_order+1]=death
+                    working.entities[death.entity_id]=nil;displaced[death.entity_id]=true
                 end
             end
         end
@@ -539,6 +576,10 @@ local function resolve_you_turn(world, action)
     for _, id in ipairs(ids) do
         local before = world.entities[id]
         local after = working.entities[id]
+        if not after then
+            local death=death_records[id]
+            after={x=death.x,y=death.y,direction=death.direction}
+        end
 
         if before.x ~= after.x
             or before.y ~= after.y then
@@ -580,7 +621,8 @@ local function resolve_you_turn(world, action)
     return {
         consumes_turn = true,
         reason = reason,
-        changes = changes
+        changes = changes,
+        destructions=death_order
     }
 end
 
@@ -727,8 +769,9 @@ function RW_ResolveTurn(world, action)
     local writes = {}
     for index, change in ipairs(plan.changes) do writes[change.entity_id] = index end
     local selected = false
+    local destroyed={};for _,death in ipairs(plan.destructions or {}) do destroyed[death.entity_id]=true end
     for id, entity in pairs(world.entities) do
-        if has_capability(world, entity, "select") then
+        if not destroyed[id] and has_capability(world, entity, "select") then
             selected = true
             local x, y = entity.x + action.dx, entity.y + action.dy
             local traversable = false

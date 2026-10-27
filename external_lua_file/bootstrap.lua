@@ -57,11 +57,27 @@ end
 
 -- Contact destruction and HAS share one flat phase: births use the pre-delete
 -- snapshot, and IDs are allocated only in the returned plan.
-function RW_PlanContactPhase(world, effective, kind, contents, services)
-    local ids,why=services.victims(effective,kind)
-    if not ids then return nil,why end
-    local specifications,err=services.births(world,ids,contents)
-    if not specifications then return nil,err end
+function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths)
+    local specifications,err
+    if deaths then
+        specifications={}
+        for _,death in ipairs(deaths) do
+            if type(death.frame) ~= "table" or not death.frame[death.entity_id] then return nil,"invalid_death_frame" end
+            local context={};for key,value in pairs(world) do context[key]=value end
+            context.entities={};for id,entity in pairs(death.frame) do context.entities[id]=entity end
+            -- Earlier deaths' HAS products already exist for later conditional HAS queries.
+            for index,spec in ipairs(specifications) do
+                local entity={};for key,value in pairs(spec) do entity[key]=value end
+                entity.id=world.next_entity_id+index-1;context.entities[entity.id]=entity
+            end
+            local born,why=services.births(context,{death.entity_id},contents)
+            if not born then return nil,why end
+            for _,spec in ipairs(born) do specifications[#specifications+1]=spec end
+        end
+    else
+        specifications,err=services.births(world,ids,contents)
+        if not specifications then return nil,err end
+    end
     local removal,remove_error=services.delete(world,ids)
     if not removal then return nil,remove_error end
     local creation,create_error=services.create(world,specifications)
@@ -71,6 +87,12 @@ function RW_PlanContactPhase(world, effective, kind, contents, services)
     for _,change in ipairs(creation.changes) do plan.changes[#plan.changes+1]=change end
     for _,id in ipairs(ids) do plan.events[#plan.events+1]={kind="destroy",cause=kind,entity_id=id} end
     return plan
+end
+
+function RW_PlanContactPhase(world, effective, kind, contents, services)
+    local ids,why=services.victims(effective,kind)
+    if not ids then return nil,why end
+    return RW_PlanDestructionPhase(world,ids,contents,kind,services)
 end
 
 -- M9.3F: host-independent turn planning. Services adapt mapped scripts;
@@ -118,12 +140,31 @@ function RW_PlanTurn(world, action, services)
     local preview, preview_error = services.preview(world, movement)
     if not preview then return fail("preview_movement", preview_error) end
 
+    local movement_prefix=movement
+    if #(movement.destructions or {}) > 0 then
+        if type(services.destroy) ~= "function" then return fail("movement_unlock","missing_destruction_service") end
+        local victims,contents={},{}
+        for _,death in ipairs(movement.destructions) do victims[#victims+1]=death.entity_id end
+        for _,relation in ipairs(before_conversions or {}) do if relation.op == "has" then contents[#contents+1]=relation end end
+        trace[#trace+1]="movement_unlock"
+        local destruction,why=services.destroy(preview,victims,contents,"unlock_movement",movement.destructions)
+        if not destruction then return fail("movement_unlock",why) end
+        local after,err=services.preview(preview,destruction)
+        if not after then return fail("movement_unlock",err) end
+        local move_stage={consumes_turn=true,changes=movement.changes,board_shift=movement.board_shift}
+        movement_prefix={consumes_turn=true,reason=movement.reason,changes={},stages={
+            {name="movement",plan=move_stage},{name="movement_unlock",plan=destruction}}}
+        for _,stage in ipairs(movement_prefix.stages) do
+            for _,change in ipairs(stage.plan.changes) do movement_prefix.changes[#movement_prefix.changes+1]=change end
+        end
+        preview=after
+    end
     trace[#trace + 1] = "rules_after"
     local post_effects, post_error, conversions = services.evaluate(preview)
     if not post_effects then
         if post_error == "word_rule_limit" or post_error == "word_rule_cycle" or post_error == "rule_complexity_limit" then
-            lock_compile_failure(movement,post_error)
-            return movement,nil,trace
+            lock_compile_failure(movement_prefix,post_error)
+            return movement_prefix,nil,trace
         end
         return fail("rules_after", post_error)
     end
@@ -154,9 +195,10 @@ function RW_PlanTurn(world, action, services)
     local conversion_stage = {consumes_turn=true,changes={},id_allocation=allocation}
     for _, change in ipairs(movement.changes) do movement_stage.changes[#movement_stage.changes+1]=change end
     for _, change in ipairs(operations) do conversion_stage.changes[#conversion_stage.changes+1]=change end
+    local stages=movement_prefix.stages or {{name="movement",plan=movement_stage}}
+    stages[#stages+1]={name="conversion",plan=conversion_stage}
     local plan = {consumes_turn=true,reason=movement.reason,changes={},
-        level_transform=target_type,level_traits=level_traits,stages={
-            {name="movement",plan=movement_stage},{name="conversion",plan=conversion_stage}}}
+        level_transform=target_type,level_traits=level_traits,stages=stages}
 
     for _, stage in ipairs(plan.stages) do
         for _, change in ipairs(stage.plan.changes) do plan.changes[#plan.changes+1]=change end
@@ -185,7 +227,7 @@ function RW_PlanTurn(world, action, services)
         end
         plan.level_traits=level_traits_from(frozen_relations)
         plan.contact_frame=frozen_rules -- Freeze declarations, re-evaluate conditions/targets.
-        for _,kind in ipairs({"sink","melt","defeat"}) do
+        for _,kind in ipairs({"sink","melt","defeat","unlock"}) do
             trace[#trace+1]=kind
             local refreshed,refresh_error=services.refresh(complete,frozen_rules)
             if not refreshed then return fail(kind,refresh_error) end
@@ -805,6 +847,9 @@ local function start(run_self_tests)
     turn_services.contact=function(world,effective,kind,contents)
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services)
     end
+    turn_services.destroy=function(world,ids,contents,cause,deaths)
+        return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths)
+    end
     turn_services.refresh=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end
 
     if run_self_tests then
@@ -1339,7 +1384,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.3W initialized")
+    print("[RuleWorld] M9.3X initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

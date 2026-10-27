@@ -34,7 +34,7 @@
   summary, never flatten it into a simultaneous plan. Child preconditions refer
   to the previous phase snapshot. See docs/PHASE_TRANSACTIONS.md.
 
-- Ordinary contacts use a frozen post-conversion rule frame: SINK then MELT then DEFEAT,
+- Ordinary contacts use a frozen post-conversion rule frame: SINK then MELT then DEFEAT then OPEN/SHUT,
   re-evaluating conditions and resolving targets for births/deletions. Do not recompile deleted
   Text halfway through these phases. HAS is triggered by destruction, not IS
   conversion; duplicate HAS instances must generate duplicate products.
@@ -97,5 +97,12 @@
   only unsafe MELT entities die, self-HOT counts, HOT sources need not be YOU and
   may be SAFE. HAS runs once per victim using frozen declarations; keep MELT after
   SINK and before DEFEAT. Newly born products do not recursively melt in that phase.
-  Movement-based WEAK and OPEN/SHUT destruction remain the next milestone;
-  do not add contact-only approximations for those words. See docs/HOT_MELT.md.
+  Movement-based WEAK remains pending; do not add a contact-only approximation.
+  See docs/HOT_MELT.md.
+
+- OPEN/SHUT unlock during movement before conversion and again after DEFEAT for
+  overlaps. At least one unsafe participant bypasses partner PUSH/STOP; unrelated
+  blockers still cancel the movement. Delete target before mover; HAS uses the
+  death frame and source position, not the final movement snapshot. Keep these
+  deletions/births in sequential atomic stages and whole-tree Undo. Both SAFE
+  participants retain normal collision rules. See docs/OPEN_SHUT.md.

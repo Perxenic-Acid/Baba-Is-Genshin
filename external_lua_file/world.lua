@@ -1244,7 +1244,6 @@ function RW_GetNavigationDefinitions()
             definition_id=definition_id,label=name})
     end
     local function configure(world)
-        grant(world,"flag","win")
         world.language.nouns.CURSOR = "cursor"
         world.language.nouns.LINE = "line"
         world.language.properties.PATH = "path"
@@ -1378,9 +1377,10 @@ function RW_GetNavigationDefinitions()
         [5]={id=5,kind="object",class="text",text={name="IS"},x=5,y=3,direction="None"},
         [6]={id=6,kind="object",class="text",text={name="WORD"},x=6,y=6,direction="None"},
         [7]={id=7,kind="object",class="text",text={name="NOT"},x=8,y=4,direction="None"},
-        [8]={id=8,kind="object",class="text",text={name="TEXT"},x=8,y=7,direction="None"}
+        [8]={id=8,kind="object",class="text",text={name="TEXT"},x=8,y=7,direction="None"},
+        [9]={id=9,kind="object",class="text",text={name="WORD"},x=9,y=9,direction="None"}
     }
-    lab.next_entity_id=9
+    lab.next_entity_id=10
     lab.language.nouns.ROCK="rock"
     grant(lab,"avatar","you")
     grant(lab,"rock","pushable") -- Makes the requested object freely movable.
@@ -1389,5 +1389,14 @@ function RW_GetNavigationDefinitions()
     object(lab,14,"line",1,1)
     definitions["navigation.text_word"]={id="navigation.text_word",initial_world=lab}
     portal(root,50,1,1,"TXT","navigation.text_word")
+    -- WIN is authored visibly in these two victory fixtures, never a Flag default.
+    for _,world in ipairs({puzzle,transform}) do
+        for offset,token in ipairs({"FLAG","IS","WIN"}) do
+            local id=world.next_entity_id
+            world.entities[id]={id=id,kind="object",class="text",text={name=token},
+                x=7+offset,y=11,direction="None"}
+            world.next_entity_id=id+1
+        end
+    end
     return definitions, "navigation.root"
 end

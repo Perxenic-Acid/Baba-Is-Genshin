@@ -69,6 +69,7 @@ Text IS Push 等现有预设继续适用，不占用可移动文字。
 | text_Word | (6,6) |
 | text_Not | (8,4) |
 | text_Text（额外提供） | (8,7) |
+| 第二块 text_Word（用于矛盾测试） | (9,9) |
 
 - 进来后 W、W：把 WORD 推上去形成 ROCK IS WORD。普通 Rock 保持对象类别，
   显示 WORD 颜色；它与旁边 IS 可以继续组成别的规则。
@@ -84,3 +85,5 @@ tests/text_word.lua 验证类转换/身份/指向、混合重复产物、原子�
 来源撤回、自支持、右侧否定、循环拒绝和 Reader 边界；tests/run.lua 通过实际按键
 回调验证上述整条 TXT 路线及整树 Undo。原有 DEFEAT/SINK/HAS、移动/方向、转换、
 重叠重复规则与关卡导航回归通过。离线验证不代表本步已真机验收。
+
+Flag 不再有隐藏的 WIN 预设。旧 A/B、T 胜利测试关卡通过棋盘上可见的 FLAG IS WIN 赋予属性。

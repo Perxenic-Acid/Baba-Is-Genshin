@@ -39,3 +39,6 @@
   Text halfway through these phases. HAS is triggered by destruction, not IS
   conversion; duplicate HAS instances must generate duplicate products.
   See docs/CONTACT_WORDS.md for source references, limits and manual routes.
+
+- YOU + DEFEAT on the same entity causes destruction and HAS births. Original
+  blocks.lua explicitly sets doit=true in the self-ID else branch; do not omit it.

@@ -215,7 +215,7 @@ function RW_ResolveContactVictims(world, kind)
             local actor=world.entities[id]
             if actor.behaviors.control then
                 for _,other_id in ipairs(ids) do
-                    if other_id ~= id and world.entities[other_id].behaviors.defeat
+                    if world.entities[other_id].behaviors.defeat
                         and overlap(actor,world.entities[other_id]) then removed[id]=true; break end
                 end
             end

@@ -60,7 +60,14 @@ assert(not dead.defeated and #death_plan.stages[4].plan.events == 1)
 assert(death_plan.stages[4].plan.events[1].cause == "defeat")
 assert(RW_Undo(dead).world == d.world)
 local self_defeat=make({{"avatar",2,2}},{{"AVATAR","IS","YOU","AND","DEFEAT"}})
-assert(step(self_defeat).world.entities[1])
+local self_dead=step(self_defeat)
+assert(not self_dead.world.entities[1] and RW_Undo(self_dead).world == self_defeat.world)
+local separate_self=make({{"avatar",2,2}},{{"AVATAR","IS","YOU"},{"AVATAR","IS","DEFEAT"},
+    {"AVATAR","HAS","ROCK"}})
+local self_born=step(separate_self)
+assert(not self_born.world.entities[1] and count(self_born.world,"rock") == 1)
+assert(self_born.world.entities[separate_self.world.next_entity_id].direction == "Right")
+assert(RW_Undo(self_born).world == separate_self.world)
 local mutual=make({{"avatar",2,2},{"avatar",3,2}},{{"AVATAR","IS","YOU","AND","DEFEAT"}})
 -- Different input positions both move together, so keep the pair initially overlapped.
 mutual.world.entities[2].x=2

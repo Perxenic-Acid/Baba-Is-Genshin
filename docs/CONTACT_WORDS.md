@@ -6,7 +6,7 @@
 
 - blocks.lua 约 1327–1390 行：SINK 与不同 ID 的同格对象作用，单体不自沉，
   标记被销毁者并调用 handledels。约 1530–1590 行：DEFEAT 查找 YOU，
-  排除自身 ID，再删除接触者。SELECT 不属于 YOU。
+  自身 ID 对应的 else 分支也触发销毁；上一版漏读该分支，现已修正。SELECT 不属于 YOU。
 - features.lua 的 getunitswitheffect（约 319 行）会查找当前还存在的对象，
   因而较早删除阶段的 HAS 产物可以参加后续效果。
 - tools.lua 的 handleinside/delete（约 477–560 行）在销毁时处理内容物；
@@ -17,8 +17,8 @@
 
 ## 当前契约
 
-**普通 DEFEAT**：有 control/YOU 的实体与另一个有 defeat 的实体同格时，
-销毁该 YOU；危险物不因此消失。单体 YOU+DEFEAT 不自毁。
+**普通 DEFEAT**：有 control/YOU 的实体与有 defeat 的实体（包括自身）同格时，
+销毁该 YOU；危险物不因此消失。单体 YOU+DEFEAT 也自毁，触发 HAS，且可整步撤销。
 SELECT 不受 DEFEAT 影响，但同时有 YOU 的 SELECT 仍是 YOU。
 最后一个 YOU 消失不写入 LEVEL DEFEAT 结果、不锁住选择器；Z 可恢复。
 原有 LEVEL IS DEFEAT 的当前关卡失败协议仍独立保留。

@@ -36,10 +36,9 @@ child 的 definition_id 与可选 label；仅 archetype 等于 source_type 时�
 bootstrap.RW_ConfirmSelectedLevel() 是当前宿主确认入口，可由其他映射脚本
 Invoke；调度器输入为 {type="confirm"}。它不依赖移动发生或某个固定角色。
 
-用户明确要求：先实现逻辑，暂不绑定替代键。因此不绑定 F、其他代用键或
-假定存在的 Enter 枚举。界面显示 Confirm: unbound。当前不能通过普通键盘
-进入子关卡，不能要求用户照旧版步骤按 F/Enter 进行完整手测。
-键盘 Enter 待宿主实际接口确认后接入同一确认入口，逻辑不需再改。
+用户最新澄清：直接使用 F 交互确认，不需要绑定物理 Enter。
+KeyboardInteractKeyDown 调用同一确认入口，界面显示 F: Confirm。
+踩块只选中，按 F 才进入；父关卡块也使用 F 确认返回。
 公开键位声明排查来源：
 https://github.com/DreamedWorker/miliastra-lua-types/blob/main/mihoyo_client_ui_api.d.lua
 （这不是原生接口可用性的真机保证）。
@@ -75,12 +74,18 @@ A=(2,1)、B=(1,2) 进入同一定义的两个独立实例；T=(3,1) 进入转换
 子关卡有父块 PARENT=(2,1)、独立 SELECT、Avatar YOU 和 WIN=(2,3)。
 T 内从 (9,10) 向上推词可组成 LEVEL IS CRATE，退出并转换根地图中的 T。
 
-当前真机仅可直接测：移动 SEL/★、踩块不进入、不同移动约束和整树移动撤销；
-完整进入/退出由启动实际映射管线自测与离线确认函数调用覆盖。待绑定可用
-Enter 后才提供完整键盘手测序列，不把此限制隐藏为已完成键位支持。
+当前真机手测（每组从重新启动试玩开始）：
+
+1. 父块返回与撤销：W 选中 A，确认仍在 MAP；F 进入；D 推箱并让 SELECT
+   移到 PARENT；F 返回 MAP；Z 应恢复到子关卡，箱子仍是推动后的位置。
+   再 Z 撤销推动，再 Z 撤销进入，回 MAP。
+2. 获胜退出：A、F 进入 B；S 让 YOU 接触 WIN，应自动返回 MAP；Z 恢复
+   获胜前的子关卡状态。
+3. 转换退出：W、D、F 进入 T；W 推词组成 LEVEL IS CRATE，应回 MAP，
+   T 变成箱子；Z 回到转换前的子关卡，再 Z 回 MAP，T 恢复为关卡块。
 
 新增启动日志：SELECT independent of YOU ...；pipeline SELECT confirm / parent /
 win / level transform / tree Undo。版本 M9.3L initialized。
 离线 tests/level_transactions.lua 检查 SELECT/Text SELECT/撤回、YOU-only 拒绝、
 三种退出、整树撤销/重放、坏计划/过期计划/投影失败整步拒绝。
-原生输入测试直接调用未绑定的确认入口；仍验证未注册替代键。
+原生输入测试通过 F 对应的已注册输入回调确认，覆盖上述三组手测流程。

@@ -55,16 +55,16 @@ for _, action in ipairs({{type = "move", dx = -1, dy = 0},
     assert(restored.world == s.world and restored.world.entities[1].direction == "Mid")
 end
 -- Actual host callbacks: SELECT + explicit confirmation, whole-tree Undo, all exits.
-assert(not listeners.confirm and type(RW_ConfirmSelectedLevel) == "function" and navigation.title:find("MAP"))
+assert(listeners.confirm and type(RW_ConfirmSelectedLevel) == "function" and navigation.title:find("MAP"))
 listeners.up()
 assert(navigation.title:find("MAP"), "Stepping onto A must not enter")
 assert(rendered.entities[12].y == 1)
-RW_ConfirmSelectedLevel()
+listeners.confirm()
 local child_a_title = navigation.title
 assert(child_a_title:find("PUZZLE") and history_depth == 2)
 listeners.right()
 assert(rendered.entities[4].x == 4 and rendered.entities[12].x == 2)
-RW_ConfirmSelectedLevel() -- SELECT on parent level block, not YOU-only contact.
+listeners.confirm() -- SELECT on parent level block, not YOU-only contact.
 assert(navigation.title:find("MAP") and rendered.entities[4].x == 3)
 listeners.undo()
 assert(navigation.title == child_a_title and rendered.entities[4].x == 4)
@@ -76,19 +76,19 @@ listeners.undo()
 assert(history_depth == 0 and rendered.entities[12].y == 2)
 listeners.undo()
 assert(history_depth == 0)
-listeners.left(); RW_ConfirmSelectedLevel() -- B, same definition, distinct instance.
+listeners.left(); listeners.confirm() -- B, same definition, distinct instance.
 local child_b_title = navigation.title
 assert(child_b_title:find("PUZZLE") and rendered.entities[4].x == 3)
 listeners.down() -- YOU overlaps WIN; SELECT has no route down.
 assert(navigation.title:find("MAP"), "WIN must return to parent")
 listeners.undo()
 assert(navigation.title == child_b_title and rendered.entities[1].y == 2)
-listeners.right(); RW_ConfirmSelectedLevel() -- parent block
+listeners.right(); listeners.confirm() -- parent block
 assert(navigation.title:find("MAP"))
-RW_ConfirmSelectedLevel() -- Re-enter the same retained B instance.
+listeners.confirm() -- Re-enter the same retained B instance.
 assert(navigation.title == child_b_title and rendered.entities[4].x == 4)
 while history_depth > 0 do listeners.undo() end
-listeners.up(); listeners.right(); RW_ConfirmSelectedLevel() -- T
+listeners.up(); listeners.right(); listeners.confirm() -- T
 assert(navigation.title:find("PUZZLE") and rendered.entities[1].x == 9)
 listeners.up() -- Completes LEVEL IS CRATE.
 assert(navigation.title:find("MAP") and rendered.entities[15].archetype == "crate")

@@ -73,7 +73,7 @@ M9.3L supersedes K's automatic portals and local-only Undo. tests/level_transact
 covers SELECT authority independent of YOU, rule retraction, explicit confirmation,
 parent/win/level-transform exits, whole-tree Undo/replay and rejection boundaries.
 The bootstrap adds a real mapped-pipeline startup probe for all three exits.
-Host tests invoke RW_ConfirmSelectedLevel directly and assert no substitute key is
-bound, as requested by the user. Physical Enter support remains unresolved;
-do not present old WASD-only/F-key navigation steps as current manual instructions.
+Host tests use the registered KeyboardInteractKeyDown callback (F), as clarified
+by the user. Physical Enter is not required. Updated manual F-key test sequences
+cover parent return, win, level transformation and cross-level Undo.
 See ../docs/NESTED_LEVELS.md for the updated scope and reference sources.

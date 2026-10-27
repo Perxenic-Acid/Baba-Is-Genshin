@@ -8,8 +8,8 @@
   suggestions. User requirements take precedence. Record any deliberate gaps.
 - SELECT and YOU are separate rule-derived capabilities. Only SELECT may select
   level blocks. Movement onto a block does not enter it; confirmation is separate.
-- The user explicitly requested confirmation logic without an alternative physical
-  key binding while Enter support is unresolved. Do not bind F or another substitute.
+- The user clarified that F interaction is the intended confirmation key. Bind
+  KeyboardInteractKeyDown to the separate confirm action; physical Enter is not required.
 - UI must not own navigation or progress facts. User-facing Undo restores whole
   tree transactions, including active level, parent/child state and allocators.
 - Keep the eight existing mapped scripts unless a deployment change is necessary.

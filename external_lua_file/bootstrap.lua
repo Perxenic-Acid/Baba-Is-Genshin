@@ -121,7 +121,7 @@ function RW_PlanLevelAction(tree, action, services)
     return {before=tree,after=next_tree,reason=outcome or turn.reason,changes=turn.changes}
 end
 
--- Host confirmation entry point. No substitute physical key is bound.
+-- Host confirmation entry point, shared with the F interaction binding.
 local confirm_selected_level = nil
 function RW_ConfirmSelectedLevel()
     if not confirm_selected_level then return false, "not_initialized" end
@@ -845,7 +845,7 @@ function OnStart()
 
     local function navigation_view()
         return {title=(#level_tree.stack == 0 and "MAP / " or "PUZZLE / ") .. session.instance_id,
-            hint="WASD: YOU + SELECT   Confirm: unbound   Z: Whole-tree Undo",portals={}}
+            hint="WASD: YOU + SELECT   F: Confirm   Z: Whole-tree Undo",portals={}}
     end
 
     local previous_rule_count = nil
@@ -931,7 +931,15 @@ function OnStart()
     end
 
     confirm_selected_level = function() return act({type="confirm"}) end
-    print("[RuleWorld] Confirm action ready; physical key intentionally unbound")
+    if key.KeyboardInteractKeyDown then
+        root:AddKeyEventListener(key.KeyboardInteractKeyDown,function()
+            RW_ConfirmSelectedLevel()
+            return true
+        end)
+        print("[RuleWorld] Confirm registered (F)")
+    else
+        printerr("[RuleWorld] Missing KeyboardInteractKeyDown for F confirmation")
+    end
     render()
 
     print("[RuleWorld] M9.3L initialized")

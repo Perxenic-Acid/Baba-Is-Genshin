@@ -224,7 +224,7 @@ function RW_PlanTurn(world, action, services)
         if conversion.op == "transform_level" then level_targets[#level_targets+1] = conversion.target_type
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
-        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" then -- Consumed by their scheduled phases, not conversion.
+        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" then -- Consumed by their scheduled phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     level_traits=level_traits_from(conversions)
@@ -389,6 +389,24 @@ function RW_PlanTurn(world, action, services)
                 if change.kind == "create" then weak_new[change.entity_id]=true end
             end
             complete=next_world
+        end
+        -- Late creation reads surviving sources with the frozen contact declarations.
+        if services.make then
+            local active=false
+            for _,relation in ipairs(frozen_relations or {}) do if relation.op=="make" then active=true;break end end
+            if active then
+                local converted={}
+                for _,stage in ipairs(plan.stages) do for _,change in ipairs(stage.plan.changes) do
+                    if change.kind=="create" or change.kind=="transform" or change.kind=="retype" then converted[change.entity_id]=true end
+                end end
+                local creation,why=services.make(complete,frozen_relations,converted)
+                if not creation then return fail("make",why) end
+                local next_world,why=services.preview(complete,creation)
+                if not next_world then return fail("make_preview",why) end
+                plan.stages[#plan.stages+1]={name="make",plan=creation}
+                for _,change in ipairs(creation.changes) do plan.changes[#plan.changes+1]=change end
+                complete=next_world;trace[#trace+1]="make"
+            end
         end
         -- CRASH is checked on surviving units after destruction, against the frozen rules.
         local crash_effects,crash_error=services.refresh(complete,frozen_rules)
@@ -1041,6 +1059,13 @@ local function start(run_self_tests)
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
+    turn_services.make=function(world,relations,converted)
+        local products,rng=rules_api:Invoke("RW_PlanMakeProducts",world,relations,converted)
+        local creation,why=world_api:Invoke("RW_PlanCreate",world,products)
+        if not creation then return nil,why end
+        creation.random_state=rng
+        return creation
+    end
     turn_services.follow=function(world,relations)
         local targets=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"follow")
         return movement_api:Invoke("RW_ResolveFollow",world,targets)
@@ -1596,7 +1621,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4H initialized")
+    print("[RuleWorld] M9.4I initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

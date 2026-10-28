@@ -200,3 +200,9 @@ M9.4H adds FOLLOW and atomic remembered-target state, source-oracle comparison a
 complete-name wrapping for single Text labels. Remaining verbs: MAKE, EAT, BECOME,
 MIMIC, PLAY. Next implementation: MAKE. See MOTION_WORDS.md for acceptance routes
 and deliberate FOLLOW/renderer scope limits.
+
+
+M9.4I adds MAKE: late physical creation, duplicate products, original converted-vs-old
+occupancy checks, MAKE TEXT/ALL and atomic deterministic random-facing state.
+Reference matrix: 1,200 installed-source cases. Native route and gaps: MAKE.md.
+Next verb: EAT, then BECOME, MIMIC and PLAY, before conditions/prefixes/GROUP/properties.

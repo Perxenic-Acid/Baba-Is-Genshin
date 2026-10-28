@@ -130,6 +130,10 @@ local function valid_board_offset(value)
         and valid_direction(value.direction)
 end
 
+local function valid_random_state(value)
+    return is_integer(value) and value>=1 and value<2147483647
+end
+
 -- Validate against the ORIGINAL world, independently of operation order.
 -- Existing move/direction/transform writes may coexist with one terminal delete.
 local function validate_plan(world, plan)
@@ -137,6 +141,13 @@ local function validate_plan(world, plan)
         or type(plan.consumes_turn) ~= "boolean"
         or not is_list(plan.changes) then
         return false, "invalid_plan"
+    end
+    if plan.random_state~=nil then
+        local rng=plan.random_state
+        if type(rng)~="table" or not valid_random_state(rng.from) or not valid_random_state(rng.to) then
+            return false,"invalid_random_state"
+        end
+        if rng.from~=(world.random_state or 1) then return false,"stale_random_state" end
     end
     if plan.board_shift ~= nil then
         local shift = plan.board_shift
@@ -146,7 +157,7 @@ local function validate_plan(world, plan)
         if not same_state(current,shift.from) then return false,"stale_board_shift" end
     end
     if not plan.consumes_turn then
-        if #plan.changes ~= 0 or plan.id_allocation ~= nil or plan.board_shift ~= nil then
+        if #plan.changes ~= 0 or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil then
             return false, "invalid_no_turn_plan"
         end
         return true
@@ -291,6 +302,7 @@ local function apply_plan(world, plan)
     end
     if plan.id_allocation then projected.next_entity_id = plan.id_allocation.to end
     if plan.board_shift then projected.board_offset = clone(plan.board_shift.to) end
+    if plan.random_state then projected.random_state=plan.random_state.to end
     return projected
 end
 
@@ -502,7 +514,7 @@ local function default_world()
                 -- New typed AST vocabulary. The legacy copula
                 -- remains until its compiler is retired.
                 verbs = {
-                    IS = "is", HAS = "has", WRITE = "write", FEAR="fear", FOLLOW="follow"
+                    IS = "is", HAS = "has", WRITE = "write", FEAR="fear", FOLLOW="follow", MAKE="make"
                 },
 
                 copulas = {
@@ -525,7 +537,7 @@ end
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
 local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, infinite_loop=true, too_complex=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
-    behavior_registry=true,board_offset=true}
+    behavior_registry=true,board_offset=true,random_state=true}
 
 local function plain_data(value, visiting)
     local kind = type(value)
@@ -555,6 +567,7 @@ local function validate_definition(definition)
     if not is_integer(world.width) or world.width < 1
         or not is_integer(world.height) or world.height < 1
         or type(world.entities) ~= "table" or not valid_frontier(world) then return false end
+    if world.random_state~=nil and not valid_random_state(world.random_state) then return false end
     if world.infinite_loop ~= nil and world.infinite_loop ~= true then return false end
     if world.too_complex ~= nil and world.too_complex ~= true then return false end
     if world.too_complex and world.infinite_loop then return false end
@@ -635,10 +648,10 @@ local function preview_transaction(world, plan)
         local result=apply_plan(world,plan)
         if plan.infinite_loop then result.infinite_loop=true end
         if plan.too_complex then result.too_complex=true end
-        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.infinite_loop == true or plan.too_complex == true
+        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.infinite_loop == true or plan.too_complex == true
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
-        or plan.id_allocation ~= nil or plan.board_shift ~= nil
+        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil
         or not is_list(plan.stages) or #plan.stages == 0 or #plan.stages > 32 then
         return nil,"invalid_stage_sequence"
     end
@@ -654,7 +667,7 @@ local function preview_transaction(world, plan)
         if not stage.plan.consumes_turn then return nil,"non_consuming_stage",nil,stage.name end
         for _, change in ipairs(stage.plan.changes) do summary[#summary+1]=change end
         current = apply_plan(current,stage.plan)
-        changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil
+        changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil or stage.plan.random_state~=nil
     end
     if not same_state(plan.changes,summary) then return nil,"stage_summary_mismatch" end
     if plan.infinite_loop then current.infinite_loop=true; changed=true end
@@ -1700,7 +1713,7 @@ function RW_GetNavigationDefinitions()
     object(motion_lab,8,"belt",21,10);motion_lab.entities[8].direction="Up"
     object(motion_lab,9,"flag",9,11);motion_lab.entities[9].direction="Right"
     for row,words in ipairs({{"AVATAR","IS","YOU"},{"ROCK","IS","MOVE"},
-        {"CRATE","IS","PUSH","AND","SLEEP"},{"BELT","IS","SHIFT"},{"WALL","IS","STOP"},{"FLAG","FEAR","AVATAR"},{"BELT","FOLLOW","AVATAR"}}) do
+        {"CRATE","IS","PUSH","AND","SLEEP"},{"BELT","IS","SHIFT"},{"WALL","IS","STOP"},{"FLAG","FEAR","AVATAR"},{"BELT","FOLLOW","AVATAR"},{"ROCK","MAKE","FLAG"}}) do
         for x,token in ipairs(words) do
             local id=motion_lab.next_entity_id
             motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},x=2+x+12*((row-1)%2),y=3+3*math.floor((row-1)/2),direction="None"}
@@ -1711,7 +1724,7 @@ function RW_GetNavigationDefinitions()
         "RIGHT","UP","LEFT","DOWN","NUDGERIGHT","NUDGEUP","NUDGELEFT","NUDGEDOWN","IS","IS","NOT",
         "NEXTTO","ABOVE","BELOW","BESIDELEFT","BESIDERIGHT","FACING",
         "REVERSE","PULL","SWAP","PHANTOM","FALL","FALLRIGHT","FALLUP","FALLLEFT",
-        "FEAR","FOLLOW","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","AND","NOT","IS","IS","IS"}) do
+        "FEAR","FOLLOW","MAKE","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","AND","NOT","IS","IS","IS"}) do
         local id=motion_lab.next_entity_id
         motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},
             x=3+3*((index-1)%10),y=15+3*math.floor((index-1)/10),direction="None"}

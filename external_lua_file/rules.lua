@@ -511,7 +511,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
+local DEFAULT_SEMANTICS = {make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -525,9 +525,9 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow"))
+                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make"))
                 or (category == "negative_property" and operation == "deny_trait")
-                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow"))) then return false end
+                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow" or operation == "forbid_make"))) then return false end
         end
     end
     return true
@@ -971,7 +971,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local key=subject_key(subject)
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
-            if sem and key and key~="@empty" and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow")
+            if sem and key and key~="@empty" and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make")
                 and (not objnot or sem.negative_noun=="forbid_"..sem.noun) then
                 local target=subject_key(obj)
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
@@ -984,6 +984,10 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                         for _,name in ipairs(targets) do
                             relations[#relations+1]={op=sem.noun,source_type=key,target_type=name,
                                 origin=target,verb=ast.verb,source=ast.source,when=query_clone(ast.when)}
+                            if sem.noun=="make" and subj.tag=="special" and subj.name=="all" and not subnot
+                                and obj.tag=="special" and obj.name=="all" then
+                                relations[#relations+1]=query_clone(relations[#relations])
+                            end
                         end
                     end
                 end
@@ -1107,7 +1111,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 for _,condition in ipairs(bans[write_origins[index]] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
             end
         end
-        if relation.op=="fear" or relation.op=="follow" then
+        if relation.op=="fear" or relation.op=="follow" or relation.op=="make" then
             local bans=(predicate_bans[relation.verb] or {})[relation.source_type] or {}
             relation.exclusions={}
             for _,condition in ipairs(bans[relation.target_type] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
@@ -1485,3 +1489,45 @@ function RW_ResolveVerbTargets(world,relations,verb)
 end
 
 function RW_ResolveFearTargets(world,relations) return RW_ResolveVerbTargets(world,relations,"fear") end
+
+-- Original block() MAKE: inspect existing non-converted occupants only. Products
+-- of this same MAKE phase do not inhibit later duplicate declarations.
+function RW_PlanMakeProducts(world,relations,converted)
+    local products={}
+    local state=world.random_state or 1
+    local original_state=state
+    local directions={"Right","Up","Left","Down"}
+    local function random_direction()
+        state=(state*48271)%2147483647
+        return directions[state%4+1]
+    end
+    for _,relation in ipairs(relations or {}) do
+        if relation.op=="make" then
+            local selector=relation.source_type=="@text" and {kind="class",value="text"}
+                or {kind="archetype",value=relation.source_type}
+            for _,id in ipairs(RW_SelectEntities(world,selector)) do
+                local source=world.entities[id]
+                if RW_RelationApplies(world,relation,source) then
+                    local direction=source.direction
+                    if direction=="None" or direction=="Mid" then direction=random_direction() end
+                    local target=relation.target_type
+                    local blocked=false
+                    for other_id,other in pairs(world.entities) do
+                        if not (converted and converted[other_id]) and other.x==source.x and other.y==source.y then
+                            if (target=="@text" and other.class=="text")
+                                or (target~="@text" and other.class~="text" and other.archetype==target) then blocked=true;break end
+                        end
+                    end
+                    if not blocked and target~="@empty" and not (target=="@text" and source.class=="text") then
+                        local product={kind="object",class=target=="@text" and "text" or "object",
+                            x=source.x,y=source.y,direction=direction,level_link=query_clone(source.level_link)}
+                        if target=="@text" then product.text={name=RW_NounTextName(world,source)}
+                        else product.archetype=target end
+                        products[#products+1]=product
+                    end
+                end
+            end
+        end
+    end
+    return products,state~=original_state and {from=original_state,to=state} or nil
+end

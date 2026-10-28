@@ -64,8 +64,10 @@ for _,entity in pairs(rendered.entities) do
     end
 end
 assert(#loose>=40)
+local make_frontier=rendered.next_entity_id
 listeners.wait();assert(rendered.entities[5].x==13 and rendered.entities[8].direction=="Left")
-listeners.undo();assert(rendered.entities[5].x==12 and rendered.entities[8].direction=="Up")
+assert(rendered.entities[make_frontier].archetype=="flag" and rendered.entities[make_frontier].x==13 and rendered.entities[make_frontier].y==10)
+listeners.undo();assert(rendered.entities[5].x==12 and rendered.entities[8].direction=="Up" and not rendered.entities[make_frontier])
 listeners.right();assert(rendered.entities[4].x==7 and rendered.entities[6].x==8 and rendered.entities[5].x==13)
 listeners.undo();assert(rendered.entities[4].x==6 and rendered.entities[6].x==7 and rendered.entities[5].x==12)
 listeners.down();listeners.right();listeners.right()
@@ -468,5 +470,6 @@ dofile("tests/fall_words.lua")
 dofile("tests/reverse.lua")
 dofile("tests/fear.lua")
 dofile("tests/follow.lua")
+dofile("tests/make.lua")
 dofile("tests/spatial_extra.lua")
 dofile("tests/level_text.lua")

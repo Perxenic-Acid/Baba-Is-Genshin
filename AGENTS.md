@@ -203,3 +203,13 @@
 - Scaled single Text labels must preserve the complete word using explicit line
   breaks and integer fonts fitted to width and height. Do not regress to first
   letters. Existing short labels for actual overlapping stacks are a tracked gap.
+
+- MAKE runs after ordinary contact destruction (future EAT goes immediately before
+  it), against surviving sources and frozen declarations. Only old non-converted
+  matching occupants block; all current-turn create/transform/retype IDs are ignored.
+  MAKE births do not suppress duplicate MAKE clauses or rerun earlier phases. Keep
+  facing/Text/links, ALL multiplicity, source conditions and late CRASH/WORD checks.
+  See docs/MAKE.md for original references and remaining LEVEL/EMPTY scope.
+- Random direction draws are pure plan data, never host/global RNG side effects.
+  world.random_state and stale-checked stage random_state={from,to} participate in
+  Preview/Commit/whole-tree Undo, including RNG-only turns and atomic late failure.

@@ -104,3 +104,35 @@ pending; pulled PUSH interactions and transient original collision cache behavio
 need broader parity. FALL HAS births are resolved after settling and cannot become
 support in the middle of that same settle. Scoped LEVEL/EMPTY lifecycle scope and
 independently authored same-target level conversion linkage remain documented gaps.
+
+
+## M9.4F: REVERSE and combined FALL directions
+
+References: installed tools.lua reversecheck() (2469 onward), cantmove() (2248),
+movement.lua active intention/returnolddir (545–592), mapcursor.lua (172 onward),
+and blocks.lua fallblock (850–1125). REVERSE counts rule instances: odd reverses,
+even cancels. It changes active YOU/MOVE/nudge/SHIFT displacement, while ordinary
+PUSH/PULL dependencies follow the physical displacement without a second reversal.
+Root facing retains the intention; SELECT and scoped LEVEL face their actual travel.
+Directional lock checks preserve the original cantmove() reverse mapping, including
+its second reversal after an active intention has already reversed.
+
+FALL reverses the directional lists before opposite-count cancellation. All remaining
+axes settle in down/right/up/left order, repeating until stable; it no longer drops
+secondary FALL axes. Facing, source-frame destruction/HAS and whole-turn Undo remain
+atomic. The existing 6000-step INFINITE LOOP limit also bounds combined-axis cycles.
+Final SHIFT alignment retains the original belt facing (the original calculates a
+reversed temporary direction but does not assign that value).
+
+`tests/reverse.lua` covers compiler/scheduler/Commit/Undo, parity, PUSH dependencies,
+MOVE/nudge/FALL/SHIFT, locks, SELECT and scoped LEVEL. `tests/reference_reverse.lua`
+executes installed reversecheck()/cantmove(): 28 vector cases and 80 lock cases.
+Expanded `tests/reference_fall.lua` executes original check()/fallblock() across 540
+count/reverse/multi-axis/support cases. These are offline checks, not native acceptance.
+Normal startup measured 1,876,000 instructions with diagnostics disabled (limit 2M).
+The MOTION room now includes loose REVERSE; route remains root D x10 F, then D x5 F.
+Construct AVATAR IS YOU AND REVERSE to move against WASD, then Z to restore the turn.
+
+FEAR/FOLLOW/TELE/HOLD remain pending; this checkpoint only completes REVERSE and the
+related multi-axis FALL correction. Existing multi-source retry, scoped autonomous
+LEVEL/EMPTY, and same-settle HAS support gaps above still apply.

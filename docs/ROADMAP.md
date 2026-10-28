@@ -176,3 +176,9 @@ before declaring all official words finished. Real-device acceptance is separate
 M9.4E adds PULL/SWAP/PHANTOM and all four FALL directions, source-referenced
 support/cancellation checks and whole-turn regressions. Next movement priorities:
 REVERSE, FEAR/FOLLOW, TELE/HOLD, then the pending lifecycle/syntax/temporal families.
+
+
+M9.4F adds REVERSE parity across active movement, SELECT and scoped LEVEL, preserving
+original facing/lock behavior. Combined FALL axes now settle sequentially instead
+of selecting only one axis; the expanded installed-source oracle covers 540 cases.
+Next: FEAR/FOLLOW, TELE/HOLD; then remaining lifecycle/syntax/temporal families.

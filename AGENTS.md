@@ -177,3 +177,9 @@
   preserves facing and uses PUSH/PULL/STOP as support. SLEEP does not suppress FALL.
   FALL passes over SWAP without swapping; bare unsafe WEAK transit victims get HAS.
   Keep settling/destruction as atomic sequential stages, newborn grace and limit Undo.
+
+- REVERSE uses physical rule-instance parity. Reverse active root intentions, not
+  PUSH/PULL dependency displacement. Preserve intention facing except SELECT/LEVEL
+  which face actual travel. Original cantmove reverses the lock query too; retain
+  that mapping. FALL reverses before cancellation and settles all surviving axes
+  down/right/up/left, repeating to stability; preserve its 6000-step terminal limit.

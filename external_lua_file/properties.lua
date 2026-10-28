@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
-    pull={pull=true}, swap={swap=true}, phantom={phantom=true},
+    reverse={reverse=true}, pull={pull=true}, swap={swap=true}, phantom={phantom=true},
     sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
     you = {control = true}, select = {select = true}, path = {select_path = true},
     more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
@@ -42,7 +42,7 @@ local function valid_behaviors(registry)
                     and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
                     and capability ~= "safe" and capability ~= "crash"
                     and capability ~= "hot" and capability ~= "melt"
-                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak" and capability ~= "float" and capability ~= "shift" and capability ~= "more" and capability ~= "fall" and capability ~= "fallright" and capability ~= "fallup" and capability ~= "fallleft" and capability ~= "pull" and capability ~= "swap" and capability ~= "phantom"
+                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak" and capability ~= "float" and capability ~= "shift" and capability ~= "more" and capability ~= "fall" and capability ~= "fallright" and capability ~= "fallup" and capability ~= "fallleft" and capability ~= "pull" and capability ~= "swap" and capability ~= "phantom" and capability ~= "reverse"
                     and capability ~= "sleep" and capability ~= "still" and capability ~= "lockedright" and capability ~= "lockedup" and capability ~= "lockedleft" and capability ~= "lockeddown" and capability ~= "move" and capability ~= "right" and capability ~= "up" and capability ~= "left" and capability ~= "down" and capability ~= "turn" and capability ~= "deturn" and capability ~= "nudgeright" and capability ~= "nudgeup" and capability ~= "nudgeleft" and capability ~= "nudgedown" )
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end

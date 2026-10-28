@@ -506,7 +506,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
+                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {ON="on",NEAR="near",NEXTTO="nextto",ABOVE="above",BELOW="below",BESIDELEFT="besideleft",BESIDERIGHT="besideright",FACING="facing"},
@@ -1701,7 +1701,7 @@ function RW_GetNavigationDefinitions()
     for index,token in ipairs({"STILL","LOCKEDRIGHT","LOCKEDUP","LOCKEDLEFT","LOCKEDDOWN","TURN","DETURN",
         "RIGHT","UP","LEFT","DOWN","NUDGERIGHT","NUDGEUP","NUDGELEFT","NUDGEDOWN","IS","IS","NOT",
         "NEXTTO","ABOVE","BELOW","BESIDELEFT","BESIDERIGHT","FACING",
-        "PULL","SWAP","PHANTOM","FALL","FALLRIGHT","FALLUP","FALLLEFT"}) do
+        "REVERSE","PULL","SWAP","PHANTOM","FALL","FALLRIGHT","FALLUP","FALLLEFT"}) do
         local id=motion_lab.next_entity_id
         motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},
             x=7+(index-1)%6,y=6+math.floor((index-1)/6),direction="None"}

@@ -11,7 +11,7 @@ local function has_capability(world, entity, capability)
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", select = "select", select_path = "path",
         win = "win", push = "pushable", block_entry = "block_entry",
-        open="open",shut="shut",safe="safe",weak="weak",float="float",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
+        open="open",shut="shut",safe="safe",weak="weak",float="float",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",reverse="reverse",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -25,9 +25,22 @@ local function level_surface(world,entity)
     return entity.level_link ~= nil or entity.archetype == block_type
 end
 
+-- REVERSE changes active intentions, never recursively pushed/pulled dependencies.
+local function reverse_vector(world,entity,dx,dy)
+    local counts=world.trait_counts and world.trait_counts[entity.id]
+    local count=counts and counts.reverse or (has_capability(world,entity,"reverse") and 1 or 0)
+    if count%2==1 then return -dx,-dy end
+    return dx,dy
+end
 local function immobile(world,entity,dx,dy)
+    dx,dy=reverse_vector(world,entity,dx,dy)
     local locked=dx==1 and "lockedright" or dx==-1 and "lockedleft" or dy==-1 and "lockedup" or "lockeddown"
     return has_capability(world,entity,"still") or has_capability(world,entity,locked)
+end
+
+local function intent_immobile(world,entity,dx,dy)
+    dx,dy=reverse_vector(world,entity,dx,dy)
+    return immobile(world,entity,dx,dy)
 end
 
 local function direction_for(dx, dy)
@@ -149,6 +162,8 @@ function RW_ResolveMovement(world, action)
         return invalid("unknown_entity")
     end
 
+    local intent_direction=direction_for(dx,dy)
+    if not action.falling then dx,dy=reverse_vector(world,mover,dx,dy) end
     local planned,removed,destructions = {},{},{}
     local visiting = {}
     local changes = {}
@@ -367,6 +382,16 @@ function RW_ResolveMovement(world, action)
         return blocked(reason)
     end
 
+    if not action.falling then
+        for _,change in ipairs(changes) do
+            if change.entity_id==action.entity_id and change.kind=="move" then change.to.direction=intent_direction end
+        end
+        for _,death in ipairs(destructions) do
+            if death.entity_id==action.entity_id then
+                death.direction=intent_direction;death.frame[action.entity_id].direction=intent_direction
+            end
+        end
+    end
     return {
         consumes_turn = true,
         changes = changes,
@@ -837,7 +862,7 @@ function RW_ResolveShift(world)
             for _,other_id in ipairs(ids) do
                 local rider=world.entities[other_id]
                 if other_id ~= id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider)
-                    and not immobile(world,rider,vectors[belt.direction][1],vectors[belt.direction][2]) then
+                    and not intent_immobile(world,rider,vectors[belt.direction][1],vectors[belt.direction][2]) then
                     if not tasks[other_id] then
                         tasks[other_id]={direction=belt.direction,count=0};order[#order+1]=other_id
                     end
@@ -977,7 +1002,7 @@ function RW_ResolveAutomatic(world)
                 if not entity or has_capability(world,entity,"sleep") then break end
                 local direction=spec[2] or entity.direction
                 local vector=vectors[direction]
-                if vector and not immobile(world,entity,vector[1],vector[2]) then
+                if vector and not intent_immobile(world,entity,vector[1],vector[2]) then
                     local old_direction=entity.direction or "None"
                     local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
                     if spec[1]=="move" and #part.changes==0 and #(part.destructions or {})==0 then
@@ -1018,18 +1043,21 @@ function RW_ResolveFall(world)
         local function count(trait) return counts[trait] or (has_capability(world,entity,trait) and 1 or 0) end
         local vertical=count("fall")-count("fallup")
         local horizontal=count("fallright")-count("fallleft")
-        if vertical>0 then tasks[id]={0,1}
-        elseif horizontal>0 then tasks[id]={1,0}
-        elseif vertical<0 then tasks[id]={0,-1}
-        elseif horizontal<0 then tasks[id]={-1,0} end
+        horizontal,vertical=reverse_vector(world,entity,horizontal,vertical)
+        tasks[id]={}
+        if vertical>0 then tasks[id][1]={0,1} end
+        if horizontal>0 then tasks[id][2]={1,0} end
+        if vertical<0 then tasks[id][3]={0,-1} end
+        if horizontal<0 then tasks[id][4]={-1,0} end
     end
     table.sort(ids)
     local deaths,records={},{}
     local moved,iterations=true,0
     while moved and iterations<6000 do
         moved=false
+        for axis=1,4 do
         for _,id in ipairs(ids) do
-            local vector=tasks[id]
+            local vector=tasks[id][axis]
             local entity=working.entities[id]
             if vector and entity then
                 while working.entities[id] and iterations<6000 do
@@ -1051,6 +1079,7 @@ function RW_ResolveFall(world)
                     moved=true
                 end
             end
+        end
         end
     end
     local changes={}
@@ -1095,7 +1124,8 @@ function RW_ResolveTurn(world, action)
     for id, entity in pairs(world.entities) do
         if not destroyed[id] and has_capability(world, entity, "select") and not has_capability(world,entity,"sleep") then
             selected = true
-            local x, y = entity.x + action.dx, entity.y + action.dy
+            local dx,dy=reverse_vector(world,entity,action.dx,action.dy)
+            local x, y = entity.x + dx, entity.y + dy
             local traversable = false
             for other_id, other in pairs(world.entities) do
                 if other_id ~= id and other.x == x and other.y == y
@@ -1104,21 +1134,26 @@ function RW_ResolveTurn(world, action)
                     traversable = true
                 end
             end
-            if traversable and not immobile(world,entity,action.dx,action.dy) and x >= 1 and x <= world.width and y >= 1 and y <= world.height then
+            if traversable and not immobile(world,entity,dx,dy) and x >= 1 and x <= world.width and y >= 1 and y <= world.height then
                 local operation = {kind="move",entity_id=id,
                     from={x=entity.x,y=entity.y,direction=entity.direction or "None"},
-                    to={x=x,y=y,direction=direction_for(action.dx,action.dy)}}
+                    to={x=x,y=y,direction=direction_for(dx,dy)}}
                 -- Both properties: SELECT positioning takes precedence; never double-step.
                 if writes[id] then plan.changes[writes[id]] = operation
                 else plan.changes[#plan.changes+1] = operation end
             end
         end
     end
+    local level_count=0
+    for _,trait in ipairs(world.level_traits or {}) do if trait=="reverse" then level_count=level_count+1 end end
+    local level_dx,level_dy=action.dx,action.dy
+    if level_count%2==1 then level_dx,level_dy=-level_dx,-level_dy end
     if world.level_behaviors and world.level_behaviors.control and not world.level_behaviors.sleep
-        and not immobile(world,{behaviors=world.level_behaviors},action.dx,action.dy) then
+        and not world.level_behaviors.still
+        and not world.level_behaviors[action.dx==1 and "lockedright" or action.dx==-1 and "lockedleft" or action.dy==-1 and "lockedup" or "lockeddown"] then
         local current = world.board_offset or {x=0,y=0,direction="None"}
         plan.board_shift = {from={x=current.x,y=current.y,direction=current.direction},
-            to={x=current.x+action.dx,y=current.y+action.dy,direction=direction_for(action.dx,action.dy)}}
+            to={x=current.x+level_dx,y=current.y+level_dy,direction=direction_for(level_dx,level_dy)}}
         plan.reason = nil
     end
     if selected then

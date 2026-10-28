@@ -134,7 +134,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | PURPLE | pending |
 | property | PUSH | implemented within documented scope |
 | property | RED | pending |
-| property | REVERSE | pending |
+| property | REVERSE | implemented within documented scope |
 | property | REVERT | pending |
 | property | RIGHT | implemented within documented scope |
 | property | ROSY | pending |

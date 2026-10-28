@@ -210,7 +210,7 @@ function RW_PlanTurn(world, action, services)
     trace[#trace + 1] = "conversions"
     local entity_conversions, level_targets, protected, level_traits = {}, {}, false, {}
     for _, conversion in ipairs(conversions or {}) do
-        if conversion.op == "transform_level" then level_targets[conversion.target_type] = true
+        if conversion.op == "transform_level" then level_targets[#level_targets+1] = conversion.target_type
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
         elseif conversion.op == "has" then -- Consumed by the destruction phases, not conversion.
@@ -219,10 +219,8 @@ function RW_PlanTurn(world, action, services)
     level_traits=level_traits_from(conversions)
     local target_type
     if not protected then
-        for target in pairs(level_targets) do
-            if target_type then return fail("conversions", "conflicting_level_transforms") end
-            target_type = target
-        end
+        if #level_targets == 1 then target_type=level_targets[1]
+        elseif #level_targets > 1 then target_type=level_targets end
     end
     local operations, conversion_error, allocation = services.convert(preview, entity_conversions)
     if not operations then return fail("conversions", conversion_error) end

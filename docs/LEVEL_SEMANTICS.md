@@ -100,3 +100,16 @@ dolevelconversions:549–716 独立处理当前关卡转换，不以 YOU 存活�
 该转换，整树 Undo 恢复规则形成前的状态。普通死亡不会取消同回合转换。
 tests/level_text.lua 覆盖存活/自 DEFEAT 死亡两条路径、父级持久转换和撤销。
 本次未扩展 scoped LEVEL 的多目标转换及条件转换支持。
+
+## 重叠右值的当前关卡多产物转换
+
+原作 convert.lua 的 dolevelconversions（549 行起）逐条向 levelmats 插入产物，
+并将整个列表交给 level_to_convert；不把不同目标当作冲突，也不对重复目标去重。
+现已移除 conflicting_level_transforms 拒绝：LEVEL IS [TEXT FLAG] 分别生成
+text_Level 和 Flag。第一项继承入口 ID，后续项在父级同一事务分配新 ID；全部
+保留坐标、方向和 level_link，因此仍可 SELECT/F 进入。持久记录保存新增产物
+及其 ID，重载时恢复分配器边界；Undo 同时撤回子关卡回合、返回、多产物与分配。
+旧单目标持久记录仍兼容。tests/level_text.lua 通过 TEXT IS SHIFT 驱动两个
+重叠词块向同一格会合，覆盖 TEXT/FLAG、重复 FLAG、重载、进入及撤销；
+tests/level_transactions.lua 的旧“多目标拒绝”断言已替换为拆分断言。
+本次仍未扩展 scoped LEVEL 条件转换、ALL 展开和原作 50 个产物的专用阈值。

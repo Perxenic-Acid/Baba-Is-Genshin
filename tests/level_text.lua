@@ -43,3 +43,50 @@ for _,dies in ipairs({false,true}) do
     assert(block.level_link.definition_id=='navigation.win')
 end
 print('PASS: LEVEL IS TEXT with simultaneous YOU death, persistent linked text level and whole-tree Undo')
+
+-- Actual TEXT IS SHIFT constructs the stacked TEXT/FLAG RHS in one turn.
+for _,duplicates in ipairs({1,2}) do
+    local defs,root_id=RW_GetNavigationDefinitions()
+    local w=defs['navigation.win'].initial_world
+    w.entities[16].y=8
+    w.entities[18].y=7;w.entities[18].text.name='TEXT'
+    local function text(id,name,x,y,direction)
+        w.entities[id]={id=id,kind='object',class='text',text={name=name},x=x,y=y,direction=direction or 'None'}
+        w.next_entity_id=math.max(w.next_entity_id,id+1)
+    end
+    text(60,'IS',6,7,'Down');text(61,'FLAG',6,9);text(62,'IS',6,9,'Up')
+    text(63,'TEXT',1,5);text(64,'IS',2,5);text(65,'SHIFT',3,5)
+    if duplicates==2 then text(66,'FLAG',6,9) end
+    local root=assert(RW_CreateLevelTree(defs,root_id))
+    local entered=assert(RW_BindLevelEntry(assert(RW_EnterLevel(root,'37','navigation.win')),37))
+    local frontier=RW_GetActiveLevel(root).world.next_entity_id
+    local plan,e=RW_PlanLevelAction(entered,{type='wait'},services);assert(plan,e and e.reason)
+    local result,r=RW_CommitLevelTree(entered,plan);assert(r.accepted,r.reason)
+    assert(result.active_id==root.active_id)
+    local function check(tree)
+        local world=RW_GetActiveLevel(tree).world
+        local text_count,flags=0,0
+        for _,entity in pairs(world.entities) do
+            if entity.level_link and entity.level_link.definition_id=='navigation.win' then
+                assert(entity.x==1 and entity.y==3 and entity.direction=='None')
+                if entity.class=='text' and entity.text.name=='LEVEL' then text_count=text_count+1
+                elseif entity.archetype=='flag' then flags=flags+1 end
+            end
+        end
+        assert(text_count==1 and flags==duplicates)
+        assert(world.next_entity_id==frontier+duplicates)
+    end
+    check(result);check(assert(RW_ReloadLevel(result,result.active_id)))
+    local restored=RW_UndoLevelTree(result)
+    assert(restored.active_id==entered.active_id)
+    assert(restored.instances[root.active_id].world.next_entity_id==frontier)
+    assert(restored.instances[root.active_id].world.entities[37].archetype=='level_block')
+    -- Both products remain selectable, including the Text product.
+    for _,id in ipairs({37,frontier}) do
+        local placed=assert(RW_PlaceLevelSelectors(result,{12},id))
+        local confirmed,why=RW_PlanLevelAction(placed,{type='confirm',entity_id=id},services)
+        assert(confirmed,why and why.reason)
+        assert(#confirmed.after.stack==1)
+    end
+end
+print('PASS: TEXT IS SHIFT forms LEVEL IS stacked TEXT/FLAG, duplicate products, SELECT, persistent IDs/allocation and Undo')

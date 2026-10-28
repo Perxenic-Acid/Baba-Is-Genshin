@@ -122,7 +122,7 @@ services.project = project
 -- A level object that is itself SELECT is not a selectable target (original cursor rule).
 projection = assert(RW_ProjectWorld(world,{{op="grant_trait",entity_ids={1,2,4},trait="select"}}))
 assert(#RW_LevelSelectionCandidates(projection) == 0)
--- Scoped LEVEL identity protects conversion; conflicting targets reject the whole turn.
+-- Scoped LEVEL identity protects conversion; distinct targets split the entrance.
 local function conversion_fixture(extra_token)
     local definitions, id = RW_GetNavigationDefinitions()
     local w = definitions["navigation.transform"].initial_world
@@ -142,9 +142,15 @@ local protected_after = step(protected,up)
 assert(protected_after.active_id == protected.active_id)
 assert(protected_after.instances[initial.active_id].world.entities[15].archetype == "level_block")
 local conflicting = conversion_fixture("AVATAR")
-local conflict, conflict_error = RW_PlanLevelAction(conflicting,up,services)
-assert(not conflict and conflict_error.reason == "conflicting_level_transforms")
-assert(#conflicting.history == 3)
+local split=step(conflicting,up)
+assert(split.active_id~=conflicting.active_id)
+local count=0
+for _,entity in pairs(RW_GetActiveLevel(split).world.entities) do
+    if entity.level_link and entity.level_link.definition_id=='navigation.transform'
+        and (entity.archetype=='crate' or entity.archetype=='avatar') then count=count+1 end
+end
+assert(count==2 and #split.history==4)
+assert(RW_UndoLevelTree(split).active_id==conflicting.active_id)
 local _, definitions = conversion_fixture()
 local orphan_root = assert(RW_CreateLevelTree(definitions,"navigation.transform"))
 local orphan, orphan_error = RW_PlanLevelAction(orphan_root,up,services)

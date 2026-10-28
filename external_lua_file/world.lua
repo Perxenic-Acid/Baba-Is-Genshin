@@ -1068,11 +1068,16 @@ function RW_ReloadLevel(tree,id)
     if not old then return nil,"unknown_instance" end
     local session = RW_InstantiateLevel(tree.definitions[old.definition_id],id)
     for entity_id, archetype in pairs(tree.level_transforms[id] or {}) do
-        if not session.world.entities[entity_id] then return nil,"persistent_level_block_missing" end
-        local entity=session.world.entities[entity_id]
-        if archetype == "text_level" then
-            entity.class,entity.archetype,entity.text="text",nil,{name="LEVEL"}
-        else entity.archetype = archetype end
+        if type(archetype) == "table" then
+            session.world.entities[entity_id]=clone(archetype.entity)
+            session.world.next_entity_id=math.max(session.world.next_entity_id,entity_id+1)
+        else
+            if not session.world.entities[entity_id] then return nil,"persistent_level_block_missing" end
+            local entity=session.world.entities[entity_id]
+            if archetype == "text_level" then
+                entity.class,entity.archetype,entity.text="text",nil,{name="LEVEL"}
+            else entity.archetype = archetype end
+        end
     end
     local result = copy_map(tree)
     result.instances = copy_map(tree.instances)
@@ -1162,8 +1167,12 @@ end
 
 function RW_RecordLevelOutcome(tree, kind, target_type)
     if kind ~= "win" and kind ~= "transform" and kind ~= "defeat" then return nil, "invalid_level_outcome" end
-    if kind == "transform" and (type(target_type) ~= "string" or target_type == "") then
-        return nil, "invalid_level_transform"
+    local targets=type(target_type) == "table" and target_type or {target_type}
+    if kind == "transform" then
+        if not is_list(targets) or #targets == 0 then return nil,"invalid_level_transform" end
+        for _,target in ipairs(targets) do
+            if type(target) ~= "string" or target == "" then return nil,"invalid_level_transform" end
+        end
     end
     local result = copy_map(tree)
     result.outcomes = copy_map(tree.outcomes)
@@ -1179,19 +1188,39 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
         local parent = tree.instances[entry.parent_id]
         local block = parent.world.entities[entry.entity_id]
         if not block then return nil, "missing_parent_level_block" end
-        local operation={kind="transform",entity_id=block.id,from=block.archetype,to=target_type}
-        if target_type == "text_level" then
+        local products={}
+        for _,target in ipairs(targets) do
             local product=clone(block)
-            product.class,product.archetype,product.text="text",nil,{name="LEVEL"}
-            operation={kind="retype",entity_id=block.id,from=clone(block),to=product}
+            product.id=nil
+            if target == "text_level" then
+                product.class,product.archetype,product.text="text",nil,{name="LEVEL"}
+            else product.class,product.archetype,product.text="object",target,nil end
+            products[#products+1]=product
         end
-        local changed, accepted = RW_Commit(parent, {consumes_turn=true, changes={operation}})
+        local first=table.remove(products,1);first.id=block.id
+        local creation,why=RW_PlanCreate(parent.world,products)
+        if not creation then return nil,why end
+        -- The first product keeps the entrance identity; all other products are
+        -- allocated in the same parent transaction, preserving clause multiplicity.
+        local operation={kind="retype",entity_id=block.id,from=clone(block),to=first}
+        if first.class == block.class and first.archetype == block.archetype
+            and ((not first.text and not block.text) or (first.text and block.text and first.text.name==block.text.name)) then
+            operation=nil
+        end
+        if operation then table.insert(creation.changes,1,operation) end
+        local changed, accepted = RW_Commit(parent,creation)
         if not accepted.accepted then return nil, accepted.reason end
         result.instances = copy_map(tree.instances)
         result.instances[entry.parent_id] = changed
         result.level_transforms = copy_map(tree.level_transforms)
-        result.level_transforms[entry.parent_id] = copy_map(tree.level_transforms[entry.parent_id] or {})
-        result.level_transforms[entry.parent_id][block.id] = target_type
+        local persisted=copy_map(tree.level_transforms[entry.parent_id] or {})
+        result.level_transforms[entry.parent_id]=persisted
+        if #targets == 1 and not persisted[block.id] then
+            persisted[block.id]=targets[1]
+        else persisted[block.id]={entity=clone(first)} end
+        for _,change in ipairs(creation.changes) do
+            if change.kind == "create" then persisted[change.entity_id]={entity=clone(change.to)} end
+        end
     end
     return result
 end

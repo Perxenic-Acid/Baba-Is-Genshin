@@ -511,7 +511,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {eat={noun="eat",negative_noun="forbid_eat"},make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
+local DEFAULT_SEMANTICS = {become={noun="become",negative_noun="forbid_become"},eat={noun="eat",negative_noun="forbid_eat"},make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -525,9 +525,9 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make" or operation == "eat"))
+                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make" or operation == "eat" or operation == "become"))
                 or (category == "negative_property" and operation == "deny_trait")
-                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow" or operation == "forbid_make" or operation == "forbid_eat"))) then return false end
+                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow" or operation == "forbid_make" or operation == "forbid_eat" or operation == "forbid_become"))) then return false end
         end
     end
     return true
@@ -776,11 +776,12 @@ function RW_PlanConversions(world, conversions)
         local source=relation.source_type
         if relation.when or relation.exclusions then
             if relation.op ~= "protect_transform" and relation.op ~= "forbid_transform" and relation.op ~= "write_text"
-                and relation.op ~= "transform_text" and relation.op ~= "transform_all" and relation.op ~= "transform" then
+                and relation.op ~= "transform_text" and relation.op ~= "transform_all" and relation.op ~= "transform"
+                and relation.op ~= "become" and relation.op ~= "forbid_become" then
                 return nil,"invalid_conversion_relation"
             end
             if (relation.op == "write_text" and (type(relation.target_text) ~= "string" or relation.target_text == ""))
-                or ((relation.op == "transform" or relation.op == "forbid_transform")
+                or ((relation.op == "transform" or relation.op == "forbid_transform" or relation.op=="become" or relation.op=="forbid_become")
                     and (type(relation.target_type) ~= "string" or relation.target_type == "")) then
                 return nil,"invalid_conversion_relation"
             end
@@ -806,6 +807,7 @@ function RW_PlanConversions(world, conversions)
     end
     table.sort(ids)
     local changes,next_id,created={},world.next_entity_id,0
+    local converted_ids={}
     local function create(product)
         if type(next_id) ~= "number" or next_id % 1 ~= 0 or next_id < 1 or world.entities[next_id] then return nil,"invalid_conversion_frontier" end
         if next_id >= 9007199254740991 then return nil,"entity_id_exhausted" end
@@ -817,39 +819,52 @@ function RW_PlanConversions(world, conversions)
         local bans=query_clone(forbidden[source] or {})
         local choices=query_clone(targets[source] or {})
         local protect=protected[source]
+        local become_bans={}
         for _,relation in ipairs(conditional[source] or {}) do
             local enabled,err=RW_RelationApplies(world,relation,virtual and {class="empty",x=entity.x,y=entity.y} or entity)
             if enabled == nil then return nil,err end
             if enabled then
                 if relation.op == "protect_transform" then protect=true
                 elseif relation.op == "forbid_transform" then bans[relation.target_type]=true
+                elseif relation.op=="forbid_become" then become_bans[relation.target_type]=true
+                elseif relation.op=="become" then choices[#choices+1]={become_target=relation.target_type}
                 elseif relation.op == "write_text" then choices[#choices+1]={text_name=relation.target_text}
                 else choices[#choices+1]=relation.op == "transform_text" and "@text"
                     or relation.op == "transform_all" and "@all" or relation.target_type end
             end
         end
-        -- A IS NOT A destroys A, including Text. It is not HAS destruction.
-        if bans[source] then
+        local has_become=false
+        for _,choice in ipairs(choices) do if type(choice)=="table" and choice.become_target then has_become=true;break end end
+        -- Preserve established IS self-negation, while BECOME is independently selected.
+        if bans[source] and not has_become then
             if not virtual then changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)} end
             return true
         end
-        if protect or #choices == 0 then return true end
-        local products,retain,remove={},false,false
-        for _,target in ipairs(choices) do
-            if not bans[target] and not (type(target) == "table" and bans["@text"]) then
-                if target == "@all" then
-                    if not virtual and entity.class ~= "text" then retain=true end
+        local products,retain,remove={},false,bans[source] or become_bans[source] or false
+        for _,choice in ipairs(choices) do
+            local becoming=type(choice)=="table" and choice.become_target~=nil
+            local target=becoming and choice.become_target or choice
+            local denied=becoming and become_bans or bans
+            if (becoming or (not protect and not bans[source])) and not denied[target]
+                and not (type(target)=="table" and denied["@text"])
+                and not (becoming and target=="@all" and become_bans["@all"]) then
+                if target=="@all" then
+                    if not virtual and entity.class~="text" then retain=true end
                     for _,name in ipairs(RW_NounPalette(world)) do
-                        if name ~= source and not bans[name] then
+                        if name~=source and not denied[name] then
                             local exists=false
                             for _,other in pairs(world.entities) do
-                                if other.x == entity.x and other.y == entity.y and other.class ~= "text" and other.archetype == name then exists=true end
+                                if other.x==entity.x and other.y==entity.y and other.class~="text" and other.archetype==name then exists=true end
                             end
                             if not exists then products[#products+1]=name end
                         end
                     end
-                elseif target == "@empty" then remove=true
-                else products[#products+1]=target end
+                    if becoming and not virtual then converted_ids[entity.id]=true end
+                elseif target=="@empty" then remove=true
+                else
+                    products[#products+1]=target
+                    if becoming and not virtual then converted_ids[entity.id]=true end
+                end
             end
         end
         local used=false
@@ -865,7 +880,9 @@ function RW_PlanConversions(world, conversions)
                     -- WRITE may target this very Text; retain its first identity product.
                 elseif entity.class == "text" or target == "@text" or type(target) == "table" then
                     changes[#changes+1]={kind="retype",entity_id=entity.id,from=query_clone(entity),to=product}
-                else changes[#changes+1]={kind="transform",entity_id=entity.id,from=entity.archetype,to=target} end
+                elseif entity.archetype~=target then
+                    changes[#changes+1]={kind="transform",entity_id=entity.id,from=entity.archetype,to=target}
+                end
                 used=true
             else local ok,err=create(product); if not ok then return nil,err end end
         end
@@ -888,7 +905,7 @@ function RW_PlanConversions(world, conversions)
             end
         end end
     end
-    return changes,nil,created > 0 and {from=world.next_entity_id,to=next_id} or nil
+    return changes,nil,created > 0 and {from=world.next_entity_id,to=next_id} or nil,converted_ids
 end
 
 -- The authored vocabulary is the palette, not the objects remaining this frame.
@@ -1041,6 +1058,15 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     end
                 end
                 supported=key ~= "@empty"
+            elseif sem and key and (ast.when.op=="always" or ast.when.op=="spatial") and sem.noun=="become" then
+                local target=subject_key(obj)
+                if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
+                if obj.tag=="special" and obj.name=="all" then target="@all" end
+                if target and (not objnot or sem.negative_noun=="forbid_become") then
+                    relations[#relations+1]={op=objnot and "forbid_become" or "become",source_type=key,
+                        target_type=target,source=ast.source,when=query_clone(ast.when)}
+                    supported=true
+                end
             elseif sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "transform" then
                 local target=subject_key(obj)
                 if obj.tag == "noun" and obj.type and obj.type.tag == "level" then target=obj.type.block_type or "level_block" end

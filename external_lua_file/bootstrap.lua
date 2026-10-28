@@ -233,7 +233,7 @@ function RW_PlanTurn(world, action, services)
         if #level_targets == 1 then target_type=level_targets[1]
         elseif #level_targets > 1 then target_type=level_targets end
     end
-    local operations, conversion_error, allocation = services.convert(preview, entity_conversions)
+    local operations, conversion_error, allocation, converted_ids = services.convert(preview, entity_conversions)
     if not operations then return fail("conversions", conversion_error) end
 
     -- Keep phase-local preconditions: conversion reads the movement snapshot,
@@ -413,6 +413,7 @@ function RW_PlanTurn(world, action, services)
             for _,relation in ipairs(frozen_relations or {}) do if relation.op=="make" then active=true;break end end
             if active then
                 local converted={}
+                for id in pairs(converted_ids or {}) do converted[id]=true end
                 for _,stage in ipairs(plan.stages) do for _,change in ipairs(stage.plan.changes) do
                     if change.kind=="create" or change.kind=="transform" or change.kind=="retype" then converted[change.entity_id]=true end
                 end end
@@ -1643,7 +1644,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4J initialized")
+    print("[RuleWorld] M9.4K initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

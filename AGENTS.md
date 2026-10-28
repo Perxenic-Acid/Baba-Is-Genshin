@@ -221,3 +221,9 @@
 - The user waived routine real-device acceptance as a progress gate. Continue through
   the requested word families with simulation/source oracles, recording known gaps;
   do not wait for manual confirmation or claim native success from offline tests.
+
+- BECOME bypasses IS identity protection; self-targets and duplicate products count.
+  Negative noun targets are verb-specific. Same-name BECOME must enter the transient
+  converted-ID set (RW_PlanConversions fourth result) for late MAKE occupancy even
+  when no persistent transform op is needed. Scoped LEVEL BECOME remains deferred;
+  see docs/BECOME.md.

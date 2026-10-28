@@ -212,3 +212,9 @@ M9.4J adds EAT after ordinary contacts and before MAKE, with simultaneous victim
 selection, SAFE/FLOAT, frozen declarations, HAS and whole-turn Undo. Source matrix:
 3,072 cases. Next: BECOME, MIMIC, PLAY. The user waived routine native acceptance;
 continue implementation with offline regressions/source oracles without waiting.
+
+
+M9.4K adds BECOME with independent IS identity/negative semantics, duplicate self
+products, TEXT conversion and transient converted tracking for MAKE. Installed
+conversion oracle: 432 normalized-rule cases. See BECOME.md for scoped LEVEL gaps.
+Next verbs: MIMIC, then PLAY; conditions/prefixes/GROUP/properties follow.

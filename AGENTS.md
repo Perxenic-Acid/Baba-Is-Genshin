@@ -158,3 +158,14 @@
   group, including when entered through an allocated copy. Preserve separate SELECT
   candidates/entry slots, retire old products atomically, keep allocator tombstones,
   and return via the surviving source ID. See docs/LEVEL_SEMANTICS.md.
+
+- Official catalog audit uses installed Data/Editor/editor_objectlist.lua, never mod
+  catalogs. See docs/OFFICIAL_WORDS.md and tools/audit_official_words.py --check.
+- MOVE/nudges run after YOU and before SHIFT; automatic deaths retain source-frame
+  HAS and newborn WEAK grace. SLEEP only suppresses self-motion, not passive PUSH.
+  STILL/directional locks block passive motion. Sleeping SHIFT sources still impart
+  displacement; only final facing alignment checks source SLEEP. Weighted direction
+  grants and TURN/DETURN use multiplicity, not Boolean capabilities. See MOTION_WORDS.md.
+- NEXTTO is cardinal adjacency excluding overlap; ABOVE/BELOW/BESIDELEFT/BESIDERIGHT
+  scan the aligned ray; FACING checks the next cell or cardinal direction arguments.
+  Keep per-identity queries and frozen contact declarations; do not filter by FLOAT.

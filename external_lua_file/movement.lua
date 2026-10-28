@@ -11,7 +11,7 @@ local function has_capability(world, entity, capability)
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", select = "select", select_path = "path",
         win = "win", push = "pushable", block_entry = "block_entry",
-        open="open",shut="shut",safe="safe",weak="weak",float="float",shift="shift"}
+        open="open",shut="shut",safe="safe",weak="weak",float="float",shift="shift",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -23,6 +23,11 @@ local function level_surface(world,entity)
     local level = world.language and world.language.nouns and world.language.nouns.LEVEL
     local block_type = type(level) == "table" and level.block_type or "level_block"
     return entity.level_link ~= nil or entity.archetype == block_type
+end
+
+local function immobile(world,entity,dx,dy)
+    local locked=dx==1 and "lockedright" or dx==-1 and "lockedleft" or dy==-1 and "lockedup" or "lockeddown"
+    return has_capability(world,entity,"still") or has_capability(world,entity,locked)
 end
 
 local function direction_for(dx, dy)
@@ -204,6 +209,7 @@ function RW_ResolveMovement(world, action)
         end
 
         local entity = world.entities[id]
+        if immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
         visiting[id] = true
 
         local nx = entity.x + dx
@@ -294,6 +300,7 @@ function RW_ResolveMovement(world, action)
 
     try_move=function(id)
         local entity=world.entities[id]
+        if immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
         if id < 1 or not has_capability(world,entity,"weak") or has_capability(world,entity,"safe") then
             return attempt_move(id)
         end
@@ -492,7 +499,7 @@ local function resolve_you_turn(world, action)
     local controllers = {}
 
     for id, entity in pairs(world.entities) do
-        if has_capability(world, entity, "control") then
+        if has_capability(world, entity, "control") and not has_capability(world,entity,"sleep") then
             controllers[#controllers + 1] = id
         end
     end
@@ -786,7 +793,8 @@ function RW_ResolveShift(world)
         if has_capability(world,belt,"shift") and vectors[belt.direction] then
             for _,other_id in ipairs(ids) do
                 local rider=world.entities[other_id]
-                if other_id ~= id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider) then
+                if other_id ~= id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider)
+                    and not immobile(world,rider,vectors[belt.direction][1],vectors[belt.direction][2]) then
                     if not tasks[other_id] then
                         tasks[other_id]={direction=belt.direction,count=0};order[#order+1]=other_id
                     end
@@ -825,7 +833,7 @@ function RW_ResolveShift(world)
     -- without adding another displacement when entering a second belt this turn.
     for _,id in ipairs(ids) do
         local belt=working.entities[id]
-        if belt and has_capability(world,belt,"shift") and vectors[belt.direction] then
+        if belt and has_capability(world,belt,"shift") and not has_capability(world,belt,"sleep") and vectors[belt.direction] then
             for _,other_id in ipairs(ids) do
                 local rider=working.entities[other_id]
                 if rider and other_id~=id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider) then
@@ -848,6 +856,112 @@ function RW_ResolveShift(world)
     return {consumes_turn=true,changes=changes,destructions=deaths,reason="shift"}
 end
 
+-- Direction grants use physical rule multiplicity (statusblock in blocks.lua).
+function RW_ResolveOrientation(world)
+    local names={"Right","Up","Left","Down"}
+    local indices={Right=0,Up=1,Left=2,Down=3,Mid=4,None=4}
+    local traits={"right","up","left","down"}
+    local changes={}
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    for _,id in ipairs(ids) do
+        local entity=world.entities[id]
+        if not has_capability(world,entity,"sleep") then
+            local counts=world.trait_counts and world.trait_counts[id] or entity.traits or {}
+            local values,maxcount,winners={},0,0
+            for i,trait in ipairs(traits) do
+                local value=counts[trait];value=value==true and 1 or value or 0
+                values[i]=value
+                if value>maxcount then maxcount,winners=value,1
+                elseif value==maxcount then winners=winners+1 end
+            end
+            local current=indices[entity.direction or "None"] or 4
+            local facing=current
+            if maxcount>0 then
+                if winners==1 then
+                    for i,value in ipairs(values) do if value==maxcount then facing=i-1 end end
+                elseif current<4 then
+                    for offset=1,3 do
+                        local candidate=(current-offset)%4
+                        if values[candidate+1]==maxcount then facing=candidate;break end
+                    end
+                end
+            end
+            local function count(trait)
+                local value=counts[trait];return value==true and 1 or value or 0
+            end
+            local turns=count("deturn")-count("turn")
+            if turns~=0 then facing=(facing+turns)%4 end
+            if names[facing+1] and names[facing+1]~=(entity.direction or "None") then
+                changes[#changes+1]={kind="direction",entity_id=id,from=entity.direction or "None",to=names[facing+1]}
+            end
+        end
+    end
+    return {consumes_turn=true,changes=changes,reason="orientation"}
+end
+
+-- Autonomous impulses reuse the ordinary collision/destruction solver.
+function RW_ResolveAutomatic(world)
+    local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
+    local opposite={Right="Left",Left="Right",Up="Down",Down="Up"}
+    local working={};for k,v in pairs(world) do working[k]=v end
+    working.entities={}
+    local ids={}
+    for id,entity in pairs(world.entities) do
+        local copy={};for k,v in pairs(entity) do copy[k]=v end
+        working.entities[id]=copy;ids[#ids+1]=id
+    end
+    table.sort(ids)
+    local deaths,records={},{}
+    local function apply(part)
+        for _,change in ipairs(part.changes) do
+            local entity=working.entities[change.entity_id]
+            if entity then
+                if change.kind=="move" then entity.x,entity.y,entity.direction=change.to.x,change.to.y,change.to.direction
+                elseif change.kind=="direction" then entity.direction=change.to end
+            end
+        end
+        for _,death in ipairs(part.destructions or {}) do
+            deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+        end
+    end
+    for _,spec in ipairs({{"move"},{"nudgeright","Right"},{"nudgeup","Up"},{"nudgeleft","Left"},{"nudgedown","Down"}}) do
+        for _,id in ipairs(ids) do
+            local entity=working.entities[id]
+            local counts=world.trait_counts and world.trait_counts[id] or {}
+            local count=counts[spec[1]] or (entity and has_capability(world,entity,spec[1]) and 1 or 0)
+            for impulse=1,count do
+                entity=working.entities[id]
+                if not entity or has_capability(world,entity,"sleep") then break end
+                local direction=spec[2] or entity.direction
+                local vector=vectors[direction]
+                if vector and not immobile(world,entity,vector[1],vector[2]) then
+                    local old_direction=entity.direction or "None"
+                    local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
+                    if spec[1]=="move" and #part.changes==0 and #(part.destructions or {})==0 then
+                        direction=opposite[direction];vector=vectors[direction]
+                        entity.direction=direction
+                        part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
+                    end
+                    apply(part)
+                    if spec[2] and working.entities[id] then working.entities[id].direction=old_direction end
+                end
+            end
+        end
+    end
+    local changes={}
+    for _,id in ipairs(ids) do
+        local before=world.entities[id];local after=working.entities[id] or records[id]
+        if before.x~=after.x or before.y~=after.y then
+            changes[#changes+1]={kind="move",entity_id=id,
+                from={x=before.x,y=before.y,direction=before.direction or "None"},
+                to={x=after.x,y=after.y,direction=after.direction or "None"}}
+        elseif (before.direction or "None")~=(after.direction or "None") then
+            changes[#changes+1]={kind="direction",entity_id=id,from=before.direction or "None",to=after.direction or "None"}
+        end
+    end
+    return {consumes_turn=true,changes=changes,destructions=deaths,reason="automatic"}
+end
+
 -- SELECT is not YOU: it follows traversable map objects without pushing them.
 function RW_ResolveTurn(world, action)
     if type(action)=="table" and action.type=="wait" then return {consumes_turn=true,changes={},reason="wait"} end
@@ -860,9 +974,9 @@ function RW_ResolveTurn(world, action)
         local keys={}; for key in pairs(world.empty_cells) do keys[#keys+1]=key end; table.sort(keys)
         for _,key in ipairs(keys) do
             local cell=world.empty_cells[key]
-            if cell.behaviors.control then
+            if cell.behaviors.control and not cell.behaviors.sleep then
                 movement_world.entities[next_virtual]={id=next_virtual,kind="object",class="object",
-                    x=cell.x,y=cell.y,direction="None",behaviors={control=true}}
+                    x=cell.x,y=cell.y,direction="None",behaviors=cell.behaviors}
                 next_virtual=next_virtual-1
             end
         end
@@ -876,7 +990,7 @@ function RW_ResolveTurn(world, action)
     local selected = false
     local destroyed={};for _,death in ipairs(plan.destructions or {}) do destroyed[death.entity_id]=true end
     for id, entity in pairs(world.entities) do
-        if not destroyed[id] and has_capability(world, entity, "select") then
+        if not destroyed[id] and has_capability(world, entity, "select") and not has_capability(world,entity,"sleep") then
             selected = true
             local x, y = entity.x + action.dx, entity.y + action.dy
             local traversable = false
@@ -887,7 +1001,7 @@ function RW_ResolveTurn(world, action)
                     traversable = true
                 end
             end
-            if traversable and x >= 1 and x <= world.width and y >= 1 and y <= world.height then
+            if traversable and not immobile(world,entity,action.dx,action.dy) and x >= 1 and x <= world.width and y >= 1 and y <= world.height then
                 local operation = {kind="move",entity_id=id,
                     from={x=entity.x,y=entity.y,direction=entity.direction or "None"},
                     to={x=x,y=y,direction=direction_for(action.dx,action.dy)}}
@@ -897,7 +1011,8 @@ function RW_ResolveTurn(world, action)
             end
         end
     end
-    if world.level_behaviors and world.level_behaviors.control then
+    if world.level_behaviors and world.level_behaviors.control and not world.level_behaviors.sleep
+        and not immobile(world,{behaviors=world.level_behaviors},action.dx,action.dy) then
         local current = world.board_offset or {x=0,y=0,direction="None"}
         plan.board_shift = {from={x=current.x,y=current.y,direction=current.direction},
             to={x=current.x+action.dx,y=current.y+action.dy,direction=direction_for(action.dx,action.dy)}}

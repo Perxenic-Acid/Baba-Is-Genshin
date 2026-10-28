@@ -99,3 +99,7 @@ before painting, avoiding clear/repaint churn for paths and portals. Native mock
 counters require zero repeated position/size/font/visibility calls for identical
 frames, and one position call when only one entity moves. Rule/turn computation
 still runs; actual frame latency requires real-device measurement.
+
+M9.4D adds a non-official MOTION laboratory after TRAP in the reference menu
+(x=7,y=2). It is authored outside the generated official layout block; the importer
+only maintains its menu link. Route: root D x10, F, D x5, F. See MOTION_WORDS.md.

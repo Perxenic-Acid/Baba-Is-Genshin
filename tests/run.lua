@@ -49,6 +49,17 @@ assert(navigation.title:find("MAP"))
 while history_depth > 0 do listeners.undo() end
 assert(self_test_calls == 0 and rendered.entities[12].x == 2 and rendered.entities[12].y == 2)
 print("PASS: production boot/navigation/movement/Undo without diagnostics")
+-- The new motion laboratory is exercised through actual production input adapters.
+for i=1,10 do listeners.right() end;listeners.confirm()
+for i=1,5 do listeners.right() end;listeners.confirm()
+assert(rendered.entities[5].archetype=="rock" and rendered.entities[5].x==6)
+listeners.wait();assert(rendered.entities[5].x==7)
+listeners.undo();assert(rendered.entities[5].x==6)
+listeners.right();assert(rendered.entities[4].x==3 and rendered.entities[6].x==4 and rendered.entities[5].x==7)
+listeners.undo();assert(rendered.entities[4].x==2 and rendered.entities[6].x==3 and rendered.entities[5].x==6)
+while history_depth>0 do listeners.undo() end
+assert(self_test_calls==0 and rendered.entities[12].x==2)
+print("PASS: production MOTION laboratory wait/MOVE, sleeping PUSH, whole-tree Undo without diagnostics")
 -- Diagnostics get a fresh mocked binding surface. Production never calls them.
 listeners={}
 RW_StartWithSelfTests()
@@ -437,4 +448,6 @@ dofile("tests/text_activation.lua")
 dofile("tests/shift.lua")
 
 dofile("tests/more.lua")
+dofile("tests/motion_words.lua")
+dofile("tests/spatial_extra.lua")
 dofile("tests/level_text.lua")

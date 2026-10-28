@@ -543,10 +543,13 @@ local function ast_parse_heads(line,language,output)
                 for _,word in ipairs(cells[cursor] or {}) do
                     if ast_is_not(word,language) then condition_at(cursor+1,append(prefix,{word})) end
                     local relation=(language.prepositions or {})[word.token]
-                    if relation == "on" or relation == "near" then
+                    if relation == "on" or relation == "near" or relation == "nextto" or relation == "above"
+                        or relation == "below" or relation == "besideleft" or relation == "besideright" or relation == "facing" then
                         local arguments
                         arguments=function(at,params,words)
-                            terms(at,false,function(parameter,finish,more)
+                            terms(at,relation=="facing",function(parameter,finish,more)
+                                local raw=parameter;while raw.tag=="not" do raw=raw.operand end
+                                if raw.tag=="property" and raw.name~="right" and raw.name~="up" and raw.name~="left" and raw.name~="down" then return end
                                 local next_params=append(params,{parameter});local next_words=append(words,more)
                                 local clause={relation=relation,negated=#prefix % 2 == 1,parameters=next_params}
                                 walk(subjects,append(clauses,{clause}),finish,append(path,next_words),leading)

@@ -158,7 +158,9 @@ function RW_TestEntityCondition(world,node,entity)
             if term.tag ~= "not" then
                 if term.tag == "noun" and type(term.type) == "table" then
                     return term.type.tag == "level" and "@level" or term.type.name,negative
-                elseif term.tag == "special" then return "@" .. term.name,negative end
+                elseif term.tag == "special" then return "@" .. term.name,negative
+                elseif term.tag == "property" and (term.name=="right" or term.name=="up" or term.name=="left" or term.name=="down") then
+                    return "@direction:"..term.name,negative end
                 return nil
             end
             negative=not negative;term=term.operand
@@ -166,7 +168,9 @@ function RW_TestEntityCondition(world,node,entity)
     end
     local result=true
     for _,clause in ipairs(node.clauses) do
-        if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near")
+        if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
+                and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
+                and clause.relation ~= "besideright" and clause.relation ~= "facing")
             or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or #clause.parameters == 0 then
             return nil,"invalid_spatial_clause"
         end
@@ -187,12 +191,23 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
+        local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
+        local vector=vectors[entity.direction]
+        local function in_region(x,y)
+            local dx,dy=x-entity.x,y-entity.y
+            local relation=clause.relation
+            if relation=="on" then return dx==0 and dy==0 end
+            if relation=="near" then return math.abs(dx)<=1 and math.abs(dy)<=1 end
+            if relation=="nextto" then return math.abs(dx)+math.abs(dy)==1 end
+            if relation=="above" then return dx==0 and dy>0 end
+            if relation=="below" then return dx==0 and dy<0 end
+            if relation=="besideleft" then return dy==0 and dx>0 end
+            if relation=="besideright" then return dy==0 and dx<0 end
+            if relation=="facing" then return vector and dx==vector[1] and dy==vector[2] end
+        end
         local candidates={}
         for id,target in pairs(world.entities) do
-            if id ~= entity.id and math.abs(target.x-entity.x) <= (clause.relation == "near" and 1 or 0)
-                and math.abs(target.y-entity.y) <= (clause.relation == "near" and 1 or 0) then
-                candidates[#candidates+1]=target
-            end
+            if id ~= entity.id and in_region(target.x,target.y) then candidates[#candidates+1]=target end
         end
         table.sort(candidates,function(a,b)
             if a.x ~= b.x then return a.x < b.x end
@@ -202,7 +217,12 @@ function RW_TestEntityCondition(world,node,entity)
         local used,allfound={},0
         for _,parameter in ipairs(parameters) do
             local matched,contribution=false,nil
-            if parameter.name == "@level" and not parameter.negative and not used["@level"] then
+            if parameter.name:sub(1,11)=="@direction:" then
+                if clause.relation~="facing" then return nil,"invalid_spatial_parameter" end
+                local expected=parameter.name:sub(12)
+                local same=entity.direction and entity.direction:lower()==expected
+                if vector and ((not parameter.negative and same) or (parameter.negative and not same)) then matched=true end
+            elseif parameter.name == "@level" and not parameter.negative and not used["@level"] then
                 used["@level"]=true;matched=true
             elseif parameter.name == "@empty" and parameter.negative and clause.relation == "on" then
                 -- Original ON NOT EMPTY consumes/counts every remaining co-occupant.
@@ -213,10 +233,25 @@ function RW_TestEntityCondition(world,node,entity)
                     end
                 end
             elseif parameter.name == "@empty" then
-                local radius=clause.relation == "near" and 1 or 0
-                for dx=-radius,radius do for dy=-radius,radius do
-                    local x,y=entity.x+dx,entity.y+dy;local key="empty:" .. x .. ":" .. y
-                    if x >= 1 and y >= 1 and x <= world.width and y <= world.height and not used[key] then
+                local xmin,xmax,ymin,ymax=1,world.width,1,world.height
+                local relation=clause.relation
+                if relation=="on" then xmin,xmax,ymin,ymax=entity.x,entity.x,entity.y,entity.y
+                elseif relation=="near" or relation=="nextto" then
+                    xmin,xmax=math.max(1,entity.x-1),math.min(world.width,entity.x+1)
+                    ymin,ymax=math.max(1,entity.y-1),math.min(world.height,entity.y+1)
+                elseif relation=="facing" then
+                    if vector then
+                        xmin,xmax=math.max(1,entity.x+vector[1]),math.min(world.width,entity.x+vector[1])
+                        ymin,ymax=math.max(1,entity.y+vector[2]),math.min(world.height,entity.y+vector[2])
+                    else xmax=0 end
+                elseif relation=="above" then xmin,xmax,ymin=entity.x,entity.x,entity.y+1
+                elseif relation=="below" then xmin,xmax,ymax=entity.x,entity.x,entity.y-1
+                elseif relation=="besideleft" then xmin,ymin,ymax=entity.x+1,entity.y,entity.y
+                elseif relation=="besideright" then xmax,ymin,ymax=entity.x-1,entity.y,entity.y end
+                for x=xmin,xmax do for y=ymin,ymax do
+                    local dx,dy=x-entity.x,y-entity.y
+                    local key="empty:" .. x .. ":" .. y
+                    if in_region(x,y) and (clause.relation=="facing" or not used[key]) then
                         local occupied=false
                         for _,target in pairs(world.entities) do if target.x == x and target.y == y then occupied=true;break end end
                         local empty=not occupied
@@ -227,7 +262,7 @@ function RW_TestEntityCondition(world,node,entity)
                                 if others <= 1 then empty=true end
                             end
                         end
-                        if not (radius == 0 and entity.class == "empty") and
+                        if not (clause.relation == "on" and entity.class == "empty") and
                             ((not parameter.negative and empty) or (parameter.negative and not empty)) then
                             if not matched then used[key]=true;matched=true end
                         end
@@ -245,6 +280,7 @@ function RW_TestEntityCondition(world,node,entity)
             allfound=allfound+(contribution or (matched and 1 or 0))
         end
         local found=allfound == #parameters
+        if clause.relation=="facing" and not vector then found=false end
         if clause.negated then found=not found end
         result=result and found
     end

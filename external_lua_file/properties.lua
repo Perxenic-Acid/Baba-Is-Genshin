@@ -25,6 +25,7 @@ end
 
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
+    sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
     you = {control = true}, select = {select = true}, path = {select_path = true},
     more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
@@ -39,7 +40,8 @@ local function valid_behaviors(registry)
                     and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
                     and capability ~= "safe" and capability ~= "crash"
                     and capability ~= "hot" and capability ~= "melt"
-                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak" and capability ~= "float" and capability ~= "shift" and capability ~= "more")
+                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak" and capability ~= "float" and capability ~= "shift" and capability ~= "more"
+                    and capability ~= "sleep" and capability ~= "still" and capability ~= "lockedright" and capability ~= "lockedup" and capability ~= "lockedleft" and capability ~= "lockeddown" and capability ~= "move" and capability ~= "right" and capability ~= "up" and capability ~= "left" and capability ~= "down" and capability ~= "turn" and capability ~= "deturn" and capability ~= "nudgeright" and capability ~= "nudgeup" and capability ~= "nudgeleft" and capability ~= "nudgedown" )
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -116,6 +118,7 @@ function RW_ProjectWorld(world, effects, level_traits)
     end
     local projected = clone(world)
     projected.empty_cells={}
+    projected.trait_counts={}
     projected.level_traits, projected.level_behaviors = {}, {}
     for _, trait in ipairs(level_traits) do
         projected.level_traits[#projected.level_traits+1] = trait
@@ -153,6 +156,9 @@ function RW_ProjectWorld(world, effects, level_traits)
                     local entity = projected.entities[id]
                     entity.traits = entity.traits or {}
                     entity.traits[effect.trait] = true
+                    projected.trait_counts[id]=projected.trait_counts[id] or {}
+                    local counts=projected.trait_counts[id]
+                    counts[effect.trait]=(counts[effect.trait] or 0)+1
                     for capability, enabled in pairs(behavior) do
                         if enabled then entity.behaviors[capability] = true end
                     end

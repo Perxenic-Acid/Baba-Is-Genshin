@@ -159,3 +159,16 @@ M9.3T.1 修复真机启动解析超时：按实际词流而非所有 NOT 长度�
 
 M9.3T.2 将全部启动回归移到显式 RW_StartWithSelfTests；生产 OnStart 固定不运行自测，
 正常启动约 72 万条离线指令，预算收紧到 200 万。验证无自测的实际输入/导航/Undo。
+
+## Official vocabulary completion (active user priority)
+
+Finish logic before frontend/level design. Track the installed official editor
+catalog in OFFICIAL_WORDS.md; generated audit includes 327 text entries and is
+checked by tools/audit_official_words.py --check. Do not treat unimplemented words
+as complete merely because parsing/token storage permits their names.
+
+M9.4D adds 17 motion/direction properties and six directional/spatial conditions.
+Tests and deliberate gaps: MOTION_WORDS.md. Next priority: PULL/SWAP/FALL/REVERSE/
+PHANTOM, then MAKE/EAT/BECOME/REVERT and remaining rule/condition families. Continue
+through the pending catalog and close documented scoped LEVEL/EMPTY/timing gaps
+before declaring all official words finished. Real-device acceptance is separate.

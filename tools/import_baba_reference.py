@@ -80,6 +80,8 @@ def generate(data):
     object(reference_map,10,"line",5,2)
     portal(reference_map,11,6,2,"TRAP","reference.3")
     object(reference_map,12,"line",6,2)
+    portal(reference_map,13,7,2,"MOTION","navigation.motion")
+    object(reference_map,14,"line",7,2)
     for x=1,4 do object(reference_map,4+x,"line",x,2) end
     definitions["navigation.reference"]={id="navigation.reference",initial_world=reference_map}
     portal(root,64,12,2,"REF","navigation.reference")

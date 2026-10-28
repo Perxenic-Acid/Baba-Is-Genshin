@@ -167,35 +167,44 @@ function RW_PlanTurn(world, action, services)
         end
         preview=after
     end
-    if services.shift then
+    local automatic_active=false
+    for _,effect in ipairs(effects) do
+        local trait=effect.trait
+        if effect.op=="grant_trait" and (trait=="move" or trait=="nudgeright" or trait=="nudgeup" or trait=="nudgeleft" or trait=="nudgedown") then
+            automatic_active=true;break
+        end
+    end
+    for _,motion_phase in ipairs({"automatic","shift"}) do
+    if services[motion_phase] and (motion_phase~="automatic" or automatic_active) then
         local refreshed,why=services.refresh(preview,before_rules)
-        if not refreshed then return fail("shift_rules",why) end
+        if not refreshed then return fail(motion_phase.."_rules",why) end
         local shifted_world,err=services.project(preview,refreshed,level_traits_from(before_conversions))
-        if not shifted_world then return fail("shift_project",err) end
-        local shift,shift_error=services.shift(shifted_world)
-        if not shift then return fail("shift",shift_error) end
+        if not shifted_world then return fail(motion_phase.."_project",err) end
+        local shift,shift_error=services[motion_phase](shifted_world)
+        if not shift then return fail(motion_phase,shift_error) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,
             changes=movement.changes,board_shift=movement.board_shift}}}
-        stages[#stages+1]={name="shift",plan={consumes_turn=true,changes=shift.changes}}
+        stages[#stages+1]={name=motion_phase,plan={consumes_turn=true,changes=shift.changes}}
         local after,problem=services.preview(preview,stages[#stages].plan)
-        if not after then return fail("preview_shift",problem) end
+        if not after then return fail("preview_"..motion_phase,problem) end
         if #(shift.destructions or {})>0 then
             local ids,contents={},{}
             for _,death in ipairs(shift.destructions) do ids[#ids+1]=death.entity_id end
             for _,relation in ipairs(before_conversions or {}) do if relation.op=="has" then contents[#contents+1]=relation end end
-            if not services.destroy then return fail("shift_destruction","missing_destruction_service") end
-            local destruction,why=services.destroy(after,ids,contents,"shift",shift.destructions)
-            if not destruction then return fail("shift_destruction",why) end
+            if not services.destroy then return fail(motion_phase.."_destruction","missing_destruction_service") end
+            local destruction,why=services.destroy(after,ids,contents,motion_phase,shift.destructions)
+            if not destruction then return fail(motion_phase.."_destruction",why) end
             local next_world,err=services.preview(after,destruction)
-            if not next_world then return fail("shift_destruction",err) end
-            stages[#stages+1]={name="shift_destruction",plan=destruction};after=next_world
+            if not next_world then return fail(motion_phase.."_destruction",err) end
+            stages[#stages+1]={name=motion_phase.."_destruction",plan=destruction};after=next_world
         end
         movement_prefix={consumes_turn=true,reason=movement.reason,changes={},stages=stages}
         for _,stage in ipairs(stages) do for _,change in ipairs(stage.plan.changes) do
             movement_prefix.changes[#movement_prefix.changes+1]=change
         end end
         preview=after
-        trace[#trace+1]="shift"
+        trace[#trace+1]=motion_phase
+    end
     end
     trace[#trace + 1] = "rules_after"
     local post_effects, post_error, conversions = services.evaluate(preview)
@@ -271,6 +280,7 @@ function RW_PlanTurn(world, action, services)
         for _,change in ipairs(more.changes) do plan.changes[#plan.changes+1]=change end
         complete=after;trace[#trace+1]="more"
     end
+    local final_world,final_effects,final_relations
     if services.contact ~= nil or services.refresh ~= nil then
         if type(services.contact) ~= "function" or type(services.refresh) ~= "function" then
             return fail("contacts","invalid_contact_services")
@@ -295,7 +305,7 @@ function RW_PlanTurn(world, action, services)
         local weak_new={}
         for _,stage in ipairs(plan.stages) do
             for _,change in ipairs(stage.plan.changes) do
-                if (stage.name == "movement_destruction" or stage.name == "shift_destruction" or stage.name == "more") and change.kind == "create" then weak_new[change.entity_id]=true
+                if (stage.name == "movement_destruction" or stage.name == "shift_destruction" or stage.name == "automatic_destruction" or stage.name == "more") and change.kind == "create" then weak_new[change.entity_id]=true
                 elseif stage.name == "conversion" then weak_new[change.entity_id]=nil end
             end
         end
@@ -330,7 +340,8 @@ function RW_PlanTurn(world, action, services)
         if not final then return fail("preview_contacts",why,phase) end
         -- Contacts can remove the grounding Text of a WORD rule. Detect a loop
         -- in the final board before Commit/render, without changing frozen contacts.
-        local checked,check_error=services.evaluate(final)
+        local checked,check_error,checked_relations=services.evaluate(final)
+        final_world,final_effects,final_relations=final,checked,checked_relations
         if not checked then
             if check_error == "word_rule_limit" or check_error == "word_rule_cycle" or check_error == "rule_complexity_limit" then
                 lock_compile_failure(plan,check_error)
@@ -339,6 +350,42 @@ function RW_PlanTurn(world, action, services)
     else
         for _,relation in ipairs(conversions or {}) do
             if relation.op == "has" then return fail("contacts","missing_contact_services") end
+        end
+    end
+    if services.orient and not plan.infinite_loop and not plan.too_complex then
+        local final,why,phase=final_world
+        if not final then final,why,phase=services.preview(world,plan) end
+        if not final then return fail("orientation_preview",why,phase) end
+        local effects,relations=final_effects,final_relations
+        if not effects then effects,why,relations=services.evaluate(final) end
+        if not effects then
+            if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
+                lock_compile_failure(plan,why);return plan,nil,trace
+            end
+            return fail("orientation_rules",why)
+        end
+        local orientation_active=false
+        for _,effect in ipairs(effects) do
+            local t=effect.trait
+            if effect.op=="grant_trait" and #(effect.entity_ids or {})>0 and
+                (t=="right" or t=="up" or t=="left" or t=="down" or t=="turn" or t=="deturn") then orientation_active=true;break end
+        end
+        if orientation_active then
+        local projected,why=services.project(final,effects,level_traits_from(relations))
+        if not projected then return fail("orientation_project",why) end
+        local orientation,why=services.orient(projected)
+        if not orientation then return fail("orientation",why) end
+        if #orientation.changes>0 then
+            plan.stages[#plan.stages+1]={name="orientation",plan=orientation}
+            for _,change in ipairs(orientation.changes) do plan.changes[#plan.changes+1]=change end
+            local checked,why,phase=services.preview(world,plan)
+            if not checked then return fail("orientation_complete",why,phase) end
+            local verified,why=services.evaluate(checked)
+            if not verified then
+                if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then lock_compile_failure(plan,why)
+                else return fail("orientation_final_rules",why) end
+            end
+        end
         end
     end
     return plan, nil, trace
@@ -928,6 +975,8 @@ local function start(run_self_tests)
         if not products then return nil,why end
         return world_api:Invoke("RW_PlanCreate",world,products)
     end
+    turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
+    turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
     turn_services.shift=function(world) return movement_api:Invoke("RW_ResolveShift",world) end
     turn_services.destroy=function(world,ids,contents,cause,deaths)
         return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths)
@@ -1475,7 +1524,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4C initialized")
+    print("[RuleWorld] M9.4D initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

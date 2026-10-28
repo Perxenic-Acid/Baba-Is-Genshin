@@ -90,3 +90,13 @@ A/B/T 原入口仍保留用于前一轮回归。
 tests/run.lua 通过真实 F 回调执行终局矩阵及 N 的可用/不可用关卡对照。
 tests/navigation_view.lua 检查属性着色、普通 Flag 标签和转换后关卡标签。
 原生 UI、输入和运行时启动自测仍待用户真机验证。
+
+## LEVEL IS TEXT 修复
+
+原作 convert.lua:69–70 把 IS TEXT 输出为 text_ 加主语名；
+dolevelconversions:549–716 独立处理当前关卡转换，不以 YOU 存活为条件。
+现在 LEVEL IS TEXT 同时重设实体 Level 块为 text_Level，并将父级入口
+按保留身份的 retype 转为 text_Level。指向、坐标和方向保留；边界重载保持
+该转换，整树 Undo 恢复规则形成前的状态。普通死亡不会取消同回合转换。
+tests/level_text.lua 覆盖存活/自 DEFEAT 死亡两条路径、父级持久转换和撤销。
+本次未扩展 scoped LEVEL 的多目标转换及条件转换支持。

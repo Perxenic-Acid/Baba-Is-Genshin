@@ -1069,7 +1069,10 @@ function RW_ReloadLevel(tree,id)
     local session = RW_InstantiateLevel(tree.definitions[old.definition_id],id)
     for entity_id, archetype in pairs(tree.level_transforms[id] or {}) do
         if not session.world.entities[entity_id] then return nil,"persistent_level_block_missing" end
-        session.world.entities[entity_id].archetype = archetype
+        local entity=session.world.entities[entity_id]
+        if archetype == "text_level" then
+            entity.class,entity.archetype,entity.text="text",nil,{name="LEVEL"}
+        else entity.archetype = archetype end
     end
     local result = copy_map(tree)
     result.instances = copy_map(tree.instances)
@@ -1176,8 +1179,13 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
         local parent = tree.instances[entry.parent_id]
         local block = parent.world.entities[entry.entity_id]
         if not block then return nil, "missing_parent_level_block" end
-        local changed, accepted = RW_Commit(parent, {consumes_turn=true, changes={
-            {kind="transform",entity_id=block.id,from=block.archetype,to=target_type}}})
+        local operation={kind="transform",entity_id=block.id,from=block.archetype,to=target_type}
+        if target_type == "text_level" then
+            local product=clone(block)
+            product.class,product.archetype,product.text="text",nil,{name="LEVEL"}
+            operation={kind="retype",entity_id=block.id,from=clone(block),to=product}
+        end
+        local changed, accepted = RW_Commit(parent, {consumes_turn=true, changes={operation}})
         if not accepted.accepted then return nil, accepted.reason end
         result.instances = copy_map(tree.instances)
         result.instances[entry.parent_id] = changed

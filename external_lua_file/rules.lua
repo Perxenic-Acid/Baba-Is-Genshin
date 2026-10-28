@@ -589,6 +589,10 @@ local function lower_simple(ast_rules, registry)
                 or (negated.tag == "noun" and type(negated.type) == "table" and negated.type.tag == "object")) then
             conversions[#conversions+1]={op="forbid_transform",source_type=subject_type.name,
                 target_type=negated.tag == "special" and "@text" or negated.type.name,source=ast.source}
+        elseif level_subject and semantics and semantics.noun == "transform"
+            and object.tag == "special" and object.name == "text" then
+            conversions[#conversions+1]={op="transform_level",target_type="text_level",source=ast.source}
+            conversions[#conversions+1]={op="transform_text",source_type=subject_type.block_type or "level_block",source=ast.source}
         elseif simple_subject and semantics and semantics.noun == "transform"
             and object.tag == "special" and object.name == "text" and ast.when.op == "always" then
             conversions[#conversions+1]={op="transform_text",source_type=subject_type.name,source=ast.source}

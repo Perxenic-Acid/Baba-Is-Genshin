@@ -437,3 +437,4 @@ dofile("tests/text_activation.lua")
 dofile("tests/shift.lua")
 
 dofile("tests/more.lua")
+dofile("tests/level_text.lua")

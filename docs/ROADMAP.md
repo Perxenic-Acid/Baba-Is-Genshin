@@ -218,3 +218,9 @@ M9.4K adds BECOME with independent IS identity/negative semantics, duplicate sel
 products, TEXT conversion and transient converted tracking for MAKE. Installed
 conversion oracle: 432 normalized-rule cases. See BECOME.md for scoped LEVEL gaps.
 Next verbs: MIMIC, then PLAY; conditions/prefixes/GROUP/properties follow.
+
+
+M9.4L adds MIMIC one-generation rule copying, combined per-identity conditions,
+verb-specific bans and the original 250-copy limit. Source matrix: 96 cases.
+See MIMIC.md for ALL/NOT-subject, EMPTY, scoped LEVEL and GROUP gaps. Next: PLAY,
+then conditions, prefixes, GROUP and properties in the agreed order.

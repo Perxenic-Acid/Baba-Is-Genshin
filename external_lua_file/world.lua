@@ -514,7 +514,7 @@ local function default_world()
                 -- New typed AST vocabulary. The legacy copula
                 -- remains until its compiler is retired.
                 verbs = {
-                    IS = "is", HAS = "has", WRITE = "write", FEAR="fear", FOLLOW="follow", MAKE="make", EAT="eat", BECOME="become"
+                    IS = "is", HAS = "has", WRITE = "write", FEAR="fear", FOLLOW="follow", MAKE="make", EAT="eat", BECOME="become", MIMIC="mimic"
                 },
 
                 copulas = {
@@ -1724,7 +1724,7 @@ function RW_GetNavigationDefinitions()
         "RIGHT","UP","LEFT","DOWN","NUDGERIGHT","NUDGEUP","NUDGELEFT","NUDGEDOWN","IS","IS","NOT",
         "NEXTTO","ABOVE","BELOW","BESIDELEFT","BESIDERIGHT","FACING",
         "REVERSE","PULL","SWAP","PHANTOM","FALL","FALLRIGHT","FALLUP","FALLLEFT",
-        "FEAR","FOLLOW","MAKE","EAT","BECOME","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","AND","NOT","IS","IS","IS"}) do
+        "FEAR","FOLLOW","MAKE","EAT","BECOME","MIMIC","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","AND","NOT","IS","IS","IS"}) do
         local id=motion_lab.next_entity_id
         motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},
             x=3+3*((index-1)%10),y=15+3*math.floor((index-1)/10),direction="None"}

@@ -167,7 +167,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | verb | HAS | implemented within documented scope |
 | verb | IS | implemented within documented scope |
 | verb | MAKE | implemented within documented scope |
-| verb | MIMIC | pending |
+| verb | MIMIC | implemented within documented scope |
 | verb | PLAY | pending |
 | verb | WRITE | implemented within documented scope |
 

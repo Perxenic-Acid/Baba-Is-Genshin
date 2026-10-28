@@ -227,3 +227,8 @@
   converted-ID set (RW_PlanConversions fourth result) for late MAKE occupancy even
   when no persistent transform op is needed. Scoped LEVEL BECOME remains deferred;
   see docs/BECOME.md.
+
+- MIMIC copies only original non-MIMIC declarations once; never propagate copied
+  copies along MIMIC chains. Evaluate combined target/source/negative conditions
+  at the imitator identity. Keep duplicate products and the 250-copy TOO COMPLEX
+  limit. Internal spatial requirements are conjunctions; see docs/MIMIC.md.

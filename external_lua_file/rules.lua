@@ -146,7 +146,8 @@ function RW_TestEntityCondition(world,node,entity)
             if v == nil then return nil,e end;result=result and v end
         return result
     end
-    if node.op ~= "spatial" or not dense_list(node.clauses) or #node.clauses == 0
+    if node.requirements~=nil and not dense_list(node.requirements) then return nil,"invalid_condition_terms" end
+    if node.op ~= "spatial" or not dense_list(node.clauses) or (#node.clauses == 0 and (not node.requirements or #node.requirements==0))
         or type(entity) ~= "table" or type(entity.x) ~= "number" or type(entity.y) ~= "number" then
         return nil,"invalid_spatial_condition"
     end
@@ -167,6 +168,11 @@ function RW_TestEntityCondition(world,node,entity)
         end
     end
     local result=true
+    for _,condition in ipairs(node.requirements or {}) do
+        local enabled,err=RW_TestEntityCondition(world,condition,entity)
+        if enabled==nil then return nil,err end
+        result=result and enabled
+    end
     for _,clause in ipairs(node.clauses) do
         if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
                 and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
@@ -511,7 +517,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {become={noun="become",negative_noun="forbid_become"},eat={noun="eat",negative_noun="forbid_eat"},make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
+local DEFAULT_SEMANTICS = {mimic={noun="mimic"},become={noun="become",negative_noun="forbid_become"},eat={noun="eat",negative_noun="forbid_eat"},make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -525,7 +531,7 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make" or operation == "eat" or operation == "become"))
+                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make" or operation == "eat" or operation == "become" or operation == "mimic"))
                 or (category == "negative_property" and operation == "deny_trait")
                 or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow" or operation == "forbid_make" or operation == "forbid_eat" or operation == "forbid_become"))) then return false end
         end
@@ -947,10 +953,66 @@ local function subject_key(term)
     if term.tag == "noun" and term.type and term.type.tag == "object" then return term.type.name end
     if term.tag == "special" and (term.name == "text" or term.name == "empty") then return "@" .. term.name end
 end
+-- Original subrules copies only untagged, non-MIMIC declarations: one generation.
+local function expand_mimic(ast_rules)
+    local present=false
+    for _,rule in ipairs(ast_rules) do if type(rule)=="table" and rule.verb=="mimic" then present=true;break end end
+    if not present then return ast_rules end
+    local function key(term)
+        if type(term)~="table" then return nil end
+        return subject_key(term)
+    end
+    local result,bans={},{}
+    for _,rule in ipairs(ast_rules) do
+        if type(rule)~="table" then return nil,"invalid_ast_rule" end
+        if rule.verb=="mimic" then
+            local target,negative=unwrap(rule.object)
+            local source,destination=key(rule.subject),key(target)
+            if source and destination and source~="@empty" and destination~="@empty" and negative then
+                bans[source]=bans[source] or {};bans[source][destination]=bans[source][destination] or {}
+                table.insert(bans[source][destination],rule.when)
+            end
+        else result[#result+1]=rule end
+    end
+    local count=0
+    for _,rule in ipairs(ast_rules) do if rule.verb=="mimic" then
+        local target,negative=unwrap(rule.object)
+        local source,destination=key(rule.subject),key(target)
+        if not source or not destination or source=="@empty" or destination=="@empty" then
+            result[#result+1]=rule -- unsupported forms remain visible as deferred.
+        elseif not negative then
+            for _,copied in ipairs(ast_rules) do
+                if copied.verb~="mimic" and key(copied.subject)==destination then
+                    local conditions={copied.when,rule.when}
+                    for _,condition in ipairs((bans[source] or {})[destination] or {}) do
+                        conditions[#conditions+1]={op="not",condition=condition}
+                    end
+                    local combined={op="spatial",clauses={},requirements={}}
+                    local blocked=false
+                    for _,condition in ipairs(conditions) do
+                        if type(condition)~="table" then return nil,"invalid_condition" end
+                        if condition.op=="not" and condition.condition and condition.condition.op=="always" then blocked=true end
+                        if condition.op~="always" then combined.requirements[#combined.requirements+1]=query_clone(condition) end
+                    end
+                    if not blocked then
+                        local copy=query_clone(copied);copy.subject=query_clone(rule.subject)
+                        copy.when=#combined.requirements>0 and combined or {op="always"}
+                        result[#result+1]=copy;count=count+1
+                        if count>250 then return nil,"rule_complexity_limit" end
+                    end
+                end
+            end
+        end
+    end end
+    return result
+end
 function RW_LowerRuleAST(ast_rules, registry, world)
     if not world then return lower_simple(ast_rules,registry) end
     registry=registry or DEFAULT_SEMANTICS
     if not valid_semantics(registry) or not dense_list(ast_rules) then return nil,"invalid_ast_rules" end
+    if registry.mimic and registry.mimic.noun=="mimic" then
+        local expanded,err=expand_mimic(ast_rules);if not expanded then return nil,err end;ast_rules=expanded
+    end
     local generated,deferred,relations={},{},{}
     local contain_bans,contain_origins,contain_verbs={},{},{}
     local write_bans,write_origins,write_verbs={},{},{}

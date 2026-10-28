@@ -188,3 +188,15 @@ M9.4G adds FEAR as a scheduled noun predicate with duplicate strength, per-ident
 conditions and atomic destruction/HAS/Undo. Installed findfears() oracle: 2,048
 cases. MOTION expands to 32x28 with three-cell-spaced loose words and a ready-made
 FLAG FEAR AVATAR route. Next: FOLLOW, then TELE/HOLD and remaining families.
+
+
+## Current user ordering (supersedes earlier next-batch suggestions)
+
+Verbs -> conditions -> prefixes -> GROUP -> properties. Letter/number/accidental
+composition is deferred until the user chooses to revisit it. Keep this ordering
+instead of moving TELE/HOLD ahead of the unfinished verbs.
+
+M9.4H adds FOLLOW and atomic remembered-target state, source-oracle comparison and
+complete-name wrapping for single Text labels. Remaining verbs: MAKE, EAT, BECOME,
+MIMIC, PLAY. Next implementation: MAKE. See MOTION_WORDS.md for acceptance routes
+and deliberate FOLLOW/renderer scope limits.

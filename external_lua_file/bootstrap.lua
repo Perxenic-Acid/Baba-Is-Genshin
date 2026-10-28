@@ -224,7 +224,7 @@ function RW_PlanTurn(world, action, services)
         if conversion.op == "transform_level" then level_targets[#level_targets+1] = conversion.target_type
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
-        elseif conversion.op == "has" or conversion.op=="fear" then -- Consumed by their scheduled phases, not conversion.
+        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" then -- Consumed by their scheduled phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     level_traits=level_traits_from(conversions)
@@ -256,13 +256,38 @@ function RW_PlanTurn(world, action, services)
     local complete, complete_error, phase = services.preview(world, plan)
     if not complete then return fail("preview_complete", complete_error,phase) end
     local more_frame
-    if services.more or services.fall then
+    if services.more or services.fall or services.follow then
         local effects,why,relations,rules=services.evaluate(complete)
         if not effects then
             if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
                 lock_compile_failure(plan,why);return plan,nil,trace
             end
             return fail("more_rules",why)
+        end
+        -- Reuse the post-conversion compile when FOLLOW is absent or unchanged.
+        if services.follow then
+        local active=false
+        for _,relation in ipairs(relations or {}) do if relation.op=="follow" then active=true;break end end
+        if active then
+            local projected,why=services.project(complete,effects,level_traits_from(relations))
+            if not projected then return fail("follow_project",why) end
+            local follow,why=services.follow(projected,relations)
+            if not follow then return fail("follow",why) end
+            local next_world,why=services.preview(complete,follow)
+            if not next_world then return fail("follow_preview",why) end
+            plan.stages[#plan.stages+1]={name="follow",plan=follow}
+            for _,change in ipairs(follow.changes) do plan.changes[#plan.changes+1]=change end
+            complete=next_world;trace[#trace+1]="follow"
+            if #follow.changes>0 then
+                effects,why,relations,rules=services.evaluate(complete)
+                if not effects then
+                    if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
+                        lock_compile_failure(plan,why);return plan,nil,trace
+                    end
+                    return fail("follow_rules",why)
+                end
+            end
+        end
         end
         local has_fall=false
         if services.fall then for _,effect in ipairs(effects) do
@@ -1016,6 +1041,10 @@ local function start(run_self_tests)
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
+    turn_services.follow=function(world,relations)
+        local targets=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"follow")
+        return movement_api:Invoke("RW_ResolveFollow",world,targets)
+    end
     turn_services.fear=function(world,relations)
         local targets=rules_api:Invoke("RW_ResolveFearTargets",world,relations)
         return movement_api:Invoke("RW_ResolveFear",world,targets)
@@ -1567,7 +1596,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4G initialized")
+    print("[RuleWorld] M9.4H initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

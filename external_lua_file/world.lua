@@ -93,6 +93,7 @@ local function valid_new_entity(world, entity, id)
         or entity.traits ~= nil or entity.behaviors ~= nil or entity.symbol ~= nil then
         return false
     end
+    if entity.followed ~= nil and entity.followed ~= -1 and not valid_id(entity.followed) then return false end
     if entity.level_link ~= nil then
         local link = entity.level_link
         if type(link) ~= "table"
@@ -157,7 +158,7 @@ local function validate_plan(world, plan)
         if type(change) ~= "table"
             or (change.kind ~= "move" and change.kind ~= "transform"
                 and change.kind ~= "direction" and change.kind ~= "create"
-                and change.kind ~= "delete" and change.kind ~= "retype") then
+                and change.kind ~= "delete" and change.kind ~= "retype" and change.kind ~= "followed") then
             return false, "invalid_operation"
         end
         local id = change.entity_id
@@ -191,6 +192,9 @@ local function validate_plan(world, plan)
                     or change.to.direction ~= entity.direction or not same_state(change.to.level_link,entity.level_link) then
                     return false,"invalid_or_stale_retype"
                 end
+            elseif change.kind == "followed" then
+                if entity.followed ~= change.from then return false,"stale_followed" end
+                if (change.to ~= -1 and not valid_id(change.to)) or change.to==change.from then return false,"invalid_followed" end
             elseif change.kind == "delete" then
                 if type(change.from) ~= "table" or change.to ~= nil then
                     return false, "invalid_deletion"
@@ -276,6 +280,8 @@ local function apply_plan(world, plan)
             entity.direction = change.to.direction or entity.direction
         elseif change.kind == "direction" then
             entity.direction = change.to
+        elseif change.kind == "followed" then
+            entity.followed=change.to
         elseif change.kind == "transform" then
             entity.archetype = change.to
         end
@@ -496,7 +502,7 @@ local function default_world()
                 -- New typed AST vocabulary. The legacy copula
                 -- remains until its compiler is retired.
                 verbs = {
-                    IS = "is", HAS = "has", WRITE = "write", FEAR="fear"
+                    IS = "is", HAS = "has", WRITE = "write", FEAR="fear", FOLLOW="follow"
                 },
 
                 copulas = {
@@ -1694,7 +1700,7 @@ function RW_GetNavigationDefinitions()
     object(motion_lab,8,"belt",21,10);motion_lab.entities[8].direction="Up"
     object(motion_lab,9,"flag",9,11);motion_lab.entities[9].direction="Right"
     for row,words in ipairs({{"AVATAR","IS","YOU"},{"ROCK","IS","MOVE"},
-        {"CRATE","IS","PUSH","AND","SLEEP"},{"BELT","IS","SHIFT"},{"WALL","IS","STOP"},{"FLAG","FEAR","AVATAR"}}) do
+        {"CRATE","IS","PUSH","AND","SLEEP"},{"BELT","IS","SHIFT"},{"WALL","IS","STOP"},{"FLAG","FEAR","AVATAR"},{"BELT","FOLLOW","AVATAR"}}) do
         for x,token in ipairs(words) do
             local id=motion_lab.next_entity_id
             motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},x=2+x+12*((row-1)%2),y=3+3*math.floor((row-1)/2),direction="None"}
@@ -1705,7 +1711,7 @@ function RW_GetNavigationDefinitions()
         "RIGHT","UP","LEFT","DOWN","NUDGERIGHT","NUDGEUP","NUDGELEFT","NUDGEDOWN","IS","IS","NOT",
         "NEXTTO","ABOVE","BELOW","BESIDELEFT","BESIDERIGHT","FACING",
         "REVERSE","PULL","SWAP","PHANTOM","FALL","FALLRIGHT","FALLUP","FALLLEFT",
-        "FEAR","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","AND","NOT","IS","IS","IS"}) do
+        "FEAR","FOLLOW","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","AND","NOT","IS","IS","IS"}) do
         local id=motion_lab.next_entity_id
         motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},
             x=3+3*((index-1)%10),y=15+3*math.floor((index-1)/10),direction="None"}

@@ -179,3 +179,46 @@ Pending: scoped LEVEL/virtual EMPTY FEAR sources and the original multi-source
 movement retry graph. Finite board boundaries still apply. The tie oracle covers
 cardinal initial facing and static STOP blockers; broader original PUSH/unlock
 probe ordering is not claimed. FOLLOW, TELE and HOLD remain pending.
+
+
+## M9.4H: FOLLOW, persistent target memory and readable labels
+
+Primary reference: installed blocks.lua moveblock() FOLLOW body (394–586),
+tools.lua xthis()/findall(), and editor_objectlist.lua. FOLLOW is a noun predicate
+that turns a source toward its nearest matching physical target (Manhattan distance,
+vertical preference on equal axes), without moving it. Nearest-distance ties and
+adjacent forward/left/right preference retain the original traversal semantics.
+The intrinsic followed identity retains an adjacent target across turns; when no
+adjacent target remains, active FOLLOW clears that memory. SLEEP suppresses FOLLOW;
+STILL, locks and REVERSE do not suppress its facing change. FLOAT does not filter
+its targets. Source conditions/negative declarations use the shared noun predicate
+lowering; physical Text works as source/target. EMPTY has no physical target identity.
+
+The followed field has a validated, stale-checked atomic operation alongside facing
+changes. Commit/Preview/whole-tree Undo share the same application path. FOLLOW runs
+after conversion, before FALL/MORE/contacts, reusing the existing compiled frame
+when inactive. Updated facing rechecks directional/WORD conditions and terminal
+limits. FOLLOW + MOVE therefore steers the next turn's MOVE, not a second movement
+in the current turn. Existing final direction-property projection still follows it.
+
+`tests/follow.lua` covers nearest/ties/memory, MOVE timing, SLEEP/STILL/REVERSE,
+conditions/NOT/TEXT, stale metadata operations, FACING refresh and Undo. Standalone
+`tests/reference_follow.lua` executes installed moveblock(true), comparing 1,096
+adjacent/distant/facing/memory/SLEEP cases. Ordinary regression, production input and
+existing source oracles pass; native acceptance remains separate.
+
+MOTION retains its 32x28 footprint and three-cell loose-word spacing, with a spare
+FOLLOW and authored BELT FOLLOW AVATAR. From entry, Space turns the Belt arrow left
+toward Avatar without moving it; Z restores its original Up facing. FEAR's S D D
+route remains. Single Text labels now receive explicit wrapping and an integer font
+chosen against both tile width and height, preserving complete long names on scaled
+boards. Render tests reconstruct full FOLLOW/LOCKEDRIGHT/NUDGERIGHT/BESIDERIGHT/
+PHANTOM/DEFEAT labels, check fit estimates, cache behavior, colours and scale resets.
+These font metrics are conservative estimates; actual native readability needs review.
+Overlapping entities still use the existing short stack labels, pending frontend work.
+
+Remaining scope: no separate authored-load FOLLOW status pass, scoped LEVEL/virtual
+EMPTY sources remain deferred, and the original SHIFT final-alignment ordering after
+FOLLOW differs from our earlier SHIFT phase. Target traversal uses stable entity IDs
+rather than original mutable unit-list insertion order in exotic conversion cases.
+These are documented limits, not whole-game parity claims.

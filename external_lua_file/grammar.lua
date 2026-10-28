@@ -196,6 +196,7 @@ local AST_VERBS = {
         }
     },
 
+    follow = {phase="orientation",rhs={noun=true,special=true}},
     fear = {
         phase = "movement_intent",
         rhs = {

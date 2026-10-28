@@ -124,6 +124,23 @@ words.width=33;assert(RW_Render(words,0,0))
 for _,c in ipairs(controls) do if c.alive and c.name and c.name:find("RW_Cell_") then
  assert(math.abs(c.px)+c.width/2<=408 and math.abs(c.py)+c.height/2<=408)
 end end
+-- Preserve complete word identities on the large sparse native test board.
+words.width=32;words.height=28
+for _,name in ipairs({"FOLLOW","LOCKEDRIGHT","NUDGERIGHT","BESIDERIGHT","PHANTOM","DEFEAT"}) do
+ words.entities[1].text.name=name
+ assert(RW_Render(words,0,0))
+ local view
+ for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then view=c end end
+ assert(view.text:gsub("\n","")==name,"scaled Text lost its full name")
+ assert(math.type(view.fontSize)=="integer")
+ local lines=0
+ for line in (view.text.."\n"):gmatch("(.-)\n") do
+  lines=lines+1
+  assert(#line*view.fontSize*0.65<=view.width)
+ end
+ assert(lines*view.fontSize*1.35<=view.height)
+end
+words.entities[1].text.name="IS"
 words.width=5;words.height=2;assert(RW_Render(words,0,0))
 local restored
 for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then restored=c end end

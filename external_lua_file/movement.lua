@@ -1336,3 +1336,59 @@ function RW_ResolveFear(world,targets)
     end
     return {consumes_turn=true,changes=changes,destructions=deaths,reason="fear"}
 end
+
+-- FOLLOW turns toward a nearest target; it never adds displacement itself.
+function RW_ResolveFollow(world,targets)
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local dirs={Right=0,Up=1,Left=2,Down=3}
+    local names={"Right","Up","Left","Down"}
+    local changes={}
+    for _,id in ipairs(ids) do
+        local entity=world.entities[id]
+        if targets[id] and #targets[id]>0 and not has_capability(world,entity,"sleep") then
+            local dir=dirs[entity.direction] or 4
+            local distance,targetdir=9999,-1
+            local priority,high,highdir,prioritydir=-1,-1,-1,-1
+            local highest,counterclockwise,found=false,false,false
+            local followed=entity.followed or -1
+            for _,target in ipairs(targets[id]) do
+                for _,other_id in ipairs(ids) do
+                    local other=world.entities[other_id]
+                    local name=other.class=="text" and "@text" or other.archetype
+                    if other_id~=id and name==target then
+                        local dx,dy=other.x-entity.x,other.y-entity.y
+                        local dist=math.abs(dx)+math.abs(dy)
+                        local facing
+                        if math.abs(dx)<=math.abs(dy) then facing=dy>=0 and 3 or 1
+                        else facing=dx>0 and 0 or 2 end
+                        if dist<=distance and dist>0 then
+                            distance,targetdir=dist,facing
+                            if dist==1 then
+                                if followed==other_id then found=true;break end
+                                priority,prioritydir=other_id,facing
+                                if facing==dir then high,highdir=other_id,facing;highest=true
+                                elseif not highest then
+                                    if facing==(dir+1)%4 then high,highdir=other_id,facing;counterclockwise=true
+                                    elseif not counterclockwise and facing==(dir+3)%4 then high,highdir=other_id,facing end
+                                end
+                            end
+                        end
+                    end
+                end
+                if found then break end
+            end
+            if not found then
+                if high>-1 then followed,targetdir=high,highdir
+                elseif priority>-1 then followed,targetdir=priority,prioritydir
+                elseif followed>-1 then followed=-1 end
+            end
+            if followed~=(entity.followed or -1) then
+                changes[#changes+1]={kind="followed",entity_id=id,from=entity.followed,to=followed}
+            end
+            if targetdir>=0 and names[targetdir+1]~=entity.direction then
+                changes[#changes+1]={kind="direction",entity_id=id,from=entity.direction or "None",to=names[targetdir+1]}
+            end
+        end
+    end
+    return {consumes_turn=true,changes=changes,reason="follow"}
+end

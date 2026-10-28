@@ -163,7 +163,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | verb | BECOME | pending |
 | verb | EAT | pending |
 | verb | FEAR | implemented within documented scope |
-| verb | FOLLOW | pending |
+| verb | FOLLOW | implemented within documented scope |
 | verb | HAS | implemented within documented scope |
 | verb | IS | implemented within documented scope |
 | verb | MAKE | pending |
@@ -175,6 +175,5 @@ Ordinary noun catalog:
 
 ALGAE, ARM, ARROW, BABA, BADBAD, BANANA, BAT, BEAN, BED, BEE, BELT, BIRD, BLOB, BOAT, BOBA, BOG, BOLT, BOMB, BONE, BOOK, BOTTLE, BOX, BRAIN, BRICK, BUBBLE, BUCKET, BUG, BUNNY, BURGER, CACTUS, CAKE, CAR, CART, CASH, CAT, CHAIR, CHEESE, CHILI, CIRCLE, CLIFF, CLOCK, CLOUD, COG, CRAB, CRYSTAL, CUP, CURSOR, DOG, DONUT, DOOR, DOT, DRINK, DRUM, DUST, EAR, EGG, EYE, FENCE, FIRE, FISH, FLAG, FLOWER, FOFO, FOLIAGE, FOOT, FORT, FOX, FROG, FRUIT, FUNGI, FUNGUS, GATE, GEM, GHOST, GRASS, GUITAR, HAND, HEDGE, HIHAT, HOTDOG, HOUSE, HUSK, HUSKS, ICE, IT, JELLY, JIJI, KEKE, KEY, KNIGHT, LADDER, LAMP, LAVA, LEAF, LEVER, LIFT, LILY, LINE, LIZARD, LOCK, LOVE, ME, MIRROR, MONITOR, MONSTER, MOON, NO, NOSE, ORB, PALM, PANTS, PAPER, PAWN, PIANO, PILLAR, PIPE, PIXEL, PIZZA, PLANE, PLANET, PLANK, POTATO, PUMPKIN, REED, RING, ROAD, ROBOT, ROCK, ROCKET, ROSE, RUBBLE, SAX, SCISSORS, SEED, SHELL, SHIRT, SHOVEL, SIGN, SKULL, SNAIL, SPIKE, SPROUT, SQUARE, STAR, STATUE, STICK, STUMP, SUN, SWORD, TABLE, TEETH, TILE, TOWER, TRACK, TRAIN, TREE, TREES, TRIANGLE, TRUMPET, TURNIP, TURTLE, UFO, VASE, VINE, WALL, WATER, WHAT, WIND, WORM, YES
 
-Next batches: remaining movement (REVERSE/FEAR/FOLLOW/TELE/HOLD), lifecycle verbs
-(MAKE/EAT/BECOME/REVERT), remaining conditions/prefixes, GROUP/MIMIC and rule dependencies,
-temporal/random/power/music/terminal/decorative words and letter composition.
+User priority: remaining verbs, then conditions, prefixes, GROUP, and properties.
+Letter/number/accidental composition is deferred for a later decision.

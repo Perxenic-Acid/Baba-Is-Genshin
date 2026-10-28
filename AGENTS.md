@@ -192,3 +192,14 @@
 - Native test rooms must leave ample working space. MOTION is 32x28; loose words
   use a three-cell grid (two empty cells between), with spare nouns/connectors and
   ready-made feature demonstrations. Preserve this spacing in later expansions.
+
+- User priority is remaining verbs, conditions, prefixes, GROUP, then properties.
+  Letter/digit/accidental composition is deferred. FOLLOW is implemented; continue
+  MAKE/EAT/BECOME/MIMIC/PLAY before returning to TELE/HOLD or other properties.
+- FOLLOW turns without moving and retains an intrinsic followed identity for
+  adjacent targets. Keep memory/facing in atomic Plan/Commit/whole-tree Undo with
+  stale-field validation. SLEEP suppresses it; STILL/locks/REVERSE do not. Its phase
+  is post-conversion before FALL/MORE/contacts. See MOTION_WORDS.md for source/gaps.
+- Scaled single Text labels must preserve the complete word using explicit line
+  breaks and integer fonts fitted to width and height. Do not regress to first
+  letters. Existing short labels for actual overlapping stacks are a tracked gap.

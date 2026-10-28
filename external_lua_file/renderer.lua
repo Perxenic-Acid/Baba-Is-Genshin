@@ -310,6 +310,23 @@ local function ensure_view(id)
     return control
 end
 
+-- Native implicit wrapping clips long words on scaled boards. Supply explicit
+-- line breaks and an integer font that fits the available width AND height.
+function RW_FitTileLabel(label,width,height,font)
+    if not label:match("^[%w_?:%-]+$") then return label,font end
+    local columns=1
+    for size=font,4,-1 do
+        columns=math.max(1,math.floor((width-1)/(size*0.65)))
+        local lines=math.ceil(#label/columns)
+        if lines*size*1.35<=height then
+            local pieces={}
+            for i=1,#label,columns do pieces[#pieces+1]=label:sub(i,i+columns-1) end
+            return table.concat(pieces,"\n"),math.floor(size)
+        end
+    end
+    return label,4
+end
+
 local function draw_entities(world)
     local occupancy = {}
     local visible_ids = {}
@@ -394,8 +411,10 @@ local function draw_entities(world)
                             CELL_SIZE - 6*board_scale
                         )
 
+                        local fitted_font=math.max(7,math.floor(font_size*board_scale+0.5))
+                        if entity.class=="text" then label,fitted_font=RW_FitTileLabel(label,tile_width,CELL_SIZE-6*board_scale,fitted_font) end
                         paint(control,"text",label)
-                        paint(control,"fontSize",math.max(7,math.floor(font_size*board_scale+0.5)))
+                        paint(control,"fontSize",fitted_font)
                         paint(control,"fontColor",fg)
                         paint(control,"bgColor",bg)
                         set_visible(control,true)

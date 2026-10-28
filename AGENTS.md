@@ -169,3 +169,11 @@
 - NEXTTO is cardinal adjacency excluding overlap; ABOVE/BELOW/BESIDELEFT/BESIDERIGHT
   scan the aligned ray; FACING checks the next cell or cardinal direction arguments.
   Keep per-identity queries and frozen contact declarations; do not filter by FLOAT.
+
+- PULL failures roll back only speculative trailing dependencies, never the successful
+  leader; blocked pulled WEAK does not shatter. SWAP preserves displaced facing and
+  distinct identities; STILL partners remain. PHANTOM skips collision, not contacts.
+- FALL settles after conversion and before MORE, counts/cancels opposite directions,
+  preserves facing and uses PUSH/PULL/STOP as support. SLEEP does not suppress FALL.
+  FALL passes over SWAP without swapping; bare unsafe WEAK transit victims get HAS.
+  Keep settling/destruction as atomic sequential stages, newborn grace and limit Undo.

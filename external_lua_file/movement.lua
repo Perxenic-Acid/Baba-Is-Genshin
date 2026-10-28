@@ -11,7 +11,7 @@ local function has_capability(world, entity, capability)
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", select = "select", select_path = "path",
         win = "win", push = "pushable", block_entry = "block_entry",
-        open="open",shut="shut",safe="safe",weak="weak",float="float",shift="shift",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
+        open="open",shut="shut",safe="safe",weak="weak",float="float",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -183,7 +183,7 @@ function RW_ResolveMovement(world, action)
         local empty=empty_at(nx,ny)
         if empty and empty.push then
             local ok,err=push_empty(nx,ny); if not ok then return false,err end
-        elseif empty and empty.block_entry then return false,"blocked_by_empty" end
+        elseif empty and (empty.block_entry or empty.pull) then return false,"blocked_by_empty" end
         local occupants={}
         for id,entity in pairs(world.entities) do
             if id > 0 and not removed[id] and entity.x == nx and entity.y == ny then occupants[#occupants+1]=id end
@@ -220,11 +220,12 @@ function RW_ResolveMovement(world, action)
             return false, "blocked_by_edge"
         end
 
+        local phantom=has_capability(world,entity,"phantom")
         local empty=empty_at(nx,ny)
-        if empty and empty.push then
+        if not phantom and empty and empty.push then
             local ok,err=push_empty(nx,ny)
             if not ok then visiting[id]=nil; return false,err end
-        elseif empty and empty.block_entry then
+        elseif not phantom and empty and (empty.block_entry or empty.pull) then
             visiting[id]=nil; return false,"blocked_by_empty"
         end
         -- Gather occupants deterministically.
@@ -241,17 +242,29 @@ function RW_ResolveMovement(world, action)
 
         table.sort(occupants)
 
-        local locks={}
+        local locks,swaps,weak_targets={},{},{}
         local partner=has_capability(world,entity,"open") and "shut"
             or has_capability(world,entity,"shut") and "open" or nil
         for _, other_id in ipairs(occupants) do
             if not planned[other_id] then
                 local other = world.entities[other_id]
 
-                if partner and id > 0 and other_id > 0 and same_layer(world,entity,other) and has_capability(world,other,partner)
+                local target_swap=has_capability(world,other,"swap") and not immobile(world,other,dx,dy)
+                local mover_swap=has_capability(world,entity,"swap")
+                if not phantom and partner and id > 0 and other_id > 0 and same_layer(world,entity,other) and has_capability(world,other,partner)
                     and (not has_capability(world,entity,"safe") or not has_capability(world,other,"safe")) then
                     locks[#locks+1]=other_id -- Unlock takes precedence over PUSH/STOP.
+                elseif action.falling and not phantom and same_layer(world,entity,other)
+                    and has_capability(world,other,"weak") and not has_capability(world,other,"safe")
+                    and not has_capability(world,other,"push") then
+                    weak_targets[#weak_targets+1]=other_id
+                elseif action.falling and target_swap then -- FALL passes over SWAP without swapping it.
+                elseif not action.falling and (target_swap or (mover_swap and not phantom)) then
+                    if not has_capability(world,other,"still") then swaps[#swaps+1]=other_id end
+                elseif phantom then -- PHANTOM bypasses ordinary collisions, not later contacts.
                 elseif has_capability(world, other, "push") then
+                    -- FALL treats PUSH as support; it never pushes the support away.
+                    if action.falling then visiting[id]=nil;return false,"blocked_by_entity" end
                     -- Push takes priority over STOP-like blocking.
                     local ok, reason = try_move(other_id)
 
@@ -260,7 +273,7 @@ function RW_ResolveMovement(world, action)
                         return false, reason
                     end
 
-                elseif has_capability(world, other, "block_entry")
+                elseif (has_capability(world, other, "block_entry") or has_capability(world,other,"pull"))
                     and (not has_capability(world,other,"weak") or not same_layer(world,entity,other)) then
                     visiting[id] = nil
                     return false, "blocked_by_entity"
@@ -268,6 +281,7 @@ function RW_ResolveMovement(world, action)
             end
         end
 
+        for _,other_id in ipairs(weak_targets) do destroy(other_id,nil,"weak") end
         for _,other_id in ipairs(locks) do
             if removed[id] then break end
             if not removed[other_id] then
@@ -278,6 +292,15 @@ function RW_ResolveMovement(world, action)
         visiting[id] = nil
         planned[id] = true
         if removed[id] then return true end
+
+        for _,other_id in ipairs(swaps) do
+            if not removed[other_id] then
+                local other=world.entities[other_id];planned[other_id]=true
+                changes[#changes+1]={kind="move",entity_id=other_id,
+                    from={x=other.x,y=other.y,direction=other.direction or "None"},
+                    to={x=entity.x,y=entity.y,direction=other.direction or "None"}}
+            end
+        end
 
         -- Append dependencies before their mover.
         changes[#changes + 1] = {
@@ -295,13 +318,33 @@ function RW_ResolveMovement(world, action)
             }
         }
 
+        -- A failed trailing pull never cancels an already successful mover.
+        local followers={}
+        for other_id,other in pairs(world.entities) do
+            if not action.falling and not planned[other_id] and not removed[other_id] and other.x==entity.x-dx and other.y==entity.y-dy
+                and has_capability(world,other,"pull") then followers[#followers+1]=other_id end
+        end
+        table.sort(followers)
+        for _,other_id in ipairs(followers) do
+            local old_planned,old_removed,old_visiting={},{},{}
+            for k,v in pairs(planned) do old_planned[k]=v end
+            for k,v in pairs(removed) do old_removed[k]=v end
+            for k,v in pairs(visiting) do old_visiting[k]=v end
+            local change_count,death_count=#changes,#destructions
+            local ok=try_move(other_id,true)
+            if not ok then
+                planned,removed,visiting=old_planned,old_removed,old_visiting
+                while #changes>change_count do table.remove(changes) end
+                while #destructions>death_count do table.remove(destructions) end
+            end
+        end
         return true
     end
 
-    try_move=function(id)
+    try_move=function(id,pulling)
         local entity=world.entities[id]
         if immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
-        if id < 1 or not has_capability(world,entity,"weak") or has_capability(world,entity,"safe") then
+        if action.falling or pulling or id < 1 or not has_capability(world,entity,"weak") or has_capability(world,entity,"safe") then
             return attempt_move(id)
         end
         -- A failed weak subtree shatters only its root, not speculative pushes.
@@ -960,6 +1003,66 @@ function RW_ResolveAutomatic(world)
         end
     end
     return {consumes_turn=true,changes=changes,destructions=deaths,reason="automatic"}
+end
+
+-- FALL is a settling phase. Opposite grants cancel by count; one surviving
+-- axis per source is selected in original down/right/up/left collection order.
+function RW_ResolveFall(world)
+    local working={};for k,v in pairs(world) do working[k]=v end
+    working.entities={}
+    local ids,tasks={},{}
+    for id,entity in pairs(world.entities) do
+        local copy={};for k,v in pairs(entity) do copy[k]=v end
+        working.entities[id]=copy;ids[#ids+1]=id
+        local counts=world.trait_counts and world.trait_counts[id] or {}
+        local function count(trait) return counts[trait] or (has_capability(world,entity,trait) and 1 or 0) end
+        local vertical=count("fall")-count("fallup")
+        local horizontal=count("fallright")-count("fallleft")
+        if vertical>0 then tasks[id]={0,1}
+        elseif horizontal>0 then tasks[id]={1,0}
+        elseif vertical<0 then tasks[id]={0,-1}
+        elseif horizontal<0 then tasks[id]={-1,0} end
+    end
+    table.sort(ids)
+    local deaths,records={},{}
+    local moved,iterations=true,0
+    while moved and iterations<6000 do
+        moved=false
+        for _,id in ipairs(ids) do
+            local vector=tasks[id]
+            local entity=working.entities[id]
+            if vector and entity then
+                while working.entities[id] and iterations<6000 do
+                    entity=working.entities[id]
+                    if immobile(world,entity,vector[1],vector[2]) then break end
+                    local facing=entity.direction or "None"
+                    local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2],falling=true})
+                    iterations=iterations+1
+                    if #part.changes==0 and #(part.destructions or {})==0 then break end
+                    for _,change in ipairs(part.changes) do
+                        local e=working.entities[change.entity_id]
+                        if e and change.kind=="move" then e.x,e.y=change.to.x,change.to.y end
+                    end
+                    for _,death in ipairs(part.destructions or {}) do
+                        if death.entity_id==id then death.direction=facing;death.frame[id].direction=facing end
+                        deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+                    end
+                    if working.entities[id] then working.entities[id].direction=facing end
+                    moved=true
+                end
+            end
+        end
+    end
+    local changes={}
+    for _,id in ipairs(ids) do
+        local before=world.entities[id];local after=working.entities[id] or records[id]
+        if before.x~=after.x or before.y~=after.y then
+            changes[#changes+1]={kind="move",entity_id=id,
+                from={x=before.x,y=before.y,direction=before.direction or "None"},
+                to={x=after.x,y=after.y,direction=after.direction or "None"}}
+        end
+    end
+    return {consumes_turn=true,changes=changes,destructions=deaths,infinite_loop=iterations>=6000,reason="fall"}
 end
 
 -- SELECT is not YOU: it follows traversable map objects without pushing them.

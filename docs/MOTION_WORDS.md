@@ -70,3 +70,37 @@ SLEEP as original sprites/animations is left to the later frontend work. Directi
 FACING against out-of-board EMPTY/edge and full original parameter witness ordering
 outside the tested matrices remain to be expanded. These are tracked gaps, not claims
 of whole-game parity.
+
+## M9.4E: PULL, SWAP, PHANTOM and FALL
+
+References: original movement.lua check (950–1204), swap updates (677–708),
+trypush/dopush (1205 onward), blocks.lua fallblock (850–1130).
+
+- PULL is solid from the front unless PUSH takes precedence. A successful movement
+  attempts trailing pull chains. Failed pulls roll back only their speculative subtree;
+  the leading mover stays moved. Blocked pulled WEAK does not shatter from that pull.
+- SWAP on a mover exchanges all eligible destination occupants, keeping their facing;
+  SWAP on a target exchanges that target after a successful arrival. Unrelated blockers
+  can cancel target swap. STILL partners remain in place; layers do not filter swaps.
+- PHANTOM bypasses ordinary entity/virtual-cell collision, including pushing and
+  movement unlock. It does not suppress later contacts, including DEFEAT. The current
+  finite authored board boundary remains solid (original off-board extent deferred).
+- FALL/FALLRIGHT/FALLUP/FALLLEFT settle after conversion and before MORE/contact
+  compilation. Opposite grants cancel by count. PUSH/PULL/STOP support rather than
+  being pushed away. SLEEP does not stop falling; STILL/locks do. Facing is preserved.
+  Unsafe bare WEAK encountered in transit dies with HAS; falling WEAK does not shatter
+  merely from resting. FALL passes over SWAP without relocating that partner.
+- Settling and its source-frame destruction/HAS are sequential atomic stages. HAS
+  newborns receive WEAK grace. A 6000-step fall limit commits INFINITE LOOP and locks
+  the board to Undo, matching the original fall limiter's terminal kind.
+
+`tests/pull_swap.lua` and `tests/fall_words.lua` exercise these through the full
+compiler/scheduler/Commit/Undo. `tests/reference_fall.lua` executes original check()
+plus fallblock() and compares 45 support/cancellation/facing scenarios. The existing
+MOTION room has loose words for all seven new properties. Startup remains <=2M.
+
+Remaining differences: full original multi-source movement retry ordering is still
+pending; pulled PUSH interactions and transient original collision cache behavior
+need broader parity. FALL HAS births are resolved after settling and cannot become
+support in the middle of that same settle. Scoped LEVEL/EMPTY lifecycle scope and
+independently authored same-target level conversion linkage remain documented gaps.

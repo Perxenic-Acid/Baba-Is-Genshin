@@ -172,3 +172,7 @@ Tests and deliberate gaps: MOTION_WORDS.md. Next priority: PULL/SWAP/FALL/REVERS
 PHANTOM, then MAKE/EAT/BECOME/REVERT and remaining rule/condition families. Continue
 through the pending catalog and close documented scoped LEVEL/EMPTY/timing gaps
 before declaring all official words finished. Real-device acceptance is separate.
+
+M9.4E adds PULL/SWAP/PHANTOM and all four FALL directions, source-referenced
+support/cancellation checks and whole-turn regressions. Next movement priorities:
+REVERSE, FEAR/FOLLOW, TELE/HOLD, then the pending lifecycle/syntax/temporal families.

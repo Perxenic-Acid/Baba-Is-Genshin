@@ -449,5 +449,7 @@ dofile("tests/shift.lua")
 
 dofile("tests/more.lua")
 dofile("tests/motion_words.lua")
+dofile("tests/pull_swap.lua")
+dofile("tests/fall_words.lua")
 dofile("tests/spatial_extra.lua")
 dofile("tests/level_text.lua")

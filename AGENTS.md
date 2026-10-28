@@ -137,3 +137,6 @@
   surviving final co-occupants. Keep SHIFT and shift destruction as sequential
   atomic stages. Wait consumes a turn without moving YOU/SELECT; terminal states
   still reject it. See docs/SHIFT.md for timing boundaries and original references.
+
+- Native UI fontSize requires a Lua integer. Round scaled font sizes with math.floor;
+  renderer mocks must enforce integer setters, including repeated assignments.

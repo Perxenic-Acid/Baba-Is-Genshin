@@ -366,7 +366,7 @@ local function draw_entities(world)
                         )
 
                         control.text = label
-                        control.fontSize = math.max(7,font_size*board_scale)
+                        control.fontSize = math.max(7,math.floor(font_size*board_scale+0.5))
                         control.fontColor = fg
                         control.bgColor = bg
                         control:SetVisible(true)

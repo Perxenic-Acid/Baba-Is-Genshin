@@ -16,7 +16,17 @@ script = {object={GetScripts=function() return {{path="bootstrap",Invoke=functio
 end}}
 game = {
     InstantiateClientUIControl=function()
-        local control = setmetatable({alive=true}, {__index=methods})
+        local control = setmetatable({alive=true,properties={}}, {
+            __index=function(c,key)
+                if key=="fontSize" then return c.properties.fontSize end
+                return methods[key]
+            end,
+            __newindex=function(c,key,value)
+                if key=="fontSize" then
+                    assert(math.type(value)=="integer","native fontSize requires a Lua integer")
+                    c.properties.fontSize=value
+                else rawset(c,key,value) end
+            end})
         controls[#controls+1] = control
         return control
     end,
@@ -100,6 +110,14 @@ words.width=33;words.height=18;assert(RW_Render(words,0,0))
 local scaled
 for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then scaled=c end end
 assert(scaled.width<24 and scaled.height<24 and scaled.fontSize>=7)
+assert(math.type(scaled.fontSize)=="integer")
+assert(not pcall(function() scaled.fontSize=7.5 end),"mock must reject native-invalid fractional font sizes")
+-- Check the 24-wide AUTO/WHERE scale as well as the 33-wide BIY scale.
+words.width=24;assert(RW_Render(words,0,0))
+for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then
+ assert(c.fontSize==9 and math.type(c.fontSize)=="integer")
+end end
+words.width=33;assert(RW_Render(words,0,0))
 for _,c in ipairs(controls) do if c.alive and c.name and c.name:find("RW_Cell_") then
  assert(math.abs(c.px)+c.width/2<=408 and math.abs(c.py)+c.height/2<=408)
 end end

@@ -91,6 +91,37 @@ for _,duplicates in ipairs({1,2}) do
         local confirmed,why=RW_PlanLevelAction(placed,{type='confirm',entity_id=id},services)
         assert(confirmed,why and why.reason)
         assert(#confirmed.after.stack==1)
+        local entered_again=confirmed.after
+        -- Prepare the next authored conversion with only the TEXT branch.
+        local session=RW_GetActiveLevel(entered_again)
+        local ids={61};if duplicates==2 then ids[#ids+1]=66 end
+        local prepared,ok=RW_Commit(session,assert(RW_PlanDelete(session.world,ids)))
+        assert(ok.accepted)
+        entered_again=assert(RW_UpdateActiveLevel(entered_again,prepared))
+        local replacement,why=RW_PlanLevelAction(entered_again,{type='wait'},services)
+        assert(replacement,why and why.reason)
+        local single,accepted=RW_CommitLevelTree(entered_again,replacement);assert(accepted.accepted)
+        assert(single.active_id==root.active_id)
+        local function check_single(tree)
+            local world=RW_GetActiveLevel(tree).world
+            local count=0
+            for _,entity in pairs(world.entities) do
+                if entity.level_link and entity.level_link.definition_id=='navigation.win' then
+                    count=count+1;assert(entity.id==37 and entity.text.name=='LEVEL')
+                end
+            end
+            assert(count==1 and not world.entities[frontier])
+            assert(world.next_entity_id==frontier+duplicates)
+            local cursor=assert(RW_PlaceLevelSelectors(tree,{12},37))
+            assert(RW_PlanLevelAction(cursor,{type='confirm'},services))
+        end
+        check_single(single);check_single(assert(RW_ReloadLevel(single,single.active_id)))
+        local undo=RW_UndoLevelTree(single)
+        assert(undo.active_id==entered_again.active_id)
+        check(assert(RW_ReturnLevel(undo)))
+        local replay=assert(RW_PlanLevelAction(undo,{type='wait'},services))
+        check_single(replay.after)
     end
 end
+print('PASS: repeated scoped conversion replaces its entire tracked group through either entry, reload/Undo/replay')
 print('PASS: TEXT IS SHIFT forms LEVEL IS stacked TEXT/FLAG, duplicate products, SELECT, persistent IDs/allocation and Undo')

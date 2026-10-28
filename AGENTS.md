@@ -153,3 +153,8 @@
 - Renderer writes are cached per control, including stable Color values. Preserve
   same-size level switches, highlights, empty cells, visibility and board scrolling
   when skipping redundant native setter calls. Keep integer fontSize enforcement.
+
+- Scoped LEVEL reconversion replaces its tracked source entrance's entire prior product
+  group, including when entered through an allocated copy. Preserve separate SELECT
+  candidates/entry slots, retire old products atomically, keep allocator tombstones,
+  and return via the surviving source ID. See docs/LEVEL_SEMANTICS.md.

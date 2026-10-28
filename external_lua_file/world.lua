@@ -1069,7 +1069,7 @@ function RW_ReloadLevel(tree,id)
     local session = RW_InstantiateLevel(tree.definitions[old.definition_id],id)
     for entity_id, archetype in pairs(tree.level_transforms[id] or {}) do
         if type(archetype) == "table" then
-            session.world.entities[entity_id]=clone(archetype.entity)
+            session.world.entities[entity_id]=archetype.deleted and nil or clone(archetype.entity)
             session.world.next_entity_id=math.max(session.world.next_entity_id,entity_id+1)
         else
             if not session.world.entities[entity_id] then return nil,"persistent_level_block_missing" end
@@ -1186,8 +1186,13 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
         local entry = tree.entry_links[tree.active_id]
         if not entry then return nil, "no_parent_level_block" end
         local parent = tree.instances[entry.parent_id]
-        local block = parent.world.entities[entry.entity_id]
-        if not block then return nil, "missing_parent_level_block" end
+        local selected = parent.world.entities[entry.entity_id]
+        if not selected then return nil, "missing_parent_level_block" end
+        local previous=tree.level_transforms[entry.parent_id] or {}
+        local record=previous[entry.entity_id]
+        local source_id=type(record)=="table" and record.source_id or entry.entity_id
+        local block=parent.world.entities[source_id]
+        if not block then return nil,"missing_parent_level_block" end
         local products={}
         for _,target in ipairs(targets) do
             local product=clone(block)
@@ -1208,6 +1213,19 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
             operation=nil
         end
         if operation then table.insert(creation.changes,1,operation) end
+        -- Re-conversion replaces the previous product group rather than appending
+        -- to it, even when entry was through one of its allocated copies.
+        local retired={}
+        for id,item in pairs(previous) do
+            if id~=source_id and type(item)=="table" and item.source_id==source_id then
+                retired[#retired+1]=id
+            end
+        end
+        table.sort(retired)
+        for _,id in ipairs(retired) do
+            local entity=parent.world.entities[id]
+            if entity then creation.changes[#creation.changes+1]={kind="delete",entity_id=id,from=clone(entity)} end
+        end
         local changed, accepted = RW_Commit(parent,creation)
         if not accepted.accepted then return nil, accepted.reason end
         result.instances = copy_map(tree.instances)
@@ -1215,11 +1233,16 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
         result.level_transforms = copy_map(tree.level_transforms)
         local persisted=copy_map(tree.level_transforms[entry.parent_id] or {})
         result.level_transforms[entry.parent_id]=persisted
-        if #targets == 1 and not persisted[block.id] then
-            persisted[block.id]=targets[1]
-        else persisted[block.id]={entity=clone(first)} end
+        for _,id in ipairs(retired) do persisted[id]={deleted=true,source_id=source_id} end
+        persisted[source_id]={entity=clone(first),source_id=source_id}
         for _,change in ipairs(creation.changes) do
-            if change.kind == "create" then persisted[change.entity_id]={entity=clone(change.to)} end
+            if change.kind == "create" then
+                persisted[change.entity_id]={entity=clone(change.to),source_id=source_id}
+            end
+        end
+        if entry.entity_id~=source_id then
+            result.entry_links=copy_map(tree.entry_links)
+            result.entry_links[tree.active_id]={parent_id=entry.parent_id,entity_id=source_id}
         end
     end
     return result

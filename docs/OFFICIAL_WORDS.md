@@ -161,7 +161,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | YOU | implemented within documented scope |
 | property | YOU2 | pending |
 | verb | BECOME | pending |
-| verb | EAT | pending |
+| verb | EAT | implemented within documented scope |
 | verb | FEAR | implemented within documented scope |
 | verb | FOLLOW | implemented within documented scope |
 | verb | HAS | implemented within documented scope |

@@ -206,3 +206,9 @@ M9.4I adds MAKE: late physical creation, duplicate products, original converted-
 occupancy checks, MAKE TEXT/ALL and atomic deterministic random-facing state.
 Reference matrix: 1,200 installed-source cases. Native route and gaps: MAKE.md.
 Next verb: EAT, then BECOME, MIMIC and PLAY, before conditions/prefixes/GROUP/properties.
+
+
+M9.4J adds EAT after ordinary contacts and before MAKE, with simultaneous victim
+selection, SAFE/FLOAT, frozen declarations, HAS and whole-turn Undo. Source matrix:
+3,072 cases. Next: BECOME, MIMIC, PLAY. The user waived routine native acceptance;
+continue implementation with offline regressions/source oracles without waiting.

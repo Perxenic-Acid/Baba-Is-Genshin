@@ -511,7 +511,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
+local DEFAULT_SEMANTICS = {eat={noun="eat",negative_noun="forbid_eat"},make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -525,9 +525,9 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make"))
+                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make" or operation == "eat"))
                 or (category == "negative_property" and operation == "deny_trait")
-                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow" or operation == "forbid_make"))) then return false end
+                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow" or operation == "forbid_make" or operation == "forbid_eat"))) then return false end
         end
     end
     return true
@@ -971,7 +971,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local key=subject_key(subject)
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
-            if sem and key and key~="@empty" and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make")
+            if sem and key and key~="@empty" and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
                 and (not objnot or sem.negative_noun=="forbid_"..sem.noun) then
                 local target=subject_key(obj)
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
@@ -1111,7 +1111,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 for _,condition in ipairs(bans[write_origins[index]] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
             end
         end
-        if relation.op=="fear" or relation.op=="follow" or relation.op=="make" then
+        if relation.op=="fear" or relation.op=="follow" or relation.op=="make" or relation.op=="eat" then
             local bans=(predicate_bans[relation.verb] or {})[relation.source_type] or {}
             relation.exclusions={}
             for _,condition in ipairs(bans[relation.target_type] or {}) do relation.exclusions[#relation.exclusions+1]=condition end

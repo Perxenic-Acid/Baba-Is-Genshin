@@ -367,3 +367,26 @@ function RW_ResolveMoreProducts(world)
     end
     return products
 end
+
+-- EAT chooses all victims from one frozen, post-contact snapshot. A source
+-- selected as another eater's victim still participates; HAS runs once per ID.
+function RW_ResolveEatVictims(world,targets)
+    local removed={}
+    for id,parameters in pairs(targets or {}) do
+        local source=world.entities[id]
+        if source then
+            for other_id,other in pairs(world.entities) do
+                if other_id~=id and other.x==source.x and other.y==source.y
+                    and not other.behaviors.safe
+                    and (source.behaviors.float==true)==(other.behaviors.float==true) then
+                    local name=other.class=="text" and "@text" or other.archetype
+                    for _,target in ipairs(parameters) do
+                        if name==target then removed[other_id]=true;break end
+                    end
+                end
+            end
+        end
+    end
+    local victims={};for id in pairs(removed) do victims[#victims+1]=id end;table.sort(victims)
+    return victims
+end

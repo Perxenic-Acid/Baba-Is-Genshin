@@ -224,7 +224,7 @@ function RW_PlanTurn(world, action, services)
         if conversion.op == "transform_level" then level_targets[#level_targets+1] = conversion.target_type
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
-        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" then -- Consumed by their scheduled phases, not conversion.
+        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" then -- Consumed by their scheduled phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     level_traits=level_traits_from(conversions)
@@ -389,6 +389,23 @@ function RW_PlanTurn(world, action, services)
                 if change.kind == "create" then weak_new[change.entity_id]=true end
             end
             complete=next_world
+        end
+        if services.eat then
+            local active=false
+            for _,relation in ipairs(frozen_relations or {}) do if relation.op=="eat" then active=true;break end end
+            if active then
+                local refreshed,why=services.refresh(complete,frozen_rules)
+                if not refreshed then return fail("eat_rules",why) end
+                local projected,why=services.project(complete,refreshed,plan.level_traits)
+                if not projected then return fail("eat_project",why) end
+                local eat,why=services.eat(complete,projected,frozen_relations,contents)
+                if not eat then return fail("eat",why) end
+                local next_world,why=services.preview(complete,eat)
+                if not next_world then return fail("eat_preview",why) end
+                plan.stages[#plan.stages+1]={name="eat",plan=eat}
+                for _,change in ipairs(eat.changes) do plan.changes[#plan.changes+1]=change end
+                complete=next_world;trace[#trace+1]="eat"
+            end
         end
         -- Late creation reads surviving sources with the frozen contact declarations.
         if services.make then
@@ -1059,6 +1076,11 @@ local function start(run_self_tests)
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
+    turn_services.eat=function(world,projected,relations,contents)
+        local targets=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"eat")
+        local ids=properties_api:Invoke("RW_ResolveEatVictims",projected,targets)
+        return RW_PlanDestructionPhase(world,ids,contents,"eat",contact_services)
+    end
     turn_services.make=function(world,relations,converted)
         local products,rng=rules_api:Invoke("RW_PlanMakeProducts",world,relations,converted)
         local creation,why=world_api:Invoke("RW_PlanCreate",world,products)
@@ -1621,7 +1643,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4I initialized")
+    print("[RuleWorld] M9.4J initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

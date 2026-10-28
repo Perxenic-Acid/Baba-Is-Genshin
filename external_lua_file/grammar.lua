@@ -196,6 +196,7 @@ local AST_VERBS = {
         }
     },
 
+    eat = {phase="destruction",rhs={noun=true,special=true}},
     make = {phase="creation",rhs={noun=true,special=true}},
     follow = {phase="orientation",rhs={noun=true,special=true}},
     fear = {

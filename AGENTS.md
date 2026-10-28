@@ -213,3 +213,11 @@
 - Random direction draws are pure plan data, never host/global RNG side effects.
   world.random_state and stale-checked stage random_state={from,to} participate in
   Preview/Commit/whole-tree Undo, including RNG-only turns and atomic late failure.
+
+- EAT runs after OPEN/SHUT, before MAKE; frozen per-source predicates select same-cell,
+  same-FLOAT non-self unsafe victims simultaneously. Mutually eaten sources still eat.
+  Each victim triggers HAS once; duplicate HAS still multiplies products. No recursive
+  newborn EAT; surviving births may participate in MAKE/CRASH. See docs/EAT.md.
+- The user waived routine real-device acceptance as a progress gate. Continue through
+  the requested word families with simulation/source oracles, recording known gaps;
+  do not wait for manual confirmation or claim native success from offline tests.

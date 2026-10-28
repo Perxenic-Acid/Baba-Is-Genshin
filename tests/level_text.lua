@@ -81,6 +81,10 @@ for _,duplicates in ipairs({1,2}) do
     assert(restored.active_id==entered.active_id)
     assert(restored.instances[root.active_id].world.next_entity_id==frontier)
     assert(restored.instances[root.active_id].world.entities[37].archetype=='level_block')
+    -- Equal destinations do not merge distinct physical selection candidates.
+    local placed=assert(RW_PlaceLevelSelectors(result,{12},37))
+    local menu,choice=RW_PlanLevelAction(placed,{type='confirm'},services)
+    assert(not menu and choice.reason=='choose_level' and #choice.candidates==duplicates+1)
     -- Both products remain selectable, including the Text product.
     for _,id in ipairs({37,frontier}) do
         local placed=assert(RW_PlaceLevelSelectors(result,{12},id))

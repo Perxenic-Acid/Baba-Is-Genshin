@@ -52,11 +52,25 @@ print("PASS: production boot/navigation/movement/Undo without diagnostics")
 -- The new motion laboratory is exercised through actual production input adapters.
 for i=1,10 do listeners.right() end;listeners.confirm()
 for i=1,5 do listeners.right() end;listeners.confirm()
-assert(rendered.entities[5].archetype=="rock" and rendered.entities[5].x==6)
-listeners.wait();assert(rendered.entities[5].x==7)
-listeners.undo();assert(rendered.entities[5].x==6)
-listeners.right();assert(rendered.entities[4].x==3 and rendered.entities[6].x==4 and rendered.entities[5].x==7)
-listeners.undo();assert(rendered.entities[4].x==2 and rendered.entities[6].x==3 and rendered.entities[5].x==6)
+assert(rendered.entities[5].archetype=="rock" and rendered.entities[5].x==12)
+assert(rendered.width==32 and rendered.height==28)
+local loose={}
+for _,entity in pairs(rendered.entities) do
+    if entity.class=="text" and entity.y>=15 then
+        for _,other in ipairs(loose) do
+            assert(math.abs(entity.x-other.x)>=3 or math.abs(entity.y-other.y)>=3,"Sparse laboratory words overlap")
+        end
+        loose[#loose+1]=entity
+    end
+end
+assert(#loose>=40)
+listeners.wait();assert(rendered.entities[5].x==13)
+listeners.undo();assert(rendered.entities[5].x==12)
+listeners.right();assert(rendered.entities[4].x==7 and rendered.entities[6].x==8 and rendered.entities[5].x==13)
+listeners.undo();assert(rendered.entities[4].x==6 and rendered.entities[6].x==7 and rendered.entities[5].x==12)
+listeners.down();listeners.right();listeners.right()
+assert(rendered.entities[4].x==8 and rendered.entities[4].y==11 and rendered.entities[9].x==10)
+listeners.undo();assert(rendered.entities[4].x==7 and rendered.entities[9].x==9)
 while history_depth>0 do listeners.undo() end
 assert(self_test_calls==0 and rendered.entities[12].x==2)
 print("PASS: production MOTION laboratory wait/MOVE, sleeping PUSH, whole-tree Undo without diagnostics")
@@ -452,5 +466,6 @@ dofile("tests/motion_words.lua")
 dofile("tests/pull_swap.lua")
 dofile("tests/fall_words.lua")
 dofile("tests/reverse.lua")
+dofile("tests/fear.lua")
 dofile("tests/spatial_extra.lua")
 dofile("tests/level_text.lua")

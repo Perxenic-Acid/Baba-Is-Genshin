@@ -496,7 +496,7 @@ local function default_world()
                 -- New typed AST vocabulary. The legacy copula
                 -- remains until its compiler is retired.
                 verbs = {
-                    IS = "is", HAS = "has", WRITE = "write"
+                    IS = "is", HAS = "has", WRITE = "write", FEAR="fear"
                 },
 
                 copulas = {
@@ -1684,27 +1684,31 @@ function RW_GetNavigationDefinitions()
     object(root,63,"line",12,1)
     local motion_lab=RW_CreateSession().world
     motion_lab.entities={};motion_lab.next_entity_id=1
+    motion_lab.width,motion_lab.height=32,28
+    motion_lab.language.nouns.FLAG="flag"
     motion_lab.language.nouns.ROCK="rock";motion_lab.language.nouns.BELT="belt";motion_lab.language.nouns.WALL="wall"
     object(motion_lab,1,"cursor",1,1);portal(motion_lab,2,2,1,"PARENT")
-    object(motion_lab,3,"line",1,1);object(motion_lab,4,"avatar",2,4)
-    object(motion_lab,5,"rock",6,3);motion_lab.entities[5].direction="Right"
-    object(motion_lab,6,"crate",3,4);object(motion_lab,7,"wall",11,3)
-    object(motion_lab,8,"belt",8,4);motion_lab.entities[8].direction="Up"
+    object(motion_lab,3,"line",1,1);object(motion_lab,4,"avatar",6,10)
+    object(motion_lab,5,"rock",12,10);motion_lab.entities[5].direction="Right"
+    object(motion_lab,6,"crate",7,10);object(motion_lab,7,"wall",26,10)
+    object(motion_lab,8,"belt",21,10);motion_lab.entities[8].direction="Up"
+    object(motion_lab,9,"flag",9,11);motion_lab.entities[9].direction="Right"
     for row,words in ipairs({{"AVATAR","IS","YOU"},{"ROCK","IS","MOVE"},
-        {"CRATE","IS","PUSH","AND","SLEEP"},{"BELT","IS","SHIFT"},{"WALL","IS","STOP"}}) do
+        {"CRATE","IS","PUSH","AND","SLEEP"},{"BELT","IS","SHIFT"},{"WALL","IS","STOP"},{"FLAG","FEAR","AVATAR"}}) do
         for x,token in ipairs(words) do
             local id=motion_lab.next_entity_id
-            motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},x=x,y=5+row,direction="None"}
+            motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},x=2+x+12*((row-1)%2),y=3+3*math.floor((row-1)/2),direction="None"}
             motion_lab.next_entity_id=id+1
         end
     end
     for index,token in ipairs({"STILL","LOCKEDRIGHT","LOCKEDUP","LOCKEDLEFT","LOCKEDDOWN","TURN","DETURN",
         "RIGHT","UP","LEFT","DOWN","NUDGERIGHT","NUDGEUP","NUDGELEFT","NUDGEDOWN","IS","IS","NOT",
         "NEXTTO","ABOVE","BELOW","BESIDELEFT","BESIDERIGHT","FACING",
-        "REVERSE","PULL","SWAP","PHANTOM","FALL","FALLRIGHT","FALLUP","FALLLEFT"}) do
+        "REVERSE","PULL","SWAP","PHANTOM","FALL","FALLRIGHT","FALLUP","FALLLEFT",
+        "FEAR","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","AND","NOT","IS","IS","IS"}) do
         local id=motion_lab.next_entity_id
         motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},
-            x=7+(index-1)%6,y=6+math.floor((index-1)/6),direction="None"}
+            x=3+3*((index-1)%10),y=15+3*math.floor((index-1)/10),direction="None"}
         motion_lab.next_entity_id=id+1
     end
     definitions["navigation.motion"]={id="navigation.motion",initial_world=motion_lab}

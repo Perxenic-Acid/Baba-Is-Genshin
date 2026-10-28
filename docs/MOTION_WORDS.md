@@ -136,3 +136,46 @@ Construct AVATAR IS YOU AND REVERSE to move against WASD, then Z to restore the 
 FEAR/FOLLOW/TELE/HOLD remain pending; this checkpoint only completes REVERSE and the
 related multi-axis FALL correction. Existing multi-source retry, scoped autonomous
 LEVEL/EMPTY, and same-settle HAS support gaps above still apply.
+
+
+## M9.4G: FEAR and a sparse laboratory
+
+Primary references: installed features.lua getunitverbtargets() (468 onward),
+tools.lua findfears() (2071–2233), movement.lua take 7 (299 onward), and rules.lua
+negative-rule cancellation (1165 onward). FEAR is a noun predicate, not a property.
+It reads the four cardinal neighbor cells, excluding overlap and without FLOAT
+filtering. Each matching target parameter adds one strength; stacked identities of
+the same target do not add strength, but duplicate physical rules do. The strongest
+side(s) determine the fleeing direction. Preserve original facing/clockwise/
+counterclockwise/opposite tie search and its exact `score == 1` test, including
+its peculiar duplicate-parameter behavior.
+
+FEAR runs after MOVE/nudges, before SHIFT, using the pre-conversion declarations
+and refreshed per-source spatial conditions. Collect all source intentions from
+that phase snapshot. Resolve movement with PUSH/PULL/STOP, REVERSE, locks, WEAK,
+unlock and source-frame HAS. SLEEP suppresses fear; STILL/locks may retain a facing
+change without displacement. FEAR destruction and HAS are atomic stages; newborns
+receive current-turn WEAK grace. Negative noun declarations veto matching grants
+per source/condition; ALL uses our authored ordinary vocabulary. TEXT and EMPTY
+are supported as targets. Real physical Text can be a source.
+
+`tests/fear.lua` uses the compiler/scheduler/Commit/Undo, including conditions,
+negative clauses, multiplicity, phase timing, PUSH, SLEEP/STILL/REVERSE, locks and
+WEAK/HAS grace. `tests/reference_fear.lua` executes the installed findfears() body
+against 2,048 combinations of neighbor masks, blocker masks, facing and duplicate
+parameters. Existing regression suite passes. Native behavior still needs acceptance.
+Normal production startup: 1,896,000 offline instructions, below the 2M budget.
+
+MOTION is now 32x28. Authored rules are separated in the upper area; objects and
+open working space occupy the middle. The 44 loose words occupy a three-cell grid
+from row 15, leaving two empty cells between adjacent loose pieces. Extra nouns,
+IS, AND and NOT are available. Tests check spacing and production input callbacks.
+Route: root D x10 F, then reference menu D x5 F. From the initial room position,
+S D D approaches a Flag with authored FLAG FEAR AVATAR: the Flag moves right one
+cell on the second D. Z restores both the approach and the fleeing Flag together.
+The room also retains the MOVE, sleeping PUSH and SHIFT examples.
+
+Pending: scoped LEVEL/virtual EMPTY FEAR sources and the original multi-source
+movement retry graph. Finite board boundaries still apply. The tie oracle covers
+cardinal initial facing and static STOP blockers; broader original PUSH/unlock
+probe ordering is not claimed. FOLLOW, TELE and HOLD remain pending.

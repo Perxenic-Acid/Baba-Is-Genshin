@@ -511,7 +511,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
+local DEFAULT_SEMANTICS = {fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -525,9 +525,9 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text"))
+                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear"))
                 or (category == "negative_property" and operation == "deny_trait")
-                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write"))) then return false end
+                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear"))) then return false end
         end
     end
     return true
@@ -937,6 +937,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     local generated,deferred,relations={},{},{}
     local contain_bans,contain_origins,contain_verbs={},{},{}
     local write_bans,write_origins,write_verbs={},{},{}
+    local fear_bans={}
     local function add_ban(store,verb,key,target,condition)
         store[verb]=store[verb] or {};local bans=store[verb]
         bans[key]=bans[key] or {};bans[key][target]=bans[key][target] or {}
@@ -970,7 +971,23 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local key=subject_key(subject)
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
-            if sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "write_text"
+            if sem and key and key~="@empty" and (ast.when.op=="always" or ast.when.op=="spatial") and sem.noun=="fear"
+                and (not objnot or sem.negative_noun=="forbid_fear") then
+                local target=subject_key(obj)
+                if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
+                if obj.tag=="special" and obj.name=="all" then target="@all" end
+                if target then
+                    supported=true
+                    if objnot then add_ban(fear_bans,ast.verb,key,target,ast.when)
+                    else
+                        local targets=target=="@all" and RW_NounPalette(world) or {target}
+                        for _,name in ipairs(targets) do
+                            relations[#relations+1]={op="fear",source_type=key,target_type=name,
+                                origin=target,verb=ast.verb,source=ast.source,when=query_clone(ast.when)}
+                        end
+                    end
+                end
+            elseif sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "write_text"
                 and (not objnot or sem.negative_noun == "forbid_write") then
                 local token=written_token(world,obj)
                 if token then
@@ -1088,6 +1105,14 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             for _,condition in ipairs(bans[relation.target_text] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
             if write_origins[index] ~= relation.target_text then
                 for _,condition in ipairs(bans[write_origins[index]] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
+            end
+        end
+        if relation.op=="fear" then
+            local bans=(fear_bans[relation.verb] or {})[relation.source_type] or {}
+            relation.exclusions={}
+            for _,condition in ipairs(bans[relation.target_type] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
+            if relation.origin=="@all" then
+                for _,condition in ipairs(bans["@all"] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
             end
         end
         if relation.exclusions then
@@ -1439,4 +1464,22 @@ function RW_PlanHasBirths(world, victims, relations)
         end
     end
     return specifications
+end
+
+-- Resolve predicates per source identity using the current phase positions.
+-- Keep duplicate physical declarations; FEAR strength counts target parameters.
+function RW_ResolveFearTargets(world,relations)
+    local groups={}
+    for _,relation in ipairs(relations or {}) do
+        if relation.op=="fear" then
+            local selector=relation.source_type=="@text" and {kind="class",value="text"}
+                or {kind="archetype",value=relation.source_type}
+            for _,id in ipairs(RW_SelectEntities(world,selector)) do
+                if RW_RelationApplies(world,relation,world.entities[id]) then
+                    groups[id]=groups[id] or {};groups[id][#groups[id]+1]=relation.target_type
+                end
+            end
+        end
+    end
+    return groups
 end

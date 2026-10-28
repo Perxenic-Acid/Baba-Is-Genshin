@@ -174,13 +174,15 @@ function RW_PlanTurn(world, action, services)
             automatic_active=true;break
         end
     end
-    for _,motion_phase in ipairs({"automatic","shift"}) do
-    if services[motion_phase] and (motion_phase~="automatic" or automatic_active) then
+    local fear_active=false
+    for _,relation in ipairs(before_conversions or {}) do if relation.op=="fear" then fear_active=true;break end end
+    for _,motion_phase in ipairs({"automatic","fear","shift"}) do
+    if services[motion_phase] and (motion_phase~="automatic" or automatic_active) and (motion_phase~="fear" or fear_active) then
         local refreshed,why=services.refresh(preview,before_rules)
         if not refreshed then return fail(motion_phase.."_rules",why) end
         local shifted_world,err=services.project(preview,refreshed,level_traits_from(before_conversions))
         if not shifted_world then return fail(motion_phase.."_project",err) end
-        local shift,shift_error=services[motion_phase](shifted_world)
+        local shift,shift_error=services[motion_phase](shifted_world,before_conversions)
         if not shift then return fail(motion_phase,shift_error) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,
             changes=movement.changes,board_shift=movement.board_shift}}}
@@ -222,7 +224,7 @@ function RW_PlanTurn(world, action, services)
         if conversion.op == "transform_level" then level_targets[#level_targets+1] = conversion.target_type
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
-        elseif conversion.op == "has" then -- Consumed by the destruction phases, not conversion.
+        elseif conversion.op == "has" or conversion.op=="fear" then -- Consumed by their scheduled phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     level_traits=level_traits_from(conversions)
@@ -341,7 +343,7 @@ function RW_PlanTurn(world, action, services)
         local weak_new={}
         for _,stage in ipairs(plan.stages) do
             for _,change in ipairs(stage.plan.changes) do
-                if (stage.name == "movement_destruction" or stage.name == "shift_destruction" or stage.name == "automatic_destruction" or stage.name == "fall_destruction" or stage.name == "more") and change.kind == "create" then weak_new[change.entity_id]=true
+                if (stage.name == "movement_destruction" or stage.name == "shift_destruction" or stage.name == "automatic_destruction" or stage.name == "fear_destruction" or stage.name == "fall_destruction" or stage.name == "more") and change.kind == "create" then weak_new[change.entity_id]=true
                 elseif stage.name == "conversion" then weak_new[change.entity_id]=nil end
             end
         end
@@ -1014,6 +1016,10 @@ local function start(run_self_tests)
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
+    turn_services.fear=function(world,relations)
+        local targets=rules_api:Invoke("RW_ResolveFearTargets",world,relations)
+        return movement_api:Invoke("RW_ResolveFear",world,targets)
+    end
     turn_services.shift=function(world) return movement_api:Invoke("RW_ResolveShift",world) end
     turn_services.destroy=function(world,ids,contents,cause,deaths)
         return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths)
@@ -1561,7 +1567,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4F initialized")
+    print("[RuleWorld] M9.4G initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

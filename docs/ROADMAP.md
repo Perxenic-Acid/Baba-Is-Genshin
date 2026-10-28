@@ -182,3 +182,9 @@ M9.4F adds REVERSE parity across active movement, SELECT and scoped LEVEL, prese
 original facing/lock behavior. Combined FALL axes now settle sequentially instead
 of selecting only one axis; the expanded installed-source oracle covers 540 cases.
 Next: FEAR/FOLLOW, TELE/HOLD; then remaining lifecycle/syntax/temporal families.
+
+
+M9.4G adds FEAR as a scheduled noun predicate with duplicate strength, per-identity
+conditions and atomic destruction/HAS/Undo. Installed findfears() oracle: 2,048
+cases. MOTION expands to 32x28 with three-cell-spaced loose words and a ready-made
+FLAG FEAR AVATAR route. Next: FOLLOW, then TELE/HOLD and remaining families.

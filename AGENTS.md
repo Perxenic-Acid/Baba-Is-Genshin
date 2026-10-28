@@ -183,3 +183,12 @@
   which face actual travel. Original cantmove reverses the lock query too; retain
   that mapping. FALL reverses before cancellation and settles all surviving axes
   down/right/up/left, repeating to stability; preserve its 6000-step terminal limit.
+
+- FEAR is a noun predicate after MOVE/nudges, before SHIFT. Resolve conditions per
+  source; collect intentions from one phase snapshot. Duplicate target parameters
+  add strength, stacked same-noun witnesses do not. Preserve original findfears tie
+  search and exact score==1 test. Destruction/HAS stages include WEAK newborn grace.
+  Scoped LEVEL/virtual EMPTY FEAR sources remain deferred; see MOTION_WORDS.md.
+- Native test rooms must leave ample working space. MOTION is 32x28; loose words
+  use a three-cell grid (two empty cells between), with spare nouns/connectors and
+  ready-made feature demonstrations. Preserve this spacing in later expansions.

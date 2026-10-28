@@ -163,7 +163,7 @@ function RW_ResolveMovement(world, action)
     end
 
     local intent_direction=direction_for(dx,dy)
-    if not action.falling then dx,dy=reverse_vector(world,mover,dx,dy) end
+    if not action.falling and not action.no_reverse then dx,dy=reverse_vector(world,mover,dx,dy) end
     local planned,removed,destructions = {},{},{}
     local visiting = {}
     local changes = {}
@@ -224,7 +224,7 @@ function RW_ResolveMovement(world, action)
         end
 
         local entity = world.entities[id]
-        if immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
+        if not (action.fear_probe and id==action.entity_id) and immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
         visiting[id] = true
 
         local nx = entity.x + dx
@@ -358,7 +358,7 @@ function RW_ResolveMovement(world, action)
 
     try_move=function(id,pulling)
         local entity=world.entities[id]
-        if immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
+        if not (action.fear_probe and id==action.entity_id) and immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
         if action.falling or pulling or id < 1 or not has_capability(world,entity,"weak") or has_capability(world,entity,"safe") then
             return attempt_move(id)
         end
@@ -1030,8 +1030,8 @@ function RW_ResolveAutomatic(world)
     return {consumes_turn=true,changes=changes,destructions=deaths,reason="automatic"}
 end
 
--- FALL is a settling phase. Opposite grants cancel by count; one surviving
--- axis per source is selected in original down/right/up/left collection order.
+-- FALL is a settling phase. Opposite grants cancel by count; surviving
+-- axes settle in original down/right/up/left collection order.
 function RW_ResolveFall(world)
     local working={};for k,v in pairs(world) do working[k]=v end
     working.entities={}
@@ -1231,4 +1231,108 @@ function RW_LevelSelectorIDs(world)
     end
     table.sort(ids)
     return ids
+end
+
+-- Original tools.lua findfears: cardinal adjacency, parameter counts and tie search.
+function RW_FindFears(world,id,targets)
+    local entity=world.entities[id]
+    if not entity then return false,"None",0 end
+    local names={"Right","Up","Left","Down"}
+    local dirs={Right=0,Up=1,Left=2,Down=3}
+    local vectors={{1,0},{0,-1},{-1,0},{0,1}}
+    local dir=dirs[entity.direction] or 4
+    local scores,maxfear,resultdir={},0,4
+    for j=0,3 do
+        local i=((dir+2+j)%4)+1
+        local v=vectors[i];local x,y=entity.x+v[1],entity.y+v[2]
+        local occupied=false;local found={}
+        for other_id,other in pairs(world.entities) do
+            if other.x==x and other.y==y then
+                occupied=true
+                if other_id~=id then found[other.class=="text" and "@text" or other.archetype]=true end
+            end
+        end
+        local amount=0
+        for _,target in ipairs(targets) do
+            if (target=="@empty" and not occupied) or found[target] then amount=amount+1 end
+        end
+        scores[i]=amount
+        if amount>0 then resultdir=(i+1)%4;maxfear=math.max(maxfear,amount) end
+    end
+    if maxfear==0 then return false,"None",0 end
+    local tied=0
+    for i=1,4 do if scores[i]>=maxfear then tied=tied+1 else scores[i]=0 end end
+    if tied>1 then
+        resultdir=dir
+        for tests=0,3 do
+            local v=vectors[resultdir+1]
+            local problem=scores[resultdir+1]==1 or not v
+            if not problem then
+                -- The original check probes geometry before REVERSE and STILL.
+                local probe=RW_ResolveMovement(world,{type="move",entity_id=id,
+                    dx=v[1],dy=v[2],no_reverse=true,fear_probe=true})
+                problem=#probe.changes==0 and #(probe.destructions or {})==0
+            end
+            if not problem then return true,names[resultdir+1],maxfear end
+            if tests==0 then resultdir=(resultdir+3)%4
+            elseif tests==1 then resultdir=(resultdir+2)%4
+            elseif tests==2 then resultdir=(resultdir+1)%4 end
+        end
+        return false,"None",maxfear
+    end
+    return true,names[resultdir+1],maxfear
+end
+
+function RW_ResolveFear(world,targets)
+    local working={};for k,v in pairs(world) do working[k]=v end
+    working.entities={}
+    local ids,tasks={},{}
+    for id,entity in pairs(world.entities) do
+        local copy={};for k,v in pairs(entity) do copy[k]=v end
+        working.entities[id]=copy;ids[#ids+1]=id
+    end
+    table.sort(ids)
+    -- Collect every intention against the same snapshot, as original take 7 does.
+    for _,id in ipairs(ids) do
+        local entity=world.entities[id]
+        if targets[id] and not has_capability(world,entity,"sleep") then
+            local valid,dir,count=RW_FindFears(world,id,targets[id])
+            if valid and count>0 then tasks[id]={direction=dir,count=count} end
+        end
+    end
+    local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
+    local deaths,records={},{}
+    for _,id in ipairs(ids) do
+        local task=tasks[id]
+        if task then
+            for impulse=1,task.count do
+                local entity=working.entities[id];if not entity then break end
+                entity.direction=task.direction
+                local v=vectors[task.direction]
+                -- take 7 checks STILL/locks before queuing the reversed intention.
+                if immobile(world,entity,v[1],v[2]) then break end
+                local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=v[1],dy=v[2]})
+                for _,change in ipairs(part.changes) do
+                    local e=working.entities[change.entity_id]
+                    if change.kind=="move" then e.x,e.y,e.direction=change.to.x,change.to.y,change.to.direction
+                    elseif change.kind=="direction" then e.direction=change.to end
+                end
+                for _,death in ipairs(part.destructions or {}) do
+                    deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+                end
+            end
+        end
+    end
+    local changes={}
+    for _,id in ipairs(ids) do
+        local before=world.entities[id];local after=working.entities[id] or records[id]
+        if before.x~=after.x or before.y~=after.y then
+            changes[#changes+1]={kind="move",entity_id=id,
+                from={x=before.x,y=before.y,direction=before.direction or "None"},
+                to={x=after.x,y=after.y,direction=after.direction or "None"}}
+        elseif (before.direction or "None")~=(after.direction or "None") then
+            changes[#changes+1]={kind="direction",entity_id=id,from=before.direction or "None",to=after.direction or "None"}
+        end
+    end
+    return {consumes_turn=true,changes=changes,destructions=deaths,reason="fear"}
 end

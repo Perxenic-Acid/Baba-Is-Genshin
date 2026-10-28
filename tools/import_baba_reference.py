@@ -16,7 +16,7 @@ def generate(data):
     out = [BEGIN, '''    local function official_world(width,height,entries)
         local world=RW_CreateSession().world
         world.width=width;world.height=height;world.entities={};world.next_entity_id=1
-        world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall",BELT="belt"}
+        world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall",BELT="belt",GHOST="ghost",LAVA="lava",LEVEL={tag="level",block_type="level_block"}}
         for _,spec in ipairs(entries) do
             local id=world.next_entity_id
             if spec[1]:sub(1,5) == "text_" then
@@ -33,7 +33,7 @@ def generate(data):
         return world
     end
 ''']
-    for index, stem in enumerate(('0level','1level','163level')):
+    for index, stem in enumerate(('0level','1level','163level','302level')):
         path = data / 'Worlds' / 'baba' / (stem + '.l')
         raw = path.read_bytes()
         ld = path.with_suffix('.ld').read_text(encoding='utf-8-sig')
@@ -58,8 +58,8 @@ def generate(data):
                 name = overrides.get(obj,name)
                 if name in ('tile','grass'): continue
                 name = name.replace('baba','avatar')
-                assert name in ('avatar','rock','flag','wall','belt') or name in {
-                    'text_avatar','text_rock','text_flag','text_wall','text_belt','text_is','text_you','text_push','text_stop','text_win','text_word','text_not','text_and','text_defeat','text_shift'}
+                assert name in ('avatar','rock','flag','wall','belt','ghost','lava') or name in {
+                    'text_avatar','text_rock','text_flag','text_wall','text_belt','text_is','text_you','text_push','text_stop','text_win','text_word','text_not','text_and','text_defeat','text_shift','text_ghost','text_lava','text_more','text_near','text_text','text_level','text_empty'}
                 x,y = i%width,i//width
                 assert 0<x<width-1 and 0<y<height-1
                 entries.append((name,x,y,('Right','Up','Left','Down')[directions[i]]))
@@ -78,6 +78,8 @@ def generate(data):
     portal(reference_map,4,1,2,"PARENT")
     portal(reference_map,9,5,2,"AUTO","reference.2")
     object(reference_map,10,"line",5,2)
+    portal(reference_map,11,6,2,"TRAP","reference.3")
+    object(reference_map,12,"line",6,2)
     for x=1,4 do object(reference_map,4+x,"line",x,2) end
     definitions["navigation.reference"]={id="navigation.reference",initial_world=reference_map}
     portal(root,64,12,2,"REF","navigation.reference")

@@ -1,10 +1,12 @@
 -- Native renderer adapter exercised with fake controls, including same-size switches.
 local old_game, old_script, old_color, old_render = game, script, Color, RW_Render
 local controls = {}
+local calls={position=0,size=0,font=0,visible=0}
 local board, status = {alive=true}, {alive=true}
 local methods = setmetatable({}, {__index=function() return function() end end})
-methods.SetAnchoredPosition = function(control,x,y) control.px,control.py=x,y end
-methods.SetSizeDelta = function(control,w,h) control.width,control.height=w,h end
+methods.SetAnchoredPosition = function(control,x,y) calls.position=calls.position+1;control.px,control.py=x,y end
+methods.SetSizeDelta = function(control,w,h) calls.size=calls.size+1;control.width,control.height=w,h end
+methods.SetVisible=function() calls.visible=calls.visible+1 end
 methods.AddCursorEventListener = function(control,event,callback) control.click=callback end
 local old_cursor_events = Enum.CursorEventType
 Enum.CursorEventType = {CursorClick="click"}
@@ -23,6 +25,7 @@ game = {
             end,
             __newindex=function(c,key,value)
                 if key=="fontSize" then
+                    calls.font=calls.font+1
                     assert(math.type(value)=="integer","native fontSize requires a Lua integer")
                     c.properties.fontSize=value
                 else rawset(c,key,value) end
@@ -125,6 +128,12 @@ words.width=5;words.height=2;assert(RW_Render(words,0,0))
 local restored
 for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then restored=c end end
 assert(restored.height==58 and restored.bgColor[1]==82)
+local before={};for k,v in pairs(calls) do before[k]=v end
+assert(RW_Render(words,0,0))
+for k,v in pairs(calls) do assert(v==before[k],"unchanged frame repeated native "..k) end
+words.entities[1].x=3;assert(RW_Render(words,0,0))
+assert(calls.position==before.position+1 and calls.size==before.size and calls.font==before.font)
+print("PASS: unchanged render makes zero repeated position/size/font/visibility calls; one moved entity updates one position")
 print("PASS: native inactive/active Text colours, same-view refresh and large-board scaling/reset")
 Enum.CursorEventType = old_cursor_events
 game, script, Color, RW_Render = old_game, old_script, old_color, old_render

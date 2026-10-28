@@ -246,12 +246,41 @@ function RW_PlanTurn(world, action, services)
     trace[#trace + 1] = "preview_complete"
     local complete, complete_error, phase = services.preview(world, plan)
     if not complete then return fail("preview_complete", complete_error,phase) end
+    local more_frame
+    if services.more then
+        local effects,why,relations,rules=services.evaluate(complete)
+        if not effects then
+            if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
+                lock_compile_failure(plan,why);return plan,nil,trace
+            end
+            return fail("more_rules",why)
+        end
+        local has_more=false
+        for _,effect in ipairs(effects) do
+            if effect.op=="grant_trait" and effect.trait=="more" and #effect.entity_ids>0 then has_more=true;break end
+        end
+        local more={consumes_turn=true,changes={}}
+        if has_more then
+            local projected,err=services.project(complete,effects,level_traits_from(relations))
+            if not projected then return fail("more_project",err) end
+            local why;more,why=services.more(complete,projected)
+            if not more then return fail("more",why) end
+        end
+        if #more.changes==0 then more_frame={effects=effects,relations=relations,rules=rules} end
+        local after,err=services.preview(complete,more)
+        if not after then return fail("more",err) end
+        plan.stages[#plan.stages+1]={name="more",plan=more}
+        for _,change in ipairs(more.changes) do plan.changes[#plan.changes+1]=change end
+        complete=after;trace[#trace+1]="more"
+    end
     if services.contact ~= nil or services.refresh ~= nil then
         if type(services.contact) ~= "function" or type(services.refresh) ~= "function" then
             return fail("contacts","invalid_contact_services")
         end
         trace[#trace+1]="contact_rules"
-        local frozen_effects,why,frozen_relations,frozen_rules=services.evaluate(complete)
+        local frozen_effects,why,frozen_relations,frozen_rules
+        if more_frame then frozen_effects=more_frame.effects;frozen_relations=more_frame.relations;frozen_rules=more_frame.rules
+        else frozen_effects,why,frozen_relations,frozen_rules=services.evaluate(complete) end
         if not frozen_effects then
             if why == "word_rule_limit" or why == "word_rule_cycle" or why == "rule_complexity_limit" then
                 lock_compile_failure(plan,why); return plan,nil,trace
@@ -268,7 +297,7 @@ function RW_PlanTurn(world, action, services)
         local weak_new={}
         for _,stage in ipairs(plan.stages) do
             for _,change in ipairs(stage.plan.changes) do
-                if (stage.name == "movement_destruction" or stage.name == "shift_destruction") and change.kind == "create" then weak_new[change.entity_id]=true
+                if (stage.name == "movement_destruction" or stage.name == "shift_destruction" or stage.name == "more") and change.kind == "create" then weak_new[change.entity_id]=true
                 elseif stage.name == "conversion" then weak_new[change.entity_id]=nil end
             end
         end
@@ -896,6 +925,11 @@ local function start(run_self_tests)
     turn_services.contact=function(world,effective,kind,contents)
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services)
     end
+    turn_services.more=function(world,projected)
+        local products,why=properties_api:Invoke("RW_ResolveMoreProducts",projected)
+        if not products then return nil,why end
+        return world_api:Invoke("RW_PlanCreate",world,products)
+    end
     turn_services.shift=function(world) return movement_api:Invoke("RW_ResolveShift",world) end
     turn_services.destroy=function(world,ids,contents,cause,deaths)
         return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths)
@@ -1443,7 +1477,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4B initialized")
+    print("[RuleWorld] M9.4C initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

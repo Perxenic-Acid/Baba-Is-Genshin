@@ -140,3 +140,16 @@
 
 - Native UI fontSize requires a Lua integer. Round scaled font sizes with math.floor;
   renderer mocks must enforce integer setters, including repeated assignments.
+
+- SHIFT resolves each impulse round against pre-update positions and queues updates
+  until all riders have been processed. Converging PUSH Text riders may overlap;
+  do not serialize arrival positions and push the first arrival away. Undo restores
+  the stacked identities and facing. See tests/shift.lua convergence coverage.
+- MORE is a creation phase after conversion, before frozen contact compilation.
+  Grow cardinally once per source; EDGE, STOP/PUSH and same concrete unit name
+  block growth regardless of FLOAT. New copies block later sources but do not
+  recursively grow this turn. Preserve text/direction/links, allocate atomically,
+  and give copies current-turn WEAK newborn grace. See docs/MORE.md.
+- Renderer writes are cached per control, including stable Color values. Preserve
+  same-size level switches, highlights, empty cells, visibility and board scrolling
+  when skipping redundant native setter calls. Keep integer fontSize enforcement.

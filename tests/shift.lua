@@ -103,3 +103,20 @@ for _,terminal in ipairs({'infinite_loop','too_complex'}) do
  assert(not denied and e.stage=='input')
 end
 print('PASS: SHIFT OPEN/SHUT source-position HAS, cause diagnostics and terminal wait lockout')
+
+-- Two simultaneous PUSH Text riders converge without pushing the first arrival away.
+s=fixture({{'ROCK','IS','SHIFT'}})
+belt(s,2,4,3,'Right');belt(s,3,6,3,'Left')
+s.world.entities[4]={id=4,kind='object',class='text',text={name='IS'},x=4,y=3,direction='None'}
+s.world.entities[5]={id=5,kind='object',class='text',text={name='NOT'},x=6,y=3,direction='None'}
+n=step(s)
+assert(n.world.entities[4].x==5 and n.world.entities[4].y==3)
+assert(n.world.entities[5].x==5 and n.world.entities[5].y==3)
+assert(n.world.entities[4].direction=='Right' and n.world.entities[5].direction=='Left')
+-- A later turn pushes the complete stack in one direction and Undo restores overlap.
+local projected=assert(RW_ProjectWorld(n.world,assert(RW_CompileWorld(n.world,cs)).effects))
+projected.entities[1].x=4;projected.entities[1].y=3
+local raw=RW_ResolveMovement(projected,{type='move',entity_id=1,dx=1,dy=0})
+local pushed=assert(RW_PreviewPlan(projected,raw))
+assert(pushed.entities[4].x==6 and pushed.entities[5].x==6)
+print('PASS: simultaneous SHIFT convergence constructs overlapping PUSH Text with independent directions and Undo')

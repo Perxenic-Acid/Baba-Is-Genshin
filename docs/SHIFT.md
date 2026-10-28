@@ -17,12 +17,14 @@ another displacement. The installed original collector is executed directly by
 ## RuleWorld pipeline
 
 YOU/SELECT movement -> movement destruction/HAS -> SHIFT -> SHIFT destruction/HAS
--> post-movement compile -> conversion -> frozen SINK/WEAK/MELT/DEFEAT/unlock ->
+-> post-movement compile -> conversion -> MORE -> frozen SINK/WEAK/MELT/DEFEAT/unlock ->
 CRASH and result processing. Rule declarations are retained for SHIFT, with
 conditions re-evaluated for the post-YOU source snapshot.
 
 RW_ResolveShift uses the ordinary movement solver on a private working world;
-collected riders get each impulse even if previously pushed. Returning movement
+collected riders get each impulse even if previously pushed. Each impulse round
+resolves against pre-update positions, then flushes queued updates: two PUSH Text
+riders can converge on the same formerly empty cell without pushing each other. Returning movement
 operations compares original/final states; deaths retain their actual source
 frames and causes. The scheduler never flattens sequential child preconditions
 into simultaneous operations. One Commit/Undo restores all moves, facing, deaths,

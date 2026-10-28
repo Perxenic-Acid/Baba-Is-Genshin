@@ -376,6 +376,22 @@ assert(avatar(rendered).y==10 and history_depth==before_wait+1)
 press("Z")
 assert(avatar(rendered).y==10 and history_depth==before_wait)
 print("PASS: official Chasm Automated Doors imports WORD/NOT/AND, belt SHIFT, wait binding and atomic Undo")
+while history_depth>0 do listeners.undo() end
+press("DDDDDDDDDDFDDDDF")
+assert(rendered.width==24 and avatar(rendered).x==7 and avatar(rendered).y==7)
+assert(rendered.language.properties.MORE=="more")
+local traps=assert(RW_CompileWorld(rendered,{read=RW_ReadLines,parse=RW_ParseRuleAST,
+ lower=RW_LowerRuleAST,evaluate=RW_EvaluateRules,project=RW_ProjectWorld,words=RW_WordTokenMap}))
+assert(#traps.deferred==0)
+press("SSSSSSS")
+assert(avatar(rendered).x==8 and avatar(rendered).y==14)
+press("Z");assert(avatar(rendered).x==7 and avatar(rendered).y==13)
+for _=1,6 do listeners.undo() end
+assert(avatar(rendered).x==7 and avatar(rendered).y==7)
+press("DDSSD")
+assert(not avatar(rendered))
+press("Z");assert(avatar(rendered).x==9 and avatar(rendered).y==9)
+print("PASS: official Meta Booby Trap vocabulary, NEAR EMPTY conversion, belt traversal and whole-tree Undo")
 print("PASS: bootstrap pipelines, directional PUSH, blocked turns, and Undo")
 dofile("tests/scheduler.lua")
 dofile("tests/lifecycle.lua")
@@ -419,3 +435,5 @@ dofile("tests/float.lua")
 dofile("tests/text_activation.lua")
 
 dofile("tests/shift.lua")
+
+dofile("tests/more.lua")

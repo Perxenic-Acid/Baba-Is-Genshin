@@ -19,6 +19,35 @@ local last_error = nil
 local board_dx, board_dy = 0, 0
 local choice_controls = {}
 
+-- Stable colours and cached writes avoid native calls for unchanged controls.
+local palette={}
+local function cached_color(r,g,b,a)
+    local key=r..":"..g..":"..b..":"..a
+    if not palette[key] then palette[key]=Color(r,g,b,a) end
+    return palette[key]
+end
+local control_state=setmetatable({},{__mode="k"})
+local function state(control)
+    if not control_state[control] then control_state[control]={} end
+    return control_state[control]
+end
+local function paint(control,key,value)
+    local previous=state(control)
+    if previous[key]~=value then control[key]=value;previous[key]=value end
+end
+local function set_position(control,x,y)
+    local previous=state(control)
+    if previous.x~=x or previous.y~=y then control:SetAnchoredPosition(x,y);previous.x=x;previous.y=y end
+end
+local function set_size(control,w,h)
+    local previous=state(control)
+    if previous.w~=w or previous.h~=h then control:SetSizeDelta(w,h);previous.w=w;previous.h=h end
+end
+local function set_visible(control,visible)
+    local previous=state(control)
+    if previous.visible~=visible then control:SetVisible(visible);previous.visible=visible end
+end
+
 local function report_error(message)
     if last_error ~= message then
         printerr("[RuleWorld M8] " .. message)
@@ -58,7 +87,7 @@ local function configure_control(control)
 
     control.adaptiveFontSize = false
     control:SetActive(true)
-    control:SetVisible(true)
+    set_visible(control,true)
 end
 
 local function instantiate(parent)
@@ -163,11 +192,11 @@ local function ensure_grid(world)
             control.name =
                 string.format("RW_Cell_%d_%d", x, y)
 
-            control:SetAnchoredPosition(px, py)
-            control:SetSizeDelta(CELL_SIZE, CELL_SIZE)
+            set_position(control,px, py)
+            set_size(control,CELL_SIZE, CELL_SIZE)
 
             control.text = ""
-            control.bgColor = Color(43, 55, 75, 255)
+            control.bgColor = cached_color(43, 55, 75, 255)
 
             created[#created + 1] = control
         end
@@ -219,43 +248,43 @@ end
 
 local function get_colors(entity,active)
     if entity.class == "text" then
-        if active then return Color(205,159,89,255),Color(36,26,15,255) end
-        return Color(82,68,49,255),Color(156,133,99,255)
+        if active then return cached_color(205,159,89,255),cached_color(36,26,15,255) end
+        return cached_color(82,68,49,255),cached_color(156,133,99,255)
     end
     local capabilities = entity.behaviors or {}
-    if capabilities.defeat then return Color(170,65,80,255),Color(255,255,255,255) end
-    if capabilities.sink then return Color(45,130,185,255),Color(255,255,255,255) end
-    if capabilities.win then return Color(238,206,88,255), Color(30,24,10,255) end
-    if capabilities.select then return Color(220,220,230,255), Color(20,20,30,255) end
-    if capabilities.word then return Color(112,90,170,255), Color(255,255,255,255) end
-    if capabilities.shift then return Color(65,125,125,255),Color(255,255,255,255) end
+    if capabilities.defeat then return cached_color(170,65,80,255),cached_color(255,255,255,255) end
+    if capabilities.sink then return cached_color(45,130,185,255),cached_color(255,255,255,255) end
+    if capabilities.win then return cached_color(238,206,88,255), cached_color(30,24,10,255) end
+    if capabilities.select then return cached_color(220,220,230,255), cached_color(20,20,30,255) end
+    if capabilities.word then return cached_color(112,90,170,255), cached_color(255,255,255,255) end
+    if capabilities.shift then return cached_color(65,125,125,255),cached_color(255,255,255,255) end
     if entity.level_link then
-        return Color(112,70,145,255), Color(255,255,255,255)
+        return cached_color(112,70,145,255), cached_color(255,255,255,255)
     end
-    if entity.archetype == "cursor" then return Color(220,220,230,255), Color(20,20,30,255) end
-    if entity.archetype == "line" then return Color(43,55,75,255), Color(90,110,140,255) end
+    if entity.archetype == "cursor" then return cached_color(220,220,230,255), cached_color(20,20,30,255) end
+    if entity.archetype == "line" then return cached_color(43,55,75,255), cached_color(90,110,140,255) end
 
     if entity.archetype == "avatar" then
         return
-            Color(77, 107, 195, 255),
-            Color(255, 255, 255, 255)
+            cached_color(77, 107, 195, 255),
+            cached_color(255, 255, 255, 255)
     end
 
     if entity.archetype == "crate" then
         return
-            Color(71, 119, 108, 255),
-            Color(255, 255, 255, 255)
+            cached_color(71, 119, 108, 255),
+            cached_color(255, 255, 255, 255)
     end
 
     if entity.traits and entity.traits.block_entry then
         return
-            Color(139, 81, 85, 255),
-            Color(255, 255, 255, 255)
+            cached_color(139, 81, 85, 255),
+            cached_color(255, 255, 255, 255)
     end
 
     return
-        Color(90, 104, 130, 255),
-        Color(255, 255, 255, 255)
+        cached_color(90, 104, 130, 255),
+        cached_color(255, 255, 255, 255)
 end
 
 local function ensure_view(id)
@@ -356,20 +385,20 @@ local function draw_entities(world)
                         local offset_x =
                             (i - (count + 1) / 2) * span
 
-                        control:SetAnchoredPosition(
+                        set_position(control,
                             cx + offset_x, cy
                         )
 
-                        control:SetSizeDelta(
+                        set_size(control,
                             tile_width,
                             CELL_SIZE - 6*board_scale
                         )
 
-                        control.text = label
-                        control.fontSize = math.max(7,math.floor(font_size*board_scale+0.5))
-                        control.fontColor = fg
-                        control.bgColor = bg
-                        control:SetVisible(true)
+                        paint(control,"text",label)
+                        paint(control,"fontSize",math.max(7,math.floor(font_size*board_scale+0.5)))
+                        paint(control,"fontColor",fg)
+                        paint(control,"bgColor",bg)
+                        set_visible(control,true)
 
                         visible_ids[item.id] = true
                     end
@@ -381,7 +410,7 @@ local function draw_entities(world)
     -- Reuse views; hide those not present in the world.
     for id, control in pairs(views) do
         if control.alive and not visible_ids[id] then
-            control:SetVisible(false)
+            set_visible(control,false)
         end
     end
 end
@@ -407,12 +436,12 @@ local function draw_level_choice(choice)
         if not control then report_error("Cannot instantiate level choice"); return end
         choice_controls[#choice_controls+1] = control
         control.name = name
-        control:SetAnchoredPosition(0,y)
-        control:SetSizeDelta(width,h)
+        set_position(control,0,y)
+        set_size(control,width,h)
         control.text = text
         control.fontSize = 18
-        control.fontColor = Color(255,255,255,255)
-        control.bgColor = selected and Color(90,80,155,255) or Color(24,30,48,255)
+        control.fontColor = cached_color(255,255,255,255)
+        control.bgColor = selected and cached_color(90,80,155,255) or cached_color(24,30,48,255)
         if id and type(control.AddCursorEventListener) == "function"
             and Enum.CursorEventType and Enum.CursorEventType.CursorClick then
             control:AddCursorEventListener(Enum.CursorEventType.CursorClick,function() choose_level(id); return true end)
@@ -442,33 +471,29 @@ function RW_Render(world, history_depth, active_effects, navigation)
         return false
     end
 
-    -- Repaint every cell so same-sized instance switches clear old portal labels.
-    for index, cell in ipairs(cells) do
-        local x,y = (index-1)%world.width+1,math.floor((index-1)/world.width)+1
-        cell:SetAnchoredPosition(display_position(x,y,world.width,world.height))
-        cell.text = ""
-        cell.bgColor = Color(43, 55, 75, 255)
-        local empty=world.empty_cells and world.empty_cells[x .. ":" .. y]
+    local annotations={}
+    for _,entity in pairs(world.entities) do
+        if entity.archetype=="line" then annotations[(entity.y-1)*world.width+entity.x]={text="."} end
+    end
+    for _,portal in ipairs(navigation and navigation.portals or {}) do
+        annotations[(portal.y-1)*world.width+portal.x]={text=portal.label,portal=true}
+    end
+    for index,cell in ipairs(cells) do
+        local x,y=(index-1)%world.width+1,math.floor((index-1)/world.width)+1
+        set_position(cell,display_position(x,y,world.width,world.height))
+        local text,font,bg,fg="",18,cached_color(43,55,75,255),cached_color(90,110,140,255)
+        local empty=world.empty_cells and world.empty_cells[x..":"..y]
         if empty then
-            cell.text="E"; cell.fontSize=12; cell.fontColor=Color(130,150,175,255)
-            if empty.behaviors.control then cell.bgColor=Color(75,100,125,255) end
-            if empty.behaviors.block_entry then cell.bgColor=Color(65,65,85,255) end
+            text="E";font=12;fg=cached_color(130,150,175,255)
+            if empty.behaviors.control then bg=cached_color(75,100,125,255) end
+            if empty.behaviors.block_entry then bg=cached_color(65,65,85,255) end
         end
-    end
-    for _, entity in pairs(world.entities) do
-        if entity.archetype == "line" then
-            local cell = cells[(entity.y-1)*world.width+entity.x]
-            if cell then cell.text = "."; cell.fontSize = 18; cell.fontColor = Color(90,110,140,255) end
+        local annotation=annotations[index]
+        if annotation then
+            text=annotation.text;font=18;fg=cached_color(90,110,140,255)
+            if annotation.portal then bg=cached_color(112,70,145,255);fg=cached_color(255,255,255,255) end
         end
-    end
-    for _, portal in ipairs(navigation and navigation.portals or {}) do
-        local cell = cells[(portal.y-1)*world.width+portal.x]
-        if cell then
-            cell.text = portal.label
-            cell.fontSize = 18
-            cell.fontColor = Color(255, 255, 255, 255)
-            cell.bgColor = Color(112, 70, 145, 255)
-        end
+        paint(cell,"text",text);paint(cell,"fontSize",font);paint(cell,"fontColor",fg);paint(cell,"bgColor",bg)
     end
     draw_entities(world)
     draw_level_choice(navigation and navigation.choice)

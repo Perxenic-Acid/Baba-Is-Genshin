@@ -796,21 +796,28 @@ function RW_ResolveShift(world)
         end
     end
     local deaths,records={},{}
-    for _,id in ipairs(order) do
-        local task=tasks[id];local vector=vectors[task.direction]
-        for impulse=1,task.count do
-            if not working.entities[id] then break end
-            local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
-            if not part.consumes_turn then return nil,part.reason end
-            -- Original SHIFT turns even a blocked rider.
-            working.entities[id].direction=task.direction
-            for _,change in ipairs(part.changes) do
-                local e=working.entities[change.entity_id]
+    local rounds=0;for _,task in pairs(tasks) do rounds=math.max(rounds,task.count) end
+    for impulse=1,rounds do
+        -- Resolve one impulse for every rider before applying queued updates.
+        -- Converging Text must be allowed to land on the same formerly empty cell.
+        local queued={}
+        for _,id in ipairs(order) do
+            local task=tasks[id];local vector=vectors[task.direction]
+            if impulse<=task.count and working.entities[id] then
+                local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
+                if not part.consumes_turn then return nil,part.reason end
+                working.entities[id].direction=task.direction
+                for _,change in ipairs(part.changes) do queued[#queued+1]=change end
+                for _,death in ipairs(part.destructions or {}) do
+                    deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+                end
+            end
+        end
+        for _,change in ipairs(queued) do
+            local e=working.entities[change.entity_id]
+            if e then
                 if change.kind=="move" then e.x=change.to.x;e.y=change.to.y;e.direction=change.to.direction
                 elseif change.kind=="direction" then e.direction=change.to end
-            end
-            for _,death in ipairs(part.destructions or {}) do
-                deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
             end
         end
     end

@@ -72,3 +72,30 @@ AUTO preserves the authored WORD/NOT/AND rules and directional belts. SHIFT is
 implemented for this fixture; see SHIFT.md. The native regression checks initial
 YOU/PUSH, belt SHIFT, entering the upper passage, wait and atomic Undo. It does
 not claim an end-to-end proof of every solution to this more complex puzzle.
+
+## Meta: Booby Trap (M9.4C)
+
+`302level.l/.ld`, referenced by official Meta (`283level.ld`), is now TRAP at
+(6,2) in REF. From initial root cursor: D ten times, F, D four times, F.
+Authored nouns Ghost/Lava and special LEVEL/EMPTY/Text vocabulary are imported;
+MORE was implemented for the loose growth rule. Source tile layers/directions
+and SHA256 are checked by the existing generator. Parent link is in the empty
+upper-left corner. Helpers do not overwrite authored units.
+
+Initial Avatar (7,7): S seven times steps onto the Right belt and lands at (8,14).
+Z restores (7,13). DDSSD from the authored start approaches Ghost, exercising
+Avatar NEAR Ghost IS EMPTY; Z restores the converted Avatar. The regression
+checks these routes, zero deferred initial rules and whole-tree Undo. This is
+mechanics coverage, not a proof of full Meta progression/solution parity.
+
+SHIFT now correctly queues concurrent arrivals: two Text/PUSH riders converging
+on a shared empty destination form a stack. Tests push the whole resulting stack
+and verify atomic Undo. The temporary frontend still subdivides each cell for
+multiple identities, with short labels on narrow subdivisions.
+
+Renderer performance: stable Color objects and per-control state skip unchanged
+positions, sizes, visibility and paint values. Cell annotations are composed
+before painting, avoiding clear/repaint churn for paths and portals. Native mock
+counters require zero repeated position/size/font/visibility calls for identical
+frames, and one position call when only one entity moves. Rule/turn computation
+still runs; actual frame latency requires real-device measurement.

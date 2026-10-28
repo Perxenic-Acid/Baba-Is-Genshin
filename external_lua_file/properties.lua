@@ -26,7 +26,7 @@ end
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
@@ -39,7 +39,7 @@ local function valid_behaviors(registry)
                     and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
                     and capability ~= "safe" and capability ~= "crash"
                     and capability ~= "hot" and capability ~= "melt"
-                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak" and capability ~= "float" and capability ~= "shift")
+                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak" and capability ~= "float" and capability ~= "shift" and capability ~= "more")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
@@ -321,4 +321,41 @@ function RW_ResolveContactVictims(world, kind)
     local victims={}
     for _,id in ipairs(ids) do if removed[id] then victims[#victims+1]=id end end
     return victims
+end
+
+-- MORE copies real units once per phase. Newly created copies block later sources
+-- but are not themselves added to this phase's source list.
+function RW_ResolveMoreProducts(world)
+    local ids,occupancy={},{}
+    local function name(e) return e.class=="text" and "text_"..e.text.name or e.archetype end
+    local function add(e)
+        local key=e.x..":"..e.y;occupancy[key]=occupancy[key] or {};table.insert(occupancy[key],e)
+    end
+    for id,e in pairs(world.entities) do ids[#ids+1]=id;add(e) end
+    table.sort(ids)
+    local products={}
+    for _,id in ipairs(ids) do
+        local source=world.entities[id]
+        if source.behaviors.more then
+            for _,v in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do
+                local x,y=source.x+v[1],source.y+v[2]
+                local valid=x>=1 and x<=world.width and y>=1 and y<=world.height
+                local occupants=occupancy[x..":"..y] or {}
+                for _,other in ipairs(occupants) do
+                    if name(other)==name(source) or other.behaviors.block_entry or other.behaviors.push then valid=false;break end
+                end
+                if #occupants==0 then
+                    local empty=world.empty_cells and world.empty_cells[x..":"..y]
+                    if empty and (empty.behaviors.block_entry or empty.behaviors.push) then valid=false end
+                end
+                if valid then
+                    local copy={kind=source.kind,class=source.class,archetype=source.archetype,text=clone(source.text),
+                        x=x,y=y,direction=source.direction or "None",level_link=clone(source.level_link)}
+                    products[#products+1]=copy
+                    local obstacle=clone(copy);obstacle.behaviors=source.behaviors;add(obstacle)
+                end
+            end
+        end
+    end
+    return products
 end

@@ -110,7 +110,7 @@ local function lock_compile_failure(plan, reason)
     if reason == "rule_complexity_limit" then plan.too_complex=true;plan.reason="too_complex"
     else plan.infinite_loop=true;plan.reason="infinite_loop" end
 end
-function RW_PlanTurn(world, action, services)
+local function plan_turn(world, action, services)
     local trace = {}
     if type(world) == "table" and world.infinite_loop then return nil,{stage="input",reason="infinite_loop_undo_only"} end
     if type(world) == "table" and world.too_complex then return nil,{stage="input",reason="too_complex_undo_only"} end
@@ -500,15 +500,36 @@ function RW_PlanTurn(world, action, services)
 end
 
 -- Whole-tree transaction planner: navigation, outcomes and movement share one Undo.
+-- Input conditions see this command before movement. Persist it only through
+-- the first atomic phase, so rejection and whole-tree Undo restore prior input.
+function RW_PlanTurn(world,action,services)
+    if type(world)~="table" or type(action)~="table" or (action.type~="move" and action.type~="wait") then
+        return plan_turn(world,action,services)
+    end
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context.last_input=action.type
+    local plan,err,trace=plan_turn(context,action,services)
+    if plan and plan.consumes_turn and world.last_input~=action.type then
+        local first=plan.stages and plan.stages[1].plan or plan
+        first.input_state={from=world.last_input or "none",to=action.type}
+    end
+    return plan,err,trace
+end
+
 function RW_PlanLevelAction(tree, action, services)
     local function fail(reason) return nil, {stage="level_action",reason=reason} end
     if type(action) ~= "table" then return fail("invalid_action") end
     local session = services.active(tree)
     if session.world.infinite_loop then return fail("infinite_loop_undo_only") end
     if session.world.too_complex then return fail("too_complex_undo_only") end
-    local effects, err, initial_conversions = services.evaluate(session.world)
+    local input_world=session.world
+    if action.type=="move" or action.type=="wait" then
+        input_world={};for k,v in pairs(session.world) do input_world[k]=v end
+        input_world.last_input=action.type
+    end
+    local effects, err, initial_conversions = services.evaluate(input_world)
     if not effects then return fail(err) end
-    local effective, project_error = services.project(session.world,effects,level_traits_from(initial_conversions))
+    local effective, project_error = services.project(input_world,effects,level_traits_from(initial_conversions))
     if not effective then return fail(project_error) end
     local select_after_defeat = session.defeated == true
     if select_after_defeat then
@@ -1657,7 +1678,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4S initialized")
+    print("[RuleWorld] M9.4T initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

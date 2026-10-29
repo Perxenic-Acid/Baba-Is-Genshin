@@ -423,8 +423,8 @@ function RW_TestEntityCondition(world,node,entity)
     for _,clause in ipairs(node.clauses) do
         if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
                 and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
-                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing" and clause.relation ~= "feeling" and clause.relation ~= "powered" and clause.relation ~= "powered2" and clause.relation ~= "powered3" and clause.relation ~= "lonely")
-            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or (#clause.parameters == 0 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3" and clause.relation~="lonely") then
+                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing" and clause.relation ~= "feeling" and clause.relation ~= "powered" and clause.relation ~= "powered2" and clause.relation ~= "powered3" and clause.relation ~= "lonely" and clause.relation ~= "idle")
+            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or (#clause.parameters == 0 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3" and clause.relation~="lonely" and clause.relation~="idle") then
             return nil,"invalid_spatial_clause"
         end
         local parameters={}
@@ -444,7 +444,11 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
-        if clause.relation=="lonely" then
+        if clause.relation=="idle" then
+            if #parameters~=0 then return nil,"invalid_prefix_parameters" end
+            local found=world.last_input=="wait"
+            result=result and (clause.negated and not found or not clause.negated and found)
+        elseif clause.relation=="lonely" then
             if #parameters~=0 then return nil,"invalid_prefix_parameters" end
             local found=true
             for id,other in pairs(world.entities) do

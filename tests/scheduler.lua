@@ -79,7 +79,7 @@ local bad, error_info = RW_PlanTurn(s.world, action, invalid_conversion)
 assert(not bad and error_info.stage == "preview_complete"
     and error_info.reason == "stale_transformation" and error_info.phase == "conversion" and equal(s, before))
 
--- Invalid input skips conversion; effective empty turns retain existing semantics.
+-- Invalid input skips conversion; empty turns still record the logical input.
 local invalid = assert(RW_PlanTurn(s.world, {type = "move", dx = 2, dy = 0}, services))
 assert(not invalid.consumes_turn)
 local unchanged, rejection = RW_Commit(s, invalid)
@@ -88,7 +88,8 @@ local nobody = RW_CreateSession()
 nobody.world.entities[11].text.name = "PUSH"
 local empty = assert(RW_PlanTurn(nobody.world, action, services))
 local recorded, empty_result = RW_Commit(nobody, empty)
-assert(empty.reason == "no_you" and empty_result.accepted and not empty_result.changed
+assert(empty.reason == "no_you" and empty_result.accepted and empty_result.changed
+    and recorded.world.last_input == "move" and nobody.world.last_input == nil
     and #recorded.history == 1)
 
 -- Keep subplanner-owned lists separate from combined plans.

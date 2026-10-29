@@ -271,3 +271,10 @@ OFTEN/SELDOM; GROUP/properties follow.
 Physical identity occupancy prefix, NOT and shared prefix/subject syntax;
 conversion/Undo regressions and twenty installed-source oracle cases.
 Next: IDLE input state, then OFTEN/SELDOM turn-stable randomness, GROUP.
+
+## M9.4T — IDLE
+
+Current-command wait prefix with validated atomic input metadata and whole-tree
+Undo. Blocked/no-YOU direction input remains non-idle. COND contains IDLE.
+Eighteen installed-source oracle cases plus planner/scheduler regressions.
+Next: OFTEN/SELDOM turn-stable randomness, then GROUP.

@@ -129,3 +129,31 @@ s=fixture({{'LONELY','AVATAR','AND','ROCK','IS','FLOAT'}})
 object(s.world,3,'flag',6,3);w=projection(s)
 assert(w.entities[1].behaviors.float and not w.entities[2].behaviors.float)
 print('PASS: LONELY physical identity occupancy, NOT, grouped prefixes/subjects, conversion and Undo')
+
+-- IDLE is the current wait command, never a lack of successful displacement.
+s=fixture({{'IDLE','AVATAR','IS','FLOAT'}})
+w=projection(s);assert(not w.entities[1].behaviors.float)
+n,p=step(s);assert(n.world.last_input=='wait' and s.world.last_input==nil)
+w=projection(n);assert(w.entities[1].behaviors.float)
+local again=assert(RW_PlanTurn(s.world,{type='wait'},services))
+local replay=RW_Commit(s,again);assert(replay.world.last_input=='wait')
+local moved=step(n,{type='move',dx=1,dy=0});w=projection(moved)
+assert(moved.world.last_input=='move' and not w.entities[1].behaviors.float)
+assert(RW_Undo(moved).world==n.world)
+s=fixture({{'IDLE','ROCK','BECOME','FLAG'}})
+n,p=step(s);assert(n.world.entities[2].archetype=='flag')
+s=fixture({{'NOT','IDLE','ROCK','BECOME','FLAG'}})
+n,p=step(s,{type='move',dx=1,dy=0});assert(n.world.entities[2].archetype=='flag')
+s=fixture({{'IDLE','AVATAR','IS','YOU'}})
+-- The new move command disables IDLE before YOU resolution.
+s.world.last_input='wait'
+n,p=step(s,{type='move',dx=1,dy=0});assert(n.world.entities[1].x==2 and n.world.last_input=='move')
+s=fixture({{'AVATAR','IS','YOU'},{'IDLE','ROCK','IS','FLOAT'}})
+s.world.entities[1].x=24
+n,p=step(s,{type='move',dx=1,dy=0});assert(n.world.last_input=='move' and n.world.entities[1].x==24)
+w=projection(n);assert(not w.entities[2].behaviors.float)
+local invalid=assert(RW_PlanTurn(s.world,{type='move',dx=2,dy=0},services))
+assert(not invalid.consumes_turn and not invalid.input_state and not s.world.last_input)
+local stale={consumes_turn=true,changes={},input_state={from='wait',to='move'}}
+local unchanged,reject=RW_Commit(s,stale);assert(unchanged==s and reject.reason=='stale_input_state')
+print('PASS: IDLE current input before movement/conversion, wait, blocked/no-YOU move, rejection, replay and Undo')

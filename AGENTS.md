@@ -267,3 +267,8 @@
   suffixes. POWERED channels query global current-frame POWER sources, including
   eligible Text/Empty and unconditional scoped LEVEL declarations. Never persist
   result caches across phases; guard ungrounded channel recursion. See docs/POWERED.md.
+
+- IDLE tests the current wait command before movement, not displacement failure.
+  Persist last_input through validated first-phase input_state metadata; rejection
+  must not change it, and whole-tree Undo restores it. Confirm is separate.
+  See docs/IDLE.md for original references and boundary behavior.

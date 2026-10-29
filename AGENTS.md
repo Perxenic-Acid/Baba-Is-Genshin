@@ -282,4 +282,6 @@
 - GROUP nouns are compiler-only typed terms, excluded from the ordinary ALL palette.
   Direct memberships expand declarations after MIMIC, preserving duplicate products
   and per-source membership/consumer conditions. Never turn GROUP into an archetype.
-  Recursive transfers/complements/condition parameters remain deferred; see docs/GROUP.md.
+  Cross-group transfers use original consumed-edge order and cumulative member
+  conditions, before exclusions; preserve duplicate members and bound positive/negative
+  expansion. Complements/condition parameters remain deferred; see docs/GROUP.md.

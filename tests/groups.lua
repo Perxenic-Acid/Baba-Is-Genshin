@@ -80,7 +80,7 @@ w=projection(s);assert(w.entities[10].behaviors.safe)
 s=fixture({{'EMPTY','IS','GROUP'},{'GROUP','IS','SAFE'}})
 w=projection(s);assert(w.empty_cells['1:1'].behaviors.safe)
 s=fixture({{'GROUP','IS','GROUP2'},{'GROUP2','IS','FLOAT'}})
-w,f=projection(s);assert(#f.deferred==1)
+w,f=projection(s);assert(#f.deferred==0)
 s=fixture({{'AVATAR','ON','GROUP','IS','FLOAT'}})
 w,f=projection(s);assert(#f.deferred==1 and not w.entities[1].behaviors.float)
 s=fixture({{'NOT','GROUP','IS','FLOAT'}})
@@ -92,3 +92,26 @@ print('PASS: direct GROUP channels, conditional/negative membership, duplicates,
 
 s=fixture({{'ROCK','IS','GROUP'},{'NOT','FLAG','IS','GROUP'},{'GROUP','IS','FLOAT'}})
 w,f=projection(s);assert(#f.deferred==1 and w.entities[2].archetype=='rock')
+
+-- Original group transfer is a finite ordered edge pass, not unbounded closure.
+s=fixture({{'ROCK','IS','GROUP'},{'GROUP2','IS','GROUP3'},{'GROUP','IS','GROUP2'},{'GROUP3','IS','FLOAT'}})
+w,f=projection(s);assert(w.entities[2].behaviors.float and #f.deferred==0)
+s=fixture({{'ROCK','IS','GROUP'},{'GROUP','IS','GROUP2'},{'GROUP2','IS','GROUP'},{'GROUP2','BECOME','FLAG'}})
+n,p=step(s);assert(n.world.entities[2].archetype=='flag')
+s=fixture({{'ROCK','IS','GROUP'},{'GROUP','IS','GROUP2'},{'ROCK','IS','NOT','GROUP'},{'GROUP2','IS','FLOAT'}})
+w=projection(s);assert(w.entities[2].behaviors.float,'source exclusion is applied after raw transfers')
+s=fixture({{'ROCK','IS','GROUP'},{'ROCK','IS','GROUP2'},{'GROUP','IS','NOT','GROUP2'},{'GROUP2','IS','FLOAT'}})
+w=projection(s);assert(not w.entities[2].behaviors.float)
+s=fixture({{'ROCK','IS','GROUP'},{'GROUP','IS','GROUP2'},{'GROUP','IS','GROUP2'},{'GROUP2','BECOME','FLAG'}})
+n,p=step(s);local products=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then products=products+1 end end
+assert(products==2,'duplicate transfer edges preserve products')
+s=fixture({{'ROCK','IS','GROUP'},{'GROUP','NEAR','AVATAR','IS','GROUP2'},{'GROUP2','IS','FLOAT'}})
+object(s.world,3,'rock',15,3);s.world.entities[1].x=6;s.world.entities[1].y=3
+w=projection(s);assert(w.entities[2].behaviors.float and not w.entities[3].behaviors.float)
+print('PASS: GROUP ordered cross-channel transfers, conditions, cycles, raw exclusions, duplicate edges and Undo')
+
+s=fixture({{'ROCK','IS','GROUP'},{'GROUP','IS','GROUP2'}})
+local many=assert(RW_ParseRuleAST(assert(RW_ReadLines(s.world)),s.world.language))
+local edge=many[2];for i=3,5002 do many[i]=edge end
+local limited,limit_reason=RW_LowerRuleAST(many,nil,s.world)
+assert(not limited and limit_reason=='rule_complexity_limit','group transfer expansion must be bounded')

@@ -1338,12 +1338,16 @@ local function expand_groups(ast_rules,registry)
         end
         return ordinary,deferred
     end
-    local members,bans={},{}
+    local bans,positive,transfers={},{},{}
     local function member_key(term) return subject_key(term) end
     local function combine(...)
         local requirements={}
         for _,condition in ipairs({...}) do
-            if condition and condition.op~="always" then requirements[#requirements+1]=query_clone(condition) end
+            if condition and condition.op~="always" then
+                if condition.op=="spatial" and #(condition.clauses or {})==0 and condition.requirements then
+                    for _,requirement in ipairs(condition.requirements) do requirements[#requirements+1]=query_clone(requirement) end
+                else requirements[#requirements+1]=query_clone(condition) end
+            end
         end
         return #requirements==0 and {op="always"} or {op="spatial",clauses={},requirements=requirements}
     end
@@ -1352,25 +1356,52 @@ local function expand_groups(ast_rules,registry)
         local key=member_key(rule.subject)
         return name and rule.verb=="is" and key and not condition_group(rule.when),name,negative,key
     end
+    local membership_count=0
+    local function add_member(name,key,term,condition,negative)
+        membership_count=membership_count+1
+        local entry={name=name,key=key,term=query_clone(term),when=condition}
+        if negative then
+            bans[name]=bans[name] or {};bans[name][key]=bans[name][key] or {}
+            bans[name][key][#bans[name][key]+1]=entry
+        else positive[#positive+1]=entry end
+    end
+    local transfer_rules={}
     for _,rule in ipairs(ast_rules) do
         local is_member,name,negative,key=membership(rule)
-        if is_member then
-            local store=negative and bans or members
-            store[name]=store[name] or {};store[name][key]=store[name][key] or {}
-            store[name][key][#store[name][key]+1]={term=query_clone(rule.subject),when=rule.when}
+        if is_member then add_member(name,key,rule.subject,rule.when,negative)
+        else
+            local source,source_not=group(rule.subject);local target,target_not=group(rule.object)
+            if rule.verb=="is" and source and not source_not and target and source~=target and not condition_group(rule.when) then
+                transfers[#transfers+1]={rule=rule,source=source,target=target,negative=target_not}
+                transfer_rules[rule]=true
+            end
         end
     end
-    local teams={}
-    for name,nouns in pairs(members) do
-        teams[name]={}
-        local keys={};for key in pairs(nouns) do keys[#keys+1]=key end;table.sort(keys)
-        for _,key in ipairs(keys) do for _,member in ipairs(nouns[key]) do
-            local condition=member.when
-            for _,ban in ipairs((bans[name] or {})[key] or {}) do
-                condition=combine(condition,invert_mimic_condition(ban.when))
-            end
-            teams[name][#teams[name]+1]={term=member.term,when=condition}
+    -- Original diffname_used consumes an edge after its first matching pass.
+    -- It scans the growing positive list, accumulating earlier member conditions.
+    local progress=true
+    while progress do
+        progress=false
+        for _,edge in ipairs(transfers) do if not edge.used then
+            local condition=edge.rule.when
+            for _,member in ipairs(positive) do if member.name==edge.source then
+                edge.used=true;progress=true
+                condition=combine(condition,member.when)
+                add_member(edge.target,member.key,member.term,condition,edge.negative)
+                if membership_count>5000 then return nil,"rule_complexity_limit" end
+            end end
         end end
+    end
+    if membership_count>5000 then return nil,"rule_complexity_limit" end
+    local teams={}
+    for _,member in ipairs(positive) do
+        local name,key=member.name,member.key
+        teams[name]=teams[name] or {}
+        local condition=member.when
+        for _,ban in ipairs((bans[name] or {})[key] or {}) do
+            condition=combine(condition,invert_mimic_condition(ban.when))
+        end
+        teams[name][#teams[name]+1]={term=member.term,when=condition}
     end
     local expanded,deferred={},{}
     local function emit(rule,subject,object,condition)
@@ -1382,7 +1413,8 @@ local function expand_groups(ast_rules,registry)
     for _,rule in ipairs(ast_rules) do
         local is_member=membership(rule)
         local source,source_not=group(rule.subject);local target,target_not=group(rule.object)
-        if condition_group(rule.when) or (source and source_not) or (target and target_not and not is_member)
+        if transfer_rules[rule] then -- Closure already consumed this declaration.
+        elseif condition_group(rule.when) or (source and source_not) or (target and target_not and not is_member)
             or (target and rule.verb=="is" and not is_member)
             or (source and target) or ((source or target) and rule.verb=="mimic") then
             deferred[#deferred+1]=rule

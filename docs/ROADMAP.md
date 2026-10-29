@@ -292,3 +292,11 @@ Three group nouns, conditional/excluded direct memberships, subject and non-IS
 target expansion, multiplicity and frozen-frame reuse. Original grouprules oracle:
 648 cases. See GROUP.md for the explicit remaining closure/complement/condition
 parameter work before ordinary properties.
+
+## M9.4W — ordered GROUP transfers
+
+Cross-group positive/negative-target transfer, original consumed-edge order and
+cumulative-condition semantics, source exclusions applied after raw transfer.
+4,096 installed-source graph cases plus direct-member regression, bounds and Undo.
+Remaining GROUP work: NOT GROUP consumers/targets, group condition parameters,
+same-group special cases and negative-source recursion.

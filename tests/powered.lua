@@ -112,3 +112,20 @@ s.world.entities[duplicate]={id=duplicate,kind='object',class='text',text={name=
 n,p=step(s);local count=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then count=count+1 end end
 assert(count==2,'stacked prefix sentence variants preserve product multiplicity')
 print('PASS: POWERED three global channels, prefixes/NOT/AND/activation/shadowing, spatial sources/EMPTY/Text/LEVEL, conversion/HAS/WORD, bounded grounding and Undo')
+
+-- LONELY shares the prefix parser, but checks physical occupancy per identity.
+s=fixture({{'LONELY','AVATAR','IS','FLOAT'}})
+w,f=projection(s);assert(w.entities[1].behaviors.float)
+object(s.world,3,'flag',2,2);s.world.entities[3].behaviors={hide=true,float=true}
+w=projection(s);assert(not w.entities[1].behaviors.float)
+s=fixture({{'NOT','LONELY','AVATAR','IS','FLOAT'}})
+w=projection(s);assert(not w.entities[1].behaviors.float)
+object(s.world,3,'flag',2,2);w=projection(s);assert(w.entities[1].behaviors.float)
+s=fixture({{'LONELY','ROCK','BECOME','FLAG'}})
+n,p=step(s);assert(n.world.entities[2].archetype=='flag')
+s=fixture({{'ROCK','IS','POWER'},{'POWERED','LONELY','AVATAR','IS','SAFE'}})
+w=projection(s);assert(w.entities[1].behaviors.safe)
+s=fixture({{'LONELY','AVATAR','AND','ROCK','IS','FLOAT'}})
+object(s.world,3,'flag',6,3);w=projection(s)
+assert(w.entities[1].behaviors.float and not w.entities[2].behaviors.float)
+print('PASS: LONELY physical identity occupancy, NOT, grouped prefixes/subjects, conversion and Undo')

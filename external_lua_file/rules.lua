@@ -423,8 +423,8 @@ function RW_TestEntityCondition(world,node,entity)
     for _,clause in ipairs(node.clauses) do
         if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
                 and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
-                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing" and clause.relation ~= "feeling" and clause.relation ~= "powered" and clause.relation ~= "powered2" and clause.relation ~= "powered3")
-            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or (#clause.parameters == 0 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3") then
+                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing" and clause.relation ~= "feeling" and clause.relation ~= "powered" and clause.relation ~= "powered2" and clause.relation ~= "powered3" and clause.relation ~= "lonely")
+            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or (#clause.parameters == 0 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3" and clause.relation~="lonely") then
             return nil,"invalid_spatial_clause"
         end
         local parameters={}
@@ -444,7 +444,14 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
-        if clause.relation=="powered" or clause.relation=="powered2" or clause.relation=="powered3" then
+        if clause.relation=="lonely" then
+            if #parameters~=0 then return nil,"invalid_prefix_parameters" end
+            local found=true
+            for id,other in pairs(world.entities) do
+                if id~=entity.id and other.x==entity.x and other.y==entity.y then found=false;break end
+            end
+            result=result and (clause.negated and not found or not clause.negated and found)
+        elseif clause.relation=="powered" or clause.relation=="powered2" or clause.relation=="powered3" then
             if #parameters~=0 then return nil,"invalid_prefix_parameters" end
             local found,err=powered_condition(world,clause.relation:gsub("powered","power"),clause.negated)
             if found==nil then return nil,err end

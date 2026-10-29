@@ -265,3 +265,9 @@ including Text/Empty and unconditional scoped LEVEL sources. Installed powered()
 oracle: 1,080 cases. COND is now 32x28 with sparse prefix words. Startup 1,983,000
 instructions, unchanged 2M cap. See POWERED.md. Next prefixes: LONELY, IDLE,
 OFTEN/SELDOM; GROUP/properties follow.
+
+## M9.4S — LONELY
+
+Physical identity occupancy prefix, NOT and shared prefix/subject syntax;
+conversion/Undo regressions and twenty installed-source oracle cases.
+Next: IDLE input state, then OFTEN/SELDOM turn-stable randomness, GROUP.

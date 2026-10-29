@@ -1657,7 +1657,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4O initialized")
+    print("[RuleWorld] M9.4P initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

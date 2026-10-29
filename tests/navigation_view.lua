@@ -6,7 +6,7 @@ local board, status = {alive=true}, {alive=true}
 local methods = setmetatable({}, {__index=function() return function() end end})
 methods.SetAnchoredPosition = function(control,x,y) calls.position=calls.position+1;control.px,control.py=x,y end
 methods.SetSizeDelta = function(control,w,h) calls.size=calls.size+1;control.width,control.height=w,h end
-methods.SetVisible=function() calls.visible=calls.visible+1 end
+methods.SetVisible=function(control,value) calls.visible=calls.visible+1;control.visible=value end
 methods.AddCursorEventListener = function(control,event,callback) control.click=callback end
 local old_cursor_events = Enum.CursorEventType
 Enum.CursorEventType = {CursorClick="click"}
@@ -98,6 +98,8 @@ local belt_view
 for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then belt_view=c end end
 assert(belt_view.text=="^" and belt_view.bgColor[1]==65)
 conveyor.entities[1].direction="Right";assert(RW_Render(conveyor,0,0));assert(belt_view.text==">")
+conveyor.entities[1].behaviors.hide=true;assert(RW_Render(conveyor,0,0));assert(belt_view.visible==false)
+conveyor.entities[1].behaviors.hide=nil;assert(RW_Render(conveyor,0,0));assert(belt_view.visible==true)
 local words={width=5,height=2,active_text_ids={[1]=true},entities={
  [1]={id=1,kind="object",class="text",text={name="IS"},x=2,y=1,behaviors={}},
  [2]={id=2,kind="object",class="text",text={name="WIN"},x=4,y=1,behaviors={win=true,defeat=true}}

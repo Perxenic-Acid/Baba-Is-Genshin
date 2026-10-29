@@ -333,7 +333,7 @@ local function draw_entities(world)
 
     -- Group the actual world entities by their positions.
     for id, entity in pairs(world.entities) do
-        if entity.x >= 1 and entity.x <= world.width
+        if not (entity.behaviors and entity.behaviors.hide) and entity.x >= 1 and entity.x <= world.width
             and entity.y >= 1 and entity.y <= world.height then
             local slot_index =
                 (entity.y - 1) * world.width + entity.x
@@ -492,7 +492,7 @@ function RW_Render(world, history_depth, active_effects, navigation)
 
     local annotations={}
     for _,entity in pairs(world.entities) do
-        if entity.archetype=="line" then annotations[(entity.y-1)*world.width+entity.x]={text="."} end
+        if entity.archetype=="line" and not (entity.behaviors and entity.behaviors.hide) then annotations[(entity.y-1)*world.width+entity.x]={text="."} end
     end
     for _,portal in ipairs(navigation and navigation.portals or {}) do
         annotations[(portal.y-1)*world.width+portal.x]={text=portal.label,portal=true}
@@ -502,7 +502,7 @@ function RW_Render(world, history_depth, active_effects, navigation)
         set_position(cell,display_position(x,y,world.width,world.height))
         local text,font,bg,fg="",18,cached_color(43,55,75,255),cached_color(90,110,140,255)
         local empty=world.empty_cells and world.empty_cells[x..":"..y]
-        if empty then
+        if empty and not empty.behaviors.hide then
             text="E";font=12;fg=cached_color(130,150,175,255)
             if empty.behaviors.control then bg=cached_color(75,100,125,255) end
             if empty.behaviors.block_entry then bg=cached_color(65,65,85,255) end

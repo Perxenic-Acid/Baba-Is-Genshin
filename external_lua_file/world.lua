@@ -524,10 +524,10 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
+                    STOP="block_entry", HIDE="hide", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
-                prepositions = {FACEDBY="facedby",WITHOUT="without",ON="on",NEAR="near",NEXTTO="nextto",ABOVE="above",BELOW="below",BESIDELEFT="besideleft",BESIDERIGHT="besideright",FACING="facing"},
+                prepositions = {SEEING="seeing",FACEDBY="facedby",WITHOUT="without",ON="on",NEAR="near",NEXTTO="nextto",ABOVE="above",BELOW="below",BESIDELEFT="besideleft",BESIDERIGHT="besideright",FACING="facing"},
                 operators = {AND="and",NOT="not"}
             }
     }
@@ -1724,7 +1724,7 @@ function RW_GetNavigationDefinitions()
         "RIGHT","UP","LEFT","DOWN","NUDGERIGHT","NUDGEUP","NUDGELEFT","NUDGEDOWN","IS","FACEDBY","NOT",
         "NEXTTO","ABOVE","BELOW","BESIDELEFT","BESIDERIGHT","FACING",
         "REVERSE","PULL","SWAP","PHANTOM","FALL","FALLRIGHT","FALLUP","FALLLEFT",
-        "FEAR","FOLLOW","MAKE","EAT","BECOME","MIMIC","PLAY","C4","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","AND","NOT","IS","WITHOUT"}) do
+        "FEAR","FOLLOW","MAKE","EAT","BECOME","MIMIC","PLAY","C4","AVATAR","ROCK","CRATE","FLAG","TEXT","AND","SEEING","NOT","HIDE","WITHOUT"}) do
         local id=motion_lab.next_entity_id
         motion_lab.entities[id]={id=id,kind="object",class="text",text={name=token},
             x=3+3*((index-1)%10),y=15+3*math.floor((index-1)/10),direction="None"}

@@ -245,3 +245,9 @@ witnesses, physical multiplicity and distinct IDs. Source matrix: 36,288 cases.
 See FACEDBY.md for virtual Empty direction boundaries. Next condition: SEEING,
 including rule-derived visibility/occlusion prerequisites; no routine confirmation
 is required between implementation batches.
+
+
+M9.4P adds SEEING, guarded frame-based visibility/occlusion queries and HIDE as
+a prerequisite, including temporary renderer visibility. Installed seeing() plus
+simplecheck() oracle: 29,952 cases. See SEEING.md for virtual facing/recursive-cache
+boundaries. Next: FEELING and POWERED conditions, then prefixes/GROUP/properties.

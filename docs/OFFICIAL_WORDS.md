@@ -23,7 +23,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | condition | NEAR | implemented within documented scope |
 | condition | NEXTTO | implemented within documented scope |
 | condition | ON | implemented within documented scope |
-| condition | SEEING | pending |
+| condition | SEEING | implemented within documented scope |
 | condition | WITHOUT | implemented within documented scope |
 | conjunction | AND | implemented within documented scope |
 | letter | 0 | pending |
@@ -105,7 +105,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | GREEN | pending |
 | property | GREY | pending |
 | property | HAPPY | pending |
-| property | HIDE | pending |
+| property | HIDE | implemented within documented scope |
 | property | HOLD | pending |
 | property | HOT | implemented within documented scope |
 | property | LEFT | implemented within documented scope |

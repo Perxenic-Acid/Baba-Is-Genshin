@@ -130,6 +130,91 @@ function RW_SelectEntities(world, selector)
     return ids
 end
 
+local evaluate_condition
+local function contains_seeing(node)
+    if type(node)~="table" then return false end
+    for _,clause in ipairs(node.clauses or {}) do if clause.relation=="seeing" then return true end end
+    if contains_seeing(node.condition) then return true end
+    for _,term in ipairs(node.terms or {}) do if contains_seeing(term) then return true end end
+    for _,term in ipairs(node.requirements or {}) do if contains_seeing(term) then return true end end
+    return false
+end
+local function seeing_context(world,rules)
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context._seeing_rules=rules;context._seeing_guard={};context._seeing_depth=0
+    return context
+end
+-- Query this rule frame, never stale entity.behaviors from a previous turn.
+local function sight_trait(world,entity,trait)
+    local guard=world._seeing_guard or {}
+    local key=tostring(entity.id or (entity.x..":"..entity.y))..":"..trait
+    if guard[key] then return false end
+    if (world._seeing_depth or 0)>=80 then return nil,"word_rule_limit" end
+    guard[key]=true
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context._seeing_guard=guard;context._seeing_depth=(world._seeing_depth or 0)+1
+    local granted,denied=false,false
+    for _,rules in ipairs({world.rule_sources or {},world._seeing_rules or {}}) do
+        for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
+            if effect.trait==trait and effect.target and valid_selector(effect.target,world) and matches(entity,effect.target,world) then
+                local enabled,err
+                if rule.when and rule.when.op=="spatial" then enabled,err=RW_TestEntityCondition(context,rule.when,entity)
+                else enabled,err=evaluate_condition(context,rule.when) end
+                if enabled==nil then guard[key]=nil;return nil,err end
+                if enabled then
+                    if effect.op=="deny_trait" then denied=true else granted=true end
+                end
+            end
+        end end
+    end
+    guard[key]=nil;return granted and not denied
+end
+local function seeing_condition(world,parameters,entity,negated)
+    local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
+    local v=vectors[entity.direction];local targets={}
+    if not v then return negated end
+    local x,y=entity.x+v[1],entity.y+v[2]
+    while x>=1 and x<=world.width and y>=1 and y<=world.height do
+        local ids={};for id,e in pairs(world.entities) do if e.x==x and e.y==y then ids[#ids+1]=id end end;table.sort(ids)
+        local visible,solid=false,false
+        for _,id in ipairs(ids) do
+            local e=world.entities[id];local hidden,err=sight_trait(world,e,"hide")
+            if hidden==nil then return nil,err end
+            if not hidden then
+                targets[#targets+1]={id=id,name=e.class=="text" and "@text" or e.archetype};visible=true
+                local phantom,err=sight_trait(world,e,"phantom");if phantom==nil then return nil,err end
+                if not phantom then for _,trait in ipairs({"block_entry","pushable","pull"}) do
+                    local blocking,err=sight_trait(world,e,trait);if blocking==nil then return nil,err end
+                    if blocking then solid=true;break end
+                end end
+            end
+        end
+        if not visible then targets[#targets+1]={name="@empty"} end
+        if solid then break end
+        x,y=x+v[1],y+v[2]
+    end
+    local used,found={},0
+    for _,p in ipairs(parameters) do
+        local matched=false
+        if p.name=="@level" and not p.negative and not used.level then used.level=true;matched=true
+        elseif p.name=="@empty" then
+            -- The original positive AND negative EMPTY branches both seek a placeholder;
+            -- repeated EMPTY arguments may reuse it.
+            for _,target in ipairs(targets) do if target.name=="@empty" then matched=true;break end end
+        else
+            local expected=p.name=="@level" and "level_block" or p.name
+            for _,target in ipairs(targets) do
+                if target.id and target.id~=entity.id and not used[target.id] and
+                    (not p.negative and target.name==expected or p.negative and target.name~=expected and target.name~="@text") then
+                    used[target.id]=true;matched=true;break
+                end
+            end
+        end
+        if matched then found=found+1 end
+    end
+    local result=found==#parameters
+    return negated and not result or not negated and result
+end
 -- Concrete effects are short-lived results for this world, not saved rules.
 -- Original WITHOUT counts shortages per parameter, with shared complement witnesses.
 local function without_condition(world,parameters,entity,negated)
@@ -245,7 +330,7 @@ function RW_TestEntityCondition(world,node,entity)
     for _,clause in ipairs(node.clauses) do
         if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
                 and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
-                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby")
+                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing")
             or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or #clause.parameters == 0 then
             return nil,"invalid_spatial_clause"
         end
@@ -266,7 +351,11 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
-        if clause.relation=="facedby" then
+        if clause.relation=="seeing" then
+            local found,err=seeing_condition(world,parameters,entity,clause.negated)
+            if found==nil then return nil,err end
+            result=result and found
+        elseif clause.relation=="facedby" then
             result=result and facedby_condition(world,parameters,entity,clause.negated)
         elseif clause.relation=="without" then
             result=result and without_condition(world,parameters,entity,clause.negated)
@@ -434,7 +523,7 @@ end
 
 -- Evaluate a Boolean condition tree.
 -- Returns boolean on success, nil + error on failure.
-local function evaluate_condition(world, node, stack)
+evaluate_condition = function(world, node, stack)
     if type(node) ~= "table" then
         return nil, "invalid_condition"
     end
@@ -588,7 +677,9 @@ function RW_EvaluateRules(world, generated_rules)
         end
     end
 
-    return RW_ResolveEffects(world, active)
+    local needs_context=false
+    for _,effect in ipairs(active) do if contains_seeing(effect.when) then needs_context=true;break end end
+    return RW_ResolveEffects(needs_context and seeing_context(world,generated_rules or {}) or world, active)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
@@ -833,6 +924,7 @@ function RW_WordTokenMap(world, effective)
     return tokens
 end
 function RW_RelationApplies(world,relation,entity)
+    if relation.condition_rules then world=seeing_context(world,relation.condition_rules) end
     if relation.exclusions ~= nil and not dense_list(relation.exclusions) then return nil,"invalid_relation_exclusions" end
     if relation.when then
         local enabled,err=RW_TestEntityCondition(world,relation.when,entity)
@@ -1312,6 +1404,11 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             if #relation.exclusions == 0 then relation.exclusions=nil end
         end
         if not blocked then filtered[#filtered+1]=relation end
+    end
+    for _,relation in ipairs(filtered) do
+        local needed=contains_seeing(relation.when)
+        for _,condition in ipairs(relation.exclusions or {}) do needed=needed or contains_seeing(condition) end
+        if needed then relation.condition_rules=generated end
     end
     return generated,deferred,filtered
 end

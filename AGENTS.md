@@ -249,3 +249,9 @@
   but never physical Text. Preserve distinct stacked witnesses and FLOAT independence.
   Virtual Empty observer direction remains None until that subsystem exists.
   See docs/FACEDBY.md.
+
+- SEEING includes the first opaque cell. STOP/PUSH/PULL occlude across FLOAT; HIDE
+  is unseen/transparent, PHANTOM seen/transparent. Query current/frozen declarations
+  with transient condition_rules, never inherited behaviors; keep recursion guards
+  outside persisted state. Preserve original EMPTY placeholder quirks. HIDE only
+  affects visibility, not reading/collision/SELECT. See docs/SEEING.md.

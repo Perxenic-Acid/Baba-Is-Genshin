@@ -67,9 +67,9 @@ A pending word is not complete merely because its name could be stored as a Text
 | negation | NOT | implemented within documented scope |
 | noun | ALL | implemented within documented scope |
 | noun | EMPTY | implemented within documented scope |
-| noun | GROUP | pending |
-| noun | GROUP2 | pending |
-| noun | GROUP3 | pending |
+| noun | GROUP | implemented within documented scope |
+| noun | GROUP2 | implemented within documented scope |
+| noun | GROUP3 | implemented within documented scope |
 | noun | LEVEL | implemented within documented scope |
 | noun | TEXT | implemented within documented scope |
 | prefix | IDLE | implemented within documented scope |

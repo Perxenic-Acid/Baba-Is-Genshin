@@ -285,3 +285,10 @@ Chance prefixes with 3/4 and 1/6 success, stable physical-head/clause/identity
 samples, atomic seed transitions and Undo/replay. Original RNG stream/cache
 allocation differences are explicit in CHANCE_PREFIXES.md. Source oracle:
 1,440 normalized-roll cases. COND includes both words. Next: GROUP.
+
+## M9.4V — direct GROUP foundation
+
+Three group nouns, conditional/excluded direct memberships, subject and non-IS
+target expansion, multiplicity and frozen-frame reuse. Original grouprules oracle:
+648 cases. See GROUP.md for the explicit remaining closure/complement/condition
+parameter work before ordinary properties.

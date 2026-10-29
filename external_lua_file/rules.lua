@@ -1308,6 +1308,97 @@ local function expand_mimic(ast_rules)
     end end
     return result
 end
+-- Direct GROUP membership expands declarations, never creates Group entities.
+local function expand_groups(ast_rules,registry)
+    local function group(term)
+        local raw,negative=unwrap(term)
+        if raw and raw.tag=="noun" and raw.type and raw.type.tag=="group" then return raw.type.name,negative end
+    end
+    local function condition_group(node)
+        if type(node)~="table" then return false end
+        for _,clause in ipairs(node.clauses or {}) do
+            for _,term in ipairs(clause.parameters or {}) do if group(term) then return true end end
+        end
+        if condition_group(node.condition) then return true end
+        for _,term in ipairs(node.terms or {}) do if condition_group(term) then return true end end
+        for _,term in ipairs(node.requirements or {}) do if condition_group(term) then return true end end
+        return false
+    end
+    local present=false
+    for _,rule in ipairs(ast_rules) do
+        if type(rule)~="table" or type(rule.when)~="table" then return nil,"invalid_ast_rule" end
+        if group(rule.subject) or group(rule.object) or condition_group(rule.when) then present=true;break end
+    end
+    if not present then return ast_rules,{} end
+    if not registry.is or registry.is.noun~="transform" then
+        local ordinary,deferred={},{}
+        for _,rule in ipairs(ast_rules) do
+            local list=(group(rule.subject) or group(rule.object) or condition_group(rule.when)) and deferred or ordinary
+            list[#list+1]=rule
+        end
+        return ordinary,deferred
+    end
+    local members,bans={},{}
+    local function member_key(term) return subject_key(term) end
+    local function combine(...)
+        local requirements={}
+        for _,condition in ipairs({...}) do
+            if condition and condition.op~="always" then requirements[#requirements+1]=query_clone(condition) end
+        end
+        return #requirements==0 and {op="always"} or {op="spatial",clauses={},requirements=requirements}
+    end
+    local function membership(rule)
+        local name,negative=group(rule.object)
+        local key=member_key(rule.subject)
+        return name and rule.verb=="is" and key and not condition_group(rule.when),name,negative,key
+    end
+    for _,rule in ipairs(ast_rules) do
+        local is_member,name,negative,key=membership(rule)
+        if is_member then
+            local store=negative and bans or members
+            store[name]=store[name] or {};store[name][key]=store[name][key] or {}
+            store[name][key][#store[name][key]+1]={term=query_clone(rule.subject),when=rule.when}
+        end
+    end
+    local teams={}
+    for name,nouns in pairs(members) do
+        teams[name]={}
+        local keys={};for key in pairs(nouns) do keys[#keys+1]=key end;table.sort(keys)
+        for _,key in ipairs(keys) do for _,member in ipairs(nouns[key]) do
+            local condition=member.when
+            for _,ban in ipairs((bans[name] or {})[key] or {}) do
+                condition=combine(condition,invert_mimic_condition(ban.when))
+            end
+            teams[name][#teams[name]+1]={term=member.term,when=condition}
+        end end
+    end
+    local expanded,deferred={},{}
+    local function emit(rule,subject,object,condition)
+        local copy=query_clone(rule);copy.subject=query_clone(subject);copy.object=query_clone(object)
+        copy.when=combine(rule.when,condition);expanded[#expanded+1]=copy
+        if #expanded>5000 then return nil,"rule_complexity_limit" end
+        return true
+    end
+    for _,rule in ipairs(ast_rules) do
+        local is_member=membership(rule)
+        local source,source_not=group(rule.subject);local target,target_not=group(rule.object)
+        if condition_group(rule.when) or (source and source_not) or (target and target_not and not is_member)
+            or (target and rule.verb=="is" and not is_member)
+            or (source and target) or ((source or target) and rule.verb=="mimic") then
+            deferred[#deferred+1]=rule
+        elseif is_member then -- Membership is a declaration, not an IS conversion.
+        elseif source or target then
+            for _,member in ipairs(teams[source or target] or {}) do
+                local ok,err=emit(rule,source and member.term or rule.subject,target and member.term or rule.object,member.when)
+                if not ok then return nil,err end
+            end
+        else
+            expanded[#expanded+1]=rule
+        end
+    end
+    return expanded,deferred
+end
+
 function RW_LowerRuleAST(ast_rules, registry, world)
     if not world then return lower_simple(ast_rules,registry) end
     registry=registry or DEFAULT_SEMANTICS
@@ -1315,7 +1406,10 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     if registry.mimic and registry.mimic.noun=="mimic" then
         local expanded,err=expand_mimic(ast_rules);if not expanded then return nil,err end;ast_rules=expanded
     end
-    local generated,deferred,relations={},{},{}
+    local expanded,group_deferred=expand_groups(ast_rules,registry)
+    if not expanded then return nil,group_deferred end
+    ast_rules=expanded
+    local generated,deferred,relations={},group_deferred,{}
     local contain_bans,contain_origins,contain_verbs={},{},{}
     local write_bans,write_origins,write_verbs={},{},{}
     local predicate_bans={}

@@ -278,3 +278,8 @@
   first-phase chance_state; compilation/render/query order cannot consume draws.
   Whole-tree Undo restores the seed. MAKE RNG stays separate. The original engine
   RNG sequence differs deliberately; see docs/CHANCE_PREFIXES.md.
+
+- GROUP nouns are compiler-only typed terms, excluded from the ordinary ALL palette.
+  Direct memberships expand declarations after MIMIC, preserving duplicate products
+  and per-source membership/consumer conditions. Never turn GROUP into an archetype.
+  Recursive transfers/complements/condition parameters remain deferred; see docs/GROUP.md.

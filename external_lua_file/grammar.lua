@@ -161,6 +161,8 @@ end
 -- Typed Rule AST and verb registry.
 -- This parser does not execute rules.
 
+local AST_GROUPS = {GROUP={tag="group",name="group"},GROUP2={tag="group",name="group2"},GROUP3={tag="group",name="group3"}}
+
 local AST_PREFIXES = {OFTEN="often",SELDOM="seldom",IDLE="idle",LONELY="lonely",POWERED="powered",POWERED2="powered2",POWERED3="powered3"}
 
 local AST_NOTES = {C="c",CSHARP="csharp",CFLAT="cflat",D="d",DSHARP="dsharp",DFLAT="dflat",E="e",ESHARP="esharp",EFLAT="eflat",F="f",FSHARP="fsharp",FFLAT="fflat",G="g",GSHARP="gsharp",GFLAT="gflat",A="a",ASHARP="asharp",AFLAT="aflat",B="b",BSHARP="bsharp",BFLAT="bflat",C4="c4",CSHARP4="csharp4",CFLAT4="cflat4",D4="d4",DSHARP4="dsharp4",DFLAT4="dflat4",E4="e4",ESHARP4="esharp4",EFLAT4="eflat4",F4="f4",FSHARP4="fsharp4",FFLAT4="fflat4",G4="g4",GSHARP4="gsharp4",GFLAT4="gflat4",A4="a4",ASHARP4="asharp4",AFLAT4="aflat4",B4="b4",BSHARP4="bsharp4",BFLAT4="bflat4",C5="c5",CSHARP5="csharp5",CFLAT5="cflat5",D5="d5",DSHARP5="dsharp5",DFLAT5="dflat5",E5="e5",ESHARP5="esharp5",EFLAT5="eflat5",F5="f5",FSHARP5="fsharp5",FFLAT5="fflat5",G5="g5",GSHARP5="gsharp5",GFLAT5="gflat5",A5="a5",ASHARP5="asharp5",AFLAT5="aflat5",B5="b5",BSHARP5="bsharp5",BFLAT5="bflat5",C6="c6",CSHARP6="csharp6",D6="d6",DSHARP6="dsharp6",DFLAT6="dflat6",E6="e6",ESHARP6="esharp6",EFLAT6="eflat6",F6="f6",FSHARP6="fsharp6",FFLAT6="fflat6",G6="g6",GSHARP6="gsharp6",GFLAT6="gflat6",A6="a6",AFLAT6="aflat6"}
@@ -303,7 +305,7 @@ end
 local function ast_term_options(token, language, property_ok)
     local result = {}
 
-    local noun = language.nouns[token]
+    local noun = language.nouns[token] or AST_GROUPS[token]
 
     if type(noun) == "string" and noun ~= "" then
         result[#result + 1] = {

@@ -1607,7 +1607,7 @@ function RW_GetNavigationDefinitions()
             conditions.next_entity_id=id+1
         end
     end
-    for index,token in ipairs({"POWERED","POWERED2","POWERED3","POWER","POWER2","POWER3","FEELING","NOT","IS","AND","AVATAR","ROCK","IDLE","LONELY","OFTEN","SELDOM"}) do
+    for index,token in ipairs({"POWERED","POWERED2","POWERED3","POWER","POWER2","POWER3","FEELING","NOT","IS","AND","AVATAR","ROCK","IDLE","LONELY","OFTEN","SELDOM","GROUP","GROUP2","GROUP3"}) do
         local id=conditions.next_entity_id
         conditions.entities[id]={id=id,kind="object",class="text",text={name=token},x=15+3*((index-1)%5),y=3+3*math.floor((index-1)/5),direction="None"}
         conditions.next_entity_id=id+1

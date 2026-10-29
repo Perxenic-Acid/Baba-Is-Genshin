@@ -238,3 +238,8 @@
   Complete note tokens do not enable letter composition. Dispatch requests only
   after successful whole-tree Commit; current native output is diagnostic logs,
   with real sound/particle bindings explicitly deferred. See docs/PLAY.md.
+
+- WITHOUT counts global shortages per repeated parameter and excludes the source.
+  NOT WITHOUT requires every quota to be met; it is not a Boolean complement of
+  positive WITHOUT with AND parameters. MIMIC condition inversion must toggle named
+  clauses before OR grouping, matching invertconds(). See docs/WITHOUT.md.

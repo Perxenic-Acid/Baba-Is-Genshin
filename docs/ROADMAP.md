@@ -232,3 +232,9 @@ tokens, grouped emission and original frequency/tune parameters. Source oracle:
 see PLAY.md. Core execution paths now exist for every official verb, with the
 previously documented scoped/special-noun gaps retained. Next: remaining conditions,
 then prefixes, GROUP and properties; letter assembly remains deferred.
+
+
+M9.4N adds WITHOUT quantity/self-exclusion and original NOT WITHOUT behavior,
+including named-condition inversion for MIMIC. Installed source matrix: 4,608 cases;
+startup 1,935,000 instructions. See WITHOUT.md for ordering/postrules boundaries.
+Next conditions: FACEDBY, SEEING, then remaining conditions before prefixes/GROUP.

@@ -24,7 +24,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | condition | NEXTTO | implemented within documented scope |
 | condition | ON | implemented within documented scope |
 | condition | SEEING | pending |
-| condition | WITHOUT | pending |
+| condition | WITHOUT | implemented within documented scope |
 | conjunction | AND | implemented within documented scope |
 | letter | 0 | pending |
 | letter | 1 | pending |

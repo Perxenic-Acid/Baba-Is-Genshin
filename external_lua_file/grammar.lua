@@ -553,7 +553,7 @@ local function ast_parse_heads(line,language,output)
                     if ast_is_not(word,language) then condition_at(cursor+1,append(prefix,{word})) end
                     local relation=(language.prepositions or {})[word.token]
                     if relation == "on" or relation == "near" or relation == "nextto" or relation == "above"
-                        or relation == "below" or relation == "besideleft" or relation == "besideright" or relation == "facing" then
+                        or relation == "below" or relation == "besideleft" or relation == "besideright" or relation == "facing" or relation == "without" then
                         local arguments
                         arguments=function(at,params,words)
                             terms(at,relation=="facing",function(parameter,finish,more)

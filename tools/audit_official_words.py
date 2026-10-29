@@ -6,7 +6,7 @@ from pathlib import Path
 
 SOURCE = Path(r"C:\Program Files (x86)\Steam\steamapps\common\Baba Is You\Data\Editor\editor_objectlist.lua")
 OUTPUT = Path(__file__).resolve().parents[1] / "docs" / "OFFICIAL_WORDS.md"
-IMPLEMENTED = set("is has write fear follow make eat become mimic play you push stop win defeat sink word safe hot melt open shut weak float shift more select and not text all empty level move sleep still lockedright lockedup lockedleft lockeddown right up left down turn deturn nudgeright nudgeup nudgeleft nudgedown pull swap phantom reverse fall fallright fallup fallleft on near nextto above below besideleft besideright facing".split())
+IMPLEMENTED = set("is has write fear follow make eat become mimic play you push stop win defeat sink word safe hot melt open shut weak float shift more select and not text all empty level move sleep still lockedright lockedup lockedleft lockeddown right up left down turn deturn nudgeright nudgeup nudgeleft nudgedown pull swap phantom reverse fall fallright fallup fallleft on near nextto above below besideleft besideright facing without".split())
 SPECIAL_NOUNS = {"text", "all", "empty", "level", "group", "group2", "group3"}
 CATEGORIES = {0: "noun", 1: "verb", 2: "property", 3: "prefix", 4: "negation", 5: "letter", 6: "conjunction", 7: "condition"}
 

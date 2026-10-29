@@ -131,6 +131,40 @@ function RW_SelectEntities(world, selector)
 end
 
 -- Concrete effects are short-lived results for this world, not saved rules.
+-- Original WITHOUT counts shortages per parameter, with shared complement witnesses.
+local function without_condition(world,parameters,entity,negated)
+    local counts,used={},{}
+    local function key(p) return (p.negative and "not " or "")..p.name end
+    for _,p in ipairs(parameters) do local k=key(p);counts[k]=(counts[k] or 0)+1 end
+    if counts["@level"] then counts["@level"]=counts["@level"]-1 end
+    local allfound=0
+    for _,p in ipairs(parameters) do
+        local k=key(p);local threshold=counts[k]
+        if p.name=="@level" and not p.negative and threshold==0 then allfound=-99;break end
+        local count=0
+        if p.name=="@empty" and not p.negative then
+            local occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
+            for y=1,world.height do for x=1,world.width do if not occupied[x..":"..y] then count=count+1 end end end
+            if entity.class=="empty" then threshold=threshold+1 end
+        else
+            local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+            for _,id in ipairs(ids) do local e=world.entities[id]
+                local name=e.class=="text" and "@text" or e.archetype
+                if p.negative then
+                    if name~=p.name and e.class~="text" and id~=entity.id and not used[id] then
+                        used[id]=true;count=count+1
+                        if count>=threshold then break end
+                    end
+                elseif name==p.name then count=count+1 end
+            end
+            local own=entity.class=="text" and "@text" or entity.class=="empty" and "@empty" or entity.archetype
+            if not p.negative and own==p.name then threshold=threshold+1 end
+        end
+        if count<threshold then allfound=allfound+1 end
+    end
+    if negated then return not (allfound>0) end
+    return allfound==#parameters
+end
 -- Contextual conditions are tested against one identity (or one virtual Empty cell).
 function RW_TestEntityCondition(world,node,entity)
     if type(node) ~= "table" then return nil,"invalid_condition" end
@@ -176,7 +210,7 @@ function RW_TestEntityCondition(world,node,entity)
     for _,clause in ipairs(node.clauses) do
         if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
                 and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
-                and clause.relation ~= "besideright" and clause.relation ~= "facing")
+                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without")
             or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or #clause.parameters == 0 then
             return nil,"invalid_spatial_clause"
         end
@@ -197,6 +231,9 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
+        if clause.relation=="without" then
+            result=result and without_condition(world,parameters,entity,clause.negated)
+        else
         local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
         local vector=vectors[entity.direction]
         local function in_region(x,y)
@@ -289,6 +326,7 @@ function RW_TestEntityCondition(world,node,entity)
         if clause.relation=="facing" and not vector then found=false end
         if clause.negated then found=not found end
         result=result and found
+        end
     end
     return result
 end
@@ -953,6 +991,19 @@ local function subject_key(term)
     if term.tag == "noun" and term.type and term.type.tag == "object" then return term.type.name end
     if term.tag == "special" and (term.name == "text" or term.name == "empty") then return "@" .. term.name end
 end
+-- Original invertconds toggles each named condition before OR grouping.
+-- WITHOUT's NOT form is intentionally not a Boolean complement for AND quotas.
+local function invert_mimic_condition(condition)
+    if type(condition)=="table" and condition.op=="spatial" and not condition.requirements then
+        local terms={}
+        for _,clause in ipairs(condition.clauses) do
+            local inverse=query_clone(clause);inverse.negated=not inverse.negated
+            terms[#terms+1]={op="not",condition={op="spatial",clauses={inverse}}}
+        end
+        return {op="not",condition={op="all",terms=terms}}
+    end
+    return {op="not",condition=condition}
+end
 -- Original subrules copies only untagged, non-MIMIC declarations: one generation.
 local function expand_mimic(ast_rules)
     local present=false
@@ -985,7 +1036,7 @@ local function expand_mimic(ast_rules)
                 if copied.verb~="mimic" and key(copied.subject)==destination then
                     local conditions={copied.when,rule.when}
                     for _,condition in ipairs((bans[source] or {})[destination] or {}) do
-                        conditions[#conditions+1]={op="not",condition=condition}
+                        conditions[#conditions+1]=invert_mimic_condition(condition)
                     end
                     local combined={op="spatial",clauses={},requirements={}}
                     local blocked=false

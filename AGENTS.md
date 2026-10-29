@@ -272,3 +272,9 @@
   Persist last_input through validated first-phase input_state metadata; rejection
   must not change it, and whole-tree Undo restores it. Confirm is separate.
   See docs/IDLE.md for original references and boundary behavior.
+
+- OFTEN/SELDOM sample by physical head/clause/identity (EMPTY by cell), using a
+  pure keyed chance_seed. Advance only accepted move/wait through validated
+  first-phase chance_state; compilation/render/query order cannot consume draws.
+  Whole-tree Undo restores the seed. MAKE RNG stays separate. The original engine
+  RNG sequence differs deliberately; see docs/CHANCE_PREFIXES.md.

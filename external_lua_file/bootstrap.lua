@@ -508,10 +508,12 @@ function RW_PlanTurn(world,action,services)
     end
     local context={};for k,v in pairs(world) do context[k]=v end
     context.last_input=action.type
+    context.chance_seed=((world.chance_seed or 1)*48271)%2147483647
     local plan,err,trace=plan_turn(context,action,services)
-    if plan and plan.consumes_turn and world.last_input~=action.type then
+    if plan and plan.consumes_turn then
         local first=plan.stages and plan.stages[1].plan or plan
-        first.input_state={from=world.last_input or "none",to=action.type}
+        if world.last_input~=action.type then first.input_state={from=world.last_input or "none",to=action.type} end
+        first.chance_state={from=world.chance_seed or 1,to=context.chance_seed}
     end
     return plan,err,trace
 end
@@ -526,6 +528,7 @@ function RW_PlanLevelAction(tree, action, services)
     if action.type=="move" or action.type=="wait" then
         input_world={};for k,v in pairs(session.world) do input_world[k]=v end
         input_world.last_input=action.type
+        input_world.chance_seed=((session.world.chance_seed or 1)*48271)%2147483647
     end
     local effects, err, initial_conversions = services.evaluate(input_world)
     if not effects then return fail(err) end
@@ -1678,7 +1681,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4T initialized")
+    print("[RuleWorld] M9.4U initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

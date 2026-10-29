@@ -157,3 +157,68 @@ assert(not invalid.consumes_turn and not invalid.input_state and not s.world.las
 local stale={consumes_turn=true,changes={},input_state={from='wait',to='move'}}
 local unchanged,reject=RW_Commit(s,stale);assert(unchanged==s and reject.reason=='stale_input_state')
 print('PASS: IDLE current input before movement/conversion, wait, blocked/no-YOU move, rejection, replay and Undo')
+
+-- Chance decisions are pure per head/clause/identity and persist through a turn.
+for _,prefix in ipairs({'OFTEN','SELDOM'}) do
+ local hits,total=0,0
+ s=fixture({{prefix,'AVATAR','IS','FLOAT','AND','SAFE'}})
+ for seed=1,240 do
+  s.world.chance_seed=seed
+  local before=s.world.chance_seed
+  w,f=projection(s);local repeated=projection(s)
+  local active=w.entities[1].behaviors.float==true
+  assert(active==(w.entities[1].behaviors.safe==true),'RHS AND shares a draw')
+  assert(active==(repeated.entities[1].behaviors.float==true) and s.world.chance_seed==before)
+  assert(f.ast[1].when.clauses[1].chance_key)
+  if active then hits=hits+1 end;total=total+1
+ end
+ assert(hits>0 and hits<total,'chance must vary across turns')
+ s=fixture({{prefix,'ROCK','BECOME','FLAG'}})
+ for seed=1,24 do
+  s.world.chance_seed=seed
+  local future={};for k,v in pairs(s.world) do future[k]=v end
+  future.chance_seed=(seed*48271)%2147483647;future.last_input='wait'
+  local frame=assert(RW_CompileWorld(future,cs));local expected=false
+  for _,relation in ipairs(frame.relations) do
+   if relation.op=='become' and RW_RelationApplies(future,relation,future.entities[2]) then expected=true end
+  end
+  n,p=step(s)
+  assert((n.world.entities[2].archetype=='flag')==expected,'conversion uses the accepted turn seed')
+  assert(n.world.chance_seed==future.chance_seed and s.world.chance_seed==seed)
+  local replay=RW_Commit(s,assert(RW_PlanTurn(s.world,{type='wait'},services)))
+  assert(replay.world.entities[2].archetype==n.world.entities[2].archetype and replay.world.chance_seed==n.world.chance_seed)
+ end
+end
+s=fixture({{'OFTEN','OFTEN','ROCK','BECOME','FLAG'}})
+w,f=projection(s)
+assert(f.ast[1].when.clauses[1].chance_key~=f.ast[1].when.clauses[2].chance_key)
+local joint=0
+for seed=1,8192 do
+ s.world.chance_seed=seed
+ if RW_TestEntityCondition(s.world,f.ast[1].when,s.world.entities[2]) then joint=joint+1 end
+end
+assert(joint>4350 and joint<4850,'repeated OFTEN clauses need separate draws, approximately 9/16')
+
+s=fixture({{'OFTEN','ROCK','IS','WORD'}})
+w,f=projection(s);assert(f.iterations<=2,'WORD queries must not reroll')
+s=fixture({{'SELDOM','AVATAR','IS','FLOAT'}})
+local invalid=assert(RW_PlanTurn(s.world,{type='move',dx=2,dy=0},services))
+assert(not invalid.consumes_turn and not invalid.chance_state and not s.world.chance_seed)
+local unchanged,reject=RW_Commit(s,{consumes_turn=true,changes={},chance_state={from=2,to=3}})
+assert(unchanged==s and reject.reason=='stale_chance_state')
+unchanged,reject=RW_Commit(s,{consumes_turn=false,changes={},chance_state={from=1,to=3}})
+assert(unchanged==s and reject.reason=='invalid_no_turn_plan')
+print('PASS: OFTEN/SELDOM stable head/clause/identity draws, RHS AND, conversion, WORD, pure replay/rejection and Undo')
+
+local node={op='spatial',clauses={{relation='often',negated=false,parameters={},chance_key='identity:1'}}}
+local e1={id=1,class='object',x=2,y=2};local e2={id=2,class='object',x=2,y=2}
+local empty1={class='empty',x=2,y=2};local empty2={class='empty',x=3,y=2}
+local distinct,empty_distinct=false,false
+for seed=1,128 do
+ s.world.chance_seed=seed
+ local a=RW_TestEntityCondition(s.world,node,e1)
+ if a~=RW_TestEntityCondition(s.world,node,e2) then distinct=true end
+ e1.x=3;assert(RW_TestEntityCondition(s.world,node,e1)==a);e1.x=2
+ if RW_TestEntityCondition(s.world,node,empty1)~=RW_TestEntityCondition(s.world,node,empty2) then empty_distinct=true end
+end
+assert(distinct and empty_distinct,'real identities and virtual EMPTY cells need distinct draws')

@@ -150,6 +150,13 @@ local function validate_plan(world, plan)
         end
         if input.from~=(world.last_input or "none") then return false,"stale_input_state" end
     end
+    if plan.chance_state~=nil then
+        local rng=plan.chance_state
+        if type(rng)~="table" or not valid_random_state(rng.from) or not valid_random_state(rng.to) then
+            return false,"invalid_chance_state"
+        end
+        if rng.from~=(world.chance_seed or 1) then return false,"stale_chance_state" end
+    end
     if plan.random_state~=nil then
         local rng=plan.random_state
         if type(rng)~="table" or not valid_random_state(rng.from) or not valid_random_state(rng.to) then
@@ -165,7 +172,7 @@ local function validate_plan(world, plan)
         if not same_state(current,shift.from) then return false,"stale_board_shift" end
     end
     if not plan.consumes_turn then
-        if #plan.changes ~= 0 or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil then
+        if #plan.changes ~= 0 or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil then
             return false, "invalid_no_turn_plan"
         end
         return true
@@ -312,6 +319,7 @@ local function apply_plan(world, plan)
     if plan.board_shift then projected.board_offset = clone(plan.board_shift.to) end
     if plan.random_state then projected.random_state=plan.random_state.to end
     if plan.input_state then projected.last_input=plan.input_state.to end
+    if plan.chance_state then projected.chance_seed=plan.chance_state.to end
     return projected
 end
 
@@ -546,7 +554,7 @@ end
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
 local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, infinite_loop=true, too_complex=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
-    behavior_registry=true,board_offset=true,random_state=true,last_input=true}
+    behavior_registry=true,board_offset=true,random_state=true,last_input=true,chance_seed=true}
 
 local function plain_data(value, visiting)
     local kind = type(value)
@@ -577,6 +585,7 @@ local function validate_definition(definition)
         or not is_integer(world.height) or world.height < 1
         or type(world.entities) ~= "table" or not valid_frontier(world) then return false end
     if world.random_state~=nil and not valid_random_state(world.random_state) then return false end
+    if world.chance_seed~=nil and not valid_random_state(world.chance_seed) then return false end
     if world.last_input~=nil and world.last_input~="none" and world.last_input~="wait" and world.last_input~="move" then return false end
     if world.infinite_loop ~= nil and world.infinite_loop ~= true then return false end
     if world.too_complex ~= nil and world.too_complex ~= true then return false end
@@ -658,10 +667,10 @@ local function preview_transaction(world, plan)
         local result=apply_plan(world,plan)
         if plan.infinite_loop then result.infinite_loop=true end
         if plan.too_complex then result.too_complex=true end
-        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.infinite_loop == true or plan.too_complex == true
+        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.infinite_loop == true or plan.too_complex == true
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
-        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil
+        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil
         or not is_list(plan.stages) or #plan.stages == 0 or #plan.stages > 32 then
         return nil,"invalid_stage_sequence"
     end
@@ -677,7 +686,7 @@ local function preview_transaction(world, plan)
         if not stage.plan.consumes_turn then return nil,"non_consuming_stage",nil,stage.name end
         for _, change in ipairs(stage.plan.changes) do summary[#summary+1]=change end
         current = apply_plan(current,stage.plan)
-        changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil or stage.plan.random_state~=nil or stage.plan.input_state~=nil
+        changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil or stage.plan.random_state~=nil or stage.plan.input_state~=nil or stage.plan.chance_state~=nil
     end
     if not same_state(plan.changes,summary) then return nil,"stage_summary_mismatch" end
     if plan.infinite_loop then current.infinite_loop=true; changed=true end
@@ -1598,7 +1607,7 @@ function RW_GetNavigationDefinitions()
             conditions.next_entity_id=id+1
         end
     end
-    for index,token in ipairs({"POWERED","POWERED2","POWERED3","POWER","POWER2","POWER3","FEELING","NOT","IS","AND","AVATAR","ROCK","IDLE","LONELY"}) do
+    for index,token in ipairs({"POWERED","POWERED2","POWERED3","POWER","POWER2","POWER3","FEELING","NOT","IS","AND","AVATAR","ROCK","IDLE","LONELY","OFTEN","SELDOM"}) do
         local id=conditions.next_entity_id
         conditions.entities[id]={id=id,kind="object",class="text",text={name=token},x=15+3*((index-1)%5),y=3+3*math.floor((index-1)/5),direction="None"}
         conditions.next_entity_id=id+1

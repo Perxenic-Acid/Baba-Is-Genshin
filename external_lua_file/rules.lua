@@ -423,8 +423,8 @@ function RW_TestEntityCondition(world,node,entity)
     for _,clause in ipairs(node.clauses) do
         if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
                 and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
-                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing" and clause.relation ~= "feeling" and clause.relation ~= "powered" and clause.relation ~= "powered2" and clause.relation ~= "powered3" and clause.relation ~= "lonely" and clause.relation ~= "idle")
-            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or (#clause.parameters == 0 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3" and clause.relation~="lonely" and clause.relation~="idle") then
+                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing" and clause.relation ~= "feeling" and clause.relation ~= "powered" and clause.relation ~= "powered2" and clause.relation ~= "powered3" and clause.relation ~= "lonely" and clause.relation ~= "idle" and clause.relation ~= "often" and clause.relation ~= "seldom")
+            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or (#clause.parameters == 0 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3" and clause.relation~="lonely" and clause.relation~="idle" and clause.relation~="often" and clause.relation~="seldom") then
             return nil,"invalid_spatial_clause"
         end
         local parameters={}
@@ -444,7 +444,16 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
-        if clause.relation=="idle" then
+        if clause.relation=="often" or clause.relation=="seldom" then
+            if #parameters~=0 or (clause.chance_key~=nil and type(clause.chance_key)~="string") then return nil,"invalid_chance_clause" end
+            local identity=entity.class=="empty" and ("empty:"..entity.x..":"..entity.y) or tostring(entity.id)
+            local key=(clause.chance_key or clause.relation)..":"..identity
+            local sample=world.chance_seed or 1
+            for index=1,#key do sample=(sample*(131+key:byte(index))+key:byte(index))%2147483647 end
+            sample=(sample*48271)%2147483647
+            local found=clause.relation=="often" and sample%4~=0 or clause.relation=="seldom" and sample%6==0
+            result=result and (clause.negated and not found or not clause.negated and found)
+        elseif clause.relation=="idle" then
             if #parameters~=0 then return nil,"invalid_prefix_parameters" end
             local found=world.last_input=="wait"
             result=result and (clause.negated and not found or not clause.negated and found)

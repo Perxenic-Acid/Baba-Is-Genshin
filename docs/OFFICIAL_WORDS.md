@@ -74,11 +74,11 @@ A pending word is not complete merely because its name could be stored as a Text
 | noun | TEXT | implemented within documented scope |
 | prefix | IDLE | implemented within documented scope |
 | prefix | LONELY | implemented within documented scope |
-| prefix | OFTEN | pending |
+| prefix | OFTEN | implemented within documented scope |
 | prefix | POWERED | implemented within documented scope |
 | prefix | POWERED2 | implemented within documented scope |
 | prefix | POWERED3 | implemented within documented scope |
-| prefix | SELDOM | pending |
+| prefix | SELDOM | implemented within documented scope |
 | property | 3D | pending |
 | property | ANGRY | pending |
 | property | AUTO | pending |

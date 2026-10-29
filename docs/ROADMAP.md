@@ -278,3 +278,10 @@ Current-command wait prefix with validated atomic input metadata and whole-tree
 Undo. Blocked/no-YOU direction input remains non-idle. COND contains IDLE.
 Eighteen installed-source oracle cases plus planner/scheduler regressions.
 Next: OFTEN/SELDOM turn-stable randomness, then GROUP.
+
+## M9.4U — OFTEN / SELDOM
+
+Chance prefixes with 3/4 and 1/6 success, stable physical-head/clause/identity
+samples, atomic seed transitions and Undo/replay. Original RNG stream/cache
+allocation differences are explicit in CHANCE_PREFIXES.md. Source oracle:
+1,440 normalized-roll cases. COND includes both words. Next: GROUP.

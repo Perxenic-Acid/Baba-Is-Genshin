@@ -243,3 +243,9 @@
   NOT WITHOUT requires every quota to be met; it is not a Boolean complement of
   positive WITHOUT with AND parameters. MIMIC condition inversion must toggle named
   clauses before OR grouping, matching invertconds(). See docs/WITHOUT.md.
+
+- FACEDBY checks incoming cardinal neighbors in Right/Up/Left/Down order, independent
+  of the subject facing. NOT noun parameters may use a wrong-facing same-name unit,
+  but never physical Text. Preserve distinct stacked witnesses and FLOAT independence.
+  Virtual Empty observer direction remains None until that subsystem exists.
+  See docs/FACEDBY.md.

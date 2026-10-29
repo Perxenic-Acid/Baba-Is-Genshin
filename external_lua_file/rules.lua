@@ -165,6 +165,41 @@ local function without_condition(world,parameters,entity,negated)
     if negated then return not (allfound>0) end
     return allfound==#parameters
 end
+-- FACEDBY visits neighbors first, then parameters (unlike forward FACING).
+local function facedby_condition(world,parameters,entity,negated)
+    local vectors={{1,0},{0,-1},{-1,0},{0,1}}
+    local dirs={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
+    local used,matched,allfound={},{},0
+    for _,offset in ipairs(vectors) do
+        local x,y=entity.x+offset[1],entity.y+offset[2]
+        local ids={}
+        for id,e in pairs(world.entities) do if e.x==x and e.y==y then ids[#ids+1]=id end end
+        table.sort(ids)
+        for index,p in ipairs(parameters) do
+            if not matched[index] then
+                if p.name=="@level" and not p.negative and not used.level then
+                    used.level=true;matched[index]=true;allfound=allfound+1
+                elseif p.name=="@empty" then
+                    -- Empty has no derived facing in the current virtual-cell model.
+                    -- Its default direction is None, so it cannot watch this source.
+                    if p.negative then matched[index]=true;allfound=allfound+1 end
+                else
+                    for _,id in ipairs(ids) do if id~=entity.id and not used[id] then
+                        local e=world.entities[id];local name=e.class=="text" and "@text" or e.archetype
+                        local expected=p.name=="@level" and "level_block" or p.name
+                        local vector=dirs[e.direction]
+                        local watching=vector and e.x+vector[1]==entity.x and e.y+vector[2]==entity.y or false
+                        local found=not p.negative and name==expected and watching
+                            or p.negative and name~="@text" and (name~=expected or not watching)
+                        if found then used[id]=true;matched[index]=true;allfound=allfound+1;break end
+                    end end
+                end
+            end
+        end
+    end
+    local found=allfound==#parameters
+    return negated and not found or not negated and found
+end
 -- Contextual conditions are tested against one identity (or one virtual Empty cell).
 function RW_TestEntityCondition(world,node,entity)
     if type(node) ~= "table" then return nil,"invalid_condition" end
@@ -210,7 +245,7 @@ function RW_TestEntityCondition(world,node,entity)
     for _,clause in ipairs(node.clauses) do
         if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
                 and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
-                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without")
+                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby")
             or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or #clause.parameters == 0 then
             return nil,"invalid_spatial_clause"
         end
@@ -231,7 +266,9 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
-        if clause.relation=="without" then
+        if clause.relation=="facedby" then
+            result=result and facedby_condition(world,parameters,entity,clause.negated)
+        elseif clause.relation=="without" then
             result=result and without_condition(world,parameters,entity,clause.negated)
         else
         local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}

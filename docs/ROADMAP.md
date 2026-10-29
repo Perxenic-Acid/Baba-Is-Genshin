@@ -238,3 +238,10 @@ M9.4N adds WITHOUT quantity/self-exclusion and original NOT WITHOUT behavior,
 including named-condition inversion for MIMIC. Installed source matrix: 4,608 cases;
 startup 1,935,000 instructions. See WITHOUT.md for ordering/postrules boundaries.
 Next conditions: FACEDBY, SEEING, then remaining conditions before prefixes/GROUP.
+
+
+M9.4O adds FACEDBY incoming-neighbor conditions, preserving wrong-facing negative
+witnesses, physical multiplicity and distinct IDs. Source matrix: 36,288 cases.
+See FACEDBY.md for virtual Empty direction boundaries. Next condition: SEEING,
+including rule-derived visibility/occlusion prerequisites; no routine confirmation
+is required between implementation batches.

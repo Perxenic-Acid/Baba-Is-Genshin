@@ -161,7 +161,10 @@ end
 -- Typed Rule AST and verb registry.
 -- This parser does not execute rules.
 
+local AST_NOTES = {C="c",CSHARP="csharp",CFLAT="cflat",D="d",DSHARP="dsharp",DFLAT="dflat",E="e",ESHARP="esharp",EFLAT="eflat",F="f",FSHARP="fsharp",FFLAT="fflat",G="g",GSHARP="gsharp",GFLAT="gflat",A="a",ASHARP="asharp",AFLAT="aflat",B="b",BSHARP="bsharp",BFLAT="bflat",C4="c4",CSHARP4="csharp4",CFLAT4="cflat4",D4="d4",DSHARP4="dsharp4",DFLAT4="dflat4",E4="e4",ESHARP4="esharp4",EFLAT4="eflat4",F4="f4",FSHARP4="fsharp4",FFLAT4="fflat4",G4="g4",GSHARP4="gsharp4",GFLAT4="gflat4",A4="a4",ASHARP4="asharp4",AFLAT4="aflat4",B4="b4",BSHARP4="bsharp4",BFLAT4="bflat4",C5="c5",CSHARP5="csharp5",CFLAT5="cflat5",D5="d5",DSHARP5="dsharp5",DFLAT5="dflat5",E5="e5",ESHARP5="esharp5",EFLAT5="eflat5",F5="f5",FSHARP5="fsharp5",FFLAT5="fflat5",G5="g5",GSHARP5="gsharp5",GFLAT5="gflat5",A5="a5",ASHARP5="asharp5",AFLAT5="aflat5",B5="b5",BSHARP5="bsharp5",BFLAT5="bflat5",C6="c6",CSHARP6="csharp6",D6="d6",DSHARP6="dsharp6",DFLAT6="dflat6",E6="e6",ESHARP6="esharp6",EFLAT6="eflat6",F6="f6",FSHARP6="fsharp6",FFLAT6="fflat6",G6="g6",GSHARP6="gsharp6",GFLAT6="gflat6",A6="a6",AFLAT6="aflat6"}
+
 local AST_VERBS = {
+    play={phase="presentation",rhs={note=true}},
     write = {phase="conversion",rhs={noun=true,property=true,special=true,literal=true}},
     is = {
         phase = "relation",
@@ -238,7 +241,7 @@ local function valid_verb_registry(registry)
         end
         local categories = 0
         for category, enabled in pairs(spec.rhs) do
-            if (category ~= "noun" and category ~= "property" and category ~= "special" and category ~= "literal")
+            if (category ~= "noun" and category ~= "property" and category ~= "special" and category ~= "literal" and category ~= "note")
                 or type(enabled) ~= "boolean" then return false end
             if enabled then categories = categories + 1 end
         end
@@ -324,6 +327,9 @@ local function ast_term_options(token, language, property_ok)
         }
     end
 
+    if property_ok and type((language.notes or AST_NOTES)[token])=="string" then
+        result[#result+1]={tag="note",name=(language.notes or AST_NOTES)[token]}
+    end
     if property_ok then
         local property = language.properties[token]
 

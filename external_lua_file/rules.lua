@@ -517,7 +517,7 @@ function RW_EvaluateRules(world, generated_rules)
 end
 
 -- M9.3H: relation semantics are level-selected data, separate from parsing.
-local DEFAULT_SEMANTICS = {mimic={noun="mimic"},become={noun="become",negative_noun="forbid_become"},eat={noun="eat",negative_noun="forbid_eat"},make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
+local DEFAULT_SEMANTICS = {play={noun="play",negative_noun="forbid_play"},mimic={noun="mimic"},become={noun="become",negative_noun="forbid_become"},eat={noun="eat",negative_noun="forbid_eat"},make={noun="make",negative_noun="forbid_make"},follow={noun="follow",negative_noun="forbid_follow"},fear={noun="fear",negative_noun="forbid_fear"},is = {property = "grant_trait", noun = "transform", negative_property="deny_trait",negative_noun="forbid_transform"}, has = {noun="contain",negative_noun="forbid_contain"}, write={noun="write_text",negative_noun="forbid_write"}}
 local function semantic_clone(value)
     if type(value) ~= "table" then return value end
     local result = {}
@@ -531,9 +531,9 @@ local function valid_semantics(registry)
         if spec.property == nil and spec.noun == nil then return false end
         for category, operation in pairs(spec) do
             if not ((category == "property" and operation == "grant_trait")
-                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make" or operation == "eat" or operation == "become" or operation == "mimic"))
+                or (category == "noun" and (operation == "transform" or operation == "contain" or operation == "write_text" or operation == "fear" or operation == "follow" or operation == "make" or operation == "eat" or operation == "become" or operation == "mimic" or operation == "play"))
                 or (category == "negative_property" and operation == "deny_trait")
-                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow" or operation == "forbid_make" or operation == "forbid_eat" or operation == "forbid_become"))) then return false end
+                or (category == "negative_noun" and (operation == "forbid_transform" or operation == "forbid_contain" or operation == "forbid_write" or operation == "forbid_fear" or operation == "forbid_follow" or operation == "forbid_make" or operation == "forbid_eat" or operation == "forbid_become" or operation == "forbid_play"))) then return false end
         end
     end
     return true
@@ -1017,6 +1017,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     local contain_bans,contain_origins,contain_verbs={},{},{}
     local write_bans,write_origins,write_verbs={},{},{}
     local predicate_bans={}
+    local play_bans={}
     local function add_ban(store,verb,key,target,condition)
         store[verb]=store[verb] or {};local bans=store[verb]
         bans[key]=bans[key] or {};bans[key][target]=bans[key][target] or {}
@@ -1050,7 +1051,12 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local key=subject_key(subject)
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
-            if sem and key and key~="@empty" and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
+            if sem and key and sem.noun=="play" and obj.tag=="note" and type(obj.name)=="string"
+                and (ast.when.op=="always" or ast.when.op=="spatial") then
+                if objnot then add_ban(play_bans,ast.verb,key,obj.name,ast.when)
+                else relations[#relations+1]={op="play",source_type=key,note=obj.name,when=query_clone(ast.when),verb=ast.verb} end
+                supported=true
+            elseif sem and key and key~="@empty" and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
                 and (not objnot or sem.negative_noun=="forbid_"..sem.noun) then
                 local target=subject_key(obj)
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
@@ -1181,6 +1187,12 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     local filtered={}
     for index,relation in ipairs(relations) do
         local blocked=false
+        if relation.op=="play" then
+            relation.exclusions={}
+            for _,condition in ipairs(((play_bans[relation.verb] or {})[relation.source_type] or {})[relation.note] or {}) do
+                relation.exclusions[#relation.exclusions+1]=condition
+            end
+        end
         if relation.op == "has" then
             local key=relation.target.kind == "class" and "@text" or relation.target.value
             local bans=(contain_bans[contain_verbs[index]] or {})[key] or {}
@@ -1618,4 +1630,129 @@ function RW_PlanMakeProducts(world,relations,converted)
         end
     end
     return products,state~=original_state and {from=original_state,to=state} or nil
+end
+
+
+-- PLAY emits presentation requests; no host audio is called during planning.
+local play_cache
+local function play_data_table()
+    if play_cache then return play_cache end
+    local play_data={freqs={},tunes={baba="beep5",box="drum_kick",rock="drum_snare",key="drum_hat",keke="tune_blop",skull="tune_short2",piano="piano2",guitar="guitar2",sax="sax2",drum="drum_snare",hihat="drum_hat",trumpet="trumpet",frog="frog",fire="burn6",lava="burn5",crystal="clink",gem="clink",shell="clink",vase="clink",mirror="clink",car="honk",water="splash",fish="splash",bubble="splash",crab="splash",bottle="splash",bunny="boing",arm="drum_kick"}}
+
+	local notes = {"c","csharp","d","dsharp","e","f","fsharp","g","gsharp","a","asharp","b"}
+	local octaves = 3
+	local base = 4
+	local step = 2 ^ (1/12)
+	local basefreq = 24000 * (step ^ 3)
+	local freq = basefreq
+	local prev = "b"
+
+	for i,v in ipairs(notes) do
+		play_data.freqs[v] = math.floor(freq)
+
+		freq = freq * step
+	end
+
+	freq = basefreq
+
+	play_data.freqs["aflat"] = freq / step
+
+	for i,v in ipairs(notes) do
+		if (string.sub(v, -5) ~= "sharp") then
+			local name = v .. "flat"
+			local pair = prev .. "sharp"
+
+			if (string.sub(name, 1, 1) == "c") or (string.sub(name, 1, 1) == "f") then
+				pair = prev
+			end
+
+
+			if (play_data.freqs[pair] ~= nil) then
+				play_data.freqs[name] = play_data.freqs[pair]
+			end
+
+			--MF_alert(name .. " = " .. pair)
+
+			prev = v
+		end
+	end
+
+	play_data.freqs["bsharp"] = play_data.freqs["c"]
+	play_data.freqs["esharp"] = play_data.freqs["f"]
+
+	freq = basefreq
+
+	for j_=1,octaves do
+		local j = base + (j_-1)
+		freq = (basefreq * 0.5) * 2 ^ j_
+		prev = "b"
+
+		for i,v in ipairs(notes) do
+			local name = v .. tostring(j)
+			play_data.freqs[name] = math.floor(freq * 0.5)
+
+			freq = freq * step
+		end
+
+		freq = (basefreq * 0.5) * 2 ^ j_
+
+		local aflat = "aflat" .. tostring(j)
+		play_data.freqs[aflat] = freq / step
+
+		for i,v in ipairs(notes) do
+			if (string.sub(v, -5) ~= "sharp") then
+				local name = v .. "flat" .. tostring(j)
+				local pair = prev .. "sharp" .. tostring(j)
+
+				if (string.sub(name, 1, 1) == "c") or (string.sub(name, 1, 1) == "f") then
+					pair = prev .. tostring(j)
+				end
+
+				if (play_data.freqs[pair] ~= nil) and (play_data.freqs[pair] < 100000) then
+					play_data.freqs[name] = play_data.freqs[pair]
+				end
+
+				--MF_alert(name .. " = " .. pair)
+
+				prev = v
+			end
+		end
+	end
+
+	play_data.freqs["bsharp4"] = play_data.freqs["c4"]
+	play_data.freqs["esharp4"] = play_data.freqs["f4"]
+	play_data.freqs["bsharp5"] = play_data.freqs["c5"]
+	play_data.freqs["esharp5"] = play_data.freqs["f5"]
+	play_data.freqs["esharp6"] = play_data.freqs["f6"]
+
+    play_cache=play_data;return play_data
+end
+function RW_ResolvePlayEvents(world,relations)
+    local events={}
+    for _,relation in ipairs(relations or {}) do if relation.op=="play" then
+        local ids,positions={},{}
+        if relation.source_type=="@empty" then
+            local occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
+            for y=1,world.height do for x=1,world.width do if not occupied[x..":"..y] then
+                local enabled,err=RW_RelationApplies(world,relation,{class="empty",x=x,y=y})
+                if enabled==nil then return nil,err end
+                if enabled then positions[#positions+1]={x=x,y=y} end
+            end end end
+        else
+            for id,e in pairs(world.entities) do
+                if (relation.source_type=="@text" and e.class=="text") or (e.class~="text" and e.archetype==relation.source_type) then
+                    local enabled,err=RW_RelationApplies(world,relation,e)
+                    if enabled==nil then return nil,err end
+                    if enabled then ids[#ids+1]=id end
+                end
+            end
+            table.sort(ids);for _,id in ipairs(ids) do local e=world.entities[id];positions[#positions+1]={x=e.x,y=e.y} end
+        end
+        if #positions>0 then
+            local data=play_data_table();local name=relation.source_type=="@text" and "text" or relation.source_type=="@empty" and "empty" or relation.source_type
+            events[#events+1]={kind="play",source_type=relation.source_type,note=relation.note,tune=data.tunes[name] or "beep",
+                frequency=data.freqs[relation.note] or 24000,entity_ids=ids,positions=positions,particles=name~="empty"}
+        end
+    end end
+    return events
 end

@@ -232,3 +232,9 @@
   copies along MIMIC chains. Evaluate combined target/source/negative conditions
   at the imitator identity. Keep duplicate products and the 250-copy TOO COMPLEX
   limit. Internal spatial requirements are conjunctions; see docs/MIMIC.md.
+
+- PLAY emits one transient event per matching rule group before contact destruction,
+  not one sound per unit. Duplicates remain distinct; EMPTY has no particles.
+  Complete note tokens do not enable letter composition. Dispatch requests only
+  after successful whole-tree Commit; current native output is diagnostic logs,
+  with real sound/particle bindings explicitly deferred. See docs/PLAY.md.

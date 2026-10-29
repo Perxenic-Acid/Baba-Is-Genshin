@@ -224,3 +224,11 @@ M9.4L adds MIMIC one-generation rule copying, combined per-identity conditions,
 verb-specific bans and the original 250-copy limit. Source matrix: 96 cases.
 See MIMIC.md for ALL/NOT-subject, EMPTY, scoped LEVEL and GROUP gaps. Next: PLAY,
 then conditions, prefixes, GROUP and properties in the agreed order.
+
+
+M9.4M adds PLAY logic and transient presentation events, dedicated complete note
+tokens, grouped emission and original frequency/tune parameters. Source oracle:
+7,872 cases. Actual native audio/particles remain pending (diagnostic logs only);
+see PLAY.md. Core execution paths now exist for every official verb, with the
+previously documented scoped/special-noun gaps retained. Next: remaining conditions,
+then prefixes, GROUP and properties; letter assembly remains deferred.

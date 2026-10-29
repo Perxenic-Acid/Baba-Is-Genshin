@@ -224,7 +224,7 @@ function RW_PlanTurn(world, action, services)
         if conversion.op == "transform_level" then level_targets[#level_targets+1] = conversion.target_type
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
-        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" then -- Consumed by their scheduled phases, not conversion.
+        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" or conversion.op=="play" then -- Consumed by their scheduled phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     level_traits=level_traits_from(conversions)
@@ -365,6 +365,15 @@ function RW_PlanTurn(world, action, services)
         end
         plan.level_traits=level_traits_from(frozen_relations)
         plan.contact_frame=frozen_rules -- Freeze declarations, re-evaluate conditions/targets.
+        if services.play then
+            local active=false
+            for _,relation in ipairs(frozen_relations or {}) do if relation.op=="play" then active=true;break end end
+            if active then
+                local events,why=services.play(complete,frozen_relations)
+                if not events then return fail("play",why) end
+                plan.events=events;trace[#trace+1]="play"
+            end
+        end
         local weak_new={}
         for _,stage in ipairs(plan.stages) do
             for _,change in ipairs(stage.plan.changes) do
@@ -556,7 +565,7 @@ function RW_PlanLevelAction(tree, action, services)
     local next_tree, update_error = services.update(tree,completed)
     if not next_tree then return fail(update_error) end
     if turn.infinite_loop or turn.too_complex then
-        return {before=tree,after=next_tree,reason=turn.too_complex and "too_complex" or "infinite_loop",changes=turn.changes}
+        return {before=tree,after=next_tree,reason=turn.too_complex and "too_complex" or "infinite_loop",changes=turn.changes,events=turn.events}
     end
     local post_effects, post_error, post_traits
     if turn.contact_frame then
@@ -601,7 +610,7 @@ function RW_PlanLevelAction(tree, action, services)
         end
     end
     return {before=tree,after=next_tree,reason=outcome or turn.reason,changes=turn.changes,select_after_defeat=select_after_defeat,
-        outcome_diagnostic=outcome_diagnostic}
+        outcome_diagnostic=outcome_diagnostic,events=turn.events}
 end
 
 -- Host confirmation entry point, shared with the F interaction binding.
@@ -1074,6 +1083,7 @@ local function start(run_self_tests)
         if not products then return nil,why end
         return world_api:Invoke("RW_PlanCreate",world,products)
     end
+    turn_services.play=function(world,relations) return rules_api:Invoke("RW_ResolvePlayEvents",world,relations) end
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
@@ -1553,6 +1563,9 @@ local function start(run_self_tests)
         end
         local next_tree, result = world_api:Invoke("RW_CommitLevelTree",level_tree,plan)
         if not result.accepted then printerr("[RuleWorld] Tree commit rejected:",result.reason); return false, result.reason end
+        for _,event in ipairs(plan.events or {}) do if event.kind=="play" then
+            print(string.format("[RuleWorld] PLAY %s %s frequency=%s sources=%d",event.source_type,event.note,tostring(event.frequency),#event.positions))
+        end end
         if plan.outcome_diagnostic then print("[RuleWorld] WIN evidence: " .. plan.outcome_diagnostic) end
         level_tree = next_tree
         pending_selection = nil
@@ -1644,7 +1657,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4L initialized")
+    print("[RuleWorld] M9.4M initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

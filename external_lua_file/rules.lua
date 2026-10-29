@@ -1309,7 +1309,7 @@ local function expand_mimic(ast_rules)
     return result
 end
 -- Direct GROUP membership expands declarations, never creates Group entities.
-local function expand_groups(ast_rules,registry)
+local function expand_groups(ast_rules,registry,world)
     local function group(term)
         local raw,negative=unwrap(term)
         if raw and raw.tag=="noun" and raw.type and raw.type.tag=="group" then return raw.type.name,negative end
@@ -1393,6 +1393,15 @@ local function expand_groups(ast_rules,registry)
         end end
     end
     if membership_count>5000 then return nil,"rule_complexity_limit" end
+    local function constant(node)
+        if node.op=="always" then return true end
+        if node.op=="not" then local v=constant(node.condition);if v~=nil then return not v end;return nil end
+        local terms=node.op=="all" and node.terms or (node.op=="spatial" and #(node.clauses or {})==0 and node.requirements)
+        if not terms then return nil end
+        local known=true
+        for _,term in ipairs(terms) do local v=constant(term);if v==false then return false elseif v==nil then known=false end end
+        if known then return true end
+    end
     local teams={}
     for _,member in ipairs(positive) do
         local name,key=member.name,member.key
@@ -1401,7 +1410,27 @@ local function expand_groups(ast_rules,registry)
         for _,ban in ipairs((bans[name] or {})[key] or {}) do
             condition=combine(condition,invert_mimic_condition(ban.when))
         end
-        teams[name][#teams[name]+1]={term=member.term,when=condition}
+        if constant(condition)~=false then teams[name][#teams[name]+1]={term=member.term,when=condition} end
+    end
+    local function complement(name,branch)
+        local result,seen={},{}
+        if branch then
+            for _,member in ipairs(teams[name] or {}) do
+                seen[member_key(member.term)]=true
+                local inverse=invert_mimic_condition(member.when)
+                if constant(inverse)~=false then result[#result+1]={term=member.term,when=inverse} end
+            end
+        end
+        for _,noun in ipairs(RW_NounPalette(world)) do
+            local condition={op="always"}
+            if not branch then
+                for _,member in ipairs(teams[name] or {}) do if member_key(member.term)==noun then
+                    condition=combine(condition,invert_mimic_condition(member.when))
+                end end
+            end
+            if not seen[noun] and constant(condition)~=false then result[#result+1]={term=noun_term(noun),when=condition} end
+        end
+        return result
     end
     local expanded,deferred={},{}
     local function emit(rule,subject,object,condition)
@@ -1414,14 +1443,38 @@ local function expand_groups(ast_rules,registry)
         local is_member=membership(rule)
         local source,source_not=group(rule.subject);local target,target_not=group(rule.object)
         if transfer_rules[rule] then -- Closure already consumed this declaration.
-        elseif condition_group(rule.when) or (source and source_not) or (target and target_not and not is_member)
-            or (target and rule.verb=="is" and not is_member)
-            or (source and target) or ((source or target) and rule.verb=="mimic") then
+        elseif condition_group(rule.when) or ((source or target) and rule.verb=="mimic")
+            or (target and rule.verb=="is" and not source and not is_member)
+            or (source and source_not and target and source~=target and rule.verb=="is") then
             deferred[#deferred+1]=rule
         elseif is_member then -- Membership is a declaration, not an IS conversion.
+        elseif source and target then
+            if source==target and rule.verb=="is" and source_not~=target_not then
+                local team=source_not and complement(source,true) or (teams[source] or {})
+                for _,member in ipairs(team) do
+                    local crash=query_clone(rule);crash.verb="is"
+                    local ok,err=emit(crash,member.term,{tag="property",name="crash"},member.when)
+                    if not ok then return nil,err end
+                end
+            elseif not target_not then
+                local first=source_not and complement(source,true) or (teams[source] or {})
+                local prevents={op="always"}
+                if not source_not and rule.verb~="is" then for _,ban in ipairs(ast_rules) do
+                    local bs,bn=group(ban.subject);local bt,btn=group(ban.object)
+                    if bs==source and not bn and bt==target and btn and ban.verb==rule.verb and not condition_group(ban.when) then
+                        prevents=combine(prevents,invert_mimic_condition(ban.when))
+                    end
+                end end
+                for _,a in ipairs(first) do for _,b in ipairs(teams[target] or {}) do
+                    local ok,err=emit(rule,a.term,b.term,combine(a.when,b.when,prevents))
+                    if not ok then return nil,err end
+                end end
+            end -- Other group-to-negative-group declarations are bans only.
         elseif source or target then
-            for _,member in ipairs(teams[source or target] or {}) do
-                local ok,err=emit(rule,source and member.term or rule.subject,target and member.term or rule.object,member.when)
+            local team=source and source_not and complement(source,false) or (teams[source or target] or {})
+            for _,member in ipairs(team) do
+                local object=target and (target_not and {tag="not",operand=member.term} or member.term) or rule.object
+                local ok,err=emit(rule,source and member.term or rule.subject,object,member.when)
                 if not ok then return nil,err end
             end
         else
@@ -1438,7 +1491,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     if registry.mimic and registry.mimic.noun=="mimic" then
         local expanded,err=expand_mimic(ast_rules);if not expanded then return nil,err end;ast_rules=expanded
     end
-    local expanded,group_deferred=expand_groups(ast_rules,registry)
+    local expanded,group_deferred=expand_groups(ast_rules,registry,world)
     if not expanded then return nil,group_deferred end
     ast_rules=expanded
     local generated,deferred,relations={},group_deferred,{}

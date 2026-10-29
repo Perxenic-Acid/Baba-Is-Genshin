@@ -284,4 +284,7 @@
   and per-source membership/consumer conditions. Never turn GROUP into an archetype.
   Cross-group transfers use original consumed-edge order and cumulative member
   conditions, before exclusions; preserve duplicate members and bound positive/negative
-  expansion. Complements/condition parameters remain deferred; see docs/GROUP.md.
+  expansion. NOT GROUP ordinary consumers use strict all-declaration complement;
+  cartesian negative sources use separate inverse member branches. Same-group IS
+  identity/CRASH follows the original. Condition parameters/negative-source IS
+  recursion and malformed nested inversion parity remain pending; see docs/GROUP.md.

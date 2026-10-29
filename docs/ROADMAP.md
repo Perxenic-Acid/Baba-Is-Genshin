@@ -300,3 +300,11 @@ cumulative-condition semantics, source exclusions applied after raw transfer.
 4,096 installed-source graph cases plus direct-member regression, bounds and Undo.
 Remaining GROUP work: NOT GROUP consumers/targets, group condition parameters,
 same-group special cases and negative-source recursion.
+
+## M9.4X — GROUP complements and same-group semantics
+
+NOT GROUP consumers/negative targets, cartesian group endpoints and same-group
+identity/CRASH rules. Production regressions and original-source matrix cover
+11,340 valid identity frames; 324 malformed original conditional frames are
+explicit parity gaps (GROUP.md), not successful comparisons. Next: group condition
+parameters, negative-source IS recursion and remaining membership syntax.

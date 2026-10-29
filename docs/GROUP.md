@@ -1,4 +1,4 @@
-# GROUP membership and ordered transfer (M9.4V–M9.4W)
+# GROUP membership, transfer and complements (M9.4V–M9.4X)
 
 Installed primary references: base Data/rules.lua code() invokes subrules then
  grouprules at 138-139; grouprules 1573-2331 categorizes memberships, combines
@@ -28,8 +28,7 @@ physical rules, including membership declarations with no consumer. No renderer,
 world-state or Undo-owned membership cache is introduced.
 
 Deliberate first-stage gaps are explicitly deferred, not converted into objects:
-- Same-group identity/contradiction rules and negative-source group recursion.
-- NOT GROUP consumers/targets and GROUP inside condition parameters.
+- Negative-source cross-group IS recursion and GROUP inside condition parameters.
 - ALL/NOT noun/scoped LEVEL membership declarations.
 - MIMIC with a GROUP endpoint (ordinary MIMIC copying an IS GROUP declaration
   before the group pass works through the existing one-generation expansion).
@@ -72,4 +71,52 @@ source/destination exclusions, duplicate edges, bounds and whole-tree Undo.
 The installed-source graph oracle tests all 64 directed three-group graphs in two
 edge orders, with duplicate/conditional/overlap/negative-transfer variants:
 4,096 cases. The previous 648 direct-membership cases remain passing.
-Next: NOT GROUP consumers, group parameters and same-group special cases.
+Next: group parameters and negative-source cross-group IS recursion.
+
+## M9.4X: complements and same-group special cases
+
+Primary references: grouprules 2018-2170 (cartesian group endpoints and strict
+ordinary NOT GROUP consumers), 2208-2245 (ordinary negative group targets),
+2248-2331 (same-group CRASH). tools.lua findnoun 2288 and syntax.lua nlist.full
+879 confirm the ordinary complement palette excludes GROUP/ALL/TEXT/EMPTY/LEVEL.
+
+Simple NOT GROUP consumers require all membership declarations of that ordinary
+noun to be false, tested per source identity. Unconditionally excluded members
+are removed before complement construction. Complement expansion uses authored
+ordinary vocabulary, never the current surviving entity list or special nouns.
+Ordinary RHS NOT GROUP on non-IS predicates expands negative member products;
+existing verb-specific bans determine the resulting behavior.
+
+Group-to-group non-membership consumers use the original cartesian expansion.
+A negative source in this form uses separate inverted conditional member branches,
+plus ordinary names not declared as members. Target membership conditions still
+apply to the source unit, as in the original. Negative RHS group declarations
+on positive group consumers supply conditional bans rather than products.
+
+GROUP IS GROUP emits the member cartesian rules, including each identity rule:
+existing IS identity protection therefore blocks conflicting conversions.
+GROUP IS NOT GROUP gives CRASH to members. NOT GROUP IS GROUP gives CRASH to
+nonmember branches. NOT GROUP IS NOT GROUP emits no rules in this source path.
+CRASH uses the existing surviving-unit Infinite Loop phase and only-Undo lock.
+Negative-source IS between different group names remains deferred (evilrecursion
+requires its own bounded membership solver). Group condition parameters also remain
+pending; this round does not claim GROUP completion.
+
+Known deliberate parity gap: original invertconds can double-invert already
+parenthesized membership exclusions into names such as '(lonely))'. Installed
+testcond then strips one closing parenthesis, fails to find 'lonely)', alerts and
+uses its invalid-condition fallback. RuleWorld retains structured Boolean
+inversion for these nested wrappers instead of recreating malformed-name fallback.
+Exact flattened named-condition inversion of nested wrappers (including WITHOUT's
+non-Boolean NOT behavior) is not claimed. This is separate from supported simple
+named-condition inversion and is explicitly retained as unfinished parity work.
+
+Validation: production regressions cover conditional complements, excluded members,
+negative HAS, cartesian identity protection, CRASH lock and whole-tree Undo.
+The oracle executes installed grouprules, invertconds and testcond; only primitive
+LONELY/host data are normalized. Across 3,888 matrix cases (11,664 identity frames),
+11,340 valid original frames match; 324 original malformed-name frames are counted
+and excluded from parity assertions, never reported as matching. Prior 648 direct
+and 4,096 ordered-transfer matrices remain passing. Normal startup is 1,989,000
+instructions under the unchanged 2M cap. Offline results do not establish native
+runtime parity.

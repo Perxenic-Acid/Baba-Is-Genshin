@@ -82,7 +82,7 @@ w=projection(s);assert(w.empty_cells['1:1'].behaviors.safe)
 s=fixture({{'GROUP','IS','GROUP2'},{'GROUP2','IS','FLOAT'}})
 w,f=projection(s);assert(#f.deferred==0)
 s=fixture({{'AVATAR','ON','GROUP','IS','FLOAT'}})
-w,f=projection(s);assert(#f.deferred==1 and not w.entities[1].behaviors.float)
+w,f=projection(s);assert(#f.deferred==0 and not w.entities[1].behaviors.float)
 s=fixture({{'NOT','GROUP','IS','FLOAT'}})
 w,f=projection(s);assert(#f.deferred==0 and w.entities[1].behaviors.float)
 s=fixture({{'ROCK','IS','GROUP'},{'GROUP','IS','FLOAT'}})
@@ -136,3 +136,41 @@ s=fixture({{'ROCK','IS','GROUP'},{'AVATAR','HAS','ROCK'},{'AVATAR','HAS','NOT','
 n,p=step(s);local rocks=0;for _,e in pairs(n.world.entities) do if e.archetype=='rock' then rocks=rocks+1 end end
 assert(rocks==1,'negative group product forbids the matching HAS birth')
 print('PASS: NOT GROUP per-identity complements, negative HAS, same-group CRASH/lock/Undo and cartesian identity protection')
+
+-- GROUP condition parameters expand all live member noun declarations.
+s=fixture({{'ROCK','IS','GROUP'},{'FLAG','IS','GROUP'},{'AVATAR','ON','GROUP','IS','FLOAT'}})
+s.world.entities[1].x=6;s.world.entities[1].y=3
+w=projection(s);assert(not w.entities[1].behaviors.float,'ON GROUP needs all expanded nouns')
+object(s.world,3,'flag',6,3);w=projection(s);assert(w.entities[1].behaviors.float)
+s=fixture({{'ROCK','IS','GROUP'},{'ROCK','IS','GROUP'},{'AVATAR','NEAR','GROUP','IS','FLOAT'}})
+s.world.entities[1].x=6;s.world.entities[1].y=3;w=projection(s);assert(not w.entities[1].behaviors.float)
+object(s.world,3,'rock',7,3);w=projection(s);assert(w.entities[1].behaviors.float,'duplicate member parameters require distinct witnesses')
+s=fixture({{'ROCK','NEAR','FLAG','IS','GROUP'},{'AVATAR','ON','GROUP','IS','FLOAT'}})
+s.world.entities[2].x=2;s.world.entities[2].y=2
+object(s.world,3,'flag',20,20);object(s.world,4,'rock',20,20)
+w=projection(s);assert(w.entities[1].behaviors.float,'any qualifying member promotes the whole noun for condition parameters')
+s.world.entities[4]=nil;w=projection(s);assert(not w.entities[1].behaviors.float)
+s=fixture({{'AVATAR','WITHOUT','GROUP','IS','FLOAT'}})
+w=projection(s);assert(w.entities[1].behaviors.float,'missing group passes WITHOUT via a missing-name sentinel')
+s=fixture({{'ROCK','IS','GROUP'},{'AVATAR','ON','GROUP','BECOME','FLAG'}})
+s.world.entities[1].x=6;s.world.entities[1].y=3
+n,p=step(s);assert(n.world.entities[1].archetype=='flag')
+s=fixture({{'ROCK','IS','GROUP'},{'AVATAR','ON','GROUP','HAS','FLAG'},{'AVATAR','IS','YOU','AND','DEFEAT'}})
+s.world.entities[1].x=6;s.world.entities[1].y=3
+n,p=step(s);local found=false;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then found=true end end;assert(found)
+s=fixture({{'ROCK','IS','GROUP'},{'AVATAR','ON','GROUP','IS','WORD'}})
+s.world.entities[1].x=6;s.world.entities[1].y=3
+w,f=projection(s);assert(f.word_tokens[1]=='AVATAR')
+s=fixture({{'ROCK','ON','GROUP','IS','GROUP'}})
+w,f=projection(s);assert(#f.deferred==1,'recursive group membership remains deferred')
+assert(not s.world.group_members and not s.world._condition_rules)
+print('PASS: GROUP condition parameters, all-member/duplicate witnesses, global conditional nouns, empty group, conversion/HAS/WORD and Undo')
+
+s=fixture({{'TEXT','IS','GROUP'},{'AVATAR','ON','GROUP','IS','FLOAT'}})
+s.world.entities[1].x=4;s.world.entities[1].y=4
+s.world.entities[100]={id=100,kind='object',class='text',text={name='ROCK'},x=4,y=4,direction='None'}
+s.world.next_entity_id=101
+w,f=projection(s);assert(w.entities[1].behaviors.float)
+for _,rule in ipairs(f.ast) do for _,id in ipairs(rule.source.sentence_entity_ids or rule.source.entity_ids) do assert(f.active_text_ids[id]) end end
+s=fixture({{'EMPTY','NEAR','AVATAR','IS','GROUP'},{'AVATAR','WITHOUT','GROUP','IS','FLOAT'}})
+w=projection(s);assert(w.entities[1].behaviors.float,'conditional Empty lacks real unitlists in original findgroup')

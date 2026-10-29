@@ -1,4 +1,4 @@
-# GROUP membership, transfer and complements (M9.4V–M9.4X)
+# GROUP membership, transfer, complements and parameters (M9.4V–M9.4Y)
 
 Installed primary references: base Data/rules.lua code() invokes subrules then
  grouprules at 138-139; grouprules 1573-2331 categorizes memberships, combines
@@ -28,7 +28,7 @@ physical rules, including membership declarations with no consumer. No renderer,
 world-state or Undo-owned membership cache is introduced.
 
 Deliberate first-stage gaps are explicitly deferred, not converted into objects:
-- Negative-source cross-group IS recursion and GROUP inside condition parameters.
+- Negative-source cross-group IS recursion and recursive membership conditions.
 - ALL/NOT noun/scoped LEVEL membership declarations.
 - MIMIC with a GROUP endpoint (ordinary MIMIC copying an IS GROUP declaration
   before the group pass works through the existing one-generation expansion).
@@ -99,8 +99,8 @@ GROUP IS NOT GROUP gives CRASH to members. NOT GROUP IS GROUP gives CRASH to
 nonmember branches. NOT GROUP IS NOT GROUP emits no rules in this source path.
 CRASH uses the existing surviving-unit Infinite Loop phase and only-Undo lock.
 Negative-source IS between different group names remains deferred (evilrecursion
-requires its own bounded membership solver). Group condition parameters also remain
-pending; this round does not claim GROUP completion.
+requires its own bounded membership solver). Nonrecursive group condition parameters are added in M9.4Y below; recursive
+membership conditions remain pending. This does not claim GROUP completion.
 
 Known deliberate parity gap: original invertconds can double-invert already
 parenthesized membership exclusions into names such as '(lonely))'. Installed
@@ -120,3 +120,53 @@ and excluded from parity assertions, never reported as matching. Prior 648 direc
 and 4,096 ordered-transfer matrices remain passing. Normal startup is 1,989,000
 instructions under the unchanged 2M cap. Offline results do not establish native
 runtime parity.
+
+## M9.4Y: nonrecursive condition parameters
+
+Primary source: tools.lua findgroup()/hasconds() 2300-2446; conditions.lua
+ testcond() group parameter insertion/removal 135-208. A condition GROUP expands
+all active member noun declarations, not a per-witness membership predicate.
+Unconditional members contribute a name even if absent. Conditional declarations
+contribute once if any real unit of that name satisfies the member condition.
+Thus a distant qualifying Rock enables a nearby nonqualifying Rock to satisfy
+ON GROUP. Duplicate declarations contribute duplicate required parameters.
+Conditional EMPTY has no real unitlist and contributes nothing in this source path.
+Text can contribute through its real unitlist. Membership checks ignore FLOAT.
+
+NOT GROUP parameters expand the currently missing ordinary noun names, uniquely,
+rather than applying NOT to each positive member. The original short noun exclusion
+also allows authored LEVEL; RuleWorld includes it when LEVEL is in the authored
+language. Empty groups inject the original missing-name sentinel _NONE_, preserving
+ON/NEAR failure and WITHOUT shortage semantics rather than treating an empty list
+as trivially true. Existing condition solvers own distinct witnesses and NOT.
+
+Parameter processing reproduces the installed order: reverse concrete parameters,
+keep complement parameters, scan the mutable list, insert positive group names at
+the front and negative-group names at the end, then remove recorded placeholders.
+The original scans ordinary entries too and can append _NONE_ / stop early, leaving
+unexpanded names in mixed or repeated group forms. This behavior is deliberately
+preserved, not silently changed to set union. The source matrix includes these
+mixed/repeated forms and positive/negative WITHOUT.
+
+Lowering carries a transient effect-free group_members declaration in the compiled
+frame. contains_rule_query detects typed group parameters; rule projection and
+relation queries receive that frame. A query refreshes qualifying units against
+current phase positions/deletions while preserving frozen declarations for contact
+and HAS. No membership/parameter cache or new world fields are persisted. Guards
+bound indirect rule-query dependencies; depth exhaustion uses word_rule_limit.
+Direct GROUP-in-condition membership declarations and conditional cross-group
+transfers remain deferred until the explicit recursive member solver is implemented.
+Negative-source IS recursion and earlier malformed nested inversion parity gaps
+remain unfinished. Group endpoints in MIMIC and ALL/NOT/LEVEL membership syntax
+also retain the prior documented limits.
+
+Production tests cover all-member and duplicate witnesses, global conditional-name
+promotion, empty groups, physical Text, virtual Empty, activation, conversion,
+HAS, WORD and whole-tree Undo. The 9,720-case oracle executes installed grouprules,
+findgroup/hasconds and testcond parameter preprocessing; primitive ON/NEAR/WITHOUT
+checks are delegated to the already tested production solver, not claimed as an
+independent original primitive-condition oracle. It varies channels, duplicates,
+conditional/negative memberships, nearby/remote units, mixed/repeated parameters,
+positive/negative conditions. Prior group source matrices remain passing.
+Native success is not inferred; the unchanged production startup budget is 2M.
+Next: recursive membership conditions and negative-source group IS recursion.

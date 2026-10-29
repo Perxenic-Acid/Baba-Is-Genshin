@@ -133,6 +133,12 @@ end
 local evaluate_condition
 local function contains_rule_query(node)
     if type(node)~="table" then return false end
+    for _,clause in ipairs(node.clauses or {}) do
+        for _,term in ipairs(clause.parameters or {}) do
+            local raw=term;while type(raw)=="table" and raw.tag=="not" do raw=raw.operand end
+            if type(raw)=="table" and raw.tag=="noun" and raw.type and raw.type.tag=="group" then return true end
+        end
+    end
     for _,clause in ipairs(node.clauses or {}) do if clause.relation=="seeing" or clause.relation=="feeling" or clause.relation=="powered" or clause.relation=="powered2" or clause.relation=="powered3" then return true end end
     if contains_rule_query(node.condition) then return true end
     for _,term in ipairs(node.terms or {}) do if contains_rule_query(term) then return true end end
@@ -260,6 +266,42 @@ local function powered_condition(world,trait,negated)
     end
     guard[key]=nil
     return negated and not found or not negated and found
+end
+-- findgroup() promotes a conditional member's noun when ANY real unit qualifies.
+local function group_parameters(world,name,invert)
+    local guard=world._condition_guard or {};local key="members:"..name
+    if guard[key] then return {} end
+    if (world._condition_depth or 0)>=80 then return nil,"word_rule_limit" end
+    guard[key]=true
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
+    local result,found={},{}
+    for _,rule in ipairs(world._condition_rules or {}) do
+        for _,member in ipairs((rule.group_members or {})[name] or {}) do
+            local active=member.when.op=="always"
+            if not active then
+                local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+                for _,id in ipairs(ids) do
+                    local e=world.entities[id]
+                    if (member.name=="@text" and e.class=="text") or (e.class~="text" and e.archetype==member.name) then
+                        local enabled,err=RW_TestEntityCondition(context,member.when,e)
+                        if enabled==nil then guard[key]=nil;return nil,err end
+                        if enabled then active=true;break end
+                    end
+                end
+            end
+            if active then result[#result+1]=member.name;found[member.name]=true end
+        end
+    end
+    guard[key]=nil
+    if invert then
+        result={}
+        for _,noun in ipairs(RW_NounPalette(world)) do if not found[noun] then result[#result+1]=noun end end
+        for _,noun in pairs((world.language or {}).nouns or {}) do
+            if type(noun)=="table" and noun.tag=="level" and not found["@level"] then result[#result+1]="@level";break end
+        end
+    end
+    return result
 end
 local function seeing_condition(world,parameters,entity,negated)
     local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
@@ -404,7 +446,7 @@ function RW_TestEntityCondition(world,node,entity)
             if type(term) ~= "table" then return nil end
             if term.tag ~= "not" then
                 if term.tag == "noun" and type(term.type) == "table" then
-                    return term.type.tag == "level" and "@level" or term.type.name,negative
+                    return term.type.tag=="group" and ("@group:"..term.type.name) or term.type.tag == "level" and "@level" or term.type.name,negative
                 elseif term.tag == "special" then return "@" .. term.name,negative
                 elseif term.tag == "property" and (term.name=="right" or term.name=="up" or term.name=="left" or term.name=="down") then
                     return "@direction:"..term.name,negative
@@ -444,6 +486,28 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
+        -- Follow testcond's insertion/removal order, including multiple group tokens.
+        local remove,offset={},0
+        local count=#parameters
+        local hasgroup=false
+        for _,parameter in ipairs(parameters) do if parameter.name:sub(1,7)=="@group:" then hasgroup=true;break end end
+        for index=1,hasgroup and count or 0 do
+            local parameter=parameters[index]
+            if parameter.name:sub(1,7)=="@group:" then
+                local members,err=group_parameters(world,parameter.name:sub(8),parameter.negative)
+                if not members then return nil,err end
+                remove[#remove+1]=index
+                for _,name in ipairs(members) do
+                    if parameter.negative then parameters[#parameters+1]={name=name}
+                    else table.insert(parameters,1,{name=name});offset=offset-1 end
+                end
+                if #members==0 then parameters[#parameters+1]={name="_NONE_"};break end
+            else
+                -- Original group preprocessing aborts even on an ordinary token.
+                parameters[#parameters+1]={name="_NONE_"};break
+            end
+        end
+        for _,index in ipairs(remove) do table.remove(parameters,index-offset);offset=offset+1 end
         if clause.relation=="often" or clause.relation=="seldom" then
             if #parameters~=0 or (clause.chance_key~=nil and type(clause.chance_key)~="string") then return nil,"invalid_chance_clause" end
             local identity=entity.class=="empty" and ("empty:"..entity.x..":"..entity.y) or tostring(entity.id)
@@ -1410,7 +1474,7 @@ local function expand_groups(ast_rules,registry,world)
         for _,ban in ipairs((bans[name] or {})[key] or {}) do
             condition=combine(condition,invert_mimic_condition(ban.when))
         end
-        if constant(condition)~=false then teams[name][#teams[name]+1]={term=member.term,when=condition} end
+        if constant(condition)~=false then teams[name][#teams[name]+1]={term=member.term,when=condition,name=key} end
     end
     local function complement(name,branch)
         local result,seen={},{}
@@ -1443,7 +1507,7 @@ local function expand_groups(ast_rules,registry,world)
         local is_member=membership(rule)
         local source,source_not=group(rule.subject);local target,target_not=group(rule.object)
         if transfer_rules[rule] then -- Closure already consumed this declaration.
-        elseif condition_group(rule.when) or ((source or target) and rule.verb=="mimic")
+        elseif (condition_group(rule.when) and target and rule.verb=="is" and source~=target) or ((source or target) and rule.verb=="mimic")
             or (target and rule.verb=="is" and not source and not is_member)
             or (source and source_not and target and source~=target and rule.verb=="is") then
             deferred[#deferred+1]=rule
@@ -1481,7 +1545,7 @@ local function expand_groups(ast_rules,registry,world)
             expanded[#expanded+1]=rule
         end
     end
-    return expanded,deferred
+    return expanded,deferred,teams
 end
 
 function RW_LowerRuleAST(ast_rules, registry, world)
@@ -1491,10 +1555,11 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     if registry.mimic and registry.mimic.noun=="mimic" then
         local expanded,err=expand_mimic(ast_rules);if not expanded then return nil,err end;ast_rules=expanded
     end
-    local expanded,group_deferred=expand_groups(ast_rules,registry,world)
+    local expanded,group_deferred,group_members=expand_groups(ast_rules,registry,world)
     if not expanded then return nil,group_deferred end
     ast_rules=expanded
     local generated,deferred,relations={},group_deferred,{}
+    if group_members then generated[1]={when={op="always"},effects={},group_members=group_members} end
     local contain_bans,contain_origins,contain_verbs={},{},{}
     local write_bans,write_origins,write_verbs={},{},{}
     local predicate_bans={}

@@ -286,5 +286,9 @@
   conditions, before exclusions; preserve duplicate members and bound positive/negative
   expansion. NOT GROUP ordinary consumers use strict all-declaration complement;
   cartesian negative sources use separate inverse member branches. Same-group IS
-  identity/CRASH follows the original. Condition parameters/negative-source IS
-  recursion and malformed nested inversion parity remain pending; see docs/GROUP.md.
+  identity/CRASH follows the original. Nonrecursive condition parameters use a
+  transient compiled group_members frame: any qualifying real unit promotes its
+  noun globally, duplicate declarations retain duplicate parameters. Preserve
+  original mutable parameter insertion/removal and missing-name behavior. Recursive
+  membership/negative-source IS and malformed nested inversion remain pending;
+  see docs/GROUP.md.

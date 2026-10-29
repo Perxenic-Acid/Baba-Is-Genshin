@@ -308,3 +308,11 @@ identity/CRASH rules. Production regressions and original-source matrix cover
 11,340 valid identity frames; 324 malformed original conditional frames are
 explicit parity gaps (GROUP.md), not successful comparisons. Next: group condition
 parameters, negative-source IS recursion and remaining membership syntax.
+
+## M9.4Y — GROUP condition parameters
+
+Nonrecursive GROUP/NOT GROUP parameter lookup through frozen compiled membership
+frames, global conditional-noun promotion, duplicate witnesses, original mutable
+parameter order and missing-name behavior. Original preprocessing oracle: 9,720
+cases; production conversion/HAS/WORD/Undo coverage. Next: recursive membership
+conditions and negative-source cross-group IS membership.

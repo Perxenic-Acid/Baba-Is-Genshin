@@ -251,3 +251,10 @@ M9.4P adds SEEING, guarded frame-based visibility/occlusion queries and HIDE as
 a prerequisite, including temporary renderer visibility. Installed seeing() plus
 simplecheck() oracle: 29,952 cases. See SEEING.md for virtual facing/recursive-cache
 boundaries. Next: FEELING and POWERED conditions, then prefixes/GROUP/properties.
+
+
+M9.4Q adds FEELING property/declaration queries, complements and consumed condition
+instances, reusing transient guarded frames. Installed source matrix: 2,880 cases;
+startup 1,949,000 instructions. FEELING completes the catalog condition category
+within documented scopes. POWERED is type 3 (prefix), so next is prefix parsing
+and POWERED families, then other prefixes/GROUP/properties. See FEELING.md.

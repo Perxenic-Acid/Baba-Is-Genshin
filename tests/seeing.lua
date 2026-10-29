@@ -100,7 +100,7 @@ w=projection(s);assert(w.entities[1].behaviors.push,'FLOAT does not restrict sig
 s=scene({{'AVATAR','SEEING','ROCK','IS','PUSH'}})
 object(s.world,3,'crate',4,3);s.world.entities[3].behaviors={block_entry=true,hide=true}
 w=projection(s);assert(w.entities[1].behaviors.push,'never inherit old projected facts')
-assert(not s.world._seeing_rules and not s.world._seeing_guard)
+assert(not s.world._condition_rules and not s.world._condition_guard)
 s=scene({{'AVATAR','SEEING','ROCK','IS','PUSH'},{'ROCK','SEEING','AVATAR','IS','HIDE'}})
 s.world.entities[2].direction='Left';w=projection(s);assert(w.entities[2].behaviors.hide and not w.entities[1].behaviors.push)
 s=scene({{'ROCK','SEEING','ROCK','IS','STOP'}})

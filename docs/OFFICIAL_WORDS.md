@@ -19,7 +19,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | condition | BESIDERIGHT | implemented within documented scope |
 | condition | FACEDBY | implemented within documented scope |
 | condition | FACING | implemented within documented scope |
-| condition | FEELING | pending |
+| condition | FEELING | implemented within documented scope |
 | condition | NEAR | implemented within documented scope |
 | condition | NEXTTO | implemented within documented scope |
 | condition | ON | implemented within documented scope |

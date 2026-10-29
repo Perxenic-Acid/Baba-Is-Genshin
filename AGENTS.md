@@ -255,3 +255,9 @@
   with transient condition_rules, never inherited behaviors; keep recursion guards
   outside persisted state. Preserve original EMPTY placeholder quirks. HIDE only
   affects visibility, not reading/collision/SELECT. See docs/SEEING.md.
+
+- FEELING queries property declarations for the current identity/cell. NOT property
+  means another positive property, not absence. Repeated parameters consume distinct
+  condition instances, including failed tests; do not reuse one declaration. Share
+  transient condition_rules with SEEING, preserve frozen frames and keep checked
+  conditions out of world/Undo. POWERED belongs to prefix syntax. See docs/FEELING.md.

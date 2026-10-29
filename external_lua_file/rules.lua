@@ -133,7 +133,7 @@ end
 local evaluate_condition
 local function contains_rule_query(node)
     if type(node)~="table" then return false end
-    for _,clause in ipairs(node.clauses or {}) do if clause.relation=="seeing" or clause.relation=="feeling" then return true end end
+    for _,clause in ipairs(node.clauses or {}) do if clause.relation=="seeing" or clause.relation=="feeling" or clause.relation=="powered" or clause.relation=="powered2" or clause.relation=="powered3" then return true end end
     if contains_rule_query(node.condition) then return true end
     for _,term in ipairs(node.terms or {}) do if contains_rule_query(term) then return true end end
     for _,term in ipairs(node.requirements or {}) do if contains_rule_query(term) then return true end end
@@ -156,7 +156,7 @@ local function query_trait(world,entity,trait)
     local granted,denied=false,false
     for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
         for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
-            if effect.trait==trait and effect.target and valid_selector(effect.target,world) and matches(entity,effect.target,world) then
+            if effect.trait==trait and effect.target and valid_selector(effect.target,world) and ((entity.class=="empty" and effect.target.kind=="empty") or (entity.class~="empty" and matches(entity,effect.target,world))) then
                 local enabled,err
                 if rule.when and rule.when.op=="spatial" then enabled,err=RW_TestEntityCondition(context,rule.when,entity)
                 else enabled,err=evaluate_condition(context,rule.when) end
@@ -225,6 +225,41 @@ local function feeling_condition(world,parameters,entity,negated,node)
     end
     local result=found==#parameters
     return negated and not result or not negated and result
+end
+local function powered_condition(world,trait,negated)
+    local guard=world._condition_guard or {};local key="global:"..trait
+    if guard[key] then return negated end
+    if (world._condition_depth or 0)>=80 then return nil,"word_rule_limit" end
+    guard[key]=true
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
+    local found,empty_source=false,false
+    for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
+        for _,rule in ipairs(rules) do
+            if rule.scoped_power and rule.scoped_power[trait] then found=true end
+            for _,effect in ipairs(rule.effects or {}) do
+                if effect.op=="grant_trait" and effect.trait==trait and effect.target.kind=="empty" then empty_source=true end
+            end
+        end
+    end
+    if not found then
+        local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+        for _,id in ipairs(ids) do
+            local active,err=query_trait(context,world.entities[id],trait)
+            if active==nil then guard[key]=nil;return nil,err end
+            if active then found=true;break end
+        end
+    end
+    if not found and empty_source then
+        local occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
+        for y=1,world.height do for x=1,world.width do if not found and not occupied[x..":"..y] then
+            local active,err=query_trait(context,{class="empty",x=x,y=y},trait)
+            if active==nil then guard[key]=nil;return nil,err end
+            found=active
+        end end end
+    end
+    guard[key]=nil
+    return negated and not found or not negated and found
 end
 local function seeing_condition(world,parameters,entity,negated)
     local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
@@ -388,8 +423,8 @@ function RW_TestEntityCondition(world,node,entity)
     for _,clause in ipairs(node.clauses) do
         if type(clause) ~= "table" or (clause.relation ~= "on" and clause.relation ~= "near" and clause.relation ~= "nextto"
                 and clause.relation ~= "above" and clause.relation ~= "below" and clause.relation ~= "besideleft"
-                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing" and clause.relation ~= "feeling")
-            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or #clause.parameters == 0 then
+                and clause.relation ~= "besideright" and clause.relation ~= "facing" and clause.relation ~= "without" and clause.relation ~= "facedby" and clause.relation ~= "seeing" and clause.relation ~= "feeling" and clause.relation ~= "powered" and clause.relation ~= "powered2" and clause.relation ~= "powered3")
+            or type(clause.negated) ~= "boolean" or not dense_list(clause.parameters) or (#clause.parameters == 0 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3") then
             return nil,"invalid_spatial_clause"
         end
         local parameters={}
@@ -409,7 +444,12 @@ function RW_TestEntityCondition(world,node,entity)
             if parameter.negative then ordered[#ordered+1]=parameter else table.insert(ordered,1,parameter) end
         end
         parameters=ordered
-        if clause.relation=="feeling" then
+        if clause.relation=="powered" or clause.relation=="powered2" or clause.relation=="powered3" then
+            if #parameters~=0 then return nil,"invalid_prefix_parameters" end
+            local found,err=powered_condition(world,clause.relation:gsub("powered","power"),clause.negated)
+            if found==nil then return nil,err end
+            result=result and found
+        elseif clause.relation=="feeling" then
             local found,err=feeling_condition(world,parameters,entity,clause.negated,node)
             if found==nil then return nil,err end
             result=result and found
@@ -1467,6 +1507,15 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         end
         if not blocked then filtered[#filtered+1]=relation end
     end
+    local scoped_power,denied_power={},{}
+    for _,relation in ipairs(filtered) do
+        if relation.trait=="power" or relation.trait=="power2" or relation.trait=="power3" then
+            if relation.op=="level_trait" then scoped_power[relation.trait]=true
+            elseif relation.op=="deny_level_trait" then denied_power[relation.trait]=true end
+        end
+    end
+    for trait in pairs(denied_power) do scoped_power[trait]=nil end
+    if next(scoped_power) then generated[#generated+1]={when={op="always"},effects={},scoped_power=scoped_power} end
     for _,relation in ipairs(filtered) do
         local needed=contains_rule_query(relation.when)
         for _,condition in ipairs(relation.exclusions or {}) do needed=needed or contains_rule_query(condition) end

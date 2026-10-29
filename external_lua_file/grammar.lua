@@ -161,6 +161,8 @@ end
 -- Typed Rule AST and verb registry.
 -- This parser does not execute rules.
 
+local AST_PREFIXES = {POWERED="powered",POWERED2="powered2",POWERED3="powered3"}
+
 local AST_NOTES = {C="c",CSHARP="csharp",CFLAT="cflat",D="d",DSHARP="dsharp",DFLAT="dflat",E="e",ESHARP="esharp",EFLAT="eflat",F="f",FSHARP="fsharp",FFLAT="fflat",G="g",GSHARP="gsharp",GFLAT="gflat",A="a",ASHARP="asharp",AFLAT="aflat",B="b",BSHARP="bsharp",BFLAT="bflat",C4="c4",CSHARP4="csharp4",CFLAT4="cflat4",D4="d4",DSHARP4="dsharp4",DFLAT4="dflat4",E4="e4",ESHARP4="esharp4",EFLAT4="eflat4",F4="f4",FSHARP4="fsharp4",FFLAT4="fflat4",G4="g4",GSHARP4="gsharp4",GFLAT4="gflat4",A4="a4",ASHARP4="asharp4",AFLAT4="aflat4",B4="b4",BSHARP4="bsharp4",BFLAT4="bflat4",C5="c5",CSHARP5="csharp5",CFLAT5="cflat5",D5="d5",DSHARP5="dsharp5",DFLAT5="dflat5",E5="e5",ESHARP5="esharp5",EFLAT5="eflat5",F5="f5",FSHARP5="fsharp5",FFLAT5="fflat5",G5="g5",GSHARP5="gsharp5",GFLAT5="gflat5",A5="a5",ASHARP5="asharp5",AFLAT5="aflat5",B5="b5",BSHARP5="bsharp5",BFLAT5="bflat5",C6="c6",CSHARP6="csharp6",D6="d6",DSHARP6="dsharp6",DFLAT6="dflat6",E6="e6",ESHARP6="esharp6",EFLAT6="eflat6",F6="f6",FSHARP6="fsharp6",FFLAT6="fflat6",G6="g6",GSHARP6="gsharp6",GFLAT6="gflat6",A6="a6",AFLAT6="aflat6"}
 
 local AST_VERBS = {
@@ -281,6 +283,7 @@ end
 local function ast_valid_language(language)
     return type(language) == "table"
         and (language.prepositions == nil or type(language.prepositions) == "table")
+        and (language.prefixes == nil or type(language.prefixes) == "table")
         and type(language.nouns) == "table"
         and type(language.properties) == "table"
         and type(language.verbs) == "table"
@@ -342,7 +345,7 @@ local function ast_term_options(token, language, property_ok)
         end
     end
 
-    if property_ok and ((language.verbs or {})[token] or (language.prepositions or {})[token]
+    if property_ok and ((language.verbs or {})[token] or (language.prepositions or {})[token] or (language.prefixes or AST_PREFIXES)[token]
         or (language.operators or {})[token] == "and") then
         result[#result+1]={tag="literal",token=token}
     end
@@ -520,6 +523,28 @@ local function ast_parse_heads(line,language,output)
             end
         end
     end
+    local function is_prefix(relation)
+        return relation=="powered" or relation=="powered2" or relation=="powered3"
+    end
+    local subjects_at
+    subjects_at=function(position,clauses,path,callback)
+        budget=budget+1;if budget>50000 then return end
+        terms(position,false,function(subject,finish,words,leading)
+            callback(subject,finish,append(path,words),leading,clauses)
+        end)
+        local function prefix_at(cursor,nots)
+            budget=budget+1;if budget>50000 then return end
+            for _,word in ipairs(cells[cursor] or {}) do
+                if ast_is_not(word,language) then prefix_at(cursor+1,append(nots,{word})) end
+                local relation=(language.prefixes or AST_PREFIXES)[word.token]
+                if is_prefix(relation) then
+                    local clause={relation=relation,negated=#nots%2==1,parameters={}}
+                    subjects_at(cursor+1,append(clauses,{clause}),append(path,append(nots,{word})),callback)
+                end
+            end
+        end
+        prefix_at(position,{})
+    end
     for start=1,#cells do
         local walk
         walk=function(subjects,clauses,position,path,leading)
@@ -542,15 +567,21 @@ local function ast_parse_heads(line,language,output)
                         end
                     end)
                 end
-                if operators[word.token] == "and" and #clauses == 0 then
-                    terms(position+1,false,function(subject,finish,words)
-                        walk(append(subjects,{subject}),clauses,finish,append(append(path,{word}),words),leading)
+                local prefix_only=true
+                for _,clause in ipairs(clauses) do if not is_prefix(clause.relation) then prefix_only=false;break end end
+                if operators[word.token] == "and" and prefix_only then
+                    subjects_at(position+1,clauses,append(path,{word}),function(subject,finish,words,_,all_clauses)
+                        walk(append(subjects,{subject}),all_clauses,finish,words,leading)
                     end)
                 end
             end
             local function condition_at(cursor,prefix)
                 for _,word in ipairs(cells[cursor] or {}) do
                     if ast_is_not(word,language) then condition_at(cursor+1,append(prefix,{word})) end
+                    local prefix_relation=(language.prefixes or AST_PREFIXES)[word.token]
+                    if is_prefix(prefix_relation) then
+                        walk(subjects,append(clauses,{{relation=prefix_relation,negated=#prefix%2==1,parameters={}}}),cursor+1,append(path,append(prefix,{word})),leading)
+                    end
                     local relation=(language.prepositions or {})[word.token]
                     if relation == "on" or relation == "near" or relation == "nextto" or relation == "above"
                         or relation == "below" or relation == "besideleft" or relation == "besideright" or relation == "facing" or relation == "without" or relation == "facedby" or relation == "seeing" or relation == "feeling" then
@@ -576,7 +607,7 @@ local function ast_parse_heads(line,language,output)
             end
             condition_at(position,{})
         end
-        terms(start,false,function(subject,position,path,leading) walk({subject},{},position,path,leading) end)
+        subjects_at(start,{},{},function(subject,position,path,leading,clauses) walk({subject},clauses,position,path,leading) end)
     end
     if budget > 50000 or #output > 50000 then return nil,"rule_complexity_limit" end
     return true

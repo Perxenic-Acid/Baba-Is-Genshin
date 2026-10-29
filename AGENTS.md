@@ -261,3 +261,9 @@
   condition instances, including failed tests; do not reuse one declaration. Share
   transient condition_rules with SEEING, preserve frozen frames and keep checked
   conditions out of world/Undo. POWERED belongs to prefix syntax. See docs/FEELING.md.
+
+- Canonical prefixes follow actual physical paths, share the subject condition group,
+  preserve sentence multiplicity/activation and suppress unconditional interior
+  suffixes. POWERED channels query global current-frame POWER sources, including
+  eligible Text/Empty and unconditional scoped LEVEL declarations. Never persist
+  result caches across phases; guard ungrounded channel recursion. See docs/POWERED.md.

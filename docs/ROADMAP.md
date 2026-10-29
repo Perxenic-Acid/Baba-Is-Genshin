@@ -258,3 +258,10 @@ instances, reusing transient guarded frames. Installed source matrix: 2,880 case
 startup 1,949,000 instructions. FEELING completes the catalog condition category
 within documented scopes. POWERED is type 3 (prefix), so next is prefix parsing
 and POWERED families, then other prefixes/GROUP/properties. See FEELING.md.
+
+
+M9.4R adds canonical prefix paths and three independent POWERED/POWER channels,
+including Text/Empty and unconditional scoped LEVEL sources. Installed powered()
+oracle: 1,080 cases. COND is now 32x28 with sparse prefix words. Startup 1,983,000
+instructions, unchanged 2M cap. See POWERED.md. Next prefixes: LONELY, IDLE,
+OFTEN/SELDOM; GROUP/properties follow.

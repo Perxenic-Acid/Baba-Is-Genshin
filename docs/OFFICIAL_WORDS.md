@@ -75,9 +75,9 @@ A pending word is not complete merely because its name could be stored as a Text
 | prefix | IDLE | pending |
 | prefix | LONELY | pending |
 | prefix | OFTEN | pending |
-| prefix | POWERED | pending |
-| prefix | POWERED2 | pending |
-| prefix | POWERED3 | pending |
+| prefix | POWERED | implemented within documented scope |
+| prefix | POWERED2 | implemented within documented scope |
+| prefix | POWERED3 | implemented within documented scope |
 | prefix | SELDOM | pending |
 | property | 3D | pending |
 | property | ANGRY | pending |
@@ -127,9 +127,9 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | PET | pending |
 | property | PHANTOM | implemented within documented scope |
 | property | PINK | pending |
-| property | POWER | pending |
-| property | POWER2 | pending |
-| property | POWER3 | pending |
+| property | POWER | implemented within documented scope |
+| property | POWER2 | implemented within documented scope |
+| property | POWER3 | implemented within documented scope |
 | property | PULL | implemented within documented scope |
 | property | PURPLE | pending |
 | property | PUSH | implemented within documented scope |

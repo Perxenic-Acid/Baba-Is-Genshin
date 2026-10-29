@@ -25,7 +25,7 @@ end
 
 -- Registry entries map rule-derived trait names to implemented capabilities.
 local BEHAVIORS = {
-    hide={hide=true},
+    power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
     reverse={reverse=true}, pull={pull=true}, swap={swap=true}, phantom={phantom=true},
     sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
@@ -38,7 +38,7 @@ local function valid_behaviors(registry)
         if type(name) ~= "string" or name == "" or type(spec) ~= "table" then return false end
         local count = 0
         for capability, enabled in pairs(spec) do
-            if (capability ~= "hide" and capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
+            if (capability ~= "power" and capability ~= "power2" and capability ~= "power3" and capability ~= "hide" and capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
                     and capability ~= "select" and capability ~= "select_path" and capability ~= "win"
                     and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
                     and capability ~= "safe" and capability ~= "crash"

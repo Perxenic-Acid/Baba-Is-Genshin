@@ -524,7 +524,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", HIDE="hide", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
+                    STOP="block_entry", HIDE="hide", POWER="power", POWER2="power2", POWER3="power3", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {FEELING="feeling",SEEING="seeing",FACEDBY="facedby",WITHOUT="without",ON="on",NEAR="near",NEXTTO="nextto",ABOVE="above",BELOW="below",BESIDELEFT="besideleft",BESIDERIGHT="besideright",FACING="facing"},
@@ -1567,6 +1567,7 @@ function RW_GetNavigationDefinitions()
     definitions["navigation.complex"]={id="navigation.complex",initial_world=complex}
     portal(root,53,6,2,"TC","navigation.complex")
     local conditions=clone(lab)
+    conditions.width,conditions.height=32,28
     conditions.entities={};conditions.next_entity_id=1
     conditions.language.nouns.FLAG="flag"
     object(conditions,1,"avatar",4,5)
@@ -1586,6 +1587,11 @@ function RW_GetNavigationDefinitions()
                 x=offset+1,y=5+row*2,direction="None"}
             conditions.next_entity_id=id+1
         end
+    end
+    for index,token in ipairs({"POWERED","POWERED2","POWERED3","POWER","POWER2","POWER3","FEELING","NOT","IS","AND","AVATAR","ROCK","PUSH","FLOAT"}) do
+        local id=conditions.next_entity_id
+        conditions.entities[id]={id=id,kind="object",class="text",text={name=token},x=15+3*((index-1)%5),y=3+3*math.floor((index-1)/5),direction="None"}
+        conditions.next_entity_id=id+1
     end
     definitions["navigation.conditions"]={id="navigation.conditions",initial_world=conditions}
     portal(root,54,8,1,"COND","navigation.conditions")

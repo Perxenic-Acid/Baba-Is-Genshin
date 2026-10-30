@@ -316,3 +316,12 @@ frames, global conditional-noun promotion, duplicate witnesses, original mutable
 parameter order and missing-name behavior. Original preprocessing oracle: 9,720
 cases; production conversion/HAS/WORD/Undo coverage. Next: recursive membership
 conditions and negative-source cross-group IS membership.
+
+## M9.4Z — recursive GROUP member conditions
+
+Previous-round subgroup substitution, ordered duplicate signatures, original
+ten-change Infinite Loop bound and converged-base multiplicity. Rule-query loops
+commit triggering command/movement/contact stages through whole-tree Undo.
+Original preprocessing oracle: 2,592 cases, including 324 terminal oscillations.
+Next: negative-source cross-group IS membership solver; prior nested-inversion
+and remaining membership/MIMIC scope gaps remain explicit in GROUP.md.

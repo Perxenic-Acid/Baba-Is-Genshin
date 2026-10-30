@@ -1,4 +1,4 @@
-# GROUP membership, transfer, complements and parameters (M9.4V–M9.4Y)
+# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.4Z)
 
 Installed primary references: base Data/rules.lua code() invokes subrules then
  grouprules at 138-139; grouprules 1573-2331 categorizes memberships, combines
@@ -28,7 +28,7 @@ physical rules, including membership declarations with no consumer. No renderer,
 world-state or Undo-owned membership cache is introduced.
 
 Deliberate first-stage gaps are explicitly deferred, not converted into objects:
-- Negative-source cross-group IS recursion and recursive membership conditions.
+- Negative-source cross-group IS recursion.
 - ALL/NOT noun/scoped LEVEL membership declarations.
 - MIMIC with a GROUP endpoint (ordinary MIMIC copying an IS GROUP declaration
   before the group pass works through the existing one-generation expansion).
@@ -170,3 +170,49 @@ conditional/negative memberships, nearby/remote units, mixed/repeated parameters
 positive/negative conditions. Prior group source matrices remain passing.
 Native success is not inferred; the unchanged production startup budget is 2M.
 Next: recursive membership conditions and negative-source group IS recursion.
+
+## M9.4Z: recursive membership conditions
+
+Primary reference: installed tools.lua findgroup() 2300-2428, especially its
+handlerecursion / currmembers / reclimit loop; conditions.lua testcond subgroup_
+replacement 147-188. GROUP parameters in direct membership conditions and in
+positive-source cross-group transfer conditions are now supported. Negative-source
+cross-group IS declarations still require their separate grouprules evilrecursion
+solver and remain deferred.
+
+The compiled member frame marks conditions that contain typed group parameters,
+including inherited transfer/exclusion conditions. The query first gathers live
+unit lists and evaluates nonrecursive members as a base. Recursive conditions are
+then tested against the previous round's noun list. Original subgroup_ substitutes
+that same previous list for every referenced group name, including other channels;
+NOT GROUP uses its authored complement. Preserve ordered names and duplicates,
+and the original concatenated-name signature rather than deduplicated identities.
+Ten consecutive changed rounds propagate word_rule_limit / Infinite Loop.
+On convergence, the original appends the stable list to the base list, so seeded
+names can occur twice in the result. This multiplicity is intentionally retained.
+
+All solver state (previous lists, guards and compiled member declarations) is
+transient and private. No _group_override or membership cache becomes a world fact.
+Unit lists are reconstructed from current real identities; native empty unit-list
+tombstones, if present, are not modeled as persistent state. Existing malformed
+nested inversion and indirect rule-query parity limits remain documented above.
+
+Loop detection is transactional even in frozen-rule refreshes before SHIFT or
+between destruction phases. Earlier movement/death/HAS stages commit, then the
+terminal board permits only Undo. A valid command that activates a loop during
+initial rule projection commits its input/seed with an empty geometry stage;
+whole-tree navigation preserves that terminal transaction. Invalid direction
+vectors do not activate a new command snapshot. Normal OnStart still runs no
+self-tests and retains the unchanged 2M instruction cap.
+
+Production tests cover unseeded positive convergence, seeded members, a movement
+creating an oscillating overlap, IDLE-activated oscillation, whole-tree command
+handling, direct Commit/wait lockout, and DEFEAT/HAS births that remove grounding
+before frozen contact refresh. Undo restores triggering geometry, units and input.
+The 2,592-case oracle executes installed grouprules/findgroup/testcond preprocessing
+with the existing normalized primitive condition callbacks: 324 cases reach the
+original ten-change limit, the remainder match stable query results. It varies
+channels, seed/recursive duplicate declarations, member names, ON/NEAR/WITHOUT,
+NOT, positions and cross-name previous-list substitution. These are offline checks,
+not a claim of native acceptance. Next: negative-source cross-group IS recursion,
+then remaining ALL/NOT/LEVEL membership and GROUP-endpoint MIMIC scope.

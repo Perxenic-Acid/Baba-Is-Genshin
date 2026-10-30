@@ -269,39 +269,79 @@ local function powered_condition(world,trait,negated)
 end
 -- findgroup() promotes a conditional member's noun when ANY real unit qualifies.
 local function group_parameters(world,name,invert)
+    local function finish(result)
+        if not invert then return result end
+        local found={};for _,noun in ipairs(result) do found[noun]=true end
+        local complement={}
+        for _,noun in ipairs(RW_NounPalette(world)) do if not found[noun] then complement[#complement+1]=noun end end
+        for _,noun in pairs((world.language or {}).nouns or {}) do
+            if type(noun)=="table" and noun.tag=="level" and not found["@level"] then complement[#complement+1]="@level";break end
+        end
+        return complement
+    end
+    -- Original subgroup_ substitutes the previous iteration for every group name.
+    if world._group_override then return finish(world._group_override) end
     local guard=world._condition_guard or {};local key="members:"..name
     if guard[key] then return {} end
     if (world._condition_depth or 0)>=80 then return nil,"word_rule_limit" end
     guard[key]=true
     local context={};for k,v in pairs(world) do context[k]=v end
     context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
-    local result,found={},{}
+    local members,units={},{}
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
     for _,rule in ipairs(world._condition_rules or {}) do
         for _,member in ipairs((rule.group_members or {})[name] or {}) do
-            local active=member.when.op=="always"
-            if not active then
-                local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
-                for _,id in ipairs(ids) do
-                    local e=world.entities[id]
+            members[#members+1]=member
+            if not units[member.name] then
+                units[member.name]={}
+                for _,id in ipairs(ids) do local e=world.entities[id]
                     if (member.name=="@text" and e.class=="text") or (e.class~="text" and e.archetype==member.name) then
-                        local enabled,err=RW_TestEntityCondition(context,member.when,e)
-                        if enabled==nil then guard[key]=nil;return nil,err end
-                        if enabled then active=true;break end
+                        units[member.name][#units[member.name]+1]=e
                     end
                 end
             end
-            if active then result[#result+1]=member.name;found[member.name]=true end
         end
     end
-    guard[key]=nil
-    if invert then
-        result={}
-        for _,noun in ipairs(RW_NounPalette(world)) do if not found[noun] then result[#result+1]=noun end end
-        for _,noun in pairs((world.language or {}).nouns or {}) do
-            if type(noun)=="table" and noun.tag=="level" and not found["@level"] then result[#result+1]="@level";break end
+    local function qualifies(member)
+        if member.when.op=="always" then return true end
+        for _,e in ipairs(units[member.name]) do
+            local active,err=RW_TestEntityCondition(context,member.when,e)
+            if active==nil then return nil,err end
+            if active then return true end
+        end
+        return false
+    end
+    local base,recursive={},false
+    for _,member in ipairs(members) do
+        if member.recursive and #units[member.name]>0 and member.when.op~="always" then recursive=true
+        elseif not member.recursive or member.when.op=="always" then
+            local active,err=qualifies(member)
+            if active==nil then guard[key]=nil;return nil,err end
+            if active then base[#base+1]=member.name end
         end
     end
-    return result
+    if recursive then
+        local current={};for _,noun in ipairs(base) do current[#current+1]=noun end
+        local signature=table.concat(current,"")
+        for iteration=1,10 do
+            local next_members={};for _,noun in ipairs(base) do next_members[#next_members+1]=noun end
+            context._group_override=current
+            for _,member in ipairs(members) do if member.recursive then
+                local active,err=qualifies(member)
+                if active==nil then guard[key]=nil;return nil,err end
+                if active then next_members[#next_members+1]=member.name end
+            end end
+            local next_signature=table.concat(next_members,"")
+            if next_signature==signature then
+                -- findgroup appends the converged list to the original base list.
+                for _,noun in ipairs(current) do base[#base+1]=noun end
+                guard[key]=nil;return finish(base)
+            end
+            current=next_members;signature=next_signature
+        end
+        guard[key]=nil;return nil,"word_rule_limit"
+    end
+    guard[key]=nil;return finish(base)
 end
 local function seeing_condition(world,parameters,entity,negated)
     local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
@@ -1418,7 +1458,7 @@ local function expand_groups(ast_rules,registry,world)
     local function membership(rule)
         local name,negative=group(rule.object)
         local key=member_key(rule.subject)
-        return name and rule.verb=="is" and key and not condition_group(rule.when),name,negative,key
+        return name and rule.verb=="is" and key,name,negative,key
     end
     local membership_count=0
     local function add_member(name,key,term,condition,negative)
@@ -1435,7 +1475,7 @@ local function expand_groups(ast_rules,registry,world)
         if is_member then add_member(name,key,rule.subject,rule.when,negative)
         else
             local source,source_not=group(rule.subject);local target,target_not=group(rule.object)
-            if rule.verb=="is" and source and not source_not and target and source~=target and not condition_group(rule.when) then
+            if rule.verb=="is" and source and not source_not and target and source~=target then
                 transfers[#transfers+1]={rule=rule,source=source,target=target,negative=target_not}
                 transfer_rules[rule]=true
             end
@@ -1474,7 +1514,7 @@ local function expand_groups(ast_rules,registry,world)
         for _,ban in ipairs((bans[name] or {})[key] or {}) do
             condition=combine(condition,invert_mimic_condition(ban.when))
         end
-        if constant(condition)~=false then teams[name][#teams[name]+1]={term=member.term,when=condition,name=key} end
+        if constant(condition)~=false then teams[name][#teams[name]+1]={term=member.term,when=condition,name=key,recursive=condition_group(condition)} end
     end
     local function complement(name,branch)
         local result,seen={},{}
@@ -1507,7 +1547,7 @@ local function expand_groups(ast_rules,registry,world)
         local is_member=membership(rule)
         local source,source_not=group(rule.subject);local target,target_not=group(rule.object)
         if transfer_rules[rule] then -- Closure already consumed this declaration.
-        elseif (condition_group(rule.when) and target and rule.verb=="is" and source~=target) or ((source or target) and rule.verb=="mimic")
+        elseif (condition_group(rule.when) and target and rule.verb=="is" and source~=target and not is_member) or ((source or target) and rule.verb=="mimic")
             or (target and rule.verb=="is" and not source and not is_member)
             or (source and source_not and target and source~=target and rule.verb=="is") then
             deferred[#deferred+1]=rule

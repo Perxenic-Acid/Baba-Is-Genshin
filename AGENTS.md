@@ -290,5 +290,8 @@
   transient compiled group_members frame: any qualifying real unit promotes its
   noun globally, duplicate declarations retain duplicate parameters. Preserve
   original mutable parameter insertion/removal and missing-name behavior. Recursive
-  membership/negative-source IS and malformed nested inversion remain pending;
+  membership conditions use original previous-round substitution (all group names),
+  ordered duplicate signatures and ten-change loop bound; stable lists append to
+  the base. Commit command/movement/contact triggers before only-Undo locking.
+  Negative-source IS and malformed nested inversion remain pending;
   see docs/GROUP.md.

@@ -162,7 +162,7 @@ s=fixture({{'ROCK','IS','GROUP'},{'AVATAR','ON','GROUP','IS','WORD'}})
 s.world.entities[1].x=6;s.world.entities[1].y=3
 w,f=projection(s);assert(f.word_tokens[1]=='AVATAR')
 s=fixture({{'ROCK','ON','GROUP','IS','GROUP'}})
-w,f=projection(s);assert(#f.deferred==1,'recursive group membership remains deferred')
+w,f=projection(s);assert(#f.deferred==0,'recursive group membership is a declaration')
 assert(not s.world.group_members and not s.world._condition_rules)
 print('PASS: GROUP condition parameters, all-member/duplicate witnesses, global conditional nouns, empty group, conversion/HAS/WORD and Undo')
 
@@ -174,3 +174,43 @@ w,f=projection(s);assert(w.entities[1].behaviors.float)
 for _,rule in ipairs(f.ast) do for _,id in ipairs(rule.source.sentence_entity_ids or rule.source.entity_ids) do assert(f.active_text_ids[id]) end end
 s=fixture({{'EMPTY','NEAR','AVATAR','IS','GROUP'},{'AVATAR','WITHOUT','GROUP','IS','FLOAT'}})
 w=projection(s);assert(w.entities[1].behaviors.float,'conditional Empty lacks real unitlists in original findgroup')
+
+-- A movement-created recursive oscillation commits its triggering geometry.
+s=fixture({{'ROCK','NOT','ON','GROUP','IS','GROUP'},{'GROUP','IS','FLOAT'},{'ROCK','ON','AVATAR','IS','YOU'}})
+s.world.entities[1].x=6;s.world.entities[1].y=3;object(s.world,3,'rock',7,3)
+w,f=projection(s);assert(#f.deferred==0 and w.entities[2].behaviors.control)
+n,p=step(s,{type='move',dx=1,dy=0})
+assert(n.world.infinite_loop and n.world.entities[2].x==7 and n.world.entities[3].x==7,'triggering overlap must commit before loop lock')
+assert(not n.world._group_override and not n.world._condition_rules)
+local failed,why=RW_PlanTurn(n.world,{type='wait'},services);assert(not failed and why.reason=='infinite_loop_undo_only')
+local unchanged,reject=RW_Commit(n,{consumes_turn=true,changes={}});assert(unchanged==n and reject.reason=='infinite_loop_undo_only')
+assert(RW_Undo(n).world==s.world and not s.world.infinite_loop)
+s=fixture({{'ROCK','NEAR','GROUP','IS','GROUP'},{'AVATAR','NEAR','GROUP','IS','FLOAT'}})
+w,f=projection(s);assert(#f.deferred==0 and not w.entities[1].behaviors.float,'unseeded positive recursion stays empty')
+s=fixture({{'ROCK','IS','GROUP'},{'FLAG','NEAR','GROUP','IS','GROUP'},{'AVATAR','NEAR','GROUP','IS','FLOAT'}})
+object(s.world,3,'flag',6,3);object(s.world,4,'flag',7,3)
+w,f=projection(s);assert(#f.deferred==0)
+print('PASS: recursive GROUP convergence/empty grounding, movement-triggered oscillation commits, only-Undo lock and restored geometry')
+
+s=fixture({{'IDLE','ROCK','NOT','ON','GROUP','IS','GROUP'},{'GROUP','IS','FLOAT'}})
+object(s.world,3,'rock',6,3)
+w=projection(s);assert(not s.world.last_input)
+n,p=step(s);assert(n.world.infinite_loop and n.world.last_input=='wait' and not s.world.infinite_loop,'input-triggered recursive loop commits its command state')
+local invalid=RW_PlanTurn(s.world,{type='move',dx=2,dy=0},services);assert(invalid and not invalid.consumes_turn)
+local tree={session=s};local ts={};for k,v in pairs(services) do ts[k]=v end
+ ts.active=function(t) return t.session end
+ ts.commit_session=RW_Commit
+ ts.update=function(t,session) return {session=session} end
+local tree_plan=assert(RW_PlanLevelAction(tree,{type='wait'},ts))
+assert(tree_plan.before==tree and tree_plan.after.session.world.infinite_loop and not tree.session.world.infinite_loop)
+assert(RW_Undo(tree_plan.after.session).world==s.world)
+print('PASS: input-triggered recursive GROUP loop commits through whole-tree navigation without accepting invalid input')
+
+-- Frozen contact refresh must lock after retaining the death/HAS that removed grounding.
+s=fixture({{'ROCK','WITHOUT','FLAG','IS','GROUP'},{'ROCK','NOT','ON','GROUP','IS','GROUP'},{'GROUP','IS','FLOAT'},{'AVATAR','IS','YOU','AND','DEFEAT'},{'AVATAR','HAS','FLAG'}})
+object(s.world,3,'rock',6,3)
+w=projection(s)
+n,p=step(s);local flag=false;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flag=true end end
+assert(n.world.infinite_loop and not n.world.entities[1] and flag,'contact/HAS-triggered group loop must commit prior phases')
+assert(RW_Undo(n).world==s.world and s.world.entities[1])
+print('PASS: recursive GROUP contact refresh commits DEFEAT/HAS trigger before only-Undo lock')

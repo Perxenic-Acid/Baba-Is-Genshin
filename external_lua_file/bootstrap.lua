@@ -110,12 +110,24 @@ local function lock_compile_failure(plan, reason)
     if reason == "rule_complexity_limit" then plan.too_complex=true;plan.reason="too_complex"
     else plan.infinite_loop=true;plan.reason="infinite_loop" end
 end
+local function valid_turn_action(action)
+    if type(action)~="table" then return false end
+    if action.type=="wait" then return true end
+    return action.type=="move" and ((action.dx==1 or action.dx==-1) and action.dy==0
+        or (action.dy==1 or action.dy==-1) and action.dx==0)
+end
 local function plan_turn(world, action, services)
     local trace = {}
     if type(world) == "table" and world.infinite_loop then return nil,{stage="input",reason="infinite_loop_undo_only"} end
     if type(world) == "table" and world.too_complex then return nil,{stage="input",reason="too_complex_undo_only"} end
     local function fail(stage, reason, phase)
         return nil, {stage = stage, reason = reason or "stage_failed", phase=phase,trace = trace}
+    end
+    local function after_failure(plan,stage,reason)
+        if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then
+            lock_compile_failure(plan,reason);return plan,nil,trace
+        end
+        return fail(stage,reason)
     end
     if type(world) ~= "table" or type(world.entities) ~= "table" then
         return fail("input", "invalid_world")
@@ -131,7 +143,10 @@ local function plan_turn(world, action, services)
 
     trace[#trace + 1] = "rules_before"
     local effects, rule_error, before_conversions, before_rules = services.evaluate(world)
-    if not effects then return fail("rules_before", rule_error) end
+    if not effects then
+        if valid_turn_action(action) then return after_failure({consumes_turn=true,changes={},reason="rules_before"},"rules_before",rule_error) end
+        return fail("rules_before",rule_error)
+    end
 
     trace[#trace + 1] = "project"
     local effective, projection_error = services.project(world, effects, level_traits_from(before_conversions))
@@ -179,7 +194,7 @@ local function plan_turn(world, action, services)
     for _,motion_phase in ipairs({"automatic","fear","shift"}) do
     if services[motion_phase] and (motion_phase~="automatic" or automatic_active) and (motion_phase~="fear" or fear_active) then
         local refreshed,why=services.refresh(preview,before_rules)
-        if not refreshed then return fail(motion_phase.."_rules",why) end
+        if not refreshed then return after_failure(movement_prefix,motion_phase.."_rules",why) end
         local shifted_world,err=services.project(preview,refreshed,level_traits_from(before_conversions))
         if not shifted_world then return fail(motion_phase.."_project",err) end
         local shift,shift_error=services[motion_phase](shifted_world,before_conversions)
@@ -384,7 +399,7 @@ local function plan_turn(world, action, services)
         for _,kind in ipairs({"sink","weak","melt","defeat","unlock"}) do
             trace[#trace+1]=kind
             local refreshed,refresh_error=services.refresh(complete,frozen_rules)
-            if not refreshed then return fail(kind,refresh_error) end
+            if not refreshed then return after_failure(plan,kind,refresh_error) end
             local projected,projection_error=services.project(complete,refreshed,plan.level_traits)
             if not projected then return fail(kind,projection_error) end
             if kind == "weak" then projected.weak_new_ids=weak_new end
@@ -404,7 +419,7 @@ local function plan_turn(world, action, services)
             for _,relation in ipairs(frozen_relations or {}) do if relation.op=="eat" then active=true;break end end
             if active then
                 local refreshed,why=services.refresh(complete,frozen_rules)
-                if not refreshed then return fail("eat_rules",why) end
+                if not refreshed then return after_failure(plan,"eat_rules",why) end
                 local projected,why=services.project(complete,refreshed,plan.level_traits)
                 if not projected then return fail("eat_project",why) end
                 local eat,why=services.eat(complete,projected,frozen_relations,contents)
@@ -437,7 +452,7 @@ local function plan_turn(world, action, services)
         end
         -- CRASH is checked on surviving units after destruction, against the frozen rules.
         local crash_effects,crash_error=services.refresh(complete,frozen_rules)
-        if not crash_effects then return fail("crash",crash_error) end
+        if not crash_effects then return after_failure(plan,"crash",crash_error) end
         local crash_world,crash_projection_error=services.project(complete,crash_effects,plan.level_traits)
         if not crash_world then return fail("crash",crash_projection_error) end
         for _,entity in pairs(crash_world.entities) do
@@ -503,7 +518,7 @@ end
 -- Input conditions see this command before movement. Persist it only through
 -- the first atomic phase, so rejection and whole-tree Undo restore prior input.
 function RW_PlanTurn(world,action,services)
-    if type(world)~="table" or type(action)~="table" or (action.type~="move" and action.type~="wait") then
+    if type(world)~="table" or not valid_turn_action(action) then
         return plan_turn(world,action,services)
     end
     local context={};for k,v in pairs(world) do context[k]=v end
@@ -531,7 +546,20 @@ function RW_PlanLevelAction(tree, action, services)
         input_world.chance_seed=((session.world.chance_seed or 1)*48271)%2147483647
     end
     local effects, err, initial_conversions = services.evaluate(input_world)
-    if not effects then return fail(err) end
+    if not effects then
+        if valid_turn_action(action) and (err=="word_rule_limit" or err=="word_rule_cycle" or err=="rule_complexity_limit") then
+            local turn,why=RW_PlanTurn(session.world,action,services)
+            if not turn then return nil,why end
+            if turn.infinite_loop or turn.too_complex then
+                local completed,accepted=services.commit_session(session,turn)
+                if not accepted.accepted then return fail(accepted.reason) end
+                local updated,why=services.update(tree,completed)
+                if not updated then return fail(why) end
+                return {before=tree,after=updated,reason=turn.too_complex and "too_complex" or "infinite_loop",changes=turn.changes,events=turn.events}
+            end
+        end
+        return fail(err)
+    end
     local effective, project_error = services.project(input_world,effects,level_traits_from(initial_conversions))
     if not effective then return fail(project_error) end
     local select_after_defeat = session.defeated == true
@@ -1681,7 +1709,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.4Y initialized")
+    print("[RuleWorld] M9.4Z initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

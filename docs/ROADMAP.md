@@ -371,3 +371,11 @@ source movement, once-per-turn riders and atomic snapshot RNG. Arrival contacts
 and loop-triggering Text retain Undo. Source-loop oracle: 768 cases. MOTION grows
 to 32x32 for its sparse TELE word. Native dynamic per-rider trait/BACK integration
 gaps are recorded in TELE.md. Next: ordinary properties and startup-cost headroom.
+
+## M9.5G — capability whitelist lookup
+
+Replace the repeated string-comparison chain with a private implemented-capability
+lookup built from the fixed built-in registry. Accepted capability vocabulary is
+unchanged (verified against the previous chain); custom aliases still require a
+nonempty Boolean capability specification. Full regression passes. Normal startup
+uses 1,992,000 instructions versus M9.5F's 1,994,000; the 2M cap remains unchanged.

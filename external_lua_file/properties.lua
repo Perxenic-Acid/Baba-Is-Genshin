@@ -32,20 +32,16 @@ local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
     tele = {tele = true}, more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
+-- Private fixed vocabulary: custom trait aliases may only map implemented capabilities.
+local CAPABILITIES={}
+for _,spec in pairs(BEHAVIORS) do for capability in pairs(spec) do CAPABILITIES[capability]=true end end
 local function valid_behaviors(registry)
     if type(registry) ~= "table" then return false end
     for name, spec in pairs(registry) do
         if type(name) ~= "string" or name == "" or type(spec) ~= "table" then return false end
         local count = 0
         for capability, enabled in pairs(spec) do
-            if (capability ~= "power" and capability ~= "power2" and capability ~= "power3" and capability ~= "hide" and capability ~= "control" and capability ~= "push" and capability ~= "block_entry"
-                    and capability ~= "select" and capability ~= "select_path" and capability ~= "win"
-                    and capability ~= "defeat" and capability ~= "sink" and capability ~= "word"
-                    and capability ~= "safe" and capability ~= "crash"
-                    and capability ~= "hot" and capability ~= "melt"
-                    and capability ~= "open" and capability ~= "shut" and capability ~= "weak" and capability ~= "float" and capability ~= "shift" and capability ~= "tele" and capability ~= "more" and capability ~= "fall" and capability ~= "fallright" and capability ~= "fallup" and capability ~= "fallleft" and capability ~= "pull" and capability ~= "swap" and capability ~= "phantom" and capability ~= "reverse"
-                    and capability ~= "sleep" and capability ~= "still" and capability ~= "lockedright" and capability ~= "lockedup" and capability ~= "lockedleft" and capability ~= "lockeddown" and capability ~= "move" and capability ~= "right" and capability ~= "up" and capability ~= "left" and capability ~= "down" and capability ~= "turn" and capability ~= "deturn" and capability ~= "nudgeright" and capability ~= "nudgeup" and capability ~= "nudgeleft" and capability ~= "nudgedown" )
-                or type(enabled) ~= "boolean" then return false end
+            if not CAPABILITIES[capability] or type(enabled) ~= "boolean" then return false end
             if enabled then count = count + 1 end
         end
         if count == 0 then return false end

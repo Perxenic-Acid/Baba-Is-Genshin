@@ -76,8 +76,38 @@ list is not reproduced yet. Candidate history still follows our agreed grounded
 WORD expansion, rather than inheriting the prior native rule tree. Late contact
 birth/destruction refresh and exact initialization/newborn timing remain pending.
 
+## Creation-time status (M9.5P)
+
+Installed Data/syntax.lua:82-86 resets a newborn's broken field and immediately
+calls statusblock({id}); Data/tools.lua:548 runs inside() before deleting its
+source. Creation conditions can therefore still see the dying parent.
+
+`RW_InitializeBirthSpecifications` is a pure ordered initializer. Each newborn is
+visible during its own query with broken=0, then keeps the selected saved status;
+subsequent products see it. Inherited broken flags reset rather than copying old
+status. Nil represents the ordinary zero state. Direction, Text and level links
+are preserved. Empty product lists skip all status work.
+
+Native HAS (including EAT and movement OPEN/SHUT/WEAK deaths), MORE and MAKE
+adapters initialize products against the phase's actual raw declarations. Contact
+births keep the frozen frame after physical Text deletion. Movement deaths use
+per-victim death snapshots, and each batch advances its temporary allocator past
+earlier products. Newborn status is included in create.to, avoiding another phase
+or extra allocator/RNG draw. Whole-turn rejection/Undo includes all births.
+
+Production tests cover the pre-delete ON witness, next-input release into CRASH,
+MORE children with distinct cell conditions, duplicate MAKE sequential witnesses,
+frozen declarations after SINK deletes BROKEN Text, EAT, paired unlock deaths with
+separate birth frames/IDs, metadata purity and Undo. All test sentences are checked
+in bounds on a 24-row fixture.
+
+Conversion-primary identity/retype status initialization remains pending. Recursive
+BROKEN-condition failure during newborn initialization currently rejects the plan;
+preserving that triggering partial newborn board as a terminal state also remains
+an explicit gap. Neither is being counted as finished gameplay support.
+
 BROKEN is still pending in the public word audit and default vocabulary. Remaining:
-initialization and boundaries, ordinary/newborn status, late contact changes,
+initialization and boundaries, conversion status, late contact code changes,
 conditional timing, outcome/navigation integration, and the LEVEL and EMPTY
 synthetic query paths. These must be implemented/tested before claiming
 complete gameplay support. In particular, do not insert a BROKEN fixed-point loop:

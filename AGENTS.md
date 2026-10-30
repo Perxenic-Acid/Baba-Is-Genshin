@@ -357,3 +357,10 @@
   movement/conversion barriers before later selection. Do not mutate state during
   render or iterate BROKEN to a fixed point. Exact WORD dependency invalidation,
   initialization/late newborn/synthetic scope remain pending; see BROKEN.md.
+
+- HAS/MORE/MAKE newborn BROKEN status initializes before later phases, using the
+  current raw/frozen rule frame. HAS creation still sees the dying parent; movement
+  deaths use each death frame and shifted temporary allocators for earlier births.
+  Include status in create.to, preserve links/facing and reset inherited flags.
+  Conversion-primary/boundary/synthetic and recursive creation-terminal gaps remain;
+  see docs/BROKEN.md.

@@ -1221,6 +1221,43 @@ function RW_PlanCodeStatus(world,generated_rules,effective)
     return RW_PlanRuleStatus(world,generated_rules,selected)
 end
 
+-- addunit() initializes a newborn's BROKEN status immediately, before later
+-- births and later destruction phases. The source/victims still exist here.
+function RW_InitializeBirthSpecifications(world,specifications,generated_rules)
+    if type(world)~="table" or type(world.entities)~="table" or type(world.next_entity_id)~="number"
+        or not dense_list(specifications) or (generated_rules~=nil and not dense_list(generated_rules)) then
+        return nil,"invalid_birth_status_input"
+    end
+    if #specifications==0 then return specifications end
+    local needed=false
+    for _,rules in ipairs({world.rule_sources or {},generated_rules or {}}) do
+        for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
+            if effect.trait=="broken" then needed=true;break end
+        end end
+    end
+    for _,spec in ipairs(specifications) do
+        if type(spec)~="table" or (spec.broken~=nil and spec.broken~=0 and spec.broken~=1) then return nil,"invalid_birth_status_specification" end
+        if spec.broken~=nil then needed=true end
+    end
+    if not needed then return specifications end
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context.entities={};for id,entity in pairs(world.entities) do context.entities[id]=entity end
+    context=condition_context(context,generated_rules or {})
+    local initialized={}
+    for index,spec in ipairs(specifications) do
+        local product=query_clone(spec)
+        local entity=query_clone(product);entity.id=world.next_entity_id+index-1;entity.broken=0
+        if context.entities[entity.id] then return nil,"birth_status_id_collision" end
+        context.entities[entity.id]=entity
+        local active,err=query_trait(context,entity,"broken")
+        if active==nil then return nil,err end
+        entity.broken=active and 1 or 0
+        product.broken=active and 1 or nil
+        initialized[#initialized+1]=product
+    end
+    return initialized
+end
+
 function RW_WordTokenMap(world, effective)
     local tokens={}
     for id,entity in pairs(effective.entities) do

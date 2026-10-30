@@ -442,3 +442,11 @@ its own conversion, SHIFT-driven retraction, conversion-created Text, WORD scope
 ordinary status latching, CRASH and Undo. Installed ordered/subset oracle expanded
 to 512 cases. Initialization/late births/synthetic scope and exact WORD dependency
 invalidation remain pending; BROKEN is not publicly registered. See BROKEN.md.
+
+## M9.5P — creation-time BROKEN status
+
+HAS/EAT/movement-death products, MORE and MAKE initialize BROKEN before later
+phases against their raw/frozen source frame. Preserve pre-delete parent witnesses,
+ordered products, per-death snapshots, allocator offsets, metadata and Undo.
+Conversion-primary initialization, boundary boot, synthetic queries and recursive
+creation-terminal preservation remain pending; BROKEN stays unregistered.

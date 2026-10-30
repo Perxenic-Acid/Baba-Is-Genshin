@@ -82,7 +82,7 @@ end
 
 -- Contact destruction and HAS share one flat phase: births use the pre-delete
 -- snapshot, and IDs are allocated only in the returned plan.
-function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths)
+function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, rules)
     local specifications,err
     if deaths then
         specifications={}
@@ -95,12 +95,13 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths)
                 local entity={};for key,value in pairs(spec) do entity[key]=value end
                 entity.id=world.next_entity_id+index-1;context.entities[entity.id]=entity
             end
-            local born,why=services.births(context,{death.entity_id},contents)
+            context.next_entity_id=world.next_entity_id+#specifications
+            local born,why=services.births(context,{death.entity_id},contents,rules)
             if not born then return nil,why end
             for _,spec in ipairs(born) do specifications[#specifications+1]=spec end
         end
     else
-        specifications,err=services.births(world,ids,contents)
+        specifications,err=services.births(world,ids,contents,rules)
         if not specifications then return nil,err end
     end
     local removal,remove_error=services.delete(world,ids)
@@ -114,10 +115,10 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths)
     return plan
 end
 
-function RW_PlanContactPhase(world, effective, kind, contents, services)
+function RW_PlanContactPhase(world, effective, kind, contents, services, rules)
     local ids,why=services.victims(effective,kind)
     if not ids then return nil,why end
-    return RW_PlanDestructionPhase(world,ids,contents,kind,services)
+    return RW_PlanDestructionPhase(world,ids,contents,kind,services,nil,rules)
 end
 
 -- M9.3F: host-independent turn planning. Services adapt mapped scripts;
@@ -190,7 +191,7 @@ local function plan_turn(world, action, services, initial_frame)
         for _,death in ipairs(movement.destructions) do victims[#victims+1]=death.entity_id end
         for _,relation in ipairs(before_conversions or {}) do if relation.op == "has" then contents[#contents+1]=relation end end
         trace[#trace+1]="movement_destruction"
-        local destruction,why=services.destroy(preview,victims,contents,"movement",movement.destructions)
+        local destruction,why=services.destroy(preview,victims,contents,"movement",movement.destructions,before_rules)
         if not destruction then return fail("movement_destruction",why) end
         local after,err=services.preview(preview,destruction)
         if not after then return fail("movement_destruction",err) end
@@ -229,7 +230,7 @@ local function plan_turn(world, action, services, initial_frame)
             for _,death in ipairs(shift.destructions) do ids[#ids+1]=death.entity_id end
             for _,relation in ipairs(before_conversions or {}) do if relation.op=="has" then contents[#contents+1]=relation end end
             if not services.destroy then return fail(motion_phase.."_destruction","missing_destruction_service") end
-            local destruction,why=services.destroy(after,ids,contents,motion_phase,shift.destructions)
+            local destruction,why=services.destroy(after,ids,contents,motion_phase,shift.destructions,before_rules)
             if not destruction then return fail(motion_phase.."_destruction",why) end
             local next_world,err=services.preview(after,destruction)
             if not next_world then return fail(motion_phase.."_destruction",err) end
@@ -363,7 +364,7 @@ local function plan_turn(world, action, services, initial_frame)
                 for _,death in ipairs(fall.destructions) do ids[#ids+1]=death.entity_id end
                 for _,relation in ipairs(relations or {}) do if relation.op=="has" then contents[#contents+1]=relation end end
                 if not services.destroy then return fail("fall_destruction","missing_destruction_service") end
-                local destruction,why=services.destroy(after,ids,contents,"fall",fall.destructions)
+                local destruction,why=services.destroy(after,ids,contents,"fall",fall.destructions,rules)
                 if not destruction then return fail("fall_destruction",why) end
                 local next_world,why=services.preview(after,destruction)
                 if not next_world then return fail("fall_destruction",why) end
@@ -387,7 +388,7 @@ local function plan_turn(world, action, services, initial_frame)
         if has_more and services.more then
             local projected,err=services.project(complete,effects,level_traits_from(relations))
             if not projected then return fail("more_project",err) end
-            local why;more,why=services.more(complete,projected)
+            local why;more,why=services.more(complete,projected,rules)
             if not more then return fail("more",why) end
         end
         if #more.changes==0 then more_frame={effects=effects,relations=relations,rules=rules} end
@@ -495,7 +496,7 @@ local function plan_turn(world, action, services, initial_frame)
             local projected,projection_error=services.project(complete,refreshed,plan.level_traits)
             if not projected then return fail(kind,projection_error) end
             if kind == "weak" then projected.weak_new_ids=weak_new end
-            local contact,contact_error=services.contact(complete,projected,kind,contents)
+            local contact,contact_error=services.contact(complete,projected,kind,contents,frozen_rules)
             if not contact then return fail(kind,contact_error) end
             local next_world,validation_error=services.preview(complete,contact)
             if not next_world then return fail(kind,validation_error) end
@@ -514,7 +515,7 @@ local function plan_turn(world, action, services, initial_frame)
                 if not refreshed then return after_failure(plan,"eat_rules",why) end
                 local projected,why=services.project(complete,refreshed,plan.level_traits)
                 if not projected then return fail("eat_project",why) end
-                local eat,why=services.eat(complete,projected,frozen_relations,contents)
+                local eat,why=services.eat(complete,projected,frozen_relations,contents,frozen_rules)
                 if not eat then return fail("eat",why) end
                 local next_world,why=services.preview(complete,eat)
                 if not next_world then return fail("eat_preview",why) end
@@ -533,7 +534,7 @@ local function plan_turn(world, action, services, initial_frame)
                 for _,stage in ipairs(plan.stages) do for _,change in ipairs(stage.plan.changes) do
                     if change.kind=="create" or change.kind=="transform" or change.kind=="retype" then converted[change.entity_id]=true end
                 end end
-                local creation,why=services.make(complete,frozen_relations,converted)
+                local creation,why=services.make(complete,frozen_relations,converted,frozen_rules)
                 if not creation then return fail("make",why) end
                 local next_world,why=services.preview(complete,creation)
                 if not next_world then return fail("make_preview",why) end
@@ -1246,15 +1247,21 @@ local function start(run_self_tests)
 
     local contact_services = {
         victims=function(world,kind) return properties_api:Invoke("RW_ResolveContactVictims",world,kind) end,
-        births=function(world,ids,contents) return rules_api:Invoke("RW_PlanHasBirths",world,ids,contents) end,
+        births=function(world,ids,contents,rules)
+            local products,why=rules_api:Invoke("RW_PlanHasBirths",world,ids,contents)
+            if not products then return nil,why end
+            return rules_api:Invoke("RW_InitializeBirthSpecifications",world,products,rules)
+        end,
         delete=function(world,ids) return world_api:Invoke("RW_PlanDelete",world,ids) end,
         create=function(world,specifications) return world_api:Invoke("RW_PlanCreate",world,specifications) end
     }
-    turn_services.contact=function(world,effective,kind,contents)
-        return RW_PlanContactPhase(world,effective,kind,contents,contact_services)
+    turn_services.contact=function(world,effective,kind,contents,rules)
+        return RW_PlanContactPhase(world,effective,kind,contents,contact_services,rules)
     end
-    turn_services.more=function(world,projected)
+    turn_services.more=function(world,projected,rules)
         local products,why=properties_api:Invoke("RW_ResolveMoreProducts",projected)
+        if not products then return nil,why end
+        products,why=rules_api:Invoke("RW_InitializeBirthSpecifications",world,products,rules)
         if not products then return nil,why end
         return world_api:Invoke("RW_PlanCreate",world,products)
     end
@@ -1264,13 +1271,15 @@ local function start(run_self_tests)
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
-    turn_services.eat=function(world,projected,relations,contents)
+    turn_services.eat=function(world,projected,relations,contents,rules)
         local targets=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"eat")
         local ids=properties_api:Invoke("RW_ResolveEatVictims",projected,targets)
-        return RW_PlanDestructionPhase(world,ids,contents,"eat",contact_services)
+        return RW_PlanDestructionPhase(world,ids,contents,"eat",contact_services,nil,rules)
     end
-    turn_services.make=function(world,relations,converted)
+    turn_services.make=function(world,relations,converted,rules)
         local products,rng=rules_api:Invoke("RW_PlanMakeProducts",world,relations,converted)
+        local why;products,why=rules_api:Invoke("RW_InitializeBirthSpecifications",world,products,rules)
+        if not products then return nil,why end
         local creation,why=world_api:Invoke("RW_PlanCreate",world,products)
         if not creation then return nil,why end
         creation.random_state=rng
@@ -1285,8 +1294,8 @@ local function start(run_self_tests)
         return movement_api:Invoke("RW_ResolveFear",world,targets)
     end
     turn_services.shift=function(world) return movement_api:Invoke("RW_ResolveShift",world) end
-    turn_services.destroy=function(world,ids,contents,cause,deaths)
-        return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths)
+    turn_services.destroy=function(world,ids,contents,cause,deaths,rules)
+        return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths,rules)
     end
     turn_services.status=function(world,rules) return rules_api:Invoke("RW_PlanRuleStatus",world,rules) end
     turn_services.refresh=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end
@@ -1835,7 +1844,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5O initialized")
+    print("[RuleWorld] M9.5P initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

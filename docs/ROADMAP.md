@@ -475,3 +475,10 @@ Text releases before rendering/next queries; ordinary and disabled-WORD objects
 retain saved status until input. Frozen contacts never rerun after release.
 Regression covers delayed MELT, rollback, terminal trigger preservation and Undo.
 BROKEN remains unregistered pending synthetic/lifecycle gaps. See BROKEN.md.
+
+## M9.5T — virtual EMPTY BROKEN queries
+
+EMPTY status is queried dynamically per cell from the current/frozen raw frame,
+with the original ignorebroken bridge. Conditions, property cells and conversions
+honor it without saved entities/IDs. Original query bridge and spatial/negative
+regressions pass; LEVEL synthetic status and other BROKEN lifecycle gaps remain.

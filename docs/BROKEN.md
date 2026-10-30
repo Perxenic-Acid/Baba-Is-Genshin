@@ -191,3 +191,24 @@ Tests delete the BROKEN token through SINK, verify restored Text PUSH, ordinary
 and disabled-WORD latching, MELT delayed until next turn, exact phase concatenation,
 late failure rollback, compile-limit trigger preservation and Undo. Synthetic scope,
 recursive creation-terminal preservation and exact WORD invalidation remain pending.
+
+## Virtual EMPTY dynamic status (M9.5T)
+
+Installed conditions.lua:46-57 queries isitbroken for virtual Empty rather than
+reading a unit field. tools.lua:2234-2240 forwards ignorebroken=true to the nested
+BROKEN declaration query. The adapter now mirrors this transient query path:
+ordinary properties, condition tests (including NOT), relation applicability and
+conversion selection reject a broken Empty cell. No Empty ID or saved status is
+created. BROKEN's nested query bypasses only virtual status suppression; ordinary
+saved-broken identities retain their normal query gates.
+
+Generated BROKEN declarations accompany relation queries even without spatial
+conditions, preventing unconditional EMPTY IS noun from taking an ungated fast
+path. Current/frozen frame ownership stays unchanged. Positive/negative BROKEN
+precedence and per-cell spatial predicates use the existing declaration resolver.
+Tests cover global/spatial suppression, healthy distant cells, override, conversion
+and negation. An installed testcond/isitbroken adapter verifies the virtual query
+and ignorebroken forwarding with a controlled hasfeature result; it does not
+claim full original condition-engine parity. Whole EMPTY lifecycle/HAS and synthetic
+LEVEL status queries remain deferred, as do recursive creation-terminal handling
+and exact WORD dependency invalidation. BROKEN remains publicly unregistered.

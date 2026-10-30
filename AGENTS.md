@@ -382,3 +382,8 @@
   contacts/CRASH, then re-evaluate. Do not rerun contacts after release. Saved-broken
   WORD objects remain outside code candidates until before-input refresh; physical
   Text remains readable. See docs/BROKEN.md and tests/broken_contacts.lua.
+
+- Virtual EMPTY BROKEN is a dynamic current/frozen declaration query with a nested
+  ignorebroken bypass, never a saved unit flag. Gate unconditional property cells
+  and conversions too; NOT conditions cannot invert disabled status. Keep generated
+  BROKEN frames on relation applicability. LEVEL synthetic status remains pending.

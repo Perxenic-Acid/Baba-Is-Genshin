@@ -150,9 +150,15 @@ local function condition_context(world,rules)
     context._condition_rules=rules;context._condition_guard={};context._condition_depth=0
     return context
 end
+local virtual_broken
 -- Query this rule frame, never stale entity.behaviors from a previous turn.
 local function query_trait(world,entity,trait)
     if entity.broken==1 then return false end
+    if virtual_broken and entity.class=="empty" and not world._ignore_virtual_broken then
+        local disabled,err=virtual_broken(world,entity)
+        if disabled==nil then return nil,err end
+        if disabled then return false end
+    end
     local guard=world._condition_guard or {}
     local key=tostring(entity.id or (entity.x..":"..entity.y))..":"..trait
     if guard[key] then return false end
@@ -176,12 +182,23 @@ local function query_trait(world,entity,trait)
     end
     guard[key]=nil;return granted and not denied
 end
+-- EMPTY has no saved unit status. Original testcond -> isitbroken queries the
+-- current declaration frame with ignorebroken=true for that nested query.
+virtual_broken=function(world,entity)
+    if entity.class~="empty" or world._ignore_virtual_broken then return false end
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context._ignore_virtual_broken=true
+    return query_trait(context,entity,"broken")
+end
 local function condition_matches(world,entity,target)
     if entity.class=="empty" then return target.kind=="empty" end
     return valid_selector(target,world) and matches(entity,target,world)
 end
 local function query_when(world,condition,entity)
     if entity.broken==1 then return false end
+    local disabled,err=virtual_broken(world,entity)
+    if disabled==nil then return nil,err end
+    if disabled then return false end
     if condition and condition.op=="spatial" then return RW_TestEntityCondition(world,condition,entity) end
     return evaluate_condition(world,condition)
 end
@@ -464,6 +481,11 @@ end
 -- Contextual conditions are tested against one identity (or one virtual Empty cell).
 function RW_TestEntityCondition(world,node,entity)
     if type(entity)=="table" and entity.broken==1 then return false end
+    if type(entity)=="table" then
+        local disabled,err=virtual_broken(world,entity)
+        if disabled==nil then return nil,err end
+        if disabled then return false end
+    end
     if type(node) ~= "table" then return nil,"invalid_condition" end
     if node.op == "always" then return true end
     if node.op == "not" then
@@ -725,7 +747,11 @@ function RW_ResolveEffects(world, effects)
             for y=1,world.height do for x=1,world.width do
                 if not occupied[x .. ":" .. y] then
                     local enabled,why=true,nil
-                    if effect.when then enabled,why=RW_TestEntityCondition(world,effect.when,{class="empty",x=x,y=y}) end
+                    local empty={class="empty",x=x,y=y}
+                    local disabled;disabled,why=virtual_broken(world,empty)
+                    if disabled==nil then return nil,why end
+                    enabled=not disabled
+                    if enabled and effect.when then enabled,why=RW_TestEntityCondition(world,effect.when,empty) end
                     if enabled == nil then return nil,why end
                     if enabled then resolved.cells[#resolved.cells+1]={x=x,y=y} end
                 end
@@ -910,7 +936,7 @@ function RW_EvaluateRules(world, generated_rules)
     end
 
     local needs_context=false
-    for _,effect in ipairs(active) do if contains_rule_query(effect.when) then needs_context=true;break end end
+    for _,effect in ipairs(active) do if contains_rule_query(effect.when) or effect.trait=="broken" then needs_context=true;break end end
     return RW_ResolveEffects(needs_context and condition_context(world,generated_rules or {}) or world, active)
 end
 
@@ -1290,6 +1316,9 @@ end
 function RW_RelationApplies(world,relation,entity)
     if entity.broken==1 then return false end
     if relation.condition_rules then world=condition_context(world,relation.condition_rules) end
+    local disabled,err=virtual_broken(world,entity)
+    if disabled==nil then return nil,err end
+    if disabled then return false end
     if relation.exclusions ~= nil and not dense_list(relation.exclusions) then return nil,"invalid_relation_exclusions" end
     if relation.when then
         local enabled,err=RW_TestEntityCondition(world,relation.when,entity)
@@ -1312,7 +1341,7 @@ function RW_PlanConversions(world, conversions, generated_rules)
             return nil,"invalid_conversion_relation"
         end
         local source=relation.source_type
-        if relation.when or relation.exclusions then
+        if relation.when or relation.exclusions or relation.condition_rules then
             if relation.op ~= "protect_transform" and relation.op ~= "forbid_transform" and relation.op ~= "write_text"
                 and relation.op ~= "transform_text" and relation.op ~= "transform_all" and relation.op ~= "transform"
                 and relation.op ~= "become" and relation.op ~= "forbid_become" then
@@ -2127,8 +2156,12 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     end
     for trait in pairs(denied_power) do scoped_power[trait]=nil end
     if next(scoped_power) then generated[#generated+1]={when={op="always"},effects={},scoped_power=scoped_power} end
+    local has_broken=false
+    for _,rule in ipairs(generated) do for _,effect in ipairs(rule.effects or {}) do
+        if effect.trait=="broken" then has_broken=true end
+    end end
     for _,relation in ipairs(filtered) do
-        local needed=contains_rule_query(relation.when)
+        local needed=has_broken or contains_rule_query(relation.when)
         for _,condition in ipairs(relation.exclusions or {}) do needed=needed or contains_rule_query(condition) end
         if needed then relation.condition_rules=generated end
     end

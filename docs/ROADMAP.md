@@ -417,3 +417,11 @@ retraction clear derived filters. Frontend blending remains deferred; see COLOUR
 Persisted binary status, ordered pure update planning, validated atomic changes
 and installed-source parity (256 cases). Production rule gating/scheduling is
 still pending; BROKEN is not marked implemented. See BROKEN.md.
+
+## M9.5M — BROKEN saved-status query layer
+
+Real-unit status gates unconditional/default effects, contextual queries,
+conversions, HAS and predicate sources without removing physical Text or spatial
+witnesses. Raw-declaration status refresh supports own-status bypass and negative
+grants. Production status scheduling and public word registration remain pending;
+see BROKEN.md. No native acceptance claim.

@@ -343,3 +343,9 @@
   active colors and clear retracted filters; same-color duplicates collapse.
   Filters are display projection data, never persisted world facts. Host blending
   and renderer binding stay in the deferred frontend workstream; see COLOURS.md.
+
+- BROKEN real-unit status queries fail even for unconditional declarations and
+  negated conditions. Keep physical Text readable; WORD objects lose readability
+  through their disabled property. Broken units remain spatial witnesses. Status
+  planning temporarily clears only the queried unit and updates in sorted ID order.
+  Production scheduling/word registration is still pending; see docs/BROKEN.md.

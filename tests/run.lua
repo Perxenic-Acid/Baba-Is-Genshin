@@ -490,3 +490,4 @@ dofile("tests/groups.lua")
 dofile("tests/level_text.lua")
 
 dofile("tests/broken_status.lua")
+dofile("tests/broken_rules.lua")

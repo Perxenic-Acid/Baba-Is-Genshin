@@ -152,6 +152,7 @@ local function condition_context(world,rules)
 end
 -- Query this rule frame, never stale entity.behaviors from a previous turn.
 local function query_trait(world,entity,trait)
+    if entity.broken==1 then return false end
     local guard=world._condition_guard or {}
     local key=tostring(entity.id or (entity.x..":"..entity.y))..":"..trait
     if guard[key] then return false end
@@ -180,6 +181,7 @@ local function condition_matches(world,entity,target)
     return valid_selector(target,world) and matches(entity,target,world)
 end
 local function query_when(world,condition,entity)
+    if entity.broken==1 then return false end
     if condition and condition.op=="spatial" then return RW_TestEntityCondition(world,condition,entity) end
     return evaluate_condition(world,condition)
 end
@@ -461,6 +463,7 @@ local function facedby_condition(world,parameters,entity,negated)
 end
 -- Contextual conditions are tested against one identity (or one virtual Empty cell).
 function RW_TestEntityCondition(world,node,entity)
+    if type(entity)=="table" and entity.broken==1 then return false end
     if type(node) ~= "table" then return nil,"invalid_condition" end
     if node.op == "always" then return true end
     if node.op == "not" then
@@ -706,6 +709,9 @@ function RW_ResolveEffects(world, effects)
             end
             ids=selected
         end
+        local enabled_ids={}
+        for _,id in ipairs(ids) do if world.entities[id].broken~=1 then enabled_ids[#enabled_ids+1]=id end end
+        ids=enabled_ids
         local resolved={op=effect.op,trait=effect.trait,when=effect.when,
             target={kind=effect.target.kind,value=effect.target.value},entity_ids=ids}
         if effect.target.kind == "empty" then
@@ -1174,6 +1180,15 @@ function RW_PlanBrokenStatus(world,query)
     return plan
 end
 
+-- Query raw declarations with only this unit's old status temporarily cleared.
+-- The callback planner preserves original ordered dependencies between units.
+function RW_PlanRuleStatus(world,generated_rules)
+    if generated_rules~=nil and not dense_list(generated_rules) then return nil,"invalid_rule_sources" end
+    return RW_PlanBrokenStatus(world,function(context,entity)
+        return query_trait(condition_context(context,generated_rules or {}),entity,"broken")
+    end)
+end
+
 function RW_WordTokenMap(world, effective)
     local tokens={}
     for id,entity in pairs(effective.entities) do
@@ -1184,6 +1199,7 @@ function RW_WordTokenMap(world, effective)
     return tokens
 end
 function RW_RelationApplies(world,relation,entity)
+    if entity.broken==1 then return false end
     if relation.condition_rules then world=condition_context(world,relation.condition_rules) end
     if relation.exclusions ~= nil and not dense_list(relation.exclusions) then return nil,"invalid_relation_exclusions" end
     if relation.when then
@@ -1249,6 +1265,7 @@ function RW_PlanConversions(world, conversions)
         next_id,created=next_id+1,created+1; return true
     end
     local function convert(entity,source,virtual)
+        if entity.broken==1 then return true end
         local bans=query_clone(forbidden[source] or {})
         local choices=query_clone(targets[source] or {})
         local protect=protected[source]

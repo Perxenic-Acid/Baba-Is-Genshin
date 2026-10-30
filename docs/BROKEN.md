@@ -17,11 +17,25 @@ entity ID order, matching this engine's other ordered phases; native unit-list
 order can differ. Queries see earlier updates and the current unit temporarily
 cleared. Failed queries and rejected later stages leave the source world intact.
 
+## Query layer (M9.5M)
+
+Saved real-unit status now suppresses direct property queries, default and other
+unconditional effects, contextual/negated conditions, and relation applicability.
+The unconditional conversion fast path also checks status; HAS, MAKE and verb
+source selection use the shared relation query. POWERED/SEEING/FEELING declaration
+queries cannot bypass BROKEN. Broken objects remain physical spatial witnesses.
+`RW_PlanRuleStatus` connects the pure planner to raw generated/default declarations,
+including negative BROKEN declarations, while temporarily clearing the queried
+unit exactly as the original status loop does.
+
+Tests additionally execute installed `testcond` for unconditional Object/Text
+queries with/without the original ignorebroken override, and cover physical Text
+reading/default PUSH, WORD filtering, conversion/HAS, MAKE/FEAR/FOLLOW/EAT,
+POWERED, physical witnesses, status acquisition/retraction and Undo.
+
 The production compiler/scheduler do not call this planner yet. BROKEN remains
 pending in the official-word audit; there is no claim of gameplay support. Next:
-connect status refresh to compilation/turn phases, apply it to unconditional and
-conditional queries (including relations), preserve physical Text reading while
-suppressing broken WORD, and cover acquisition/retraction/conditional timing,
+connect status refresh to compilation/turn phases and cover conditional timing,
 conversion/HAS, terminal checks, navigation and whole-tree Undo. LEVEL and EMPTY
 need their original synthetic query paths rather than real unit records.
 

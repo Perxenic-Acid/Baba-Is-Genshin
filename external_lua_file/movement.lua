@@ -1436,3 +1436,42 @@ function RW_ResolveTele(world)
     return {consumes_turn=true,changes=changes,reason="tele",
         random_state=state~=original_state and {from=original_state,to=state} or nil}
 end
+
+function RW_ResolveHold(world)
+    local ids,holders,positions,held={},{},{},{}
+    for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    for _,id in ipairs(ids) do local e=world.entities[id]
+        positions[id]={x=e.x,y=e.y};held[id]=e.holder or 0
+        if has_capability(world,e,"hold") then holders[id]=true end
+    end
+    for _,id in ipairs(ids) do if holders[id] then local source=world.entities[id]
+        for _,other in ipairs(ids) do local e=world.entities[other]
+            if other~=id and source.x==e.x and source.y==e.y and same_layer(world,source,e) then held[other]=id end
+        end
+    end end
+    for _,id in ipairs(ids) do local holder=held[id]
+        if holder~=0 then
+            if not holders[holder] then held[id]=0
+            else
+                local p,target=positions[id],positions[holder];local e=world.entities[id]
+                local dx,dy=target.x-p.x,target.y-p.y
+                local locked=has_capability(world,e,"still")
+                if (dx==0)~=(dy==0) then
+                    local rx,ry=reverse_vector(world,e,dx,dy)
+                    local key=rx>0 and "lockedright" or rx<0 and "lockedleft" or ry<0 and "lockedup" or "lockeddown"
+                    locked=locked or has_capability(world,e,key)
+                end
+                if locked then held[id]=0
+                else positions[id]={x=target.x,y=target.y}
+                    if not same_layer(world,e,world.entities[holder]) then held[id]=0 end
+                end
+            end
+        end
+    end
+    local changes={}
+    for _,id in ipairs(ids) do local e,p=world.entities[id],positions[id]
+        if e.x~=p.x or e.y~=p.y then changes[#changes+1]={kind="move",entity_id=id,from={x=e.x,y=e.y,direction=e.direction},to={x=p.x,y=p.y,direction=e.direction}} end
+        if (e.holder or 0)~=held[id] then changes[#changes+1]={kind="holder",entity_id=id,from=e.holder,to=held[id]} end
+    end
+    return {consumes_turn=true,changes=changes,reason="hold"}
+end

@@ -1,4 +1,5 @@
 -- Establish installed HOLD behavior before implementing transactional holder state.
+dofile("external_lua_file/movement.lua")
 local f=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/blocks.lua]],'rb'))
 local source=f:read('*a');f:close()
 local a=assert(source:find('local ishold =',1,true));local b=assert(source:find('local issink =',a,true))
@@ -17,11 +18,19 @@ for mask=0,15 do
  env.addundo=function() end
  env.update=function(id,x,y,dir) local u=id==1 and rider or holder;u.values[1],u.values[2],u.values[3]=x,y,dir end
  if bit(3) then rider.values[1]=7;env.unitmap[7+2*12]=true;env.findallhere=function() return {1,2} end;rider.holder=0 end
+ local w={entities={
+  [1]={id=1,class="object",archetype="avatar",x=rider.values[1],y=2,direction="Down",holder=rider.holder,behaviors={still=bit(1),float=bit(2)}},
+  [2]={id=2,class="object",archetype="rock",x=7,y=2,direction="Right",behaviors={hold=not bit(0),float=false}}}}
+ local plan=assert(RW_ResolveHold(w));local actual_x=w.entities[1].x;local actual_holder=w.entities[1].holder
+ for _,change in ipairs(plan.changes) do if change.entity_id==1 then
+  if change.kind=="move" then actual_x=change.to.x elseif change.kind=="holder" then actual_holder=change.to end
+ end end
  assert(load(source:sub(a,b-1),'@original_hold','t',env))()
  local acquired=not bit(0) and (not bit(3) or not bit(2))
  local should_move=acquired and not bit(1)
  assert(rider.values[1]==(bit(3) and 7 or should_move and 7 or 2))
  assert(rider.holder==(should_move and not bit(2) and 2 or 0))
+ assert(actual_x==rider.values[1] and actual_holder==rider.holder,'production HOLD differs')
  assert(rider.values[3]==3,'HOLD must preserve rider facing')
  checked=checked+1
 end

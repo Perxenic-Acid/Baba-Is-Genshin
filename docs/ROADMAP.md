@@ -390,3 +390,11 @@ SAFE/FLOAT filtering, destruction/HAS and whole-tree Undo. Scope in BOOM.md.
 Skip 3D by user request. Color properties combine as stacked filters. Frontend
 and authored level design remain separate deferred major workstreams. BOOM's
 installed-loop oracle passes 256 radius/layer/safety/multiple-source cases.
+
+## M9.5I — HOLD identity transactions
+
+Persistent holder metadata, acquisition, collision-bypassing follow/release before
+SINK, stale validation and Undo. Source/production comparisons and regression tests
+cover the ordinary path; conditional/copy/scope gaps remain in HOLD.md. Deep clone
+skips recursive scalar calls while retaining table keys/cycles, restoring startup
+headroom under the unchanged 2M cap.

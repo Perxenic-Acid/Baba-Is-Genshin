@@ -106,7 +106,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | GREY | pending |
 | property | HAPPY | pending |
 | property | HIDE | implemented within documented scope |
-| property | HOLD | pending |
+| property | HOLD | implemented within documented scope |
 | property | HOT | implemented within documented scope |
 | property | LEFT | implemented within documented scope |
 | property | LIME | pending |

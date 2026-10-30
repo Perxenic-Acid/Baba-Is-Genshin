@@ -28,7 +28,8 @@ local function clone(value, seen)
     seen[value] = result
 
     for k, v in pairs(value) do
-        result[clone(k, seen)] = clone(v, seen)
+        local key=type(k)=="table" and clone(k,seen) or k
+        result[key]=type(v)=="table" and clone(v,seen) or v
     end
 
     return result
@@ -93,6 +94,7 @@ local function valid_new_entity(world, entity, id)
         or entity.traits ~= nil or entity.behaviors ~= nil or entity.symbol ~= nil then
         return false
     end
+    if entity.holder ~= nil and entity.holder ~= 0 and not valid_id(entity.holder) then return false end
     if entity.followed ~= nil and entity.followed ~= -1 and not valid_id(entity.followed) then return false end
     if entity.level_link ~= nil then
         local link = entity.level_link
@@ -184,7 +186,7 @@ local function validate_plan(world, plan)
         if type(change) ~= "table"
             or (change.kind ~= "move" and change.kind ~= "transform"
                 and change.kind ~= "direction" and change.kind ~= "create"
-                and change.kind ~= "delete" and change.kind ~= "retype" and change.kind ~= "followed") then
+                and change.kind ~= "delete" and change.kind ~= "retype" and change.kind ~= "followed" and change.kind ~= "holder") then
             return false, "invalid_operation"
         end
         local id = change.entity_id
@@ -218,6 +220,9 @@ local function validate_plan(world, plan)
                     or change.to.direction ~= entity.direction or not same_state(change.to.level_link,entity.level_link) then
                     return false,"invalid_or_stale_retype"
                 end
+            elseif change.kind == "holder" then
+                if entity.holder ~= change.from then return false,"stale_holder" end
+                if (change.to ~= 0 and not valid_id(change.to)) or change.to==change.from or change.to==id then return false,"invalid_holder" end
             elseif change.kind == "followed" then
                 if entity.followed ~= change.from then return false,"stale_followed" end
                 if (change.to ~= -1 and not valid_id(change.to)) or change.to==change.from then return false,"invalid_followed" end
@@ -306,6 +311,8 @@ local function apply_plan(world, plan)
             entity.direction = change.to.direction or entity.direction
         elseif change.kind == "direction" then
             entity.direction = change.to
+        elseif change.kind == "holder" then
+            entity.holder=change.to
         elseif change.kind == "followed" then
             entity.followed=change.to
         elseif change.kind == "transform" then
@@ -541,7 +548,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", HIDE="hide", POWER="power", POWER2="power2", POWER3="power3", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", TELE="tele", BOOM="boom", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
+                    STOP="block_entry", HIDE="hide", POWER="power", POWER2="power2", POWER3="power3", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", TELE="tele", HOLD="hold", BOOM="boom", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {FEELING="feeling",SEEING="seeing",FACEDBY="facedby",WITHOUT="without",ON="on",NEAR="near",NEXTTO="nextto",ABOVE="above",BELOW="below",BESIDELEFT="besideleft",BESIDERIGHT="besideright",FACING="facing"},

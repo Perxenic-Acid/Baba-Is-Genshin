@@ -358,6 +358,32 @@ local function plan_turn(world, action, services)
         for _,change in ipairs(more.changes) do plan.changes[#plan.changes+1]=change end
         complete=after;trace[#trace+1]="more"
     end
+    if services.tele then
+        local frame=more_frame
+        if not frame then
+            local effects,why,relations,rules=services.evaluate(complete)
+            if not effects then
+                if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then lock_compile_failure(plan,why);return plan,nil,trace end
+                return fail("tele_rules",why)
+            end
+            frame={effects=effects,relations=relations,rules=rules}
+        end
+        local active=false
+        for _,effect in ipairs(frame.effects) do
+            if effect.op=="grant_trait" and effect.trait=="tele" and #effect.entity_ids>0 then active=true;break end
+        end
+        if active then
+            local projected,why=services.project(complete,frame.effects,level_traits_from(frame.relations))
+            if not projected then return fail("tele_project",why) end
+            local tele,why=services.tele(projected);if not tele then return fail("tele",why) end
+            local after,why=services.preview(complete,tele);if not after then return fail("tele_preview",why) end
+            plan.stages[#plan.stages+1]={name="tele",plan=tele}
+            for _,change in ipairs(tele.changes) do plan.changes[#plan.changes+1]=change end
+            complete=after;trace[#trace+1]="tele"
+            if #tele.changes>0 then frame=nil end
+        end
+        more_frame=frame
+    end
     local final_world,final_effects,final_relations
     if services.contact ~= nil or services.refresh ~= nil then
         if type(services.contact) ~= "function" or type(services.refresh) ~= "function" then
@@ -1136,6 +1162,7 @@ local function start(run_self_tests)
         return world_api:Invoke("RW_PlanCreate",world,products)
     end
     turn_services.play=function(world,relations) return rules_api:Invoke("RW_ResolvePlayEvents",world,relations) end
+    turn_services.tele=function(world) return movement_api:Invoke("RW_ResolveTele",world) end
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
@@ -1709,7 +1736,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5E initialized")
+    print("[RuleWorld] M9.5F initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

@@ -53,7 +53,7 @@ print("PASS: production boot/navigation/movement/Undo without diagnostics")
 for i=1,10 do listeners.right() end;listeners.confirm()
 for i=1,5 do listeners.right() end;listeners.confirm()
 assert(rendered.entities[5].archetype=="rock" and rendered.entities[5].x==12)
-assert(rendered.width==32 and rendered.height==28)
+assert(rendered.width==32 and rendered.height==32)
 local loose={}
 for _,entity in pairs(rendered.entities) do
     if entity.class=="text" and entity.y>=15 then
@@ -464,6 +464,8 @@ dofile("tests/text_activation.lua")
 dofile("tests/shift.lua")
 
 dofile("tests/more.lua")
+
+dofile("tests/tele.lua")
 dofile("tests/motion_words.lua")
 dofile("tests/pull_swap.lua")
 dofile("tests/fall_words.lua")

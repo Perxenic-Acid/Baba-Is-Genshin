@@ -319,3 +319,9 @@
   for an empty group. Normalize ALL membership before MIMIC exactly once. Never
   run MIMIC again on derived member rules; retain one-generation tags/limits and
   conditional protections. Other endpoint gaps remain documented in MIMIC.md.
+
+- TELE runs after MORE before contact compilation, using same concrete-name source
+  networks (all Text share one name). Riders must differ from source name, match
+  source FLOAT and lack STILL; destination FLOAT/collision/locks/SLEEP do not block.
+  Each identity travels once, preserving facing/links. Sources can themselves move
+  before later processing. Commit destination RNG atomically; see docs/TELE.md.

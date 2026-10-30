@@ -149,7 +149,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | STILL | implemented within documented scope |
 | property | STOP | implemented within documented scope |
 | property | SWAP | implemented within documented scope |
-| property | TELE | pending |
+| property | TELE | implemented within documented scope |
 | property | TURN | implemented within documented scope |
 | property | UP | implemented within documented scope |
 | property | WEAK | implemented within documented scope |

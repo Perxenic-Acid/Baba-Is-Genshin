@@ -363,3 +363,11 @@ Raw one-generation copies precede GROUP expansion; ALL membership normalization
 now precedes MIMIC once. Source matrix: 1,152 complete-pass cases. Production
 coverage includes empty groups, negatives, multiplicity, LEVEL and Undo. Remaining
 endpoint/conditional parity gaps are documented; proceed with ordinary properties.
+
+## M9.5F — TELE
+
+Same-name networks, cross-name riders, source FLOAT/STILL filtering, immediate
+source movement, once-per-turn riders and atomic snapshot RNG. Arrival contacts
+and loop-triggering Text retain Undo. Source-loop oracle: 768 cases. MOTION grows
+to 32x32 for its sparse TELE word. Native dynamic per-rider trait/BACK integration
+gaps are recorded in TELE.md. Next: ordinary properties and startup-cost headroom.

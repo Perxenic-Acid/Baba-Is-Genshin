@@ -11,7 +11,7 @@ local function has_capability(world, entity, capability)
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", select = "select", select_path = "path",
         win = "win", push = "pushable", block_entry = "block_entry",
-        open="open",shut="shut",safe="safe",weak="weak",float="float",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",reverse="reverse",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
+        open="open",shut="shut",safe="safe",weak="weak",float="float",tele="tele",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",reverse="reverse",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -1391,4 +1391,48 @@ function RW_ResolveFollow(world,targets)
         end
     end
     return {consumes_turn=true,changes=changes,reason="follow"}
+end
+
+-- TELE bypasses collision, preserves facing and moves each rider at most once.
+function RW_ResolveTele(world)
+    local ids,sources={},{}
+    for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local positions={}
+    for _,id in ipairs(ids) do local e=world.entities[id]
+        positions[id]={x=e.x,y=e.y}
+        if has_capability(world,e,"tele") then sources[#sources+1]=id end
+    end
+    local function name(e) return e.class=="text" and "@text" or e.archetype end
+    local function same_layer(a,b) return has_capability(world,a,"float")==has_capability(world,b,"float") end
+    local state=world.random_state or 1;local original_state=state
+    local moved={}
+    for _,source_id in ipairs(sources) do
+        local source=world.entities[source_id];local at=positions[source_id]
+        local targets={}
+        for _,id in ipairs(ids) do local p=positions[id]
+            if p.x==at.x and p.y==at.y then targets[#targets+1]=id end
+        end
+        for _,id in ipairs(targets) do local target=world.entities[id]
+            if id~=source_id and not moved[id] and name(target)~=name(source)
+                and not has_capability(world,target,"still") and same_layer(source,target) then
+                local destinations={}
+                for _,other_id in ipairs(sources) do
+                    if other_id~=source_id and name(world.entities[other_id])==name(source) then destinations[#destinations+1]=other_id end
+                end
+                if #destinations>0 then
+                    state=(state*48271)%2147483647
+                    local destination=positions[destinations[state%#destinations+1]]
+                    positions[id]={x=destination.x,y=destination.y};moved[id]=true
+                end
+            end
+        end
+    end
+    local changes={}
+    for _,id in ipairs(ids) do local e,p=world.entities[id],positions[id]
+        if e.x~=p.x or e.y~=p.y then changes[#changes+1]={kind="move",entity_id=id,
+            from={x=e.x,y=e.y,direction=e.direction or "None"},
+            to={x=p.x,y=p.y,direction=e.direction or "None"}} end
+    end
+    return {consumes_turn=true,changes=changes,reason="tele",
+        random_state=state~=original_state and {from=original_state,to=state} or nil}
 end

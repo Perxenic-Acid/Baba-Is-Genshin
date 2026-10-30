@@ -39,3 +39,43 @@ local released=step(removed);assert(released.world.entities[1].holder==0)
 local stale=RW_PreviewPlan(n.world,{consumes_turn=true,changes={{kind='holder',entity_id=1,from=99,to=0}}});assert(not stale)
 assert(s.world.entities[1].holder==nil)
 print('PASS: HOLD acquisition, persistent following, facing, holder deletion/release, stale metadata and Undo')
+
+-- Scoped HOLD freezes only real units on the map FLOAT layer.
+for _,map_float in ipairs({false,true}) do for _,unit_float in ipairs({false,true}) do
+ local sample=fixture({});sample.world.language.nouns.LEVEL={tag='level',block_type='level_block'}
+ local ast={{subject={tag='noun',type={tag='level',block_type='level_block'}},verb='is',object={tag='property',name='hold'},when={op='always'}}}
+ if map_float then ast[#ast+1]={subject=ast[1].subject,verb='is',object={tag='property',name='float'},when={op='always'}} end
+ local g,d,relations=RW_LowerRuleAST(ast,nil,sample.world);assert(#d==0)
+ local effects=assert(RW_EvaluateRules(sample.world,g));local traits={};for _,r in ipairs(relations) do if r.op=='level_trait' then traits[#traits+1]=r.trait end end
+ local projected=assert(RW_ProjectWorld(sample.world,effects,traits))
+ for _,e in pairs(projected.entities) do e.behaviors={} end
+ projected.entities[1].behaviors={control=true,float=unit_float};projected.entities[1].x=1
+ local motion=assert(RW_ResolveTurn(projected,{type='move',dx=1,dy=0}))
+ local moved=false;for _,c in ipairs(motion.changes) do if c.entity_id==1 and c.kind=='move' then moved=true end end
+ assert(moved==(map_float~=unit_float),'LEVEL HOLD must use map FLOAT layer')
+end end
+print('PASS: scoped LEVEL HOLD real-unit movement and FLOAT separation')
+
+for _,frozen in ipairs({false,true}) do
+ local sample=fixture({});sample.world.entities[3]=nil
+ local w=assert(RW_ProjectWorld(sample.world,{}));w.level_behaviors={hold=frozen}
+ w.entities[1].x,w.entities[1].y=2,2;w.entities[2].x,w.entities[2].y=3,2
+ w.entities[1].behaviors={control=true,float=true};w.entities[2].behaviors={push=true}
+ local push=assert(RW_ResolveTurn(w,{type='move',dx=1,dy=0}));local moved=false
+ for _,c in ipairs(push.changes) do if c.kind=='move' and c.entity_id==2 then moved=true end end
+ assert(moved~=frozen,'scoped HOLD passive PUSH')
+ w.entities[1].x=3;w.entities[2].x=2;w.entities[2].behaviors={pull=true}
+ local pull=assert(RW_ResolveTurn(w,{type='move',dx=1,dy=0}));local pulled=false
+ for _,c in ipairs(pull.changes) do if c.kind=='move' and c.entity_id==2 then pulled=true end end
+ assert(pulled~=frozen,'scoped HOLD passive PULL')
+ w.entities[2].x=3
+ w.entities[2].behaviors={fall=true}
+ local fall=assert(RW_ResolveFall(w));local moved=false
+ for _,c in ipairs(fall.changes) do if c.kind=='move' and c.entity_id==2 then moved=true end end
+ assert(moved~=frozen,'scoped HOLD FALL')
+ w.entities[1].x=3;w.entities[1].behaviors={shift=true};w.entities[1].direction='Right';w.entities[2].behaviors={}
+ local shift=assert(RW_ResolveShift(w));local moved=false
+ for _,c in ipairs(shift.changes) do if c.kind=='move' and c.entity_id==2 then moved=true end end
+ assert(moved~=frozen,'scoped HOLD SHIFT rider')
+end
+print('PASS: scoped LEVEL HOLD blocks passive PUSH, FALL and SHIFT without disabling other layers')

@@ -25,6 +25,13 @@ local function level_surface(world,entity)
     return entity.level_link ~= nil or entity.archetype == block_type
 end
 
+-- Native cantmove checks LEVEL HOLD against the map's FLOAT layer first.
+local function held_by_level(world,entity)
+    local level=world.level_behaviors or {}
+    return entity.class~="empty" and level.hold==true
+        and has_capability(world,entity,"float")== (level.float==true)
+end
+
 -- REVERSE changes active intentions, never recursively pushed/pulled dependencies.
 local function reverse_vector(world,entity,dx,dy)
     local counts=world.trait_counts and world.trait_counts[entity.id]
@@ -35,7 +42,7 @@ end
 local function immobile(world,entity,dx,dy)
     dx,dy=reverse_vector(world,entity,dx,dy)
     local locked=dx==1 and "lockedright" or dx==-1 and "lockedleft" or dy==-1 and "lockedup" or "lockeddown"
-    return has_capability(world,entity,"still") or has_capability(world,entity,locked)
+    return held_by_level(world,entity) or has_capability(world,entity,"still") or has_capability(world,entity,locked)
 end
 
 local function intent_immobile(world,entity,dx,dy)
@@ -275,7 +282,7 @@ function RW_ResolveMovement(world, action)
                     weak_targets[#weak_targets+1]=other_id
                 elseif action.falling and target_swap then -- FALL passes over SWAP without swapping it.
                 elseif not action.falling and (target_swap or (mover_swap and not phantom)) then
-                    if not has_capability(world,other,"still") then swaps[#swaps+1]=other_id end
+                    if not held_by_level(world,other) and not has_capability(world,other,"still") then swaps[#swaps+1]=other_id end
                 elseif phantom then -- PHANTOM bypasses ordinary collisions, not later contacts.
                 elseif has_capability(world, other, "push") then
                     -- FALL treats PUSH as support; it never pushes the support away.
@@ -1455,7 +1462,7 @@ function RW_ResolveHold(world)
             else
                 local p,target=positions[id],positions[holder];local e=world.entities[id]
                 local dx,dy=target.x-p.x,target.y-p.y
-                local locked=has_capability(world,e,"still")
+                local locked=held_by_level(world,e) or has_capability(world,e,"still")
                 if (dx==0)~=(dy==0) then
                     local rx,ry=reverse_vector(world,e,dx,dy)
                     local key=rx>0 and "lockedright" or rx<0 and "lockedleft" or ry<0 and "lockedup" or "lockeddown"

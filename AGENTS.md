@@ -332,3 +332,8 @@
 - BOOM runs after SINK before WEAK, with multiplicity-scaled square range,
   independent SAFE victims and FLOAT matching. Destruction triggers HAS once per
   victim; see BOOM.md and tests/reference_boom.lua.
+
+- Unconditional scoped LEVEL HOLD blocks real-unit displacement only on the map
+  FLOAT layer, through common cantmove-style checks (including passive movement
+  and HOLD following). Virtual EMPTY is excluded; TELE bypasses cantmove as in
+  the original. Conditional scoped evaluation remains deferred; see HOLD.md.

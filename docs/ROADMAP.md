@@ -398,3 +398,9 @@ SINK, stale validation and Undo. Source/production comparisons and regression te
 cover the ordinary path; conditional/copy/scope gaps remain in HOLD.md. Deep clone
 skips recursive scalar calls while retaining table keys/cycles, restoring startup
 headroom under the unchanged 2M cap.
+
+## M9.5J — scoped LEVEL HOLD movement
+
+Shared movement restriction respects the map FLOAT layer and excludes virtual
+EMPTY. Covers active/passive movement and HOLD transport; TELE retains its direct
+update behavior. Scoped conditional evaluation and holder conversion gaps remain.

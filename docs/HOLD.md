@@ -46,3 +46,15 @@ The installed-loop comparison now covers 272 cases: 256 additional source-order,
 mobile-holder/cycle, FLOAT, STILL, directional-lock and REVERSE combinations match
 production positions and holder metadata. This is stronger ordinary solver evidence,
 not completion of the scoped/conversion/dynamic-condition gaps above.
+
+## M9.5J scoped movement restriction
+
+Unconditional scoped LEVEL HOLD now participates in the shared cantmove-style
+restriction for real units on the map FLOAT layer. Ordinary root and passive
+movement, PULL, SHIFT, FALL, SWAP partners and HOLD transport use this restriction;
+virtual EMPTY is excluded. TELE still bypasses cantmove as in the original loop.
+This supersedes the earlier global-restriction deferral, not the separate conditional
+scoped LEVEL evaluator gap. Projection uses the existing scoped LEVEL trait frame.
+Physical level_block objects remain real units, unlike the native synthetic map ID.
+Tests cover map/unit FLOAT combinations, active movement, passive PUSH/PULL, SHIFT
+and FALL. The existing entire suite covers transaction/Undo behavior.

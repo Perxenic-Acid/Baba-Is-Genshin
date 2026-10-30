@@ -351,3 +351,9 @@
   Before-input status refresh is atomic with movement/wait and input/RNG state;
   empty refreshes reuse the initial compile. Initialization/post-code/newborn/
   synthetic paths and public word registration remain pending; see docs/BROKEN.md.
+
+- Post-code BROKEN refresh targets physical Text and WORD candidates, not all
+  ordinary units. Compiler code_status is a pure plan; apply at changed-reading
+  movement/conversion barriers before later selection. Do not mutate state during
+  render or iterate BROKEN to a fixed point. Exact WORD dependency invalidation,
+  initialization/late newborn/synthetic scope remain pending; see BROKEN.md.

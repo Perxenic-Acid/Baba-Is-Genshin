@@ -1,11 +1,11 @@
 local cs={read=RW_ReadLines,parse=RW_ParseRuleAST,lower=RW_LowerRuleAST,
-    evaluate=RW_EvaluateRules,project=RW_ProjectWorld,words=RW_WordTokenMap}
+    evaluate=RW_EvaluateRules,project=RW_ProjectWorld,words=RW_WordTokenMap,code_status=RW_PlanCodeStatus}
 local services={status=RW_PlanRuleStatus,project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,
     convert=RW_PlanConversions,refresh=RW_EvaluateRules,
     contact=function(w,p,k,c) return RW_PlanContactPhase(w,p,k,c,{victims=RW_ResolveContactVictims,
         births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete}) end,
     evaluate=function(w) local f,e=RW_CompileWorld(w,cs);if not f then return nil,e.reason end
-        return f.effects,nil,f.relations,f.rules end}
+        return f.effects,nil,f.relations,f.rules,f.code_status end}
 local function fixture(rows)
     local s=RW_CreateSession();local w=s.world
     w.entities={[1]={id=1,kind="object",class="object",archetype="avatar",x=2,y=2,direction="Left"}}

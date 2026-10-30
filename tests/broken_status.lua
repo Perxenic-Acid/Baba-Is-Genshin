@@ -4,6 +4,7 @@ local source=file:read("*a");file:close()
 local first=assert(source:find("function brokenblock(ids)",1,true))
 local last=assert(source:find("function statusblock(",first,true))
 local cases=0
+for subset=0,1 do
 for mask=0,255 do
     local function bit(n) return math.floor(mask/2^n)%2==1 end
     local session=RW_CreateSession();local world=session.world
@@ -25,12 +26,12 @@ for mask=0,255 do
     local undo={}
     env.addundo=function(event) undo[#undo+1]=event end
     assert(load(source:sub(first,last-1),"@installed_brokenblock","t",env))()
-    env.brokenblock()
+    env.brokenblock(subset==1 and {units[2],units[4]} or nil)
     local plan=assert(RW_PlanBrokenStatus(world,function(context,entity)
         assert(entity.broken==0)
         local previous=context.entities[entity.id==1 and 4 or entity.id-1].broken
         return bit(entity.id+3)~=(previous==1)
-    end))
+    end,subset==1 and {[2]=true,[4]=true} or nil))
     assert(#plan.changes==#undo,"count mismatch "..mask..":"..#plan.changes..":"..#undo)
     local completed,result=RW_Commit(session,plan);assert(result.accepted,result.reason)
     for id=1,4 do
@@ -39,6 +40,7 @@ for mask=0,255 do
     end
     if #plan.changes>0 then assert(RW_Undo(completed).world==world) end
     cases=cases+1
+end
 end
 local s=RW_CreateSession();s.world.entities[1].broken=nil
 local plan=assert(RW_PlanBrokenStatus(s.world,function(_,entity) return entity.id==1 end))

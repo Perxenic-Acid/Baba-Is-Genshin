@@ -47,16 +47,45 @@ WORD eligibility additionally rejects a current positive BROKEN declaration befo
 persisted status is refreshed, matching `findwordunits`' separate BROKEN query.
 Physical Text remains readable. The raw query handles NOT via normal projection.
 
+## Post-code status barriers (M9.5O)
+
+Installed Data/rules.lua:20-60 collects Text and readable WORD candidates; the
+outer code() call runs brokenblock on that list (163-164), rather than every real
+unit. Data/movement.lua:926-929 compiles before conversion and again afterward.
+Data/tools.lua:update/updatedir invalidate code when Text moves/turns; update.lua
+also tracks WORD and wordrelatedunits updates.
+
+The compiler optionally returns `code_status` as a separate pure plan after its
+WORD fixed point. It never applies it or changes saved fields during display.
+Only selected Text/WORD records update; ordinary units retain their old status
+until before-input statusblock. Current positive WORD grants include candidates
+whose token BROKEN has already excluded. Selected updates preserve the original
+ordered-loop behavior and are checked against installed brokenblock with both
+complete and subset unit lists (512 cases).
+
+The turn scheduler commits code-status stages after changed reading positions,
+before conversion, and after conversion creates/retypes reading units. Conditions
+and conversion selection read the updated snapshot. Text can disable its own
+conversion, and passive SHIFT can break TEXT IS BROKEN and restore default PUSH.
+Conversion-created Text gets its status before contacts. Terminal CRASH observes
+updated status. All phases remain one Undo; later rejection discards everything.
+
+Known timing boundary: WORD invalidation is conservative whenever any generated
+WORD declaration and a change coexist. The original wordrelatedunits dependency
+list is not reproduced yet. Candidate history still follows our agreed grounded
+WORD expansion, rather than inheriting the prior native rule tree. Late contact
+birth/destruction refresh and exact initialization/newborn timing remain pending.
+
 BROKEN is still pending in the public word audit and default vocabulary. Remaining:
-initialization and boundaries, post-code/Text status updates and newly created unit
-status, conditional timing, terminal/outcome/navigation integration, and the LEVEL
-and EMPTY synthetic query paths. These must be implemented/tested before claiming
+initialization and boundaries, ordinary/newborn status, late contact changes,
+conditional timing, outcome/navigation integration, and the LEVEL and EMPTY
+synthetic query paths. These must be implemented/tested before claiming
 complete gameplay support. In particular, do not insert a BROKEN fixed-point loop:
 original saved status is refreshed at explicit lifecycle points, not recursively
 until a Boolean state stabilizes.
 
 Validation: tests/broken_status.lua executes the installed original brokenblock
-in an isolated adapter and compares 256 ordered status cases, including mixed
+in an isolated adapter and compares 512 ordered status cases, including mixed
 Object/Text and dependencies on earlier/later units. Production transaction tests
 cover nil-to-one, Preview purity, stale/invalid status, atomic late failure and Undo.
 Native gameplay acceptance is not inferred from these tests.

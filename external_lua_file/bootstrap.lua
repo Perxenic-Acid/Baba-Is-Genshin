@@ -54,13 +54,30 @@ function RW_CompileWorld(world, services)
                     if world.entities[id] and world.entities[id].class == "text" then active_text_ids[id]=true end
                 end
             end
+            local code_status
+            if services.code_status then
+                local why;code_status,why=services.code_status(world,generated,effective)
+                if not code_status then return nil,{stage="code_status",reason=why} end
+            end
             return {effects=effects,ast=ast,rules=generated,deferred=deferred,relations=relations,
-                active_text_ids=active_text_ids,word_tokens=tokens,iterations=iteration}
+                active_text_ids=active_text_ids,word_tokens=tokens,iterations=iteration,code_status=code_status}
         end
         -- Stay bounded without recursively calling the parser, even on oscillation.
         tokens=next_tokens
     end
     return nil,{stage="word",reason="word_rule_limit"}
+end
+
+local function reading_changed(world,changes,rules)
+    if #changes==0 then return false end
+    for _,rule in ipairs(rules or {}) do for _,effect in ipairs(rule.effects or {}) do
+        if effect.trait=="word" then return true end
+    end end
+    for _,change in ipairs(changes) do
+        local entity=world.entities[change.entity_id]
+        if (entity and entity.class=="text") or (change.to and type(change.to)=="table" and change.to.class=="text") then return true end
+    end
+    return false
 end
 
 -- Contact destruction and HAS share one flat phase: births use the pre-delete
@@ -227,13 +244,23 @@ local function plan_turn(world, action, services, initial_frame)
     end
     end
     trace[#trace + 1] = "rules_after"
-    local post_effects, post_error, conversions = services.evaluate(preview)
+    local post_effects, post_error, conversions, post_rules, code_status = services.evaluate(preview)
     if not post_effects then
         if post_error == "word_rule_limit" or post_error == "word_rule_cycle" or post_error == "rule_complexity_limit" then
             lock_compile_failure(movement_prefix,post_error)
             return movement_prefix,nil,trace
         end
         return fail("rules_after", post_error)
+    end
+
+    if code_status and #code_status.changes>0 and reading_changed(world,movement_prefix.changes,before_rules) then
+        local updated,why=services.preview(preview,code_status)
+        if not updated then return fail("code_status_after_move",why) end
+        local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,changes=movement.changes,board_shift=movement.board_shift}}}
+        stages[#stages+1]={name="code_status_after_move",plan=code_status}
+        local changes={};for _,stage in ipairs(stages) do for _,change in ipairs(stage.plan.changes) do changes[#changes+1]=change end end
+        movement_prefix={consumes_turn=true,reason=movement.reason,changes=changes,stages=stages}
+        preview=updated;trace[#trace+1]="code_status_after_move"
     end
 
     trace[#trace + 1] = "conversions"
@@ -274,13 +301,22 @@ local function plan_turn(world, action, services, initial_frame)
     local complete, complete_error, phase = services.preview(world, plan)
     if not complete then return fail("preview_complete", complete_error,phase) end
     local more_frame
-    if services.more or services.fall or services.follow then
-        local effects,why,relations,rules=services.evaluate(complete)
+    if services.more or services.fall or services.follow or (services.status and reading_changed(preview,operations,post_rules)) then
+        local effects,why,relations,rules,code_status=services.evaluate(complete)
         if not effects then
             if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
                 lock_compile_failure(plan,why);return plan,nil,trace
             end
             return fail("more_rules",why)
+        end
+        if code_status and #code_status.changes>0 and reading_changed(preview,operations,rules) then
+            local updated,why=services.preview(complete,code_status)
+            if not updated then return fail("code_status_after_conversion",why) end
+            plan.stages[#plan.stages+1]={name="code_status_after_conversion",plan=code_status}
+            for _,change in ipairs(code_status.changes) do plan.changes[#plan.changes+1]=change end
+            complete=updated;trace[#trace+1]="code_status_after_conversion"
+            effects,why=services.refresh(complete,rules)
+            if not effects then return after_failure(plan,"code_status_conversion_rules",why) end
         end
         -- Reuse the post-conversion compile when FOLLOW is absent or unchanged.
         if services.follow then
@@ -1175,7 +1211,8 @@ local function start(run_self_tests)
         lower=function(ast,semantics,world) return rules_api:Invoke("RW_LowerRuleAST",ast,semantics,world) end,
         evaluate=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end,
         project=function(world,effects,traits) return properties_api:Invoke("RW_ProjectWorld",world,effects,traits) end,
-        words=function(world,effective) return rules_api:Invoke("RW_WordTokenMap",world,effective) end
+        words=function(world,effective) return rules_api:Invoke("RW_WordTokenMap",world,effective) end,
+        code_status=function(world,rules,effective) return rules_api:Invoke("RW_PlanCodeStatus",world,rules,effective) end
     }
     local function evaluate(world_state)
         local frame,problem=RW_CompileWorld(world_state or session.world,compile_services)
@@ -1183,15 +1220,15 @@ local function start(run_self_tests)
             print("[RuleWorld] Rule compilation rejected:",problem.stage,problem.reason)
             return nil,nil,nil,nil,nil,problem.reason
         end
-        return frame.effects,#frame.ast,#frame.deferred,frame.relations,frame.rules,nil,frame.active_text_ids
+        return frame.effects,#frame.ast,#frame.deferred,frame.relations,frame.rules,nil,frame.active_text_ids,frame.code_status
     end
 
     -- Mapped script calls stay in the host adapter, outside the scheduler.
     local turn_services = {
         evaluate = function(world_state)
-            local effects, rule_count, deferred_count, conversions, generated, why = evaluate(world_state)
+            local effects, rule_count, deferred_count, conversions, generated, why, _, code_status = evaluate(world_state)
             if not effects then return nil, why or "evaluation_failed" end
-            return effects, nil, conversions, generated
+            return effects, nil, conversions, generated, code_status
         end,
         project = function(world_state, effects, traits)
             return properties_api:Invoke("RW_ProjectWorld", world_state, effects, traits)
@@ -1798,7 +1835,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5N initialized")
+    print("[RuleWorld] M9.5O initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

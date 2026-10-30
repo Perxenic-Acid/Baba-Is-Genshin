@@ -433,3 +433,12 @@ recompiles only after actual status changes, and validates the combined plan.
 Same-input disable/recovery, Undo, failure purity, terminal lockout and raw BROKEN
 WORD gating are covered. Initialization/post-code/newborn/synthetic paths and
 public registration remain pending; see BROKEN.md.
+
+## M9.5O — pure post-code BROKEN plans
+
+Compiler returns scoped Text/WORD status plans; movement/conversion barriers
+apply them atomically before subsequent rules/contact queries. Covers Text blocking
+its own conversion, SHIFT-driven retraction, conversion-created Text, WORD scope,
+ordinary status latching, CRASH and Undo. Installed ordered/subset oracle expanded
+to 512 cases. Initialization/late births/synthetic scope and exact WORD dependency
+invalidation remain pending; BROKEN is not publicly registered. See BROKEN.md.

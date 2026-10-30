@@ -1149,15 +1149,21 @@ end
 -- Original brokenblock updates units in order, temporarily clearing only the
 -- current unit's old status for its own BROKEN query. Keep this pure so late
 -- transaction rejection cannot leak partially updated statuses into the world.
-function RW_PlanBrokenStatus(world,query)
+function RW_PlanBrokenStatus(world,query,selected_ids)
     if type(world)~="table" or type(world.entities)~="table" or type(query)~="function" then
         return nil,"invalid_broken_status_input"
+    end
+    if selected_ids~=nil then
+        if type(selected_ids)~="table" then return nil,"invalid_broken_status_selection" end
+        for id,value in pairs(selected_ids) do
+            if not world.entities[id] or value~=true then return nil,"invalid_broken_status_selection" end
+        end
     end
     local context={};for k,v in pairs(world) do context[k]=v end
     context.entities={}
     local ids={}
     for id,entity in pairs(world.entities) do
-        ids[#ids+1]=id
+        if not selected_ids or selected_ids[id] then ids[#ids+1]=id end
         local copy={};for k,v in pairs(entity) do copy[k]=v end
         context.entities[id]=copy
     end
@@ -1182,9 +1188,13 @@ end
 
 -- Query raw declarations with only this unit's old status temporarily cleared.
 -- The callback planner preserves original ordered dependencies between units.
-function RW_PlanRuleStatus(world,generated_rules)
+function RW_PlanRuleStatus(world,generated_rules,selected_ids)
     if type(world)~="table" or type(world.entities)~="table" then return nil,"invalid_broken_status_input" end
     if generated_rules~=nil and not dense_list(generated_rules) then return nil,"invalid_rule_sources" end
+    if selected_ids~=nil then
+        if type(selected_ids)~="table" then return nil,"invalid_broken_status_selection" end
+        for id,value in pairs(selected_ids) do if not world.entities[id] or value~=true then return nil,"invalid_broken_status_selection" end end
+    end
     local needed=false
     for _,sources in ipairs({world.rule_sources or {},generated_rules or {}}) do
         for _,rule in ipairs(sources) do for _,effect in ipairs(rule.effects or {}) do
@@ -1195,7 +1205,20 @@ function RW_PlanRuleStatus(world,generated_rules)
     if not needed then return {consumes_turn=true,changes={},reason="broken_status"} end
     return RW_PlanBrokenStatus(world,function(context,entity)
         return query_trait(condition_context(context,generated_rules or {}),entity,"broken")
-    end)
+    end,selected_ids)
+end
+
+-- code() refreshes its Text/WORD reading candidates rather than every unit.
+-- Ordinary unit status otherwise remains latched until the next statusblock.
+function RW_PlanCodeStatus(world,generated_rules,effective)
+    if type(world)~="table" or type(world.entities)~="table" then return nil,"invalid_broken_status_input" end
+    if type(effective)~="table" or type(effective.entities)~="table" then return nil,"invalid_code_status_frame" end
+    local selected={}
+    for id,entity in pairs(world.entities) do
+        local projected=effective.entities[id]
+        if entity.class=="text" or (projected and projected.behaviors and projected.behaviors.word) then selected[id]=true end
+    end
+    return RW_PlanRuleStatus(world,generated_rules,selected)
 end
 
 function RW_WordTokenMap(world, effective)

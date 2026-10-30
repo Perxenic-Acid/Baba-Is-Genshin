@@ -7,7 +7,7 @@ local function fixture(rows)
         [2]={id=2,kind="object",class="object",archetype="rock",x=4,y=2,direction="Right"},
         [3]={id=3,kind="object",class="object",archetype="avatar",x=6,y=2,direction="Up"}}
     w.language.nouns.ROCK="rock";w.language.nouns.FLAG="flag"
-    w.rule_sources={};w.next_entity_id=10
+    w.next_entity_id=10
     for row,words in ipairs(rows) do for x,word in ipairs(words) do
         local id=w.next_entity_id;w.next_entity_id=id+1
         w.entities[id]={id=id,kind="object",class="text",text={name=word},x=x,y=4+row*2,direction="None",broken=1}
@@ -27,6 +27,9 @@ for id=10,s.world.next_entity_id-1 do
     assert(f.active_text_ids[id],"broken physical Text must still form complete sentences")
     assert(not p.entities[id].behaviors.push,"broken Text must lose default PUSH")
 end
+local saved=s.world.entities[10].broken;s.world.entities[10].broken=0
+local healthy_frame,healthy=frame(s);assert(healthy.entities[10].behaviors.push,"fixture lost default TEXT IS PUSH")
+s.world.entities[10].broken=saved
 local relation={when={op="always"}}
 assert(not RW_RelationApplies(s.world,relation,s.world.entities[1]))
 assert(RW_RelationApplies(s.world,relation,s.world.entities[2]))

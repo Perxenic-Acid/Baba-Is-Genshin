@@ -466,6 +466,7 @@ dofile("tests/shift.lua")
 dofile("tests/more.lua")
 
 dofile("tests/tele.lua")
+dofile("tests/boom.lua")
 dofile("tests/motion_words.lua")
 dofile("tests/pull_swap.lua")
 dofile("tests/fall_words.lua")

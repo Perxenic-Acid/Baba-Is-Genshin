@@ -30,7 +30,7 @@ local BEHAVIORS = {
     reverse={reverse=true}, pull={pull=true}, swap={swap=true}, phantom={phantom=true},
     sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
     you = {control = true}, select = {select = true}, path = {select_path = true},
-    tele = {tele = true}, more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
+    boom = {boom = true}, tele = {tele = true}, more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 -- Private fixed vocabulary: custom trait aliases may only map implemented capabilities.
 local CAPABILITIES={}
@@ -245,7 +245,7 @@ end
 -- Ordered contacts on a rule-projected snapshot. Identity is distinct from type.
 function RW_ResolveContactVictims(world, kind)
     if type(world) ~= "table" or type(world.entities) ~= "table" then return nil,"invalid_contact_world" end
-    if kind ~= "sink" and kind ~= "melt" and kind ~= "defeat" and kind ~= "unlock" and kind ~= "weak" then return nil,"invalid_contact_kind" end
+    if kind ~= "boom" and kind ~= "sink" and kind ~= "melt" and kind ~= "defeat" and kind ~= "unlock" and kind ~= "weak" then return nil,"invalid_contact_kind" end
     local ids, removed = {}, {}
     for id,entity in pairs(world.entities) do
         if type(id) ~= "number" or id % 1 ~= 0 or id < 1
@@ -258,7 +258,20 @@ function RW_ResolveContactVictims(world, kind)
     local function overlap(a,b)
         return a.x == b.x and a.y == b.y and (a.behaviors.float == true)==(b.behaviors.float == true)
     end
-    if kind == "sink" then
+    if kind == "boom" then
+        for _,id in ipairs(ids) do
+            local source=world.entities[id]
+            if source.behaviors.boom then
+                local count=((world.trait_counts or {})[id] or {}).boom or 1
+                local radius=math.min(count-1,math.max(world.width,world.height))
+                for _,other_id in ipairs(ids) do local other=world.entities[other_id]
+                    if not other.behaviors.safe and (other_id==id or
+                        ((source.behaviors.float==true)==(other.behaviors.float==true)
+                        and math.abs(other.x-source.x)<=radius and math.abs(other.y-source.y)<=radius)) then removed[other_id]=true end
+                end
+            end
+        end
+    elseif kind == "sink" then
         for _,id in ipairs(ids) do
             local source=world.entities[id]
             if source.behaviors.sink and not removed[id] then

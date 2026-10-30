@@ -87,7 +87,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | BLACK | pending |
 | property | BLUE | pending |
 | property | BONUS | pending |
-| property | BOOM | pending |
+| property | BOOM | implemented within documented scope |
 | property | BROKEN | pending |
 | property | BROWN | pending |
 | property | CHILL | pending |

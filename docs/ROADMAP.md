@@ -379,3 +379,8 @@ lookup built from the fixed built-in registry. Accepted capability vocabulary is
 unchanged (verified against the previous chain); custom aliases still require a
 nonempty Boolean capability specification. Full regression passes. Normal startup
 uses 1,992,000 instructions versus M9.5F's 1,994,000; the 2M cap remains unchanged.
+
+## M9.5H — BOOM
+
+Add multiplicity-scaled square blasts after SINK, before WEAK, with independent
+SAFE/FLOAT filtering, destruction/HAS and whole-tree Undo. Scope in BOOM.md.

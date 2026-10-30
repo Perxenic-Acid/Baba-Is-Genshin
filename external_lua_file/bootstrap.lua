@@ -422,7 +422,7 @@ local function plan_turn(world, action, services)
                 elseif stage.name == "conversion" then weak_new[change.entity_id]=nil end
             end
         end
-        for _,kind in ipairs({"sink","weak","melt","defeat","unlock"}) do
+        for _,kind in ipairs({"sink","boom","weak","melt","defeat","unlock"}) do
             trace[#trace+1]=kind
             local refreshed,refresh_error=services.refresh(complete,frozen_rules)
             if not refreshed then return after_failure(plan,kind,refresh_error) end
@@ -1736,7 +1736,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5G initialized")
+    print("[RuleWorld] M9.5H initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

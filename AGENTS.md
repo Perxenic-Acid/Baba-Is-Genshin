@@ -377,3 +377,8 @@
   position. Keep this inside whole-tree transactions, without input/RNG/local Undo;
   retain compile-limit terminal boundaries and avoid recompiling terminal boards.
   Ordinary startup uses the authored status/vocabulary guard. See docs/BROKEN.md.
+
+- Final contact reading changes apply compiler BROKEN status once after frozen
+  contacts/CRASH, then re-evaluate. Do not rerun contacts after release. Saved-broken
+  WORD objects remain outside code candidates until before-input refresh; physical
+  Text remains readable. See docs/BROKEN.md and tests/broken_contacts.lua.

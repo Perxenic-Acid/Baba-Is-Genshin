@@ -467,3 +467,11 @@ a final status refresh. No input/RNG/local history is consumed. Whole-tree Undo,
 first-F gating and compile-limit terminal boundaries are tested. Synthetic scope,
 late contact code invalidation and recursive birth-terminal preservation remain;
 BROKEN stays unregistered. See BROKEN.md.
+
+## M9.5S — final contact BROKEN code barrier
+
+Contact/MAKE reading changes now apply final compiler status plans atomically.
+Text releases before rendering/next queries; ordinary and disabled-WORD objects
+retain saved status until input. Frozen contacts never rerun after release.
+Regression covers delayed MELT, rollback, terminal trigger preservation and Undo.
+BROKEN remains unregistered pending synthetic/lifecycle gaps. See BROKEN.md.

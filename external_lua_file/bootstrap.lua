@@ -467,6 +467,7 @@ local function plan_turn(world, action, services, initial_frame)
             return fail("contact_rules",why)
         end
         if type(frozen_rules) ~= "table" then return fail("contact_rules","missing_contact_rule_frame") end
+        local contact_origin,contact_change_start=complete,#plan.changes
         local contents={}
         for _,relation in ipairs(frozen_relations or {}) do
             if relation.op == "has" then contents[#contents+1]=relation end
@@ -556,7 +557,20 @@ local function plan_turn(world, action, services, initial_frame)
         if not final then return fail("preview_contacts",why,phase) end
         -- Contacts can remove the grounding Text of a WORD rule. Detect a loop
         -- in the final board before Commit/render, without changing frozen contacts.
-        local checked,check_error,checked_relations=services.evaluate(final)
+        local checked,check_error,checked_relations,_,code_status=services.evaluate(final)
+        if checked and code_status and #code_status.changes>0 then
+            local contact_changes={}
+            for i=contact_change_start+1,#plan.changes do contact_changes[#contact_changes+1]=plan.changes[i] end
+            if reading_changed(contact_origin,contact_changes,frozen_rules) then
+                local updated,why=services.preview(final,code_status)
+                if not updated then return fail("code_status_after_contacts",why) end
+                plan.stages[#plan.stages+1]={name="code_status_after_contacts",plan=code_status}
+                for _,change in ipairs(code_status.changes) do plan.changes[#plan.changes+1]=change end
+                trace[#trace+1]="code_status_after_contacts"
+                final=updated
+                checked,check_error,checked_relations=services.evaluate(final)
+            end
+        end
         final_world,final_effects,final_relations=final,checked,checked_relations
         if not checked then
             if check_error == "word_rule_limit" or check_error == "word_rule_cycle" or check_error == "rule_complexity_limit" then
@@ -1914,7 +1928,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5R initialized")
+    print("[RuleWorld] M9.5S initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

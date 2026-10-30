@@ -137,7 +137,6 @@ witnesses are not covered by this oracle. Synthetic scoped LEVEL status queries 
 preservation remain separate gaps.
 
 BROKEN is still pending in the public word audit and default vocabulary. Remaining:
-late contact code changes,
 conditional timing, outcome/navigation integration, and the LEVEL and EMPTY
 synthetic query paths. These must be implemented/tested before claiming
 complete gameplay support. In particular, do not insert a BROKEN fixed-point loop:
@@ -172,3 +171,23 @@ Tests cover first-confirm gating, conditional selector placement, aliases and WO
 reset of authored saved flags, sibling isolation, failure purity, terminal returns,
 allocator/RNG/input preservation and tree Undo. Public BROKEN registration remains
 pending the synthetic-scope and later lifecycle gaps above.
+
+## Final contact code barrier (M9.5S)
+
+Installed tools.lua deletion invalidates updatecode for Text/WORD-related units;
+rules.lua:20-60 selects physical Text and eligible WORD identities, and :163-164
+refreshes only that set through brokenblock. A saved-broken WORD object fails
+its condition and remains outside this set until the next before-input refresh.
+
+The existing final-board compile after contacts now applies its pure code-status
+plan when contact/MAKE operations changed readable data, then reevaluates the
+resulting board. This is one explicit barrier, not repeated status stabilization.
+The final compilation boundary is our scheduler adapter; host callbacks scheduling
+code() outside movement.lua are not exposed in the installed Lua source.
+Frozen contact declarations and CRASH-before-final-code timing remain intact.
+No SINK/MELT/etc phase reruns when Text regains properties at this barrier.
+
+Tests delete the BROKEN token through SINK, verify restored Text PUSH, ordinary
+and disabled-WORD latching, MELT delayed until next turn, exact phase concatenation,
+late failure rollback, compile-limit trigger preservation and Undo. Synthetic scope,
+recursive creation-terminal preservation and exact WORD invalidation remain pending.

@@ -24,6 +24,18 @@ local function clone(value, seen)
 end
 
 -- Registry entries map rule-derived trait names to implemented capabilities.
+local COLOUR_FILTERS={
+    {"red",2,2},{"orange",2,3},{"yellow",2,4},{"lime",5,3},{"green",5,2},
+    {"cyan",1,4},{"blue",3,2},{"purple",3,1},{"pink",4,1},{"rosy",4,2},
+    {"black",0,4},{"grey",0,1},{"silver",0,2},{"white",0,3},{"brown",6,1}
+}
+local function colour_filters(behaviors)
+    local filters={}
+    for _,colour in ipairs(COLOUR_FILTERS) do if behaviors[colour[1]] then
+        filters[#filters+1]={name=colour[1],palette={colour[2],colour[3]}}
+    end end
+    return filters
+end
 local BEHAVIORS = {
     power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
@@ -32,6 +44,7 @@ local BEHAVIORS = {
     you = {control = true}, select = {select = true}, path = {select_path = true},
     hold = {hold = true}, boom = {boom = true}, tele = {tele = true}, more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
+for _,colour in ipairs(COLOUR_FILTERS) do BEHAVIORS[colour[1]]={[colour[1]]=true} end
 -- Private fixed vocabulary: custom trait aliases may only map implemented capabilities.
 local CAPABILITIES={}
 for _,spec in pairs(BEHAVIORS) do for capability in pairs(spec) do CAPABILITIES[capability]=true end end
@@ -177,6 +190,10 @@ function RW_ProjectWorld(world, effects, level_traits)
             end
         end
     end
+    -- Presentation metadata is derived afresh; never store it in authoritative worlds.
+    projected.level_colour_filters=colour_filters(projected.level_behaviors)
+    for _,entity in pairs(projected.entities) do entity.colour_filters=colour_filters(entity.behaviors) end
+    for _,cell in pairs(projected.empty_cells) do cell.colour_filters=colour_filters(cell.behaviors) end
     return projected
 end
 

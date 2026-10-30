@@ -337,3 +337,9 @@
   FLOAT layer, through common cantmove-style checks (including passive movement
   and HOLD following). Virtual EMPTY is excluded; TELE bypasses cantmove as in
   the original. Conditional scoped evaluation remains deferred; see HOLD.md.
+
+- Fifteen color properties project canonical ordered colour_filters records with
+  name/palette references for entities, EMPTY cells and scoped LEVEL. Keep multiple
+  active colors and clear retracted filters; same-color duplicates collapse.
+  Filters are display projection data, never persisted world facts. Host blending
+  and renderer binding stay in the deferred frontend workstream; see COLOURS.md.

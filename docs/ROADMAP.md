@@ -404,3 +404,10 @@ headroom under the unchanged 2M cap.
 Shared movement restriction respects the map FLOAT layer and excludes virtual
 EMPTY. Covers active/passive movement and HOLD transport; TELE retains its direct
 update behavior. Scoped conditional evaluation and holder conversion gaps remain.
+
+## M9.5K — fifteen colour filter backend
+
+Named rules project canonical ordered palette-filter lists for units, EMPTY cells
+and scoped LEVEL. Multiple colors coexist, same-color duplicates collapse, NOT and
+retraction clear derived filters. Frontend blending remains deferred; see COLOURS.md.
+3D is now explicitly excluded in the source catalog audit by user request.

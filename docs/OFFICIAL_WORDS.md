@@ -79,19 +79,19 @@ A pending word is not complete merely because its name could be stored as a Text
 | prefix | POWERED2 | implemented within documented scope |
 | prefix | POWERED3 | implemented within documented scope |
 | prefix | SELDOM | implemented within documented scope |
-| property | 3D | pending |
+| property | 3D | excluded by user request |
 | property | ANGRY | pending |
 | property | AUTO | pending |
 | property | BACK | pending |
 | property | BEST | pending |
-| property | BLACK | pending |
-| property | BLUE | pending |
+| property | BLACK | implemented within documented scope |
+| property | BLUE | implemented within documented scope |
 | property | BONUS | pending |
 | property | BOOM | implemented within documented scope |
 | property | BROKEN | pending |
-| property | BROWN | pending |
+| property | BROWN | implemented within documented scope |
 | property | CHILL | pending |
-| property | CYAN | pending |
+| property | CYAN | implemented within documented scope |
 | property | DEFEAT | implemented within documented scope |
 | property | DETURN | implemented within documented scope |
 | property | DONE | pending |
@@ -102,14 +102,14 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | FALLRIGHT | implemented within documented scope |
 | property | FALLUP | implemented within documented scope |
 | property | FLOAT | implemented within documented scope |
-| property | GREEN | pending |
-| property | GREY | pending |
+| property | GREEN | implemented within documented scope |
+| property | GREY | implemented within documented scope |
 | property | HAPPY | pending |
 | property | HIDE | implemented within documented scope |
 | property | HOLD | implemented within documented scope |
 | property | HOT | implemented within documented scope |
 | property | LEFT | implemented within documented scope |
-| property | LIME | pending |
+| property | LIME | implemented within documented scope |
 | property | LOCKEDDOWN | implemented within documented scope |
 | property | LOCKEDLEFT | implemented within documented scope |
 | property | LOCKEDRIGHT | implemented within documented scope |
@@ -122,28 +122,28 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | NUDGERIGHT | implemented within documented scope |
 | property | NUDGEUP | implemented within documented scope |
 | property | OPEN | implemented within documented scope |
-| property | ORANGE | pending |
+| property | ORANGE | implemented within documented scope |
 | property | PARTY | pending |
 | property | PET | pending |
 | property | PHANTOM | implemented within documented scope |
-| property | PINK | pending |
+| property | PINK | implemented within documented scope |
 | property | POWER | implemented within documented scope |
 | property | POWER2 | implemented within documented scope |
 | property | POWER3 | implemented within documented scope |
 | property | PULL | implemented within documented scope |
-| property | PURPLE | pending |
+| property | PURPLE | implemented within documented scope |
 | property | PUSH | implemented within documented scope |
-| property | RED | pending |
+| property | RED | implemented within documented scope |
 | property | REVERSE | implemented within documented scope |
 | property | REVERT | pending |
 | property | RIGHT | implemented within documented scope |
-| property | ROSY | pending |
+| property | ROSY | implemented within documented scope |
 | property | SAD | pending |
 | property | SAFE | implemented within documented scope |
 | property | SELECT | implemented within documented scope |
 | property | SHIFT | implemented within documented scope |
 | property | SHUT | implemented within documented scope |
-| property | SILVER | pending |
+| property | SILVER | implemented within documented scope |
 | property | SINK | implemented within documented scope |
 | property | SLEEP | implemented within documented scope |
 | property | STILL | implemented within documented scope |
@@ -153,11 +153,11 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | TURN | implemented within documented scope |
 | property | UP | implemented within documented scope |
 | property | WEAK | implemented within documented scope |
-| property | WHITE | pending |
+| property | WHITE | implemented within documented scope |
 | property | WIN | implemented within documented scope |
 | property | WONDER | pending |
 | property | WORD | implemented within documented scope |
-| property | YELLOW | pending |
+| property | YELLOW | implemented within documented scope |
 | property | YOU | implemented within documented scope |
 | property | YOU2 | pending |
 | verb | BECOME | implemented within documented scope |

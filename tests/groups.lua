@@ -265,3 +265,21 @@ s=negative_fixture({{'NOT','ROCK','IS','GROUP'},{'NOT','ROCK','IS','GROUP'},{'GR
 n,p=step(s);local count=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then count=count+1 end end
 assert(count==2 and n.world.entities[2].archetype=='rock')
 print('PASS: ordinary NOT noun GROUP delayed expansion, literal/concrete bans, channels, duplicate conversion and Undo')
+
+s=negative_fixture({{'ALL','IS','GROUP'},{'GROUP','IS','FLOAT'}})
+object(s.world,3,'level_block',12,3)
+w,f=projection(s);assert(#f.deferred==0 and w.entities[1].behaviors.float and w.entities[2].behaviors.float)
+assert(not w.entities[3].behaviors.float and not w.entities[10].behaviors.float,'ALL group membership excludes scoped LEVEL and physical Text')
+s=negative_fixture({{'NOT','ALL','IS','GROUP'},{'GROUP','IS','FLOAT'}})
+w,f=projection(s);assert(not w.entities[1].behaviors.float and w.entities[10].behaviors.float)
+assert(#f.effects>0)
+s=negative_fixture({{'ALL','IS','GROUP'},{'AVATAR','HAS','GROUP'},{'AVATAR','IS','YOU','AND','DEFEAT'}})
+n,p=step(s);local flags=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flags=flags+1 end end
+assert(flags==2,'raw ALL and concrete members both contribute RHS HAS products')
+s=negative_fixture({{'ALL','IS','GROUP'},{'GROUP','HAS','FLAG'},{'AVATAR','IS','YOU','AND','DEFEAT'}})
+n,p=step(s);local flags=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flags=flags+1 end end
+assert(flags==1,'raw ALL member is not expanded twice as a source')
+s=negative_fixture({{'ALL','IS','GROUP'},{'ALL','IS','GROUP'},{'GROUP','BECOME','FLAG'}})
+n,p=step(s);local flags=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flags=flags+1 end end
+assert(flags==4,'duplicate ALL membership preserves each concrete source product')
+print('PASS: ALL/NOT ALL GROUP declarations, palette boundaries, asymmetric source/RHS multiplicity, conversion and Undo')

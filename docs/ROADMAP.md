@@ -342,3 +342,10 @@ then expand ordinary complements with concrete-name exclusions. Source matrices:
 5,184 direct cases plus 6,144 negative-recursion cases (2,880 loops). Production
 coverage includes channels, literal bans, Text exclusion, duplicates and Undo.
 Next: ALL and scoped LEVEL membership, then GROUP-endpoint MIMIC.
+
+## M9.5C — ALL / NOT ALL GROUP membership
+
+Keep literal ALL plus ordinary declarations and NOT ALL's TEXT/EMPTY copies.
+Preserve source/RHS HAS asymmetry, exclusions and duplicate products. Full installed
+addoption/subrules/grouprules oracle: 576 cases; production conversion/Undo checks.
+Next: scoped LEVEL membership and GROUP/MIMIC integration, including ALL ordering.

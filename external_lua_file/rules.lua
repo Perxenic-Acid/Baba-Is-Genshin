@@ -1446,6 +1446,7 @@ local function expand_groups(ast_rules,registry,world)
     local function member_key(term)
         local value,negative=unwrap(term)
         local key=subject_key(value)
+        if value and value.tag=="special" and value.name=="all" then key="all" end
         return key and (negative and ("not "..key) or key)
     end
     local function combine(...)
@@ -1459,6 +1460,25 @@ local function expand_groups(ast_rules,registry,world)
         end
         return #requirements==0 and {op="always"} or {op="spatial",clauses={},requirements=requirements}
     end
+    -- addoption expands NOT ALL immediately; subrules expands ALL before grouprules.
+    -- Keep the literal declaration as well as its generated concrete declarations.
+    local normalized={}
+    for _,rule in ipairs(ast_rules) do
+        normalized[#normalized+1]=rule
+        local subject,negative=unwrap(rule.subject)
+        local target=group(rule.object)
+        if target and rule.verb=="is" and subject.tag=="special" and subject.name=="all" then
+            local products=negative and {{tag="special",name="empty"},{tag="special",name="text"}} or {}
+            if not negative then for _,noun in ipairs(RW_NounPalette(world)) do products[#products+1]=noun_term(noun) end end
+            local condition=rule.when
+            for _,product in ipairs(products) do
+                local copy=query_clone(rule);copy.subject=product;copy.when=condition
+                normalized[#normalized+1]=copy
+                if #normalized>5000 then return nil,"rule_complexity_limit" end
+            end
+        end
+    end
+    ast_rules=normalized
     local function membership(rule)
         local name,negative=group(rule.object)
         local key=member_key(rule.subject)
@@ -1584,8 +1604,8 @@ local function expand_groups(ast_rules,registry,world)
         local term,negative=unwrap(member.term)
         if negative then
             candidates={}
-            local excluded=subject_key(term)
-            for _,noun in ipairs(RW_NounPalette(world)) do if noun~=excluded then
+            local excluded=member_key(term)
+            for _,noun in ipairs(term.tag=="special" and term.name=="all" and {} or RW_NounPalette(world)) do if noun~=excluded then
                 candidates[#candidates+1]={key=noun,term=noun_term(noun)}
             end end
         end
@@ -1623,6 +1643,8 @@ local function expand_groups(ast_rules,registry,world)
     local expanded,deferred={},{}
     local function emit(rule,subject,object,condition)
         local copy=query_clone(rule);copy.subject=query_clone(subject);copy.object=query_clone(object)
+        -- A raw ALL group member is a literal source, not a second ALL expansion.
+        if group(rule.subject) and subject.tag=="special" and subject.name=="all" then copy.subject=noun_term("all") end
         copy.when=combine(rule.when,condition);expanded[#expanded+1]=copy
         if #expanded>5000 then return nil,"rule_complexity_limit" end
         return true

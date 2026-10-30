@@ -1,4 +1,4 @@
-# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.5B)
+# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.5C)
 
 Installed primary references: base Data/rules.lua code() invokes subrules then
  grouprules at 138-139; grouprules 1573-2331 categorizes memberships, combines
@@ -272,3 +272,32 @@ duplicate conversion and whole-tree Undo. Native testing is not inferred.
 This supersedes ordinary NOT membership deferrals above. ALL and scoped LEVEL
 membership, GROUP-endpoint MIMIC and the previously documented nested inversion,
 unit-list tombstone and indirect-query parity gaps remain pending.
+
+## M9.5C: ALL / NOT ALL membership
+
+Primary reference: installed rules.lua addoption 1084-1110, subrules 1157-1205,
+grouprules 1919-2020; tools.lua inside 977-1025. ALL IS GROUP retains its literal
+ALL declaration alongside ordinary authored-vocabulary declarations. NOT ALL IS
+GROUP retains its raw declaration through solver setup, then emits only the
+additional EMPTY and TEXT members. ALL exclusions receive ordinary copies too.
+NOT ALL's literal membership itself yields no member names.
+
+A raw ALL member remains a literal source when GROUP is used as subject: do not
+expand that source a second time. As a HAS product it retains ALL expansion, so
+AVATAR HAS GROUP can receive both the raw ALL expansion and each concrete member.
+This asymmetry and duplicate declarations are intentional source behavior. ALL's
+subrules guard does not turn ALL IS NOT GROUP into pre-transfer suppression;
+normal concrete exclusions are applied later by grouprules. Canonical vocabulary
+ordering remains our documented deterministic replacement for native pairs.
+
+The 576-case oracle executes installed addoption, subrules and grouprules with
+host bookkeeping, then compares live-unit HAS products, including conditional
+membership/exclusions, three channels, transfers, raw ALL multiplicity, duplicate
+members and unrelated NOT ALL declarations. Production regressions cover palette
+boundaries (Text/LEVEL excluded), NOT ALL Text projection, both HAS axes, duplicate
+conversion and Undo. EMPTY lifecycle/HAS remains deferred as before.
+
+ALL normalization currently follows the existing ordinary MIMIC pass; exact ALL
+copying through MIMIC remains part of pending GROUP/MIMIC integration. Scoped LEVEL
+membership and prior nested inversion/query/cache gaps remain pending. No native
+acceptance is implied by offline tests; normal startup retains the 2M budget.

@@ -34,4 +34,39 @@ for mask=0,15 do
  assert(rider.values[3]==3,'HOLD must preserve rider facing')
  checked=checked+1
 end
-print('PASS: installed HOLD acquisition, lost holders, lock release, post-move FLOAT release and facing ('..checked..' cases)')
+
+for mask=0,255 do
+ local function bit(n) return math.floor(mask/2^n)%2==1 end
+ local w={entities={}}
+ for id=1,4 do
+  w.entities[id]={id=id,class='object',archetype='rock',x=id<=2 and 3 or 8,y=id==4 and 5 or 3,direction='Left',holder=id==1 and 3 or id==3 and (bit(7) and 1 or 0) or 0,
+   behaviors={hold=id==2 or id==3,still=id==1 and bit(0),lockedright=id==1 and bit(1),lockedleft=id==1 and bit(2),reverse=id==1 and bit(3),float=id==1 and bit(4) or id==2 and bit(5) or id==3 and bit(6)}}
+ end
+ local units,holders={},{}
+ for id=1,4 do local e=w.entities[id];units[id]={fixed=id,values={e.x,e.y,2,id},strings={'rock'},holder=e.holder};if e.behaviors.hold then holders[#holders+1]=units[id] end end
+ local env=setmetatable({XPOS=1,YPOS=2,DIR=3,ID=4,roomsizex=12,unitmap={},units=units},{__index=_G})
+ for _,e in pairs(w.entities) do env.unitmap[e.x+e.y*12]=true end
+ env.getunitswitheffect=function() return holders end
+ env.findallhere=function(x,y) local r={};for id,u in ipairs(units) do if u.values[1]==x and u.values[2]==y then r[#r+1]=id end end;return r end
+ env.mmf={newObject=function(id) return units[id] end};env.getunitid=function(id) return id end;env.getname=function() return 'rock' end
+ env.floating=function(x,y) return w.entities[x].behaviors.float==w.entities[y].behaviors.float end
+ env.cantmove=function(_,id,dir)
+  local traits=w.entities[id].behaviors
+  if traits.still then return true end
+  if dir~=4 then
+   if traits.reverse then dir=(dir+2)%4 end
+   return traits[({'lockedright','lockedup','lockedleft','lockeddown'})[dir+1]] or false
+  end
+  return false
+ end
+ env.addundo=function() end;env.update=function(id,x,y) units[id].values[1],units[id].values[2]=x,y end
+ assert(load(source:sub(a,b-1),'@original_hold_order','t',env))()
+ local result={};for id,e in pairs(w.entities) do result[id]={x=e.x,y=e.y,holder=e.holder} end
+ for _,change in ipairs(assert(RW_ResolveHold(w)).changes) do local r=result[change.entity_id]
+  if change.kind=='move' then r.x,r.y=change.to.x,change.to.y elseif change.kind=='holder' then r.holder=change.to end
+ end
+ for id,u in ipairs(units) do local r=result[id];assert(r.x==u.values[1] and r.y==u.values[2] and r.holder==u.holder,'HOLD order mismatch '..mask..':'..id) end
+ checked=checked+1
+end
+assert(checked==272)
+print('PASS: installed HOLD acquisition, mobile holders/cycles, layers, STILL/directional locks/REVERSE, release and facing ('..checked..' cases)')

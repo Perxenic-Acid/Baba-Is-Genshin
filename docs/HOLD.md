@@ -33,3 +33,16 @@ The 16-case installed-loop test now compares production solver outcomes too.
 Production tests cover persistent acquisition/following, deletion/release, stale
 holder rejection, facing and Undo. Startup clone scalar-call optimization preserves
 table-key/cycle cloning and reduces normal startup to about 1.86M instructions.
+
+Further source audit: tools.lua cantmove 2248-2286 also checks scoped LEVEL HOLD
+before STILL/locks. That global movement restriction is not yet implemented and
+must be integrated across active/passive motion, rather than only the HOLD solver.
+convert.lua 330-390 creates replacement units and copies selected metadata without
+explicit holder propagation; our identity-preserving first product and cloned extra
+products therefore need a dedicated conversion policy/parity pass. Do not infer
+native holder inheritance merely from ordinary ID/link preservation.
+
+The installed-loop comparison now covers 272 cases: 256 additional source-order,
+mobile-holder/cycle, FLOAT, STILL, directional-lock and REVERSE combinations match
+production positions and holder metadata. This is stronger ordinary solver evidence,
+not completion of the scoped/conversion/dynamic-condition gaps above.

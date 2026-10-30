@@ -94,6 +94,7 @@ local function valid_new_entity(world, entity, id)
         or entity.traits ~= nil or entity.behaviors ~= nil or entity.symbol ~= nil then
         return false
     end
+    if entity.broken ~= nil and entity.broken ~= 0 and entity.broken ~= 1 then return false end
     if entity.holder ~= nil and entity.holder ~= 0 and not valid_id(entity.holder) then return false end
     if entity.followed ~= nil and entity.followed ~= -1 and not valid_id(entity.followed) then return false end
     if entity.level_link ~= nil then
@@ -186,7 +187,7 @@ local function validate_plan(world, plan)
         if type(change) ~= "table"
             or (change.kind ~= "move" and change.kind ~= "transform"
                 and change.kind ~= "direction" and change.kind ~= "create"
-                and change.kind ~= "delete" and change.kind ~= "retype" and change.kind ~= "followed" and change.kind ~= "holder") then
+                and change.kind ~= "delete" and change.kind ~= "retype" and change.kind ~= "followed" and change.kind ~= "holder" and change.kind ~= "broken") then
             return false, "invalid_operation"
         end
         local id = change.entity_id
@@ -220,6 +221,9 @@ local function validate_plan(world, plan)
                     or change.to.direction ~= entity.direction or not same_state(change.to.level_link,entity.level_link) then
                     return false,"invalid_or_stale_retype"
                 end
+            elseif change.kind == "broken" then
+                if entity.broken ~= change.from then return false,"stale_broken" end
+                if (change.to ~= 0 and change.to ~= 1) or change.to==(change.from or 0) then return false,"invalid_broken" end
             elseif change.kind == "holder" then
                 if entity.holder ~= change.from then return false,"stale_holder" end
                 if (change.to ~= 0 and not valid_id(change.to)) or change.to==change.from or change.to==id then return false,"invalid_holder" end
@@ -311,6 +315,8 @@ local function apply_plan(world, plan)
             entity.direction = change.to.direction or entity.direction
         elseif change.kind == "direction" then
             entity.direction = change.to
+        elseif change.kind == "broken" then
+            entity.broken=change.to
         elseif change.kind == "holder" then
             entity.holder=change.to
         elseif change.kind == "followed" then

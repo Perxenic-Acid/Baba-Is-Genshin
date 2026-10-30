@@ -411,3 +411,9 @@ Named rules project canonical ordered palette-filter lists for units, EMPTY cell
 and scoped LEVEL. Multiple colors coexist, same-color duplicates collapse, NOT and
 retraction clear derived filters. Frontend blending remains deferred; see COLOURS.md.
 3D is now explicitly excluded in the source catalog audit by user request.
+
+## M9.5L — BROKEN status transaction prerequisite
+
+Persisted binary status, ordered pure update planning, validated atomic changes
+and installed-source parity (256 cases). Production rule gating/scheduling is
+still pending; BROKEN is not marked implemented. See BROKEN.md.

@@ -1140,6 +1140,40 @@ function RW_NounTextName(world, entity)
     table.sort(names)
     return names[1] or string.upper(entity.archetype or "OBJECT")
 end
+-- Original brokenblock updates units in order, temporarily clearing only the
+-- current unit's old status for its own BROKEN query. Keep this pure so late
+-- transaction rejection cannot leak partially updated statuses into the world.
+function RW_PlanBrokenStatus(world,query)
+    if type(world)~="table" or type(world.entities)~="table" or type(query)~="function" then
+        return nil,"invalid_broken_status_input"
+    end
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context.entities={}
+    local ids={}
+    for id,entity in pairs(world.entities) do
+        ids[#ids+1]=id
+        local copy={};for k,v in pairs(entity) do copy[k]=v end
+        context.entities[id]=copy
+    end
+    table.sort(ids)
+    local plan={consumes_turn=true,changes={},reason="broken_status"}
+    for _,id in ipairs(ids) do
+        local entity=context.entities[id]
+        local old=entity.broken
+        entity.broken=0
+        local active,err=query(context,entity)
+        entity.broken=old
+        if active==nil then return nil,err or "invalid_broken_query" end
+        if type(active)~="boolean" then return nil,"invalid_broken_query" end
+        local status=active and 1 or 0
+        if status~=(old or 0) then
+            plan.changes[#plan.changes+1]={kind="broken",entity_id=id,from=old,to=status}
+            entity.broken=status
+        end
+    end
+    return plan
+end
+
 function RW_WordTokenMap(world, effective)
     local tokens={}
     for id,entity in pairs(effective.entities) do

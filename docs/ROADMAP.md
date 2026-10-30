@@ -459,3 +459,11 @@ source witnesses preserve original create-before-remove ordering while keeping
 persistent IDs/links and atomic Undo. Installed doconvert/brokenblock oracle covers
 640 cases. Boot/boundary/synthetic and terminal-preservation gaps remain pending;
 BROKEN stays unregistered. See BROKEN.md.
+
+## M9.5R — BROKEN runtime boundary initialization
+
+Boot, entry and return initialize only reloaded runtimes; selector placement receives
+a final status refresh. No input/RNG/local history is consumed. Whole-tree Undo,
+first-F gating and compile-limit terminal boundaries are tested. Synthetic scope,
+late contact code invalidation and recursive birth-terminal preservation remain;
+BROKEN stays unregistered. See BROKEN.md.

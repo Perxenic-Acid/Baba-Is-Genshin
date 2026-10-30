@@ -133,11 +133,11 @@ that converted Text acquires BROKEN directly in conversion.to rather than waitin
 for the post-code barrier.
 
 Advanced condition queries using persistent IDs/chance keys on synthetic old-source
-witnesses are not covered by this oracle. Scoped LEVEL conversion initialization
-and recursive creation-terminal preservation remain separate gaps.
+witnesses are not covered by this oracle. Synthetic scoped LEVEL status queries and recursive creation-terminal
+preservation remain separate gaps.
 
 BROKEN is still pending in the public word audit and default vocabulary. Remaining:
-initialization and boundaries, late contact code changes,
+late contact code changes,
 conditional timing, outcome/navigation integration, and the LEVEL and EMPTY
 synthetic query paths. These must be implemented/tested before claiming
 complete gameplay support. In particular, do not insert a BROKEN fixed-point loop:
@@ -149,3 +149,26 @@ in an isolated adapter and compares 512 ordered status cases, including mixed
 Object/Text and dependencies on earlier/later units. Production transaction tests
 cover nil-to-one, Preview purity, stale/invalid status, atomic late failure and Undo.
 Native gameplay acceptance is not inferred from these tests.
+
+## Runtime initialization and boundaries (M9.5R)
+
+Boot and reloaded boundary instances receive one ordered status pass over the
+fully authored runtime. Saved BROKEN flags reset before that pass; this is not a
+recursive BROKEN fixed point. The installed blocks.lua brokenblock loop supplies
+the ordered own-status bypass; the original host load schedule is not reproduced
+by the isolated Lua reference. This initialization schedule is an explicit adapter
+choice. Definitions and untouched sibling instances remain unchanged.
+
+Initialization consumes no input, RNG draw, allocator ID or local Undo step.
+Entry initializes the reloaded parent and child. Return initializes both runtimes,
+then refreshes the parent after placing SELECT at its entrance, so the next F
+queries its final position. Whole-tree Undo restores the pre-boundary snapshot.
+Compile-limit states retain the triggering boundary and permit only Undo, including
+when a scoped conversion makes the parent terminal. Terminal boards are not
+compiled again. Non-limit initialization errors reject the boundary atomically.
+
+An authored vocabulary/status guard avoids an extra compile on ordinary startup.
+Tests cover first-confirm gating, conditional selector placement, aliases and WORD,
+reset of authored saved flags, sibling isolation, failure purity, terminal returns,
+allocator/RNG/input preservation and tree Undo. Public BROKEN registration remains
+pending the synthetic-scope and later lifecycle gaps above.

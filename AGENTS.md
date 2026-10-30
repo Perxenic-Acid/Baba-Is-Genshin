@@ -371,3 +371,9 @@
   when the primary product reuses its persistent ID; never commit those witnesses.
   Preserve same-name BECOME/WRITE, duplicate allocation, links/facing and no-HAS
   conversion semantics. Scope and oracle limits are recorded in docs/BROKEN.md.
+
+- BROKEN boot/boundary initialization resets saved status and runs one ordered pass,
+  never a recursive fixed point. Refresh returned selectors at their final entrance
+  position. Keep this inside whole-tree transactions, without input/RNG/local Undo;
+  retain compile-limit terminal boundaries and avoid recompiling terminal boards.
+  Ordinary startup uses the authored status/vocabulary guard. See docs/BROKEN.md.

@@ -1258,6 +1258,25 @@ function RW_InitializeBirthSpecifications(world,specifications,generated_rules)
     return initialized
 end
 
+-- Cheap authored-data guard for boot/boundary initialization. The standard
+-- grounded WORD reader can only produce a property token through this vocabulary.
+function RW_StatusInitializationNeeded(world)
+    if type(world)~="table" or type(world.entities)~="table" then return nil,"invalid_world" end
+    for _,rule in ipairs(world.rule_sources or {}) do for _,effect in ipairs(rule.effects or {}) do
+        if effect.trait=="broken" then return true end
+    end end
+    local properties=(world.language or {}).properties or {}
+    local has_token=false;for _,trait in pairs(properties) do if trait=="broken" then has_token=true;break end end
+    for _,entity in pairs(world.entities) do
+        if entity.broken==1 then return true end
+        if has_token then
+            local token=entity.class=="text" and entity.text and entity.text.name or RW_NounTextName(world,entity)
+            if properties[token]=="broken" then return true end
+        end
+    end
+    return false
+end
+
 function RW_WordTokenMap(world, effective)
     local tokens={}
     for id,entity in pairs(effective.entities) do

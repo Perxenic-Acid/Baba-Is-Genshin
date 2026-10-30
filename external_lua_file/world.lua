@@ -1113,6 +1113,17 @@ function RW_UpdateActiveLevel(tree, session)
     return next_tree
 end
 
+-- Semantic initialization may replace a freshly reloaded suspended parent too.
+-- Navigation and history are preserved; the compiler does not own those facts.
+function RW_UpdateLevelInstance(tree, session)
+    if type(tree)~="table" or type(tree.instances)~="table" then return nil,"instance_identity_mismatch" end
+    local current=type(session)=="table" and tree.instances[session.instance_id]
+    if not current or session.definition_id~=current.definition_id then return nil,"instance_identity_mismatch" end
+    local result=copy_map(tree);result.instances=copy_map(tree.instances)
+    result.instances[session.instance_id]=session
+    return result
+end
+
 -- Boundaries reload authored data plus persistent LEVEL transformations.
 function RW_ReloadLevel(tree,id)
     local old = tree.instances[id]

@@ -656,6 +656,58 @@ function RW_PlanTurn(world,action,services)
     return plan,err,trace
 end
 
+local function initialize_compile_failure(world,reason,services)
+    if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then
+        local terminal={consumes_turn=true,changes={}}
+        lock_compile_failure(terminal,reason)
+        return services.preview(world,terminal)
+    end
+    return nil,reason
+end
+
+-- A loaded runtime receives one ordered status initialization, without an input,
+-- RNG advance, local Undo entry or recursive BROKEN fixed point.
+function RW_InitializeLevelWorld(world,services)
+    if type(world)~="table" or type(world.entities)~="table" or type(services)~="table" then return nil,"invalid_initialization_input" end
+    if world.infinite_loop or world.too_complex then return world end
+    if not services.status_required or not services.status then return world end
+    local needed,why=services.status_required(world)
+    if needed==nil then return nil,why end
+    if not needed then return world end
+    local reset={consumes_turn=true,changes={}}
+    local ids={};for id,entity in pairs(world.entities) do if entity.broken==1 then ids[#ids+1]=id end end
+    table.sort(ids)
+    for _,id in ipairs(ids) do reset.changes[#reset.changes+1]={kind="broken",entity_id=id,from=1,to=0} end
+    local current=world
+    if #reset.changes>0 then current,why=services.preview(world,reset);if not current then return nil,why end end
+    local effects,err,relations,rules=services.evaluate(current)
+    if not effects then return initialize_compile_failure(current,err,services) end
+    local status,why=services.status(current,rules)
+    if not status then return initialize_compile_failure(current,why,services) end
+    if #status.changes==0 then return current end
+    return services.preview(current,status)
+end
+
+-- Only the instances reloaded by this boundary are initialized. Definitions and
+-- sibling runtimes remain intact; the outer whole-tree Commit owns its history.
+function RW_InitializeLevelBoundary(tree,ids,services)
+    if not services.initialize then return tree end
+    local current,seen=tree,{}
+    for _,id in ipairs(ids) do if not seen[id] then
+        seen[id]=true
+        local session=current.instances[id]
+        if not session then return nil,"unknown_instance" end
+        local initialized,why=services.initialize(session.world)
+        if not initialized then return nil,why end
+        if initialized~=session.world then
+            local updated={};for k,v in pairs(session) do updated[k]=v end;updated.world=initialized
+            current,why=services.update_instance(current,updated)
+            if not current then return nil,why end
+        end
+    end end
+    return current
+end
+
 function RW_PlanLevelAction(tree, action, services)
     local function fail(reason) return nil, {stage="level_action",reason=reason} end
     if type(action) ~= "table" then return fail("invalid_action") end
@@ -702,13 +754,23 @@ function RW_PlanLevelAction(tree, action, services)
     local function return_to_parent(current)
         local entry = current.entry_links[current.active_id]
         local returned, reason = services.return_level(current)
+        if not returned then return nil,reason end
+        returned,reason=RW_InitializeLevelBoundary(returned,{current.active_id,returned.active_id},services)
         if not returned or not entry then return returned,reason end
         local parent = services.active(returned)
+        if parent.world.infinite_loop or parent.world.too_complex then return returned end
         local e, why, commands = services.evaluate(parent.world)
-        if not e then return nil,why end
+        if not e then
+            local terminal,reason=initialize_compile_failure(parent.world,why,services)
+            if not terminal then return nil,reason end
+            local updated={};for k,v in pairs(parent) do updated[k]=v end;updated.world=terminal
+            return services.update(returned,updated)
+        end
         local projected, projection_error = services.project(parent.world,e,level_traits_from(commands))
         if not projected then return nil,projection_error end
-        return services.place_selectors(returned,services.selectors(projected),entry.entity_id)
+        local placed,why=services.place_selectors(returned,services.selectors(projected),entry.entity_id)
+        if not placed then return nil,why end
+        return RW_InitializeLevelBoundary(placed,{placed.active_id},services)
     end
     if action.type == "confirm" then
         local candidates = services.candidates(effective)
@@ -728,6 +790,7 @@ function RW_PlanLevelAction(tree, action, services)
         else
             next_tree, reason = services.enter(tree,tostring(entity_id),link.definition_id)
             if next_tree then next_tree, reason = services.bind_entry(next_tree,entity_id) end
+            if next_tree then next_tree,reason=RW_InitializeLevelBoundary(next_tree,{tree.active_id,next_tree.active_id},services) end
         end
         if not next_tree then return fail(reason) end
         return {before=tree,after=next_tree,reason="confirm_level",changes={},select_after_defeat=select_after_defeat}
@@ -1297,6 +1360,7 @@ local function start(run_self_tests)
     turn_services.destroy=function(world,ids,contents,cause,deaths,rules)
         return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths,rules)
     end
+    turn_services.status_required=function(world) return rules_api:Invoke("RW_StatusInitializationNeeded",world) end
     turn_services.status=function(world,rules) return rules_api:Invoke("RW_PlanRuleStatus",world,rules) end
     turn_services.refresh=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end
 
@@ -1564,6 +1628,8 @@ local function start(run_self_tests)
     for name, service in pairs(turn_services) do level_services[name] = service end
     level_services.active = function(tree) return world_api:Invoke("RW_GetActiveLevel",tree) end
     level_services.update = function(tree,value) return world_api:Invoke("RW_UpdateActiveLevel",tree,value) end
+    level_services.update_instance = function(tree,value) return world_api:Invoke("RW_UpdateLevelInstance",tree,value) end
+    level_services.initialize = function(world) return RW_InitializeLevelWorld(world,turn_services) end
     level_services.enter = function(tree,slot,id) return world_api:Invoke("RW_EnterLevel",tree,slot,id) end
     level_services.return_level = function(tree) return world_api:Invoke("RW_ReturnLevel",tree) end
     level_services.bind_entry = function(tree,id) return world_api:Invoke("RW_BindLevelEntry",tree,id) end
@@ -1578,6 +1644,10 @@ local function start(run_self_tests)
     level_services.level_outcome = function(world,traits)
         return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",world,traits)
     end
+
+    local initialized,initialization_error=RW_InitializeLevelBoundary(level_tree,{level_tree.active_id},level_services)
+    if not initialized then printerr("[RuleWorld] Runtime initialization failed:",initialization_error);return end
+    level_tree=initialized;session=world_api:Invoke("RW_GetActiveLevel",level_tree)
 
     if run_self_tests then
     -- Real mapped pipeline probe; never change the live tree during self-tests.
@@ -1844,7 +1914,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5Q initialized")
+    print("[RuleWorld] M9.5R initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

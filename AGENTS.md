@@ -325,3 +325,10 @@
   source FLOAT and lack STILL; destination FLOAT/collision/locks/SLEEP do not block.
   Each identity travels once, preserving facing/links. Sources can themselves move
   before later processing. Commit destination RNG atomically; see docs/TELE.md.
+
+- User scope update: skip 3D; color properties combine as stacked color filters.
+  Defer frontend and authored level design as separate major workstreams. Continue
+  remaining logic and documented semantic gaps without routine planning pauses.
+- BOOM runs after SINK before WEAK, with multiplicity-scaled square range,
+  independent SAFE victims and FLOAT matching. Destruction triggers HAS once per
+  victim; see BOOM.md and tests/reference_boom.lua.

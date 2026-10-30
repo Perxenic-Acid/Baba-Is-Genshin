@@ -13,3 +13,7 @@ whole-tree Undo. No recursive newborn explosions run in that phase. EMPTY/scoped
 LEVEL explosion and native presentation are deferred. Production tests cover
 radius, SAFE, HAS, Undo and FLOAT; full suite retains the 2M startup cap. These
 checks are not native acceptance or a complete original-source oracle.
+
+The installed BOOM loop now has a 256-case host-normalized source oracle covering
+one to four declarations, diagonal/range boundaries, SAFE/FLOAT, Text and multiple
+blast sources. This supplements the production transaction tests.

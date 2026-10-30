@@ -384,3 +384,9 @@ uses 1,992,000 instructions versus M9.5F's 1,994,000; the 2M cap remains unchang
 
 Add multiplicity-scaled square blasts after SINK, before WEAK, with independent
 SAFE/FLOAT filtering, destruction/HAS and whole-tree Undo. Scope in BOOM.md.
+
+## Scope update / BOOM source matrix
+
+Skip 3D by user request. Color properties combine as stacked filters. Frontend
+and authored level design remain separate deferred major workstreams. BOOM's
+installed-loop oracle passes 256 radius/layer/safety/multiple-source cases.

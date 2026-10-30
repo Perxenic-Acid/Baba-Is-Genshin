@@ -349,3 +349,10 @@ Keep literal ALL plus ordinary declarations and NOT ALL's TEXT/EMPTY copies.
 Preserve source/RHS HAS asymmetry, exclusions and duplicate products. Full installed
 addoption/subrules/grouprules oracle: 576 cases; production conversion/Undo checks.
 Next: scoped LEVEL membership and GROUP/MIMIC integration, including ALL ordering.
+
+## M9.5D — LEVEL GROUP membership
+
+Typed membership/exclusions preserve physical and scoped LEVEL consumers, ordered
+terminal outcomes, conversions, destination metadata and whole-tree Undo. Source
+matrix: 144 cases. Conditional scoped consumers remain explicitly deferred under
+the existing campaign-context condition boundary. Next: GROUP/MIMIC integration.

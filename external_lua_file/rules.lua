@@ -295,7 +295,7 @@ local function group_parameters(world,name,invert)
             if not units[member.name] then
                 units[member.name]={}
                 for _,id in ipairs(ids) do local e=world.entities[id]
-                    if (member.name=="@text" and e.class=="text") or (e.class~="text" and e.archetype==member.name) then
+                    if (member.name=="@text" and e.class=="text") or (e.class~="text" and e.archetype==(member.name=="@level" and "level_block" or member.name)) then
                         units[member.name][#units[member.name]+1]=e
                     end
                 end
@@ -1447,6 +1447,7 @@ local function expand_groups(ast_rules,registry,world)
         local value,negative=unwrap(term)
         local key=subject_key(value)
         if value and value.tag=="special" and value.name=="all" then key="all" end
+        if value and value.tag=="noun" and value.type and value.type.tag=="level" then key="@level" end
         return key and (negative and ("not "..key) or key)
     end
     local function combine(...)

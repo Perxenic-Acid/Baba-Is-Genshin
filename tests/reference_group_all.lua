@@ -76,4 +76,3 @@ for _,rhs in ipairs({false,true}) do for _,transfer in ipairs({false,true}) do
 end end end end end end end end
 assert(checked==576)
 print('PASS: installed addoption/subrules/grouprules ALL/NOT ALL membership, exclusions, duplicate products, conditions and transfers ('..checked..' cases)')
-

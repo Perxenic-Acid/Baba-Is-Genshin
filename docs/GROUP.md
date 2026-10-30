@@ -1,4 +1,4 @@
-# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.5C)
+# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.5D)
 
 Installed primary references: base Data/rules.lua code() invokes subrules then
  grouprules at 138-139; grouprules 1573-2331 categorizes memberships, combines
@@ -301,3 +301,26 @@ ALL normalization currently follows the existing ordinary MIMIC pass; exact ALL
 copying through MIMIC remains part of pending GROUP/MIMIC integration. Scoped LEVEL
 membership and prior nested inversion/query/cache gaps remain pending. No native
 acceptance is implied by offline tests; normal startup retains the 2M budget.
+
+## M9.5D: LEVEL membership
+
+Primary reference: installed rules.lua grouprules 1919-2020 keeps the literal level
+member; tools.lua findgroup 2300-2375 tests conditional members against physical
+unitlists, while blocks.lua levelblock and convert.lua dolevelconversions interpret
+resulting LEVEL declarations independently of ordinary unit contacts.
+
+Typed LEVEL may now declare membership/exclusions and pass through group transfers.
+It stays typed when expanded, preserving existing physical level_block effects and
+scoped level_trait/transform_level IR. GROUP condition parameters retain @level and
+conditional lookup can witness real level_block units. NOT LEVEL membership expands
+to ordinary nouns only. No destination is inferred or membership fact persisted.
+
+The original-source declaration matrix covers 144 channel/count/exclusion/transfer
+and WIN/DEFEAT/ROCK/TEXT outcomes. Production whole-tree tests cover ordered terminal
+properties, conversion before WIN, persistent linked Text/Rock, and Undo. Conditional
+scoped LEVEL consumers retain the existing deferred surroundings limitation; this
+change does not claim a campaign-context condition evaluator. Group member queries
+still use live physical units, not an invented synthetic unit for the current map.
+Custom nonstandard LEVEL block_type aliases in spatial queries remain outside the
+existing fixed level_block condition contract. GROUP-endpoint MIMIC and ALL ordering
+through MIMIC remain next, alongside earlier documented parity gaps.

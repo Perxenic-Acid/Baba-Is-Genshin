@@ -218,6 +218,7 @@ print('PASS: recursive GROUP contact refresh commits DEFEAT/HAS trigger before o
 -- Negative-source membership iterates declaration names before conditions/bans.
 local function negative_fixture(rows)
  local result=fixture(rows)
+ result.world.language.nouns.LEVEL={tag="level",block_type="level_block"}
  for _,e in pairs(result.world.entities) do if e.class=='text' then e.y=7+(e.y-7)*3 end end
  return result
 end
@@ -283,3 +284,36 @@ s=negative_fixture({{'ALL','IS','GROUP'},{'ALL','IS','GROUP'},{'GROUP','BECOME',
 n,p=step(s);local flags=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flags=flags+1 end end
 assert(flags==4,'duplicate ALL membership preserves each concrete source product')
 print('PASS: ALL/NOT ALL GROUP declarations, palette boundaries, asymmetric source/RHS multiplicity, conversion and Undo')
+
+s=negative_fixture({{'LEVEL','IS','GROUP'},{'GROUP','IS','FLOAT'}})
+object(s.world,3,'level_block',12,3)
+w,f=projection(s);assert(#f.deferred==0 and w.entities[3].behaviors.float and not w.entities[1].behaviors.float)
+local scoped=false;for _,r in ipairs(f.relations) do if r.op=='level_trait' and r.trait=='float' then scoped=true end end;assert(scoped)
+s=negative_fixture({{'LEVEL','IS','GROUP'},{'LEVEL','IS','NOT','GROUP'},{'GROUP','IS','FLOAT'}})
+object(s.world,3,'level_block',12,3);w=projection(s);assert(not w.entities[3].behaviors.float)
+s=negative_fixture({{'NOT','LEVEL','IS','GROUP'},{'GROUP','IS','FLOAT'}})
+object(s.world,3,'level_block',12,3);w=projection(s);assert(w.entities[1].behaviors.float and not w.entities[3].behaviors.float)
+s=negative_fixture({{'LEVEL','IS','GROUP'},{'AVATAR','ON','GROUP','IS','FLOAT'}})
+object(s.world,3,'level_block',2,2);w=projection(s);assert(w.entities[1].behaviors.float,'LEVEL group condition parameter matches physical level shapes')
+local level_services={};for k,v in pairs(services) do level_services[k]=v end
+level_services.active=RW_GetActiveLevel;level_services.update=RW_UpdateActiveLevel
+level_services.enter=RW_EnterLevel;level_services.return_level=RW_ReturnLevel
+level_services.selectors=RW_LevelSelectorIDs;level_services.place_selectors=RW_PlaceLevelSelectors
+level_services.bind_entry=RW_BindLevelEntry;level_services.commit_session=RW_Commit
+level_services.outcome=RW_RecordLevelOutcome;level_services.candidates=RW_LevelSelectionCandidates
+level_services.win=RW_HasWinContact;level_services.level_outcome=RW_ResolveLevelPropertyOutcome
+for _,case in ipairs({{'WIN','DEFEAT','win'},{'DEFEAT','WIN','defeat'},{'ROCK','WIN','transform'},{'TEXT','WIN','transform'}}) do
+ local sample=negative_fixture({{'LEVEL','IS','GROUP'},{'GROUP','IS',case[1],'AND',case[2]},{'AVATAR','IS','YOU'}})
+ local defs,root_id=RW_GetNavigationDefinitions();defs['navigation.win'].initial_world=sample.world
+ local root=assert(RW_CreateLevelTree(defs,root_id));local entered=assert(RW_EnterLevel(root,'37','navigation.win'));entered=assert(RW_BindLevelEntry(entered,37))
+ local plan,err=RW_PlanLevelAction(entered,{type='wait'},level_services);assert(plan,err and err.reason)
+ local result,report=RW_CommitLevelTree(entered,plan);assert(report.accepted,report.reason)
+ assert(result.outcomes[entered.active_id].kind==case[3],'GROUP must retain scoped LEVEL terminal order and conversion precedence')
+ if case[3]=='transform' then
+  local block=RW_GetActiveLevel(result).world.entities[37]
+  assert(block.level_link.definition_id=='navigation.win')
+  assert(case[1]=='TEXT' and block.class=='text' and block.text.name=='LEVEL' or case[1]=='ROCK' and block.archetype=='rock')
+ end
+ assert(RW_UndoLevelTree(result).active_id==entered.active_id and RW_UndoLevelTree(result).instances[entered.active_id].world==entered.instances[entered.active_id].world)
+end
+print('PASS: LEVEL GROUP physical/scoped projection, exclusions, condition parameters, ordered outcomes, linked conversion and whole-tree Undo')

@@ -309,3 +309,8 @@
   NOT ALL IS GROUP additionally declares EMPTY and TEXT and its raw NOT ALL emits
   no names. Raw ALL members remain literal sources in GROUP consumers but expand
   as ALL products on HAS's RHS. Never deduplicate those products; see GROUP.md.
+
+- LEVEL membership in GROUP preserves its typed LEVEL term through consumers, so
+  existing scoped IR, terminal order and identity-bound conversions still apply.
+  Group condition parameters use @level and real level_block witnesses. Conditional
+  scoped LEVEL consumers retain their existing deferred boundary; see GROUP.md.

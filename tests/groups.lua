@@ -214,3 +214,38 @@ n,p=step(s);local flag=false;for _,e in pairs(n.world.entities) do if e.archetyp
 assert(n.world.infinite_loop and not n.world.entities[1] and flag,'contact/HAS-triggered group loop must commit prior phases')
 assert(RW_Undo(n).world==s.world and s.world.entities[1])
 print('PASS: recursive GROUP contact refresh commits DEFEAT/HAS trigger before only-Undo lock')
+
+-- Negative-source membership iterates declaration names before conditions/bans.
+local function negative_fixture(rows)
+ local result=fixture(rows)
+ for _,e in pairs(result.world.entities) do if e.class=='text' then e.y=7+(e.y-7)*3 end end
+ return result
+end
+s=negative_fixture({{'ROCK','IS','GROUP'},{'NOT','GROUP','IS','GROUP2'},{'GROUP2','IS','FLOAT'}})
+w,f=projection(s);assert(#f.deferred==0 and w.entities[1].behaviors.float and not w.entities[2].behaviors.float)
+s=negative_fixture({{'ROCK','ON','AVATAR','IS','GROUP'},{'NOT','GROUP','IS','GROUP2'},{'GROUP2','IS','FLOAT'}})
+w=projection(s);assert(not w.entities[2].behaviors.float,'conditional declaration presence participates before its condition')
+s=negative_fixture({{'ROCK','IS','GROUP'},{'GROUP','IS','GROUP2'},{'NOT','GROUP2','IS','GROUP3'},{'GROUP3','IS','FLOAT'}})
+w=projection(s);assert(w.entities[2].behaviors.float,'positive transfer products are not negative solver base declarations')
+s=negative_fixture({{'ROCK','IS','GROUP2'},{'NOT','GROUP','IS','NOT','GROUP2'},{'GROUP2','IS','FLOAT'}})
+w=projection(s);assert(not w.entities[2].behaviors.float)
+s=negative_fixture({{'ROCK','IS','GROUP'},{'NOT','GROUP','IS','GROUP2'},{'NOT','GROUP','IS','GROUP2'},{'GROUP2','BECOME','FLAG'}})
+n,p=step(s);local flags=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flags=flags+1 end end
+assert(flags==2 and n.world.entities[2].archetype=='rock','duplicate negative edges preserve products')
+-- Push the final noun into a second inverse edge: the triggering words must commit.
+s=fixture({{'NOT','GROUP2','IS','GROUP'},{'NOT','GROUP','IS'},{'AVATAR','IS','YOU'}})
+s.world.entities[1].x=4;s.world.entities[1].y=10
+local id=s.world.next_entity_id;s.world.next_entity_id=id+1
+s.world.entities[id]={id=id,kind='object',class='text',text={name='GROUP2'},x=4,y=9,direction='None'}
+w,f=projection(s);assert(#f.deferred==0)
+n,p=step(s,{type='move',dx=0,dy=-1})
+assert(n.world.infinite_loop and n.world.entities[id].y==8 and n.world.entities[1].y==9)
+assert(RW_Undo(n).world==s.world and s.world.entities[id].y==9)
+local blocked,why=RW_PlanLevelAction({session=n},{type='confirm'},{active=function(t) return t.session end})
+assert(not blocked and why.reason=='infinite_loop_undo_only')
+s=fixture({{'NOT','GROUP','IS','GROUP2'},{'GROUP2','IS','FLOAT'}})
+local rules=assert(RW_ParseRuleAST(assert(RW_ReadLines(s.world)),s.world.language))
+local edge=rules[1];for i=3,math.floor(5000/#RW_NounPalette(s.world))+4 do rules[i]=edge end
+local result,reason=RW_LowerRuleAST(rules,nil,s.world);assert(not result and reason=='rule_complexity_limit')
+assert(not s.world.negative_base and not s.world._condition_rules)
+print('PASS: negative-source GROUP declaration iteration, conditions, positive-transfer ordering, duplicate products, bounds and triggering-move Infinite Loop/Undo')

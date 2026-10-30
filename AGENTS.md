@@ -293,5 +293,8 @@
   membership conditions use original previous-round substitution (all group names),
   ordered duplicate signatures and ten-change loop bound; stable lists append to
   the base. Commit command/movement/contact triggers before only-Undo locking.
-  Negative-source IS and malformed nested inversion remain pending;
+  Negative-source cross-group IS iterates direct declaration presence before conditions,
+  excludes positive-transfer products from its base, overwrites destination maps,
+  and counts negative targets as presence. Preserve duplicate edges and the ten-change
+  bound; malformed nested inversion remains a documented gap;
   see docs/GROUP.md.

@@ -1442,7 +1442,7 @@ local function expand_groups(ast_rules,registry,world)
         end
         return ordinary,deferred
     end
-    local bans,positive,transfers={},{},{}
+    local bans,positive,transfers,negative_transfers={},{},{},{}
     local function member_key(term) return subject_key(term) end
     local function combine(...)
         local requirements={}
@@ -1475,10 +1475,20 @@ local function expand_groups(ast_rules,registry,world)
         if is_member then add_member(name,key,rule.subject,rule.when,negative)
         else
             local source,source_not=group(rule.subject);local target,target_not=group(rule.object)
-            if rule.verb=="is" and source and not source_not and target and source~=target then
-                transfers[#transfers+1]={rule=rule,source=source,target=target,negative=target_not}
+            if rule.verb=="is" and source and target and source~=target then
+                local list=source_not and negative_transfers or transfers
+                list[#list+1]={rule=rule,source=source,target=target,negative=target_not}
                 transfer_rules[rule]=true
             end
+        end
+    end
+    -- The negative solver's base is direct positive declarations only: positive
+    -- transfer products and exclusions are deliberately absent from this snapshot.
+    local negative_base={}
+    if #negative_transfers>0 then
+        for _,member in ipairs(positive) do
+            negative_base[member.name]=negative_base[member.name] or {}
+            negative_base[member.name][member.key]=true
         end
     end
     -- Original diffname_used consumes an edge after its first matching pass.
@@ -1495,6 +1505,59 @@ local function expand_groups(ast_rules,registry,world)
                 if membership_count>5000 then return nil,"rule_complexity_limit" end
             end end
         end end
+    end
+    if #negative_transfers>0 then
+        local function keys(map)
+            local list={};for key in pairs(map) do list[#list+1]=key end;table.sort(list);return list
+        end
+        local function signature(map)
+            local parts={}
+            for _,group in ipairs(keys(map)) do
+                parts[#parts+1]=group
+                for _,noun in ipairs(keys(map[group])) do parts[#parts+1]=noun end
+            end
+            return table.concat(parts,"")
+        end
+        local function copy_base()
+            local result={}
+            for group,nouns in pairs(negative_base) do
+                result[group]={};for noun in pairs(nouns) do result[group][noun]=true end
+            end
+            return result
+        end
+        local base_id=signature(negative_base)
+        local previous,previous_id=copy_base(),base_id
+        local vocabulary=RW_NounPalette(world)
+        local converged=false
+        for iteration=1,10 do
+            local found,derived={},0
+            for _,edge in ipairs(negative_transfers) do
+                found[edge.target]=found[edge.target] or {}
+                for _,noun in ipairs(vocabulary) do if not (previous[edge.source] or {})[noun] then
+                    local entries=found[edge.target]
+                    entries[noun]=entries[noun] or {};entries[noun][#entries[noun]+1]=edge
+                    derived=derived+1
+                    if derived+membership_count>5000 then return nil,"rule_complexity_limit" end
+                end end
+            end
+            -- Original repeats base_id and counts even empty destination tables.
+            local current_id=base_id..base_id..signature(found)
+            if current_id==previous_id then
+                for _,group in ipairs(keys(found)) do for _,noun in ipairs(keys(found[group])) do
+                    for _,edge in ipairs(found[group][noun]) do
+                        add_member(group,noun,noun_term(noun),edge.rule.when,edge.negative)
+                    end
+                end end
+                converged=true;break
+            end
+            previous=copy_base()
+            -- Found destination tables replace their entire base entry, not union.
+            for group,nouns in pairs(found) do
+                previous[group]={};for noun in pairs(nouns) do previous[group][noun]=true end
+            end
+            previous_id=current_id
+        end
+        if not converged then return nil,"word_rule_limit" end
     end
     if membership_count>5000 then return nil,"rule_complexity_limit" end
     local function constant(node)

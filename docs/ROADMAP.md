@@ -325,3 +325,12 @@ commit triggering command/movement/contact stages through whole-tree Undo.
 Original preprocessing oracle: 2,592 cases, including 324 terminal oscillations.
 Next: negative-source cross-group IS membership solver; prior nested-inversion
 and remaining membership/MIMIC scope gaps remain explicit in GROUP.md.
+
+## M9.5A — negative-source GROUP membership
+
+Implement original evilrecursion declaration-presence iteration, negative-target
+presence, destination replacement, duplicate edge products and ten-change lock.
+Installed-source matrix: 6,144 cases including 3,024 loops. Triggering movement,
+only-Undo and expansion bounds have production regressions. Next: remaining
+ALL/NOT/LEVEL membership syntax, then GROUP-endpoint MIMIC; documented parity gaps
+remain in GROUP.md.

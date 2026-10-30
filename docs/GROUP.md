@@ -216,3 +216,32 @@ channels, seed/recursive duplicate declarations, member names, ON/NEAR/WITHOUT,
 NOT, positions and cross-name previous-list substitution. These are offline checks,
 not a claim of native acceptance. Next: negative-source cross-group IS recursion,
 then remaining ALL/NOT/LEVEL membership and GROUP-endpoint MIMIC scope.
+
+## M9.5A: negative-source cross-group IS
+
+Primary reference: installed Data/rules.lua grouprules(), the evilrecursion branch
+around lines 1770-1920, following positive consumed-edge transfers. NOT GROUP IS
+GROUP2 and NOT GROUP IS NOT GROUP2 now use that separate ten-round solver.
+
+Its base contains direct positive declaration names before evaluating conditions
+or exclusions. Positive transfer products do not enter the base. Each round derives
+ordinary vocabulary names absent from the previous source group; negative targets
+also count as presence during iteration. Derived destination maps replace their
+whole base entry rather than union with it. Signatures retain empty destination
+groups and the original repeated base prefix. On convergence, each duplicate edge
+produces its own declaration with its own conditions. Positive transfers are not
+rerun afterward. Ten changed rounds yield Infinite Loop; excessive derived output
+yields Too Complex. Both retain the triggering transaction and permit only Undo.
+
+Group/noun traversal uses sorted keys for deterministic allocation, deliberately
+replacing native pairs order. The source oracle compares products/counts and loop
+outcomes, not native allocation order. The 6,144-case installed-source matrix covers
+three channels, graph edges, positive/negative targets, direct seeds, inactive
+conditional declarations, duplicate edges and positive transfer ordering; 3,024
+cases reach the original loop limit. Production tests additionally cover a pushed
+word completing an oscillation, terminal lockout, Undo and expansion limits.
+
+This supersedes the earlier negative-source IS deferrals above. Remaining gaps:
+ALL/ordinary NOT noun/scoped LEVEL membership declarations, GROUP endpoints in
+MIMIC, malformed nested inversion, native empty unit-list tombstones and indirect
+query/cache parity described above. Offline checks do not imply native acceptance.

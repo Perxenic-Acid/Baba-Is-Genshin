@@ -33,11 +33,27 @@ queries with/without the original ignorebroken override, and cover physical Text
 reading/default PUSH, WORD filtering, conversion/HAS, MAKE/FEAR/FOLLOW/EAT,
 POWERED, physical witnesses, status acquisition/retraction and Undo.
 
-The production compiler/scheduler do not call this planner yet. BROKEN remains
-pending in the official-word audit; there is no claim of gameplay support. Next:
-connect status refresh to compilation/turn phases and cover conditional timing,
-conversion/HAS, terminal checks, navigation and whole-tree Undo. LEVEL and EMPTY
-need their original synthetic query paths rather than real unit records.
+## Before-input status barrier (M9.5N)
+
+The native turn service now invokes the rule-status planner before resolving move
+or wait input, matching Data/movement.lua:2 (`statusblock(nil,nil,true)`). Changed
+status is prepended as an atomic `status_before` stage; later stages use the updated
+snapshot. Final Preview validates the combined transaction against the original
+world, including input/chance state. Undo restores the entire input. Failed later
+planning and both terminal states cannot leak or refresh statuses. An empty status
+plan adds no phase and reuses the initial compile rather than compiling twice.
+
+WORD eligibility additionally rejects a current positive BROKEN declaration before
+persisted status is refreshed, matching `findwordunits`' separate BROKEN query.
+Physical Text remains readable. The raw query handles NOT via normal projection.
+
+BROKEN is still pending in the public word audit and default vocabulary. Remaining:
+initialization and boundaries, post-code/Text status updates and newly created unit
+status, conditional timing, terminal/outcome/navigation integration, and the LEVEL
+and EMPTY synthetic query paths. These must be implemented/tested before claiming
+complete gameplay support. In particular, do not insert a BROKEN fixed-point loop:
+original saved status is refreshed at explicit lifecycle points, not recursively
+until a Boolean state stabilizes.
 
 Validation: tests/broken_status.lua executes the installed original brokenblock
 in an isolated adapter and compares 256 ordered status cases, including mixed

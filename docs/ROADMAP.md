@@ -425,3 +425,11 @@ conversions, HAS and predicate sources without removing physical Text or spatial
 witnesses. Raw-declaration status refresh supports own-status bypass and negative
 grants. Production status scheduling and public word registration remain pending;
 see BROKEN.md. No native acceptance claim.
+
+## M9.5N — before-input BROKEN status barrier
+
+Native move/wait service prepends ordered status refresh to the same atomic turn,
+recompiles only after actual status changes, and validates the combined plan.
+Same-input disable/recovery, Undo, failure purity, terminal lockout and raw BROKEN
+WORD gating are covered. Initialization/post-code/newborn/synthetic paths and
+public registration remain pending; see BROKEN.md.

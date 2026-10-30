@@ -348,4 +348,6 @@
   negated conditions. Keep physical Text readable; WORD objects lose readability
   through their disabled property. Broken units remain spatial witnesses. Status
   planning temporarily clears only the queried unit and updates in sorted ID order.
-  Production scheduling/word registration is still pending; see docs/BROKEN.md.
+  Before-input status refresh is atomic with movement/wait and input/RNG state;
+  empty refreshes reuse the initial compile. Initialization/post-code/newborn/
+  synthetic paths and public word registration remain pending; see docs/BROKEN.md.

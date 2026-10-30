@@ -116,7 +116,7 @@ local function valid_turn_action(action)
     return action.type=="move" and ((action.dx==1 or action.dx==-1) and action.dy==0
         or (action.dy==1 or action.dy==-1) and action.dx==0)
 end
-local function plan_turn(world, action, services)
+local function plan_turn(world, action, services, initial_frame)
     local trace = {}
     if type(world) == "table" and world.infinite_loop then return nil,{stage="input",reason="infinite_loop_undo_only"} end
     if type(world) == "table" and world.too_complex then return nil,{stage="input",reason="too_complex_undo_only"} end
@@ -142,7 +142,10 @@ local function plan_turn(world, action, services)
     end
 
     trace[#trace + 1] = "rules_before"
-    local effects, rule_error, before_conversions, before_rules = services.evaluate(world)
+    local effects, rule_error, before_conversions, before_rules
+    if initial_frame then
+        effects,rule_error,before_conversions,before_rules=initial_frame[1],initial_frame[2],initial_frame[3],initial_frame[4]
+    else effects,rule_error,before_conversions,before_rules=services.evaluate(world) end
     if not effects then
         if valid_turn_action(action) then return after_failure({consumes_turn=true,changes={},reason="rules_before"},"rules_before",rule_error) end
         return fail("rules_before",rule_error)
@@ -577,11 +580,41 @@ function RW_PlanTurn(world,action,services)
     local context={};for k,v in pairs(world) do context[k]=v end
     context.last_input=action.type
     context.chance_seed=((world.chance_seed or 1)*48271)%2147483647
-    local plan,err,trace=plan_turn(context,action,services)
+    local status,initial_frame
+    if not world.infinite_loop and not world.too_complex and type(services)=="table"
+        and type(services.status)=="function" and type(services.evaluate)=="function" and type(services.preview)=="function" then
+        initial_frame={services.evaluate(context)}
+        if initial_frame[1] then
+            local why
+            status,why=services.status(context,initial_frame[4])
+            if not status then return nil,{stage="status_before",reason=why} end
+            if #status.changes>0 then
+                local updated,why=services.preview(context,status)
+                if not updated then return nil,{stage="status_before_preview",reason=why} end
+                context=updated;initial_frame=nil
+            else status=nil end
+        end
+    end
+    local plan,err,trace=plan_turn(context,action,services,initial_frame)
     if plan and plan.consumes_turn then
+        if status then
+            local stages={{name="status_before",plan=status}}
+            if plan.stages then for _,stage in ipairs(plan.stages) do stages[#stages+1]=stage end
+            else
+                local child={};for key,value in pairs(plan) do child[key]=value end
+                stages[#stages+1]={name="movement",plan=child}
+            end
+            local changes={};for _,change in ipairs(status.changes) do changes[#changes+1]=change end
+            for _,change in ipairs(plan.changes) do changes[#changes+1]=change end
+            plan.stages,plan.changes=stages,changes
+        end
         local first=plan.stages and plan.stages[1].plan or plan
         if world.last_input~=action.type then first.input_state={from=world.last_input or "none",to=action.type} end
         first.chance_state={from=world.chance_seed or 1,to=context.chance_seed}
+        if status then
+            local verified,why,phase=services.preview(world,plan)
+            if not verified then return nil,{stage="status_complete",reason=why,phase=phase} end
+        end
     end
     return plan,err,trace
 end
@@ -1218,6 +1251,7 @@ local function start(run_self_tests)
     turn_services.destroy=function(world,ids,contents,cause,deaths)
         return RW_PlanDestructionPhase(world,ids,contents,cause,contact_services,deaths)
     end
+    turn_services.status=function(world,rules) return rules_api:Invoke("RW_PlanRuleStatus",world,rules) end
     turn_services.refresh=function(world,rules) return rules_api:Invoke("RW_EvaluateRules",world,rules) end
 
     if run_self_tests then
@@ -1764,7 +1798,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5K initialized")
+    print("[RuleWorld] M9.5N initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

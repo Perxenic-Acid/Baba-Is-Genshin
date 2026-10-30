@@ -1183,7 +1183,16 @@ end
 -- Query raw declarations with only this unit's old status temporarily cleared.
 -- The callback planner preserves original ordered dependencies between units.
 function RW_PlanRuleStatus(world,generated_rules)
+    if type(world)~="table" or type(world.entities)~="table" then return nil,"invalid_broken_status_input" end
     if generated_rules~=nil and not dense_list(generated_rules) then return nil,"invalid_rule_sources" end
+    local needed=false
+    for _,sources in ipairs({world.rule_sources or {},generated_rules or {}}) do
+        for _,rule in ipairs(sources) do for _,effect in ipairs(rule.effects or {}) do
+            if effect.trait=="broken" then needed=true;break end
+        end end
+    end
+    if not needed then for _,entity in pairs(world.entities) do if entity.broken==1 then needed=true;break end end end
+    if not needed then return {consumes_turn=true,changes={},reason="broken_status"} end
     return RW_PlanBrokenStatus(world,function(context,entity)
         return query_trait(condition_context(context,generated_rules or {}),entity,"broken")
     end)
@@ -1192,7 +1201,8 @@ end
 function RW_WordTokenMap(world, effective)
     local tokens={}
     for id,entity in pairs(effective.entities) do
-        if entity.class ~= "text" and entity.behaviors and entity.behaviors.word then
+        if entity.class ~= "text" and entity.behaviors and entity.behaviors.word
+            and not (entity.traits and entity.traits.broken) then
             tokens[id]=RW_NounTextName(world,entity)
         end
     end

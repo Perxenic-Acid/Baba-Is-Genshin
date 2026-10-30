@@ -101,13 +101,43 @@ frozen declarations after SINK deletes BROKEN Text, EAT, paired unlock deaths wi
 separate birth frames/IDs, metadata purity and Undo. All test sentences are checked
 in bounds on a 24-row fixture.
 
-Conversion-primary identity/retype status initialization remains pending. Recursive
-BROKEN-condition failure during newborn initialization currently rejects the plan;
+Recursive BROKEN-condition failure during newborn initialization currently rejects the plan;
 preserving that triggering partial newborn board as a terminal state also remains
 an explicit gap. Neither is being counted as finished gameplay support.
 
+## Conversion products (M9.5Q)
+
+Installed Data/convert.lua:329-381 constructs each product and calls addunit before
+adding it to the map. The old source is removed only after the full group (476).
+`RW_PlanConversions(world, relations, generated_rules)` now accepts the actual raw
+frame from the native scheduler and initializes each product in that order.
+
+The primary product preserves its existing persistent ID. A query-only negative-ID
+copy retains the original source as a distinct old-name witness until all products
+from that source finish. It never enters the plan, allocator, world or Undo. Extra
+products see earlier products and the source; subsequent sources see the completed
+earlier group. Stored transform plus binary-status changes share one phase, retype
+and create carry status in their full specifications. Same-name BECOME/WRITE also
+initialize their primary product even when no archetype change is necessary.
+Conversion still does not trigger HAS. Direction, links, duplicate products,
+converted-ID MAKE occupancy and allocator behavior are preserved.
+
+The installed full doconvert and brokenblock functions are executed in an isolated
+host adapter for 640 cases. The adapter supplies the selected BROKEN/ON predicate
+and host map operations; both original creation/deletion loops execute unchanged.
+Cases cover old-source and earlier-product witnesses, two simultaneous quotas,
+negative grants, physical Text, same-name BECOME and duplicate outputs. Production
+turn tests cover late MAKE/CRASH suppression and next-input release, WRITE, links,
+identity, allocation and whole-turn Undo. The earlier code-status test now verifies
+that converted Text acquires BROKEN directly in conversion.to rather than waiting
+for the post-code barrier.
+
+Advanced condition queries using persistent IDs/chance keys on synthetic old-source
+witnesses are not covered by this oracle. Scoped LEVEL conversion initialization
+and recursive creation-terminal preservation remain separate gaps.
+
 BROKEN is still pending in the public word audit and default vocabulary. Remaining:
-initialization and boundaries, conversion status, late contact code changes,
+initialization and boundaries, late contact code changes,
 conditional timing, outcome/navigation integration, and the LEVEL and EMPTY
 synthetic query paths. These must be implemented/tested before claiming
 complete gameplay support. In particular, do not insert a BROKEN fixed-point loop:

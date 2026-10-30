@@ -450,3 +450,12 @@ phases against their raw/frozen source frame. Preserve pre-delete parent witness
 ordered products, per-death snapshots, allocator offsets, metadata and Undo.
 Conversion-primary initialization, boundary boot, synthetic queries and recursive
 creation-terminal preservation remain pending; BROKEN stays unregistered.
+
+## M9.5Q — BROKEN conversion products
+
+Native conversion adapter supplies raw declarations; primary, duplicate, BECOME
+self and WRITE products initialize status before later phases. Query-only old
+source witnesses preserve original create-before-remove ordering while keeping
+persistent IDs/links and atomic Undo. Installed doconvert/brokenblock oracle covers
+640 cases. Boot/boundary/synthetic and terminal-preservation gaps remain pending;
+BROKEN stays unregistered. See BROKEN.md.

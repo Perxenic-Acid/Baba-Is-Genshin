@@ -279,7 +279,7 @@ local function plan_turn(world, action, services, initial_frame)
         if #level_targets == 1 then target_type=level_targets[1]
         elseif #level_targets > 1 then target_type=level_targets end
     end
-    local operations, conversion_error, allocation, converted_ids = services.convert(preview, entity_conversions)
+    local operations, conversion_error, allocation, converted_ids = services.convert(preview, entity_conversions, post_rules)
     if not operations then return fail("conversions", conversion_error) end
 
     -- Keep phase-local preconditions: conversion reads the movement snapshot,
@@ -1240,8 +1240,8 @@ local function start(run_self_tests)
         preview = function(world_state, plan)
             return world_api:Invoke("RW_PreviewPlan", world_state, plan)
         end,
-        convert = function(world_state, conversions)
-            return rules_api:Invoke("RW_PlanConversions", world_state, conversions)
+        convert = function(world_state, conversions, rules)
+            return rules_api:Invoke("RW_PlanConversions", world_state, conversions, rules)
         end
     }
 
@@ -1844,7 +1844,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5P initialized")
+    print("[RuleWorld] M9.5Q initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

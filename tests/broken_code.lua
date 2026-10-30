@@ -67,7 +67,10 @@ end
 s.world.next_entity_id=16
 n,plan=move(s)
 assert(n.world.entities[2].class=="text" and n.world.entities[2].text.name=="ROCK" and n.world.entities[2].broken==1)
-local found=false;for _,stage in ipairs(plan.stages) do if stage.name=="code_status_after_conversion" then found=true end end
+local found=false
+for _,stage in ipairs(plan.stages) do if stage.name=="conversion" then
+    for _,change in ipairs(stage.plan.changes) do if change.kind=="retype" and change.entity_id==2 and change.to.broken==1 then found=true end end
+end end
 assert(found and RW_Undo(n).world==s.world)
 -- BROKEN acquired at the code barrier silences Text CRASH in the contact frame.
 s=fixture("TEXT",true);s.world.entities[15].text.name="CRASH"

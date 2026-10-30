@@ -1284,7 +1284,7 @@ function RW_RelationApplies(world,relation,entity)
     end
     return true
 end
-function RW_PlanConversions(world, conversions)
+function RW_PlanConversions(world, conversions, generated_rules)
     if type(world) ~= "table" or type(world.entities) ~= "table"
         or not dense_list(conversions) then return nil,"invalid_conversion_input" end
     local targets,protected,forbidden,conditional={},{},{},{}
@@ -1327,10 +1327,42 @@ function RW_PlanConversions(world, conversions)
     table.sort(ids)
     local changes,next_id,created={},world.next_entity_id,0
     local converted_ids={}
+    local status_context
+    if generated_rules~=nil then
+        if not dense_list(generated_rules) then return nil,"invalid_rule_sources" end
+        local needed=false
+        for _,rules in ipairs({world.rule_sources or {},generated_rules}) do
+            for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
+                if effect.trait=="broken" then needed=true;break end
+            end end
+        end
+        if needed then
+            status_context=condition_context(world,generated_rules)
+            status_context.entities={};for id,entity in pairs(world.entities) do status_context.entities[id]=entity end
+        end
+    end
+    local function initialize_product(product,id,original)
+        if not status_context then return true end
+        -- Native doconvert creates all products before deleting its source.
+        -- A transient negative-ID witness retains the old source when our first
+        -- product reuses its persistent identity. It is never emitted in a plan.
+        if original then
+            local witness=query_clone(original);witness.id=-original.id
+            status_context.entities[witness.id]=witness
+        end
+        local unit=query_clone(product);unit.id=id;unit.broken=0
+        status_context.entities[id]=unit
+        local active,err=query_trait(status_context,unit,"broken")
+        if active==nil then return nil,err end
+        unit.broken=active and 1 or 0;product.broken=active and 1 or nil
+        return true
+    end
     local function create(product)
         if type(next_id) ~= "number" or next_id % 1 ~= 0 or next_id < 1 or world.entities[next_id] then return nil,"invalid_conversion_frontier" end
         if next_id >= 9007199254740991 then return nil,"entity_id_exhausted" end
         product.id=next_id
+        local ok,err=initialize_product(product,next_id)
+        if not ok then return nil,err end
         changes[#changes+1]={kind="create",entity_id=next_id,to=product}
         next_id,created=next_id+1,created+1; return true
     end
@@ -1357,7 +1389,10 @@ function RW_PlanConversions(world, conversions)
         for _,choice in ipairs(choices) do if type(choice)=="table" and choice.become_target then has_become=true;break end end
         -- Preserve established IS self-negation, while BECOME is independently selected.
         if bans[source] and not has_become then
-            if not virtual then changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)} end
+            if not virtual then
+                changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)}
+                if status_context then status_context.entities[entity.id]=nil end
+            end
             return true
         end
         local products,retain,remove={},false,bans[source] or become_bans[source] or false
@@ -1396,19 +1431,28 @@ function RW_PlanConversions(world, conversions)
                     {name=type(target) == "table" and target.text_name or (virtual and "EMPTY" or RW_NounTextName(world,entity))}
             else product.class,product.archetype,product.text="object",target,nil end
             if not virtual and not retain and not used then
+                local ok,err=initialize_product(product,entity.id,entity)
+                if not ok then return nil,err end
+                local retyped=false
                 if entity.class == "text" and product.class == "text" and entity.text.name == product.text.name then
                     -- WRITE may target this very Text; retain its first identity product.
                 elseif entity.class == "text" or target == "@text" or type(target) == "table" then
                     changes[#changes+1]={kind="retype",entity_id=entity.id,from=query_clone(entity),to=product}
+                    retyped=true
                 elseif entity.archetype~=target then
                     changes[#changes+1]={kind="transform",entity_id=entity.id,from=entity.archetype,to=target}
+                end
+                if not retyped and (product.broken or 0)~=(entity.broken or 0) then
+                    changes[#changes+1]={kind="broken",entity_id=entity.id,from=entity.broken,to=product.broken or 0}
                 end
                 used=true
             else local ok,err=create(product); if not ok then return nil,err end end
         end
         if not virtual and not retain and not used and remove then
             changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)}
+            if status_context then status_context.entities[entity.id]=nil end
         end
+        if status_context and not virtual then status_context.entities[-entity.id]=nil end
         return true
     end
     for _,id in ipairs(ids) do

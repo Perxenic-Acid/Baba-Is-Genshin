@@ -364,3 +364,10 @@
   Include status in create.to, preserve links/facing and reset inherited flags.
   Conversion-primary/boundary/synthetic and recursive creation-terminal gaps remain;
   see docs/BROKEN.md.
+
+- Conversion status initialization receives raw generated rules as the third
+  RW_PlanConversions argument. Products initialize in declaration order before the
+  old source is removed. Query-only negative-ID source witnesses preserve ON/NEAR
+  when the primary product reuses its persistent ID; never commit those witnesses.
+  Preserve same-name BECOME/WRITE, duplicate allocation, links/facing and no-HAS
+  conversion semantics. Scope and oracle limits are recorded in docs/BROKEN.md.

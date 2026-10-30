@@ -314,3 +314,8 @@
   existing scoped IR, terminal order and identity-bound conversions still apply.
   Group condition parameters use @level and real level_block witnesses. Conditional
   scoped LEVEL consumers retain their existing deferred boundary; see GROUP.md.
+
+- GROUP/LEVEL MIMIC endpoints copy raw declarations before GROUP expansion, even
+  for an empty group. Normalize ALL membership before MIMIC exactly once. Never
+  run MIMIC again on derived member rules; retain one-generation tags/limits and
+  conditional protections. Other endpoint gaps remain documented in MIMIC.md.

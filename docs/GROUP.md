@@ -1,4 +1,4 @@
-# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.5D)
+# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.5E)
 
 Installed primary references: base Data/rules.lua code() invokes subrules then
  grouprules at 138-139; grouprules 1573-2331 categorizes memberships, combines
@@ -324,3 +324,28 @@ still use live physical units, not an invented synthetic unit for the current ma
 Custom nonstandard LEVEL block_type aliases in spatial queries remain outside the
 existing fixed level_block condition contract. GROUP-endpoint MIMIC and ALL ordering
 through MIMIC remain next, alongside earlier documented parity gaps.
+
+## M9.5E: GROUP endpoints in MIMIC
+
+Primary reference: installed rules.lua subrules 1209-1342 executes the one-generation
+copy pass before grouprules; tools.lua getmat 1504-1518 checks the authored noun
+vocabulary. Positive GROUP/GROUP2/GROUP3 and LEVEL now have compiler MIMIC keys.
+A MIMIC GROUP copies raw declarations whose subject is that group, even with no
+members. GROUP MIMIC A copies A's declarations onto the group before expansion.
+Group-to-group copies use the same rule; copied membership declarations remain
+membership. Conditional/negative MIMIC protections and the 250-copy limit apply.
+No membership-based second MIMIC copy pass is introduced.
+
+ALL/NOT ALL membership normalization is shared and now runs before MIMIC when
+present, exactly once. This supersedes M9.5C's ordering gap for those membership
+declarations. Existing ordinary no-MIMIC startup keeps its fast path. The 1,152-case
+oracle executes installed addoption/subrules/grouprules and copyrule, varying group
+channels/endpoints, empty/ordinary/ALL/NOT ALL memberships, duplicate copies,
+conditional declarations, and conditional/unconditional negative protections.
+Production regressions also cover scoped LEVEL copying, raw empty-group behavior,
+HAS multiplicity and Undo. No native acceptance is inferred.
+
+Remaining MIMIC scope: ALL as an actual MIMIC endpoint, ordinary NOT/NOT GROUP
+subjects, and virtual EMPTY endpoints retain their existing deferred diagnostics.
+Conditional scoped LEVEL consumers and prior nested-inversion/query/cache gaps
+remain explicit. This is not a claim that every original GROUP combination is done.

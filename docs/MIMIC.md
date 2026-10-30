@@ -34,3 +34,13 @@ remain deferred; unsupported forms stay in compiler diagnostics. Other copied
 verbs retain their own documented restrictions. PLAY remains the next verb.
 A loose MIMIC word is present in the sparse MOTION room. Routine native acceptance
 is waived; these offline checks do not establish native runtime parity.
+
+## M9.5E GROUP / LEVEL integration
+
+Positive GROUP channels and typed LEVEL endpoints now participate in the existing
+raw one-generation copy pass. GROUP declarations are copied before membership is
+expanded; an empty group does not disable copying its authored declarations. ALL
+membership normalization precedes the copy pass. See GROUP.md M9.5E and the
+1,152-case installed complete-pass oracle in tests/reference_group_mimic.lua.
+ALL as a MIMIC endpoint, NOT sources and virtual EMPTY remain deferred. Existing
+conditional scoped LEVEL restrictions still apply to copied consumers.

@@ -1359,13 +1359,42 @@ local function invert_mimic_condition(condition)
     end
     return {op="not",condition=condition}
 end
+-- Normalize the ALL membership declarations that original subrules sees before MIMIC.
+local function normalize_group_all(ast_rules,world)
+    -- addoption expands NOT ALL immediately; subrules expands ALL before grouprules.
+    -- Keep the literal declaration as well as its generated concrete declarations.
+    local normalized={}
+    for _,rule in ipairs(ast_rules) do
+        normalized[#normalized+1]=rule
+        local subject,negative=unwrap(rule.subject)
+        local raw=unwrap(rule.object)
+        local target=raw and raw.tag=="noun" and raw.type and raw.type.tag=="group"
+        if target and rule.verb=="is" and subject.tag=="special" and subject.name=="all" then
+            local products=negative and {{tag="special",name="empty"},{tag="special",name="text"}} or {}
+            if not negative then for _,noun in ipairs(RW_NounPalette(world)) do products[#products+1]=noun_term(noun) end end
+            local condition=rule.when
+            for _,product in ipairs(products) do
+                local copy=query_clone(rule);copy.subject=product;copy.when=condition
+                normalized[#normalized+1]=copy
+                if #normalized>5000 then return nil,"rule_complexity_limit" end
+            end
+        end
+    end
+    return normalized
+end
 -- Original subrules copies only untagged, non-MIMIC declarations: one generation.
-local function expand_mimic(ast_rules)
+local function expand_mimic(ast_rules,world)
     local present=false
     for _,rule in ipairs(ast_rules) do if type(rule)=="table" and rule.verb=="mimic" then present=true;break end end
     if not present then return ast_rules end
+    local normalized,err=normalize_group_all(ast_rules,world);if not normalized then return nil,err end
+    ast_rules=normalized
     local function key(term)
         if type(term)~="table" then return nil end
+        if term.tag=="noun" and term.type then
+            if term.type.tag=="group" then return "@group:"..term.type.name end
+            if term.type.tag=="level" then return "@level" end
+        end
         return subject_key(term)
     end
     local result,bans={},{}
@@ -1410,10 +1439,10 @@ local function expand_mimic(ast_rules)
             end
         end
     end end
-    return result
+    return result,nil,true
 end
 -- Direct GROUP membership expands declarations, never creates Group entities.
-local function expand_groups(ast_rules,registry,world)
+local function expand_groups(ast_rules,registry,world,normalized)
     local function group(term)
         local raw,negative=unwrap(term)
         if raw and raw.tag=="noun" and raw.type and raw.type.tag=="group" then return raw.type.name,negative end
@@ -1461,25 +1490,10 @@ local function expand_groups(ast_rules,registry,world)
         end
         return #requirements==0 and {op="always"} or {op="spatial",clauses={},requirements=requirements}
     end
-    -- addoption expands NOT ALL immediately; subrules expands ALL before grouprules.
-    -- Keep the literal declaration as well as its generated concrete declarations.
-    local normalized={}
-    for _,rule in ipairs(ast_rules) do
-        normalized[#normalized+1]=rule
-        local subject,negative=unwrap(rule.subject)
-        local target=group(rule.object)
-        if target and rule.verb=="is" and subject.tag=="special" and subject.name=="all" then
-            local products=negative and {{tag="special",name="empty"},{tag="special",name="text"}} or {}
-            if not negative then for _,noun in ipairs(RW_NounPalette(world)) do products[#products+1]=noun_term(noun) end end
-            local condition=rule.when
-            for _,product in ipairs(products) do
-                local copy=query_clone(rule);copy.subject=product;copy.when=condition
-                normalized[#normalized+1]=copy
-                if #normalized>5000 then return nil,"rule_complexity_limit" end
-            end
-        end
+    if not normalized then
+        local rules,err=normalize_group_all(ast_rules,world);if not rules then return nil,err end
+        ast_rules=rules
     end
-    ast_rules=normalized
     local function membership(rule)
         local name,negative=group(rule.object)
         local key=member_key(rule.subject)
@@ -1699,10 +1713,12 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     if not world then return lower_simple(ast_rules,registry) end
     registry=registry or DEFAULT_SEMANTICS
     if not valid_semantics(registry) or not dense_list(ast_rules) then return nil,"invalid_ast_rules" end
+    local groups_normalized=false
     if registry.mimic and registry.mimic.noun=="mimic" then
-        local expanded,err=expand_mimic(ast_rules);if not expanded then return nil,err end;ast_rules=expanded
+        local expanded,err,normalized=expand_mimic(ast_rules,world);if not expanded then return nil,err end
+        ast_rules=expanded;groups_normalized=normalized
     end
-    local expanded,group_deferred,group_members=expand_groups(ast_rules,registry,world)
+    local expanded,group_deferred,group_members=expand_groups(ast_rules,registry,world,groups_normalized)
     if not expanded then return nil,group_deferred end
     ast_rules=expanded
     local generated,deferred,relations={},group_deferred,{}

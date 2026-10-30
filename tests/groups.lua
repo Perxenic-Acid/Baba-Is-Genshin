@@ -317,3 +317,19 @@ for _,case in ipairs({{'WIN','DEFEAT','win'},{'DEFEAT','WIN','defeat'},{'ROCK','
  assert(RW_UndoLevelTree(result).active_id==entered.active_id and RW_UndoLevelTree(result).instances[entered.active_id].world==entered.instances[entered.active_id].world)
 end
 print('PASS: LEVEL GROUP physical/scoped projection, exclusions, condition parameters, ordered outcomes, linked conversion and whole-tree Undo')
+
+s=negative_fixture({{'AVATAR','MIMIC','GROUP'},{'GROUP','IS','FLOAT'}})
+w,f=projection(s);assert(#f.deferred==0 and w.entities[1].behaviors.float and not w.entities[2].behaviors.float,'MIMIC copies raw GROUP declarations even without members')
+s=negative_fixture({{'ROCK','IS','GROUP'},{'GROUP','MIMIC','AVATAR'},{'AVATAR','IS','FLOAT'}})
+w,f=projection(s);assert(#f.deferred==0 and w.entities[2].behaviors.float)
+s=negative_fixture({{'ROCK','IS','GROUP'},{'GROUP','MIMIC','GROUP2'},{'GROUP2','IS','FLOAT'}})
+w=projection(s);assert(w.entities[2].behaviors.float)
+s=negative_fixture({{'AVATAR','MIMIC','GROUP'},{'AVATAR','MIMIC','NOT','GROUP'},{'GROUP','IS','FLOAT'}})
+w=projection(s);assert(not w.entities[1].behaviors.float)
+s=negative_fixture({{'ALL','IS','GROUP'},{'AVATAR','MIMIC','GROUP'},{'GROUP','HAS','FLAG'},{'AVATAR','IS','YOU','AND','DEFEAT'}})
+n,p=step(s);local flags=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flags=flags+1 end end
+assert(flags==2,'raw MIMIC copies and ordinary ALL member declarations retain separate products')
+s=negative_fixture({{'LEVEL','MIMIC','GROUP'},{'GROUP','IS','WIN'}})
+w,f=projection(s);local scoped=false;for _,r in ipairs(f.relations) do if r.op=='level_trait' and r.trait=='win' then scoped=true end end;assert(scoped)
+assert(not s.world.group_members and not s.world._condition_rules)
+print('PASS: GROUP MIMIC raw declarations/empty groups, channels, negative copies, ALL multiplicity, LEVEL and Undo')

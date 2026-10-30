@@ -356,3 +356,10 @@ Typed membership/exclusions preserve physical and scoped LEVEL consumers, ordere
 terminal outcomes, conversions, destination metadata and whole-tree Undo. Source
 matrix: 144 cases. Conditional scoped consumers remain explicitly deferred under
 the existing campaign-context condition boundary. Next: GROUP/MIMIC integration.
+
+## M9.5E — GROUP / LEVEL MIMIC endpoints
+
+Raw one-generation copies precede GROUP expansion; ALL membership normalization
+now precedes MIMIC once. Source matrix: 1,152 complete-pass cases. Production
+coverage includes empty groups, negatives, multiplicity, LEVEL and Undo. Remaining
+endpoint/conditional parity gaps are documented; proceed with ordinary properties.

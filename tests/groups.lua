@@ -91,7 +91,7 @@ local g,d=RW_LowerRuleAST(ast,{},s.world);assert(#g==0 and #d==2)
 print('PASS: direct GROUP channels, conditional/negative membership, duplicates, HAS/TEXT/WORD/EMPTY, activation, deferred gaps and Undo')
 
 s=fixture({{'ROCK','IS','GROUP'},{'NOT','FLAG','IS','GROUP'},{'GROUP','IS','FLOAT'}})
-w,f=projection(s);assert(#f.deferred==1 and w.entities[2].archetype=='rock')
+w,f=projection(s);assert(#f.deferred==0 and w.entities[2].archetype=='rock' and w.entities[2].behaviors.float)
 
 -- Original group transfer is a finite ordered edge pass, not unbounded closure.
 s=fixture({{'ROCK','IS','GROUP'},{'GROUP2','IS','GROUP3'},{'GROUP','IS','GROUP2'},{'GROUP3','IS','FLOAT'}})
@@ -249,3 +249,19 @@ local edge=rules[1];for i=3,math.floor(5000/#RW_NounPalette(s.world))+4 do rules
 local result,reason=RW_LowerRuleAST(rules,nil,s.world);assert(not result and reason=='rule_complexity_limit')
 assert(not s.world.negative_base and not s.world._condition_rules)
 print('PASS: negative-source GROUP declaration iteration, conditions, positive-transfer ordering, duplicate products, bounds and triggering-move Infinite Loop/Undo')
+
+-- Ordinary NOT subjects expand after membership transfers, with literal bans.
+s=negative_fixture({{'NOT','ROCK','IS','GROUP'},{'GROUP','IS','FLOAT'}})
+w,f=projection(s);assert(#f.deferred==0 and w.entities[1].behaviors.float and not w.entities[2].behaviors.float)
+s=negative_fixture({{'NOT','ROCK','IS','GROUP'},{'GROUP','IS','GROUP2'},{'GROUP2','IS','FLOAT'}})
+w=projection(s);assert(w.entities[1].behaviors.float and not w.entities[2].behaviors.float)
+s=negative_fixture({{'NOT','ROCK','IS','GROUP'},{'NOT','ROCK','IS','NOT','GROUP'},{'GROUP','IS','FLOAT'}})
+w=projection(s);assert(w.entities[1].behaviors.float,'literal negative-source exclusion does not ban expanded concrete members')
+s=negative_fixture({{'NOT','ROCK','IS','GROUP'},{'AVATAR','IS','NOT','GROUP'},{'GROUP','IS','FLOAT'}})
+w=projection(s);assert(not w.entities[1].behaviors.float)
+s=negative_fixture({{'NOT','TEXT','IS','GROUP'},{'GROUP','IS','FLOAT'}})
+w=projection(s);assert(w.entities[1].behaviors.float and w.entities[2].behaviors.float and not w.entities[10].behaviors.float)
+s=negative_fixture({{'NOT','ROCK','IS','GROUP'},{'NOT','ROCK','IS','GROUP'},{'GROUP','BECOME','FLAG'}})
+n,p=step(s);local count=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then count=count+1 end end
+assert(count==2 and n.world.entities[2].archetype=='rock')
+print('PASS: ordinary NOT noun GROUP delayed expansion, literal/concrete bans, channels, duplicate conversion and Undo')

@@ -1,4 +1,4 @@
-# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.4Z)
+# GROUP membership, transfer, parameters and recursive conditions (M9.4V–M9.5B)
 
 Installed primary references: base Data/rules.lua code() invokes subrules then
  grouprules at 138-139; grouprules 1573-2331 categorizes memberships, combines
@@ -245,3 +245,30 @@ This supersedes the earlier negative-source IS deferrals above. Remaining gaps:
 ALL/ordinary NOT noun/scoped LEVEL membership declarations, GROUP endpoints in
 MIMIC, malformed nested inversion, native empty unit-list tombstones and indirect
 query/cache parity described above. Offline checks do not imply native acceptance.
+
+## M9.5B: ordinary NOT membership subjects
+
+Primary reference: installed rules.lua addoption() at 1084-1114 specifically
+excludes group targets from ordinary NOT expansion; grouprules() at 1919-1980
+expands positive membership subjects only after cross-group transfer and the
+negative-source recursion solver. NOT ROCK IS GROUP now keeps its literal subject
+through both solvers, then contributes every authored ordinary noun except ROCK.
+NOT TEXT/NOT EMPTY contribute the ordinary palette, not virtual/Text members.
+No membership conversion, new identity or persistent world field is introduced.
+
+Exclusion declarations remain keyed by their literal subject: NOT ROCK IS NOT
+GROUP does not act as a concrete AVATAR exclusion when NOT ROCK IS GROUP expands.
+AVATAR IS NOT GROUP does exclude that expanded member. Conditional declarations
+and duplicate products preserve their existing behavior. Expanded member output
+has the same 5,000-entry defensive cap as declaration expansion.
+
+The installed grouprules/invertconds oracle checks 5,184 direct membership cases
+with positive/NOT sources, literal/concrete bans, channels, duplicate/conditional
+members and HAS on either side. A separate 6,144-case negative recursion matrix
+uses literal NOT ROCK seeds; 2,880 hit the original ten-change loop bound. Existing
+production tests cover delayed positive transfers, physical text exclusion,
+duplicate conversion and whole-tree Undo. Native testing is not inferred.
+
+This supersedes ordinary NOT membership deferrals above. ALL and scoped LEVEL
+membership, GROUP-endpoint MIMIC and the previously documented nested inversion,
+unit-list tombstone and indirect-query parity gaps remain pending.

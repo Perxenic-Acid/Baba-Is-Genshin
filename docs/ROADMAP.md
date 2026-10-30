@@ -334,3 +334,11 @@ Installed-source matrix: 6,144 cases including 3,024 loops. Triggering movement,
 only-Undo and expansion bounds have production regressions. Next: remaining
 ALL/NOT/LEVEL membership syntax, then GROUP-endpoint MIMIC; documented parity gaps
 remain in GROUP.md.
+
+## M9.5B — ordinary NOT subjects in GROUP membership
+
+Preserve literal NOT declarations through group transfer/negative recursion,
+then expand ordinary complements with concrete-name exclusions. Source matrices:
+5,184 direct cases plus 6,144 negative-recursion cases (2,880 loops). Production
+coverage includes channels, literal bans, Text exclusion, duplicates and Undo.
+Next: ALL and scoped LEVEL membership, then GROUP-endpoint MIMIC.

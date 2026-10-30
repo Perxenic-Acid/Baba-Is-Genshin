@@ -1443,7 +1443,11 @@ local function expand_groups(ast_rules,registry,world)
         return ordinary,deferred
     end
     local bans,positive,transfers,negative_transfers={},{},{},{}
-    local function member_key(term) return subject_key(term) end
+    local function member_key(term)
+        local value,negative=unwrap(term)
+        local key=subject_key(value)
+        return key and (negative and ("not "..key) or key)
+    end
     local function combine(...)
         local requirements={}
         for _,condition in ipairs({...}) do
@@ -1570,14 +1574,31 @@ local function expand_groups(ast_rules,registry,world)
         if known then return true end
     end
     local teams={}
+    local team_count=0
     for _,member in ipairs(positive) do
-        local name,key=member.name,member.key
+        local name=member.name
         teams[name]=teams[name] or {}
-        local condition=member.when
-        for _,ban in ipairs((bans[name] or {})[key] or {}) do
-            condition=combine(condition,invert_mimic_condition(ban.when))
+        local candidates={member}
+        -- grouprules expands ordinary NOT only after transfer/negative recursion.
+        -- Exclusions stay keyed by their literal declaration, not by complements.
+        local term,negative=unwrap(member.term)
+        if negative then
+            candidates={}
+            local excluded=subject_key(term)
+            for _,noun in ipairs(RW_NounPalette(world)) do if noun~=excluded then
+                candidates[#candidates+1]={key=noun,term=noun_term(noun)}
+            end end
         end
-        if constant(condition)~=false then teams[name][#teams[name]+1]={term=member.term,when=condition,name=key,recursive=condition_group(condition)} end
+        for _,candidate in ipairs(candidates) do
+            local key,condition=candidate.key,member.when
+            for _,ban in ipairs((bans[name] or {})[key] or {}) do
+                condition=combine(condition,invert_mimic_condition(ban.when))
+            end
+            if constant(condition)~=false then
+                team_count=team_count+1;if team_count>5000 then return nil,"rule_complexity_limit" end
+                teams[name][#teams[name]+1]={term=candidate.term,when=condition,name=key,recursive=condition_group(condition)}
+            end
+        end
     end
     local function complement(name,branch)
         local result,seen={},{}

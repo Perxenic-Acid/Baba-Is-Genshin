@@ -482,3 +482,10 @@ EMPTY status is queried dynamically per cell from the current/frozen raw frame,
 with the original ignorebroken bridge. Conditions, property cells and conversions
 honor it without saved entities/IDs. Original query bridge and spatial/negative
 regressions pass; LEVEL synthetic status and other BROKEN lifecycle gaps remain.
+
+## M9.5U — unconditional scoped LEVEL BROKEN
+
+Raw LEVEL BROKEN/NOT BROKEN gates scoped commands before outcome/conversion/HOLD
+and POWER publication. Physical Level blocks keep independent saved status.
+Compiler, installed virtual-query and tree Undo regressions cover this scope.
+Conditional surroundings and remaining lifecycle gaps stay documented; see BROKEN.md.

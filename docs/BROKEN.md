@@ -212,3 +212,24 @@ and ignorebroken forwarding with a controlled hasfeature result; it does not
 claim full original condition-engine parity. Whole EMPTY lifecycle/HAS and synthetic
 LEVEL status queries remain deferred, as do recursive creation-terminal handling
 and exact WORD dependency invalidation. BROKEN remains publicly unregistered.
+
+## Unconditional scoped LEVEL (M9.5U)
+
+Installed conditions.lua:58-69 obtains virtual LEVEL status through isitbroken,
+not a saved entity flag. Currently supported scoped declarations are unconditional:
+the compiler queries raw LEVEL BROKEN grant/deny presence before selecting scoped
+consumers. When enabled, BROKEN removes level_trait/deny_level_trait,
+transform_level and protect_level commands before scoped POWER publication.
+IS NOT BROKEN overrides BROKEN regardless of physical sentence order.
+
+Concrete level_block declarations remain in the raw frame: physical units still
+receive ordered status initialization and independent conversions/contacts. No
+virtual LEVEL unit or persisted status is introduced. Conditional LEVEL surroundings
+remain deferred by the existing compiler boundary, and are not approximated using
+an arbitrary real level block. Recursive creation-terminal preservation and exact
+WORD invalidation remain pending; BROKEN stays publicly unregistered.
+
+Tests cover grant/deny and ordering, WIN/DEFEAT, ROCK/TEXT conversions, identity
+protection, HOLD and POWER, physical-block status, actual tree outcomes and Undo.
+An installed testcond adapter verifies the virtual LEVEL query branch and bypass;
+its isitbroken result is controlled, so this is not a full surroundings oracle.

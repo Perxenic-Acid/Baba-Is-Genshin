@@ -387,3 +387,8 @@
   ignorebroken bypass, never a saved unit flag. Gate unconditional property cells
   and conversions too; NOT conditions cannot invert disabled status. Keep generated
   BROKEN frames on relation applicability. LEVEL synthetic status remains pending.
+
+- Unconditional virtual LEVEL BROKEN/NOT BROKEN gates scoped consumer commands
+  before POWER publication. Preserve concrete Level-block raw declarations and
+  saved status; do not synthesize a virtual entity. Conditional scoped surroundings
+  remain deferred, never approximate them using a physical entrance. See BROKEN.md.

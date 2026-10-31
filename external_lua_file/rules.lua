@@ -2147,6 +2147,26 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         end
         if not blocked then filtered[#filtered+1]=relation end
     end
+    -- Virtual LEVEL has no saved unit flag (testcond unitid=1 -> isitbroken).
+    -- All currently supported scoped declarations are unconditional, so its raw
+    -- BROKEN query reduces to grant/deny precedence before consumer selection.
+    local level_broken,level_not_broken=false,false
+    for _,relation in ipairs(filtered) do
+        if relation.trait=="broken" then
+            if relation.op=="level_trait" then level_broken=true
+            elseif relation.op=="deny_level_trait" then level_not_broken=true end
+        end
+    end
+    if level_broken and not level_not_broken then
+        local enabled={}
+        for _,relation in ipairs(filtered) do
+            if relation.op~="level_trait" and relation.op~="deny_level_trait"
+                and relation.op~="transform_level" and relation.op~="protect_level" then
+                enabled[#enabled+1]=relation
+            end
+        end
+        filtered=enabled
+    end
     local scoped_power,denied_power={},{}
     for _,relation in ipairs(filtered) do
         if relation.trait=="power" or relation.trait=="power2" or relation.trait=="power3" then

@@ -34,9 +34,23 @@ installed player-list selection branch executes unchanged in an isolated adapter
 for 256 combinations; it verifies selection/fallback, not the entire host movement
 solver. Native success is not inferred.
 
-The original playerid=3 dual-direction simultaneous command is not implemented:
-this interface currently schedules one channel per atomic action. Native secondary
-key bindings and multi-player input arbitration belong to the deferred frontend
-integration. Conditional scoped LEVEL/EMPTY lifecycle retain their existing engine
+M9.6G adds `player=3,type="move",dx,dy,dx2,dy2` for one scheduled dual-input
+turn. Each pair is cardinal or `(0,0)` (wait). There is no YOU2 fallback in this
+mode. First-channel non-wait intentions win for dual-capability identities;
+second-channel intentions apply when the first channel waits. The existing
+front-to-back solver processes channel one before channel two; passive displacement
+prevents a second root step. Conversion, contacts, creation, input/chance metadata
+and Undo run once. Both channels waiting records IDLE; either moving records move.
+SELECT follows channel one only. Scoped LEVEL YOU/YOU2 uses channel one's direction,
+including its wait, matching installed movement.lua's explicit dir_ preference.
+Virtual EMPTY uses ephemeral per-cell proxies, never committed identities.
+
+The installed direction/been_seen collection branch is executed for 400 mask/vector
+combinations, alongside blocked facing, shared contact destruction, single MORE
+phase, waits, invalid vectors and atomic Undo. This verifies root intent selection,
+not the original full mutable collision scheduler or duplicate dual-channel facing
+writes before collisions; those remain part of the shared solver parity gap.
+Native secondary key bindings and multi-player input arbitration belong to deferred
+frontend integration. Conditional scoped LEVEL/EMPTY lifecycle retain their existing engine
 gaps. The transient Empty presence adapter handles unconditional negative overrides;
 complex conditional cancellation parity remains part of the broader condition audit.

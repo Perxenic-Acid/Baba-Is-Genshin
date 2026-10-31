@@ -52,7 +52,7 @@ s=fixture({{"LEVEL","IS","YOU2"}});s.world.language.nouns.LEVEL={tag="level",blo
 n=step(s,2);assert(n.world.board_offset.x==1)
 local primary=step(s,1);assert(not primary.world.board_offset or primary.world.board_offset.x==0)
 -- Invalid channels reject without input/chance/RNG changes.
-local bad,e=RW_PlanTurn(s.world,{type="move",dx=1,dy=0,player=3},services);assert(not bad and e.reason=="invalid_player")
+local bad,e=RW_PlanTurn(s.world,{type="move",dx=1,dy=0,player=4},services);assert(not bad and e.reason=="invalid_player")
 assert(not s.world.last_input and not s.world.chance_seed)
 -- A defeated tree permits SELECT displacement but freezes both YOU channels.
 s=fixture({{"AVATAR","IS","YOU2"}})
@@ -95,3 +95,67 @@ for you=0,3 do for you2=0,3 do for sleep=0,3 do for empty=0,1 do for player=1,2 
 end end end end end
 assert(cases==256)
 print("PASS: YOU2 independent channel/fallback, sleeping/negative/dual controllers, PUSH/blocked facing, contacts, BROKEN, EMPTY placeholder, LEVEL, atomic Undo and installed channel-selection oracle (256 cases)")
+
+-- Dual input is one scheduled turn and one Undo; absent channels wait, no fallback.
+s=fixture({{"AVATAR","IS","YOU"},{"ROCK","IS","YOU2"}})
+local function dual(a,b,c,d)
+ local p,e=RW_PlanTurn(s.world,{type="move",player=3,dx=a,dy=b,dx2=c,dy2=d},services);assert(p,e and e.reason)
+ local n,r=RW_Commit(s,p);assert(r.accepted,r.reason);assert(RW_Undo(n).world==s.world);return n
+end
+n=dual(1,0,0,1);assert(n.world.entities[1].x==3 and n.world.entities[2].y==3)
+n=dual(0,0,-1,0);assert(n.world.entities[1].x==2 and n.world.entities[2].x==4)
+n=dual(0,0,0,0);assert(n.world.entities[1].x==2 and n.world.entities[2].x==5)
+s=fixture({{"AVATAR","IS","YOU"},{"AVATAR","IS","YOU2"}})
+n=dual(1,0,0,1);assert(n.world.entities[1].x==3 and n.world.entities[1].y==2)
+n=dual(0,0,0,1);assert(n.world.entities[1].x==2 and n.world.entities[1].y==3)
+s=fixture({{"AVATAR","IS","YOU2"}});n=dual(1,0,0,0);assert(n.world.entities[1].x==2)
+print("TEST PASSED: simultaneous YOU/YOU2 independent intents and atomic Undo")
+
+s=fixture({{"AVATAR","IS","YOU"},{"ROCK","IS","YOU2"},{"FLAG","IS","STOP"}})
+s.world.entities[3]={id=3,kind="object",class="object",archetype="flag",x=3,y=2,direction="None"}
+n=dual(1,0,0,1);assert(n.world.entities[1].x==2 and n.world.entities[1].direction=="Right" and n.world.entities[2].y==3)
+s=fixture({{"AVATAR","IS","YOU"},{"ROCK","IS","YOU2"},{"ROCK","IS","DEFEAT"}})
+s.world.entities[2].x=4
+n=dual(1,0,-1,0);assert(not n.world.entities[1] and not n.world.entities[2],"both final contacts must share one phase")
+services.more=function(w,p) return RW_PlanCreate(w,RW_ResolveMoreProducts(p)) end
+s=fixture({{"AVATAR","IS","YOU"},{"ROCK","IS","YOU2"},{"AVATAR","IS","MORE"}})
+n=dual(1,0,0,1);local count=0;for _,e in pairs(n.world.entities) do if e.archetype=="avatar" then count=count+1 end end
+assert(count==5,"two inputs must not run creation twice: "..count)
+n=dual(0,0,0,0);assert(n.world.last_input=="wait")
+n=dual(0,0,0,1);assert(n.world.last_input=="move")
+local p,e=RW_PlanTurn(s.world,{type="move",player=3,dx=0,dy=0,dx2=1,dy2=1},services)
+assert(p and not p.consumes_turn and p.reason=="invalid_direction");assert(not s.world.last_input and not s.world.chance_seed)
+print("PASS: dual input blocked facing, shared destruction/creation, IDLE state and invalid direction purity")
+
+-- Execute the installed direction/been_seen collection code with host queries stubbed.
+local collect=assert(source:match("(\t\t\t\tlocal fdir = 4.-)\n\t\t\t\tfdir = 4"))
+local oracle_env=setmetatable({XPOS=1,YPOS=2},{__index=_G})
+local collect_original=assert(load("return function(players,players2,dir_,dir_2) local playerid=3; local moving_units,been_seen,empty={},{},{} "..collect.." return moving_units end","@installed_dual_collection","t",oracle_env))()
+local vectors={{1,0},{0,-1},{-1,0},{0,1},{0,0}}
+local count=0
+for mask=0,15 do for a=1,5 do for b=1,5 do
+ local w={width=20,height=15,entities={}};local first,second={},{}
+ for id=1,2 do
+  local one=math.floor(mask/2^(id-1))%2==1;local two=math.floor(mask/2^(id+1))%2==1
+  w.entities[id]={id=id,x=id*5,y=6,direction="Right",behaviors={control=one,control2=two}}
+  if one then first[#first+1]=id+10 end;if two then second[#second+1]=id+10 end
+ end
+ local all={};for _,id in ipairs(first) do all[#all+1]=id end;for _,id in ipairs(second) do all[#all+1]=id end
+ oracle_env.mmf={newObject=function(id) local u=w.entities[id-10];return {values={u.x,u.y}} end}
+ oracle_env.getname=function() return "unit" end;oracle_env.hasfeature=function() return nil end
+ oracle_env.cantmove=function() return false end;oracle_env.updatedir=function() end
+ local expected={};for _,item in ipairs(collect_original(all,second,a-1,b-1)) do expected[item.unitid-10]=vectors[item.dir+1] end
+ local plan=RW_ResolveTurn(w,{type="move",player=3,dx=vectors[a][1],dy=vectors[a][2],dx2=vectors[b][1],dy2=vectors[b][2]})
+ assert(plan.consumes_turn);local actual={};for _,op in ipairs(plan.changes) do if op.kind=="move" then actual[op.entity_id]={op.to.x-op.from.x,op.to.y-op.from.y} end end
+ for id=1,2 do local x,y=expected[id],actual[id];assert((x==nil)==(y==nil));if x then assert(x[1]==y[1] and x[2]==y[2]) end end
+ count=count+1
+end end end
+assert(count==400);print("PASS: installed simultaneous direction/seen-identity oracle (400 cases)")
+
+s=fixture({{"LEVEL","IS","YOU2"}});s.world.language.nouns.LEVEL={tag="level",block_type="level_block"}
+n=dual(1,0,0,1);assert(n.world.board_offset.x==1 and n.world.board_offset.y==0)
+n=dual(0,0,0,1);assert(not n.world.board_offset or n.world.board_offset.x==0)
+local wait_plan=assert(RW_PlanTurn(s.world,{type="wait",player=3},services))
+local waited,accepted=RW_Commit(s,wait_plan);assert(accepted.accepted and waited.world.last_input=="wait")
+assert(RW_Undo(waited).world==s.world)
+print("PASS: simultaneous scoped LEVEL first-direction preference and wait shorthand")

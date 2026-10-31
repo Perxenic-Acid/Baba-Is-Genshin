@@ -550,7 +550,7 @@ end
 -- Order: front-to-back along the movement direction.
 -- Produce one atomic plan relative to the input world.
 
-local function resolve_you_turn(world, action)
+local function resolve_you_turn(world, action, intentions)
     if type(world) ~= "table"
         or type(world.entities) ~= "table" then
         return invalid("invalid_world")
@@ -563,7 +563,7 @@ local function resolve_you_turn(world, action)
 
     local dx, dy = action.dx, action.dy
 
-    if not (
+    if not intentions and not (
         ((dx == 1 or dx == -1) and dy == 0)
         or (dx == 0 and (dy == 1 or dy == -1))
     ) then
@@ -574,7 +574,7 @@ local function resolve_you_turn(world, action)
     local controllers = {}
 
     for id, entity in pairs(world.entities) do
-        if has_capability(world, entity, "control") and not has_capability(world,entity,"sleep") then
+        if (intentions and intentions[id] or not intentions and has_capability(world, entity, "control")) and not has_capability(world,entity,"sleep") then
             controllers[#controllers + 1] = id
         end
     end
@@ -588,8 +588,11 @@ local function resolve_you_turn(world, action)
         local ea = world.entities[a]
         local eb = world.entities[b]
 
-        local pa = ea.x * dx + ea.y * dy
-        local pb = eb.x * dx + eb.y * dy
+        local da = intentions and intentions[a] or {dx,dy}
+        local db = intentions and intentions[b] or {dx,dy}
+        if intentions and da[3] ~= db[3] then return da[3] < db[3] end
+        local pa = ea.x * da[1] + ea.y * da[2]
+        local pb = eb.x * db[1] + eb.y * db[2]
 
         if pa == pb then
             return a < b
@@ -626,6 +629,8 @@ local function resolve_you_turn(world, action)
 
     for _, id in ipairs(controllers) do
         if not displaced[id] and working.entities[id] then
+            local dx,dy=dx,dy
+            if intentions then dx,dy=intentions[id][1],intentions[id][2] end
             local part = RW_ResolveMovement(
                 working,
                 {
@@ -1167,7 +1172,7 @@ local function input_control_world(world,player)
 end
 -- SELECT is not YOU: it follows traversable map objects without pushing them.
 function RW_ResolveTurn(world, action)
-    if type(action)=="table" and action.player~=nil and action.player~=1 and action.player~=2 then return invalid("invalid_player") end
+    if type(action)=="table" and action.player~=nil and action.player~=1 and action.player~=2 and action.player~=3 then return invalid("invalid_player") end
     if type(action)=="table" and action.type=="wait" then return {consumes_turn=true,changes={},reason="wait"} end
     if type(world)~="table" or type(world.entities)~="table" then return invalid("invalid_world") end
     world=input_control_world(world,type(action)=="table" and action.player or 1)
@@ -1180,14 +1185,24 @@ function RW_ResolveTurn(world, action)
         local keys={}; for key in pairs(world.empty_cells) do keys[#keys+1]=key end; table.sort(keys)
         for _,key in ipairs(keys) do
             local cell=world.empty_cells[key]
-            if cell.behaviors.control and not cell.behaviors.sleep then
+            if (cell.behaviors.control or action.player==3 and cell.behaviors.control2) and not cell.behaviors.sleep then
                 movement_world.entities[next_virtual]={id=next_virtual,kind="object",class="object",
                     x=cell.x,y=cell.y,direction="None",behaviors=cell.behaviors}
                 next_virtual=next_virtual-1
             end
         end
     end
-    local plan = resolve_you_turn(movement_world, action)
+    local intentions
+    if action.player==3 then
+        local function vector(x,y) return x==0 and y==0 or ((x==1 or x==-1) and y==0) or (x==0 and (y==1 or y==-1)) end
+        if not vector(action.dx,action.dy) or not vector(action.dx2,action.dy2) then return invalid("invalid_direction") end
+        intentions={}
+        for id,e in pairs(movement_world.entities) do
+            if has_capability(movement_world,e,"control") and (action.dx~=0 or action.dy~=0) then intentions[id]={action.dx,action.dy,1}
+            elseif has_capability(movement_world,e,"control2") and (action.dx2~=0 or action.dy2~=0) then intentions[id]={action.dx2,action.dy2,2} end
+        end
+    end
+    local plan = resolve_you_turn(movement_world, action, intentions)
     local real={}; for _,change in ipairs(plan.changes) do if change.entity_id > 0 then real[#real+1]=change end end
     plan.changes=real
     if not plan.consumes_turn then return plan end
@@ -1196,7 +1211,7 @@ function RW_ResolveTurn(world, action)
     local selected = false
     local destroyed={};for _,death in ipairs(plan.destructions or {}) do destroyed[death.entity_id]=true end
     for id, entity in pairs(world.entities) do
-        if not destroyed[id] and has_capability(world, entity, "select") and not has_capability(world,entity,"sleep") then
+        if (action.dx~=0 or action.dy~=0) and not destroyed[id] and has_capability(world, entity, "select") and not has_capability(world,entity,"sleep") then
             selected = true
             local dx,dy=reverse_vector(world,entity,action.dx,action.dy)
             local x, y = entity.x + dx, entity.y + dy
@@ -1222,7 +1237,7 @@ function RW_ResolveTurn(world, action)
     for _,trait in ipairs(world.level_traits or {}) do if trait=="reverse" then level_count=level_count+1 end end
     local level_dx,level_dy=action.dx,action.dy
     if level_count%2==1 then level_dx,level_dy=-level_dx,-level_dy end
-    if world.level_behaviors and world.level_behaviors.control and not world.level_behaviors.sleep
+    if (action.dx~=0 or action.dy~=0) and world.level_behaviors and (world.level_behaviors.control or action.player==3 and world.level_behaviors.control2) and not world.level_behaviors.sleep
         and not world.level_behaviors.still
         and not world.level_behaviors[action.dx==1 and "lockedright" or action.dx==-1 and "lockedleft" or action.dy==-1 and "lockedup" or "lockeddown"] then
         local current = world.board_offset or {x=0,y=0,direction="None"}

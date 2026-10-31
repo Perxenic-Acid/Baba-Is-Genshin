@@ -579,3 +579,16 @@ nonbouncing AUTO, duplicate impulses, common movement/destruction and atomic Und
 576 installed collection/guard oracle cases plus native-pipeline simulations and
 scoped AUTO_ON count checks. AUTO remains explicitly partial: next is LEVEL AUTO
 queued input/pulses and simultaneous YOU/YOU2. BACK and REVERT also remain pending.
+
+
+## M9.6G — dual-channel scheduled input
+
+Added simultaneous player=3 per-channel cardinal/wait vectors, no fallback,
+first-channel root precedence, virtual-cell intents, shared collision/death frame
+planning, scoped LEVEL first-direction semantics and SELECT separation. Both
+channels share one conversion/contact/creation transaction and one input/chance
+advance/Undo. Both waits record IDLE. Installed movement.lua direction/seen-ID
+collection oracle covers 400 combinations; phase tests cover blocked facing,
+mutual contact, MORE once, invalid vector purity and Undo. Full original collision
+scheduler and duplicate pre-collision facing writes remain shared parity gaps.
+LEVEL AUTO command queuing/pulses remain next; no native timer is claimed.

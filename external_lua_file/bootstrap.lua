@@ -179,9 +179,17 @@ function RW_PlanInitializedCreation(world,specifications,rules,services)
     return plan
 end
 
+local function turn_input_type(action)
+    if action.player==3 and action.dx==0 and action.dy==0 and action.dx2==0 and action.dy2==0 then return "wait" end
+    return action.type
+end
 local function valid_turn_action(action)
-    if type(action)~="table" or (action.player~=nil and action.player~=1 and action.player~=2) then return false end
+    if type(action)~="table" or (action.player~=nil and action.player~=1 and action.player~=2 and action.player~=3) then return false end
     if action.type=="wait" then return true end
+    if action.player==3 then
+        local function vector(x,y) return x==0 and y==0 or ((x==1 or x==-1) and y==0) or (x==0 and (y==1 or y==-1)) end
+        return action.type=="move" and vector(action.dx,action.dy) and vector(action.dx2,action.dy2)
+    end
     return action.type=="move" and ((action.dx==1 or action.dx==-1) and action.dy==0
         or (action.dy==1 or action.dy==-1) and action.dx==0)
 end
@@ -201,7 +209,7 @@ local function plan_turn(world, action, services, initial_frame)
     if type(world) ~= "table" or type(world.entities) ~= "table" then
         return fail("input", "invalid_world")
     end
-    if type(action)=="table" and action.player~=nil and action.player~=1 and action.player~=2 then return fail("input","invalid_player") end
+    if type(action)=="table" and action.player~=nil and action.player~=1 and action.player~=2 and action.player~=3 then return fail("input","invalid_player") end
     if type(services) ~= "table" then
         return fail("input", "invalid_services")
     end
@@ -815,7 +823,7 @@ function RW_PlanTurn(world,action,services)
         return plan_turn(world,action,services)
     end
     local context={};for k,v in pairs(world) do context[k]=v end
-    context.last_input=action.type
+    context.last_input=turn_input_type(action)
     context.chance_seed=((world.chance_seed or 1)*48271)%2147483647
     local status,initial_frame
     if not world.infinite_loop and not world.too_complex and type(services)=="table"
@@ -846,7 +854,7 @@ function RW_PlanTurn(world,action,services)
             plan.stages,plan.changes=stages,changes
         end
         local first=plan.stages and plan.stages[1].plan or plan
-        if world.last_input~=action.type then first.input_state={from=world.last_input or "none",to=action.type} end
+        if world.last_input~=turn_input_type(action) then first.input_state={from=world.last_input or "none",to=turn_input_type(action)} end
         first.chance_state={from=world.chance_seed or 1,to=context.chance_seed}
         if status then
             local verified,why,phase=services.preview(world,plan)
@@ -917,7 +925,7 @@ function RW_PlanLevelAction(tree, action, services)
     local input_world=session.world
     if action.type=="move" or action.type=="wait" then
         input_world={};for k,v in pairs(session.world) do input_world[k]=v end
-        input_world.last_input=action.type
+        input_world.last_input=turn_input_type(action)
         input_world.chance_seed=((session.world.chance_seed or 1)*48271)%2147483647
     end
     local effects, err, initial_conversions = services.evaluate(input_world)
@@ -2162,7 +2170,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6F initialized")
+    print("[RuleWorld] M9.6G initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

@@ -28,8 +28,8 @@ statusblock(). Querying counts has no input, RNG, history or host timing effects
 LEVEL AUTO input queuing and command_auto pulse execution remain pending. Original
 normal commands save direction instead of moving when AUTO_ON > 0; each native pulse
 executes AUTO_ON turns using both queued player directions, defaults absent channels
-to wait, then clears auto_dir. This requires the simultaneous playerid=3 path noted
-in YOU2.md, plus explicit queue/pulse transactions. The current native adapter still
+to wait, then clears auto_dir. The simultaneous playerid=3 prerequisite is implemented in M9.6G (YOU2.md);
+explicit queue/pulse transactions remain pending. The current native adapter still
 executes normal inputs immediately, and no real-time AUTO timer is bound. The audit
 marks AUTO partial rather than complete. Do not infer timed-mode success from the
 unit-motion tests or a registered Text word.

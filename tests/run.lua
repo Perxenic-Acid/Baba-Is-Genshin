@@ -507,3 +507,5 @@ dofile("tests/broken_integration.lua")
 dofile("tests/you2.lua")
 
 dofile("tests/chill.lua")
+
+dofile("tests/presentation_words.lua")

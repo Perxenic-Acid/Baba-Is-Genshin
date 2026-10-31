@@ -535,3 +535,11 @@ reverses on blockage and respects sleep/locks. Random state survives scheduler
 stages, Preview/Commit/Undo and RNG-only turns. Installed collection oracle: 384
 cases. Virtual EMPTY/scoped LEVEL and exact original unitlist scheduling remain
 recorded in CHILL.md. Thirteen official catalog properties remain pending.
+
+## M9.6B — presentation-only property rule support
+
+ANGRY/HAPPY/SAD/WONDER/BEST/PET/PARTY have real compiler/property capabilities and
+an original-source-checked pure effect catalog. Conditions, FEELING, MIMIC, stacking,
+NOT and BROKEN are exercised. Native particle playback and timing remain frontend
+work, explicitly distinguished in the catalog audit. Remaining property backends:
+AUTO, BACK, BONUS, DONE, END, REVERT; letters/3D/frontend/level design stay deferred.

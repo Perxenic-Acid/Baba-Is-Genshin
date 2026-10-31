@@ -80,10 +80,10 @@ A pending word is not complete merely because its name could be stored as a Text
 | prefix | POWERED3 | implemented within documented scope |
 | prefix | SELDOM | implemented within documented scope |
 | property | 3D | excluded by user request |
-| property | ANGRY | pending |
+| property | ANGRY | rule capability/catalog implemented; frontend deferred |
 | property | AUTO | pending |
 | property | BACK | pending |
-| property | BEST | pending |
+| property | BEST | rule capability/catalog implemented; frontend deferred |
 | property | BLACK | implemented within documented scope |
 | property | BLUE | implemented within documented scope |
 | property | BONUS | pending |
@@ -104,7 +104,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | FLOAT | implemented within documented scope |
 | property | GREEN | implemented within documented scope |
 | property | GREY | implemented within documented scope |
-| property | HAPPY | pending |
+| property | HAPPY | rule capability/catalog implemented; frontend deferred |
 | property | HIDE | implemented within documented scope |
 | property | HOLD | implemented within documented scope |
 | property | HOT | implemented within documented scope |
@@ -123,8 +123,8 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | NUDGEUP | implemented within documented scope |
 | property | OPEN | implemented within documented scope |
 | property | ORANGE | implemented within documented scope |
-| property | PARTY | pending |
-| property | PET | pending |
+| property | PARTY | rule capability/catalog implemented; frontend deferred |
+| property | PET | rule capability/catalog implemented; frontend deferred |
 | property | PHANTOM | implemented within documented scope |
 | property | PINK | implemented within documented scope |
 | property | POWER | implemented within documented scope |
@@ -138,7 +138,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | REVERT | pending |
 | property | RIGHT | implemented within documented scope |
 | property | ROSY | implemented within documented scope |
-| property | SAD | pending |
+| property | SAD | rule capability/catalog implemented; frontend deferred |
 | property | SAFE | implemented within documented scope |
 | property | SELECT | implemented within documented scope |
 | property | SHIFT | implemented within documented scope |
@@ -155,7 +155,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | WEAK | implemented within documented scope |
 | property | WHITE | implemented within documented scope |
 | property | WIN | implemented within documented scope |
-| property | WONDER | pending |
+| property | WONDER | rule capability/catalog implemented; frontend deferred |
 | property | WORD | implemented within documented scope |
 | property | YELLOW | implemented within documented scope |
 | property | YOU | implemented within documented scope |

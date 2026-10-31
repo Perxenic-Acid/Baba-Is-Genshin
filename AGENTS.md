@@ -428,3 +428,8 @@
   Duplicate CHILL grants and MOVE share final facing/impulse counts. Carry automatic
   random_state through scheduled stage plans, including RNG-only turns and Undo.
   EMPTY/scoped LEVEL and original mutable scheduling remain gaps; see CHILL.md.
+
+- ANGRY/HAPPY/SAD/WONDER/BEST/PET/PARTY are independent queryable rule capabilities.
+  RW_GetPresentationEffectCatalog is a pure cloned original-effect description;
+  no simulation RNG or persisted emitters. Native particle timing/placement and
+  duplicate-declaration emission remain frontend work; see PRESENTATION_WORDS.md.

@@ -36,6 +36,18 @@ local function colour_filters(behaviors)
     end end
     return filters
 end
+-- Presentation-only words still participate in ordinary rule/property queries.
+local PRESENTATION_EFFECTS={
+    {name="best",particle="unlock",count=6,chance=30,timing=2,palette={2,4}},
+    {name="wonder",particle="wonder",count=1,chance=10,timing=5,palette={0,3}},
+    {name="sad",particle="tear",count=1,chance=2,timing=20,palette={3,2}},
+    {name="pet",particle="pet",count=1,chance=0,timing=50,palette={3,1},special="nojitter",follow=true},
+    {name="angry",particle="angry",count=1,chance=10,timing=5,palette={2,2}},
+    {name="happy",particle="happy",count=1,chance=10,timing=5,palette={5,4}},
+    {name="party",particle="confetti",count=6,trigger="short_effect",xvel={-20,20},yvel={-25,-10},
+        palettes={{1,4},{2,2},{2,4},{4,1},{5,3}}}
+}
+function RW_GetPresentationEffectCatalog() return clone(PRESENTATION_EFFECTS) end
 local BEHAVIORS = {
     power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
@@ -44,6 +56,7 @@ local BEHAVIORS = {
     you = {control = true}, you2 = {control2 = true}, select = {select = true}, path = {select_path = true},
     hold = {hold = true}, boom = {boom = true}, tele = {tele = true}, more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
+for _,effect in ipairs(PRESENTATION_EFFECTS) do BEHAVIORS[effect.name]={[effect.name]=true} end
 for _,colour in ipairs(COLOUR_FILTERS) do BEHAVIORS[colour[1]]={[colour[1]]=true} end
 -- Private fixed vocabulary: custom trait aliases may only map implemented capabilities.
 local CAPABILITIES={}

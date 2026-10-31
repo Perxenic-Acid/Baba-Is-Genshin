@@ -392,3 +392,9 @@
   before POWER publication. Preserve concrete Level-block raw declarations and
   saved status; do not synthesize a virtual entity. Conditional scoped surroundings
   remain deferred, never approximate them using a physical entrance. See BROKEN.md.
+
+- Birth initialization may return nil, compile-limit reason, ordered product prefix
+  through its triggering newborn. MORE/MAKE use RW_PlanInitializedCreation to commit
+  that prefix and stop later phases with a top-level only-Undo terminal flag. Other
+  errors reject atomically. HAS/conversion prefix propagation remains pending;
+  preserve input/RNG/allocator Undo and never silently ignore the limit diagnostic.

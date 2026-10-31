@@ -233,3 +233,27 @@ Tests cover grant/deny and ordering, WIN/DEFEAT, ROCK/TEXT conversions, identity
 protection, HOLD and POWER, physical-block status, actual tree outcomes and Undo.
 An installed testcond adapter verifies the virtual LEVEL query branch and bypass;
 its isitbroken result is controlled, so this is not a full surroundings oracle.
+
+## MORE/MAKE creation limits (M9.5V)
+
+Installed syntax.lua:82-86 registers the newborn with broken=0 before statusblock.
+A status recursion limit therefore occurs after that product exists. The birth
+initializer now returns a third diagnostic result on compile limits only: ordered
+product specifications through the triggering newborn. Earlier initialized status
+is preserved; the triggering newborn retains its initial zero status, later products
+are absent. Inputs, IDs and RNG are never mutated while producing this prefix.
+
+RW_PlanInitializedCreation converts this result into an atomic terminal creation
+plan for native MORE/MAKE. Their scheduler slots append the creation stage, propagate
+INFINITE LOOP/TOO COMPLEX to the whole transaction and stop before later phases or
+compilation. Commit/Undo includes earlier movement/contact stages, allocated IDs,
+input/chance metadata and MAKE's already planned RNG transition. This adapter does
+not claim the same host RNG draw sequence as original per-product creation.
+Non-limit errors still reject; malformed prefix products still undergo normal
+creation validation. HAS/movement-death and conversion terminal-prefix propagation
+remain pending and must not be claimed complete. Public BROKEN stays unregistered.
+
+Tests construct 83 distinct nested FEELING declarations to trigger the production
+80-query guard (not an injected error), verify prefix products and allocator purity,
+and exercise both scheduler slots, terminal lockout, RNG and Undo. An injected
+complexity limit separately verifies TOO COMPLEX classification.

@@ -1276,7 +1276,14 @@ function RW_InitializeBirthSpecifications(world,specifications,generated_rules)
         if context.entities[entity.id] then return nil,"birth_status_id_collision" end
         context.entities[entity.id]=entity
         local active,err=query_trait(context,entity,"broken")
-        if active==nil then return nil,err end
+        if active==nil then
+            if err=="word_rule_limit" or err=="word_rule_cycle" or err=="rule_complexity_limit" then
+                -- addunit already exists when its statusblock reaches the limit.
+                product.broken=nil;initialized[#initialized+1]=product
+                return nil,err,initialized
+            end
+            return nil,err
+        end
         entity.broken=active and 1 or 0
         product.broken=active and 1 or nil
         initialized[#initialized+1]=product

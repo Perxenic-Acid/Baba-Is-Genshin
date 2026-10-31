@@ -489,3 +489,10 @@ Raw LEVEL BROKEN/NOT BROKEN gates scoped commands before outcome/conversion/HOLD
 and POWER publication. Physical Level blocks keep independent saved status.
 Compiler, installed virtual-query and tree Undo regressions cover this scope.
 Conditional surroundings and remaining lifecycle gaps stay documented; see BROKEN.md.
+
+## M9.5V — MORE/MAKE birth-status terminal preservation
+
+Recursive status limits preserve products through the triggering newborn and stop
+later phases. Atomic Commit/Undo retains allocator, input and planned RNG changes.
+Real nested FEELING queries exercise the guard; HAS/conversion propagation remains
+pending alongside other BROKEN gaps. See BROKEN.md.

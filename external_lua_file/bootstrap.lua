@@ -128,6 +128,19 @@ local function lock_compile_failure(plan, reason)
     if reason == "rule_complexity_limit" then plan.too_complex=true;plan.reason="too_complex"
     else plan.infinite_loop=true;plan.reason="infinite_loop" end
 end
+-- MORE/MAKE creation preserves the installed addunit-before-status order on a
+-- recursion limit. Ordinary errors still reject without a partial creation plan.
+function RW_PlanInitializedCreation(world,specifications,rules,services)
+    local initialized,why,prefix=services.initialize(world,specifications,rules)
+    local terminal=not initialized and prefix and
+        (why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit")
+    if not initialized and not terminal then return nil,why end
+    local plan,err=services.create(world,initialized or prefix)
+    if not plan then return nil,err end
+    if terminal then lock_compile_failure(plan,why) end
+    return plan
+end
+
 local function valid_turn_action(action)
     if type(action)~="table" then return false end
     if action.type=="wait" then return true end
@@ -397,6 +410,10 @@ local function plan_turn(world, action, services, initial_frame)
         plan.stages[#plan.stages+1]={name="more",plan=more}
         for _,change in ipairs(more.changes) do plan.changes[#plan.changes+1]=change end
         complete=after;trace[#trace+1]="more"
+        if more.infinite_loop or more.too_complex then
+            plan.infinite_loop,plan.too_complex,plan.reason=more.infinite_loop,more.too_complex,more.reason
+            return plan,nil,trace
+        end
     end
     if services.tele then
         local frame=more_frame
@@ -542,6 +559,10 @@ local function plan_turn(world, action, services, initial_frame)
                 plan.stages[#plan.stages+1]={name="make",plan=creation}
                 for _,change in ipairs(creation.changes) do plan.changes[#plan.changes+1]=change end
                 complete=next_world;trace[#trace+1]="make"
+                if creation.infinite_loop or creation.too_complex then
+                    plan.infinite_loop,plan.too_complex,plan.reason=creation.infinite_loop,creation.too_complex,creation.reason
+                    return plan,nil,trace
+                end
             end
         end
         -- CRASH is checked on surviving units after destruction, against the frozen rules.
@@ -1338,9 +1359,9 @@ local function start(run_self_tests)
     turn_services.more=function(world,projected,rules)
         local products,why=properties_api:Invoke("RW_ResolveMoreProducts",projected)
         if not products then return nil,why end
-        products,why=rules_api:Invoke("RW_InitializeBirthSpecifications",world,products,rules)
-        if not products then return nil,why end
-        return world_api:Invoke("RW_PlanCreate",world,products)
+        return RW_PlanInitializedCreation(world,products,rules,{
+            initialize=function(w,p,r) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r) end,
+            create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end})
     end
     turn_services.play=function(world,relations) return rules_api:Invoke("RW_ResolvePlayEvents",world,relations) end
     turn_services.hold=function(world) return movement_api:Invoke("RW_ResolveHold",world) end
@@ -1355,9 +1376,10 @@ local function start(run_self_tests)
     end
     turn_services.make=function(world,relations,converted,rules)
         local products,rng=rules_api:Invoke("RW_PlanMakeProducts",world,relations,converted)
-        local why;products,why=rules_api:Invoke("RW_InitializeBirthSpecifications",world,products,rules)
-        if not products then return nil,why end
-        local creation,why=world_api:Invoke("RW_PlanCreate",world,products)
+        if not products then return nil,rng end
+        local creation,why=RW_PlanInitializedCreation(world,products,rules,{
+            initialize=function(w,p,r) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r) end,
+            create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end})
         if not creation then return nil,why end
         creation.random_state=rng
         return creation
@@ -1928,7 +1950,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5U initialized")
+    print("[RuleWorld] M9.5V initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

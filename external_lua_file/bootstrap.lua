@@ -1083,6 +1083,66 @@ function RW_PlanLevelAction(tree, action, services)
         outcome_diagnostic=outcome_diagnostic,events=turn.events}
 end
 
+-- Clock-independent AUTO command collection. The adapter decides when a pulse
+-- happens; no host time, RNG or UI state is consumed by planning.
+local function auto_frame(tree,services)
+    local session=services.active(tree)
+    if session.world.infinite_loop then return nil,"infinite_loop_undo_only" end
+    if session.world.too_complex then return nil,"too_complex_undo_only" end
+    local effects,why,commands,rules=services.evaluate(session.world)
+    if not effects then return nil,why end
+    local projected,why=services.project(session.world,effects,level_traits_from(commands))
+    if not projected then return nil,why end
+    if session.defeated and #services.selectors(projected)==0 then return nil,"level_defeated_undo_only" end
+    local count=services.auto_count(projected)
+    return {count=count,rules=rules or {},select_after_defeat=session.defeated==true}
+end
+local function input_direction(action)
+    if action.type=="wait" then return 4 end
+    if action.dx==1 then return 0 elseif action.dy==-1 then return 1 elseif action.dx==-1 then return 2 else return 3 end
+end
+function RW_PlanAutoCommand(tree,action,services)
+    if type(action)~="table" then return nil,{reason="invalid_action"} end
+    if action.type~="move" and action.type~="wait" then return RW_PlanLevelAction(tree,action,services) end
+    if not valid_turn_action(action) or action.player==3 then return nil,{reason="invalid_auto_command"} end
+    local frame,why=auto_frame(tree,services);if not frame then return nil,{reason=why} end
+    local queue={};for k,v in pairs(tree.auto_input or {}) do queue[k]=v end
+    local player=action.player or 1;queue[player]=input_direction(action)
+    if frame.count>0 and queue[1]==nil then
+        -- featureindex checks declaration presence, not qualifying YOU2 units.
+        local you2=false
+        for _,rule in ipairs(frame.rules) do for _,effect in ipairs(rule.effects or {}) do
+            if effect.trait=="you2" then you2=true end
+        end end
+        if not you2 then queue[1]=queue[player] end
+    end
+    if frame.count==0 then
+        local plan,why=RW_PlanLevelAction(tree,action,services);if not plan then return nil,why end
+        local after={};for k,v in pairs(plan.after) do after[k]=v end
+        after.auto_input=queue;plan.after=after;return plan
+    end
+    local after={};for k,v in pairs(tree) do after[k]=v end;after.auto_input=queue
+    return {kind="auto_input",before=tree,after=after,reason="auto_input",changes={},select_after_defeat=frame.select_after_defeat}
+end
+function RW_PlanAutoPulse(tree,services)
+    local frame,why=auto_frame(tree,services);if not frame then return nil,{reason=why} end
+    local vectors={{1,0},{0,-1},{-1,0},{0,1},{0,0}}
+    local queue=tree.auto_input or {};local a,b=vectors[(queue[1] or 4)+1],vectors[(queue[2] or 4)+1]
+    local current=tree;local turns,events={},{}
+    for i=1,frame.count do
+        local plan,why=RW_PlanLevelAction(current,{type="move",player=3,dx=a[1],dy=a[2],dx2=b[1],dy2=b[2]},services)
+        if not plan then return nil,why end
+        turns[#turns+1]=plan
+        for _,event in ipairs(plan.events or {}) do events[#events+1]=event end
+        local previous_id=current.active_id;current=plan.after
+        local session=services.active(current)
+        if session.world.infinite_loop or session.world.too_complex or session.defeated or current.active_id~=previous_id then break end
+    end
+    local after={};for k,v in pairs(current) do after[k]=v end;after.auto_input={}
+    return {kind=#turns==0 and "auto_input" or nil,before=tree,after=after,reason="auto_pulse",
+        changes={},pulse_turns=turns,events=events,select_after_defeat=frame.select_after_defeat}
+end
+
 -- Host confirmation entry point, shared with the F interaction binding.
 local confirm_selected_level, choose_selected_level = nil, nil
 function RW_ConfirmSelectedLevel()
@@ -2170,7 +2230,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6G initialized")
+    print("[RuleWorld] M9.6H initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

@@ -592,3 +592,16 @@ collection oracle covers 400 combinations; phase tests cover blocked facing,
 mutual contact, MORE once, invalid vector purity and Undo. Full original collision
 scheduler and duplicate pre-collision facing writes remain shared parity gaps.
 LEVEL AUTO command queuing/pulses remain next; no native timer is claimed.
+
+
+## M9.6H — AUTO pure queue and pulse transactions
+
+Implemented tree-owned channel queues with isolated queue-only validated commits,
+original declaration-presence fallback, immediate non-AUTO commands and count-zero
+clearing. Pure pulses use fixed initial scoped multiplicity and existing dual
+turn plans, aggregate events and commit one whole-tree Undo transaction. Queueing
+never advances input/chance/RNG/status or history. CRASH/complexity retain their
+triggering prefix; ordinary late failure rejects the entire pulse. Added 60
+installed syntax.lua command/command_auto adapter cases plus queue, weighted dual
+movement, wait, stale/invalid commit, terminal and rollback tests. Native routing/
+clock and exact deferred boundary/result ordering remain explicit AUTO gaps.

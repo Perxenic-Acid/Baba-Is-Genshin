@@ -92,3 +92,107 @@ for count=0,6 do local env={generaldata5={values={}},AUTO_ON="auto",featureindex
  assert(load(assignment,"installed scoped AUTO count","t",env))();assert(RW_GetAutoTurnCount({},(function() local t={};for i=1,count do t[i]="auto" end;return t end)())==env.generaldata5.values.auto)
 end
 print("PASS: AUTO nonbouncing weighted motion, MOVE/CHILL precedence, PUSH/WEAK/HAS/status/conditions/Undo, scoped count and "..cases.." installed collection/guard oracle cases")
+
+-- Pure clock input collection and whole-tree pulse transactions.
+local nav={};for k,v in pairs(services) do nav[k]=v end
+nav.active=RW_GetActiveLevel;nav.update=RW_UpdateActiveLevel;nav.enter=RW_EnterLevel;nav.return_level=RW_ReturnLevel
+nav.selectors=RW_LevelSelectorIDs;nav.place_selectors=RW_PlaceLevelSelectors;nav.bind_entry=RW_BindLevelEntry
+nav.commit_session=RW_Commit;nav.outcome=RW_RecordLevelOutcome;nav.candidates=RW_LevelSelectionCandidates
+nav.win=RW_HasWinContact;nav.level_outcome=RW_ResolveLevelPropertyOutcome;nav.auto_count=RW_GetAutoTurnCount
+local function tree_for(rows)
+ local s=fixture(rows);return assert(RW_CreateLevelTree({root=assert(RW_CreateLevelDefinition("root",s.world))},"root"))
+end
+local function command(t,a)
+ local p,e=RW_PlanAutoCommand(t,a,nav);assert(p,e and e.reason)
+ local n,r;if p.kind=="auto_input" then n,r=RW_CommitAutoInput(t,p) else n,r=RW_CommitLevelTree(t,p) end
+ assert(r.accepted,r.reason);return n,p
+end
+local function pulse(t)
+ local p,e=RW_PlanAutoPulse(t,nav);assert(p,e and e.reason)
+ local n,r;if p.kind=="auto_input" then n,r=RW_CommitAutoInput(t,p) else n,r=RW_CommitLevelTree(t,p) end
+ assert(r.accepted,r.reason);return n,p
+end
+local t=tree_for({{"LEVEL","IS","AUTO"},{"LEVEL","IS","AUTO"},{"AVATAR","IS","YOU"},{"ROCK","IS","YOU2"}})
+local original=t;local base=RW_GetActiveLevel(t).world
+local queued,qp=command(t,{type="move",dx=1,dy=0})
+assert(queued.auto_input[1]==0 and not queued.auto_input[2]);assert(RW_GetActiveLevel(queued).world==base and #queued.history==0)
+queued=command(queued,{type="move",dx=0,dy=-1,player=2});assert(queued.auto_input[2]==1)
+local finished,pp=pulse(queued);local w=RW_GetActiveLevel(finished).world
+assert(#pp.pulse_turns==2 and w.entities[1].x==14 and w.entities[2].y==16)
+assert(w.chance_seed==48271*48271%2147483647 and #finished.history==1 and next(finished.auto_input)==nil)
+local restored=RW_UndoLevelTree(finished);assert(RW_GetActiveLevel(restored).world==base and restored.auto_input[1]==0 and restored.auto_input[2]==1)
+assert(original.auto_input==nil and base.last_input==nil)
+-- Last direction replaces its own channel; waiting is an explicit stored input.
+queued=command(queued,{type="wait",player=1});assert(queued.auto_input[1]==4 and queued.auto_input[2]==1)
+finished=pulse(queued);assert(RW_GetActiveLevel(finished).world.entities[1].x==12)
+t=tree_for({{"LEVEL","IS","AUTO"},{"AVATAR","IS","YOU"}})
+queued=command(t,{type="move",dx=0,dy=1,player=2});assert(queued.auto_input[1]==3 and queued.auto_input[2]==3)
+finished=pulse(queued);assert(RW_GetActiveLevel(finished).world.entities[1].y==19)
+-- Conditional/negative YOU2 declaration presence prevents primary copying.
+for _,row in ipairs({{"ROCK","ON","FLAG","IS","YOU2"},{"ROCK","IS","NOT","YOU2"}}) do
+ t=tree_for({{"LEVEL","IS","AUTO"},{"AVATAR","IS","YOU"},row})
+ queued=command(t,{type="move",dx=0,dy=1,player=2});assert(queued.auto_input[1]==nil and queued.auto_input[2]==3)
+ finished=pulse(queued);assert(RW_GetActiveLevel(finished).world.entities[1].y==18)
+end
+-- Empty pulse waits but advances automatic motion; no queued state leaks to the next pulse.
+t=tree_for({{"LEVEL","IS","AUTO"},{"AVATAR","IS","AUTO"}})
+finished=pulse(t);assert(RW_GetActiveLevel(finished).world.entities[1].x==13 and RW_GetActiveLevel(finished).world.last_input=="wait")
+local second=pulse(finished);assert(RW_GetActiveLevel(second).world.entities[1].x==14)
+-- Without clock input is immediate, still remembered until command_auto clears it.
+t=tree_for({{"AVATAR","IS","YOU"}});queued=command(t,{type="move",dx=1,dy=0})
+assert(RW_GetActiveLevel(queued).world.entities[1].x==13 and #queued.history==1 and queued.auto_input[1]==0)
+finished,pp=pulse(queued);assert(#pp.pulse_turns==0 and #finished.history==1 and next(finished.auto_input)==nil)
+-- Queue commits cannot alter any other tree fact or bypass terminal locks.
+t=tree_for({{"LEVEL","IS","AUTO"}});local plan=assert(RW_PlanAutoCommand(t,{type="wait"},nav))
+local bad={};for k,v in pairs(plan) do bad[k]=v end;bad.after={};for k,v in pairs(plan.after) do bad.after[k]=v end;bad.after.bonus_count=100
+local _,r=RW_CommitAutoInput(t,bad);assert(not r.accepted)
+local other=command(t,{type="wait"});_,r=RW_CommitAutoInput(other,plan);assert(not r.accepted)
+plan.after.auto_input={[3]=0};_,r=RW_CommitAutoInput(t,plan);assert(not r.accepted)
+t.instances[t.active_id].world.infinite_loop=true
+local no,e=RW_PlanAutoPulse(t,nav);assert(not no and e.reason=="infinite_loop_undo_only")
+_,r=RW_CommitAutoInput(t,plan);assert(not r.accepted and r.reason=="infinite_loop_undo_only")
+print("PASS: AUTO queue isolation/replacement/fallback, weighted dual pulses, RNG/input/history/Undo, no-clock clearing and guarded queue Commit")
+
+-- Run installed command()/command_auto() unchanged with native calls captured.
+local file=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/syntax.lua]],"rb"));local syntax=file:read("*a");file:close()
+local original_commands=assert(syntax:match("(function command%(key,player_%).-)\nfunction dolog"))
+local cases=0
+for count=0,2 do for second_channel=0,1 do for dir=0,4 do for player=1,2 do
+ local rows={{"AVATAR","IS","YOU"}};for i=1,count do rows[#rows+1]={"LEVEL","IS","AUTO"} end
+ if second_channel==1 then rows[#rows+1]={"ROCK","IS","YOU2"} end
+ local t=tree_for(rows);local calls={};local env=setmetatable({keys={test=dir},auto_dir={},AUTO_ON="auto",VISION="vision",
+  generaldata5={values={auto=count}},spritedata={values={vision=0}},featureindex=second_channel==1 and {you2={}} or {},
+  ndirs={{1,0},{0,-1},{-1,0},{0,1},{0,0}},do_mod_hook=function() end,dolog=function() end,MF_update=function() end,
+  movecommand=function(x,y,d,p,d2) calls[#calls+1]={x,y,d,p,d2} end},{__index=_G})
+ assert(load(original_commands,"@installed_AUTO_commands","t",env))()
+ local v=env.ndirs[dir+1];local action=dir==4 and {type="wait",player=player} or {type="move",dx=v[1],dy=v[2],player=player}
+ env.command("test",player);local queued=command(t,action)
+ for p=1,2 do assert(queued.auto_input[p]==env.auto_dir[p],"installed AUTO queue mismatch") end
+ local immediate=calls;calls={};env.command_auto();local finished,plan=pulse(queued)
+ assert(#plan.pulse_turns==#calls and next(finished.auto_input)==nil)
+ local expected={{12,18},{13,18}}
+ for _,list in ipairs({immediate,calls}) do for _,call in ipairs(list) do
+  local function move(id,d) local v=env.ndirs[d+1];expected[id][1]=expected[id][1]+v[1];expected[id][2]=expected[id][2]+v[2] end
+  if call[4]==1 then move(1,call[3])
+  elseif call[4]==2 then move(second_channel==1 and 2 or 1,call[3])
+  else assert(call[4]==3);move(1,call[3]);if second_channel==1 then move(2,call[5]) end end
+ end end
+ local actual=RW_GetActiveLevel(finished).world
+ for id=1,2 do assert(actual.entities[id].x==expected[id][1] and actual.entities[id].y==expected[id][2],"installed AUTO command direction mismatch") end
+ cases=cases+1
+end end end end
+assert(cases==60)
+print("PASS: installed command/command_auto queue and pulse-count oracle (60 cases)")
+
+t=tree_for({{"LEVEL","IS","AUTO"},{"LEVEL","IS","AUTO"},{"AVATAR","IS","CRASH"}})
+queued=command(t,{type="move",dx=1,dy=0})
+finished,pp=pulse(queued);assert(#pp.pulse_turns==1 and RW_GetActiveLevel(finished).world.infinite_loop)
+restored=RW_UndoLevelTree(finished);assert(not RW_GetActiveLevel(restored).world.infinite_loop and restored.auto_input[1]==0)
+-- A late nonterminal planning failure rejects the entire pulse, including prior turns.
+t=tree_for({{"LEVEL","IS","AUTO"},{"LEVEL","IS","AUTO"},{"AVATAR","IS","YOU"}})
+queued=command(t,{type="move",dx=1,dy=0});base=RW_GetActiveLevel(queued).world
+local failing={};for k,v in pairs(nav) do failing[k]=v end;local calls=0
+failing.resolve=function(w,a) calls=calls+1;if calls==2 then return {consumes_turn=false,changes={},reason="test_late_failure"} end;return nav.resolve(w,a) end
+local rejected,why=RW_PlanAutoPulse(queued,failing);assert(not rejected and why.reason=="test_late_failure")
+assert(RW_GetActiveLevel(queued).world==base and base.entities[1].x==12 and #queued.history==0 and queued.auto_input[1]==0)
+print("PASS: AUTO triggering CRASH pulse prefix/Undo and atomic late failure")

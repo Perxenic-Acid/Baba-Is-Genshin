@@ -1318,7 +1318,17 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
     return result
 end
 
+local function valid_auto_input(queue)
+    if queue==nil then return true end
+    if type(queue)~="table" then return false end
+    for player,dir in pairs(queue) do
+        if (player~=1 and player~=2) or not is_integer(dir) or dir<0 or dir>4 then return false end
+    end
+    return true
+end
+
 local function valid_tree_candidate(tree)
+    if type(tree)~="table" or not valid_auto_input(tree.auto_input) then return false end
     if type(tree)=="table" and tree.ending~=nil then
         local ending=tree.ending
         local function valid_point(p)
@@ -1381,6 +1391,23 @@ function RW_CommitLevelTree(tree, plan)
     if #result.history >= HISTORY_LIMIT then table.remove(result.history,1) end
     result.history[#result.history+1] = snapshot
     return result, {accepted=true,changed=true,reason=plan.reason,changes=plan.changes or {}}
+end
+
+-- Input collection changes only the immutable queue, not gameplay or Undo history.
+-- A separate commit surface prevents arbitrary tree plans from bypassing history.
+function RW_CommitAutoInput(tree,plan)
+    local active=RW_GetActiveLevel(tree)
+    if active.world.infinite_loop then return tree,rejected("infinite_loop_undo_only") end
+    if active.world.too_complex then return tree,rejected("too_complex_undo_only") end
+    if active.defeated and not (type(plan)=="table" and plan.select_after_defeat) then return tree,rejected("level_defeated_undo_only") end
+    if type(plan)~="table" or plan.kind~="auto_input" or plan.before~=tree
+        or type(plan.after)~="table" or not valid_auto_input(plan.after.auto_input) then
+        return tree,rejected("invalid_or_stale_auto_input")
+    end
+    for k,v in pairs(tree) do if k~="auto_input" and plan.after[k]~=v then return tree,rejected("invalid_auto_input_change") end end
+    for k,v in pairs(plan.after) do if k~="auto_input" and tree[k]~=v then return tree,rejected("invalid_auto_input_change") end end
+    local result=copy_map(tree);result.auto_input=clone(plan.after.auto_input)
+    return result,{accepted=true,changed=true,reason="auto_input",changes={}}
 end
 
 function RW_UndoLevelTree(tree)

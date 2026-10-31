@@ -503,3 +503,10 @@ HAS preserves the triggering newborn and parent, earlier completed products/deat
 and later unprocessed victims. All destruction slots stop and commit only-Undo
 terminal plans; source frames, events, links and allocation restore with Undo.
 Conversion status-limit propagation remains pending. See BROKEN.md.
+
+## M9.5X — conversion status-limit trigger groups
+
+Conversion returns a fifth terminal reason, preserving earlier sources and the
+interrupted group's product prefix alongside its retained parent at fresh IDs.
+Scheduler commits/locks before later phases; WRITE/BECOME/EMPTY, duplicate allocation,
+source conditions and Undo are covered. Remaining BROKEN integration audit follows.

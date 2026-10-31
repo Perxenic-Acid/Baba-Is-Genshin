@@ -1382,6 +1382,7 @@ function RW_PlanConversions(world, conversions, generated_rules)
     table.sort(ids)
     local changes,next_id,created={},world.next_entity_id,0
     local converted_ids={}
+    local terminal_reason,group_products
     local status_context
     if generated_rules~=nil then
         if not dense_list(generated_rules) then return nil,"invalid_rule_sources" end
@@ -1398,6 +1399,8 @@ function RW_PlanConversions(world, conversions, generated_rules)
     end
     local function initialize_product(product,id,original)
         if not status_context then return true end
+        group_products[#group_products+1]=product
+        product.broken=nil
         -- Native doconvert creates all products before deleting its source.
         -- A transient negative-ID witness retains the old source when our first
         -- product reuses its persistent identity. It is never emitted in a plan.
@@ -1510,21 +1513,44 @@ function RW_PlanConversions(world, conversions, generated_rules)
         if status_context and not virtual then status_context.entities[-entity.id]=nil end
         return true
     end
+    local function convert_group(entity,source,virtual)
+        local start,frontier,allocated=#changes,next_id,created
+        group_products={}
+        local ok,err=convert(entity,source,virtual)
+        if ok then return true end
+        if err~="word_rule_limit" and err~="word_rule_cycle" and err~="rule_complexity_limit" then return nil,err end
+        -- doconvert registers products before removing its old source. Our normal
+        -- primary reuses that source ID; an interrupted group instead retains the
+        -- source and materializes its entire completed/trigger prefix at fresh IDs.
+        for index=#changes,start+1,-1 do changes[index]=nil end
+        next_id,created=frontier,allocated
+        for _,product in ipairs(group_products) do
+            if type(next_id)~="number" or next_id%1~=0 or next_id<1 or world.entities[next_id] then return nil,"invalid_conversion_frontier" end
+            if next_id>=9007199254740991 then return nil,"entity_id_exhausted" end
+            local born=query_clone(product);born.id=next_id
+            changes[#changes+1]={kind="create",entity_id=next_id,to=born}
+            next_id,created=next_id+1,created+1
+        end
+        terminal_reason=err
+        return true
+    end
     for _,id in ipairs(ids) do
         local entity=world.entities[id]
         local source=entity.class == "text" and "@text" or entity.archetype
-        if source then local ok,err=convert(entity,source,false); if not ok then return nil,err end end
+        if source then local ok,err=convert_group(entity,source,false); if not ok then return nil,err end end
+        if terminal_reason then break end
     end
     -- All EMPTY products read one frozen occupancy snapshot: no within-phase cascade.
-    if targets["@empty"] or conditional["@empty"] then
+    if not terminal_reason and (targets["@empty"] or conditional["@empty"]) then
         for y=1,world.height do for x=1,world.width do
             if not occupied[x .. ":" .. y] then
-                local ok,err=convert({kind="object",class="object",x=x,y=y,direction="None"},"@empty",true)
+                local ok,err=convert_group({kind="object",class="object",x=x,y=y,direction="None"},"@empty",true)
                 if not ok then return nil,err end
             end
-        end end
+            if terminal_reason then break end
+        end; if terminal_reason then break end end
     end
-    return changes,nil,created > 0 and {from=world.next_entity_id,to=next_id} or nil,converted_ids
+    return changes,nil,created > 0 and {from=world.next_entity_id,to=next_id} or nil,converted_ids,terminal_reason
 end
 
 -- The authored vocabulary is the palette, not the objects remaining this frame.

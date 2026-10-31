@@ -280,3 +280,30 @@ zero-product cases, death frames, links/facing, allocator, events, each schedule
 slot and Undo. An injected TOO COMPLEX result verifies separate classification.
 Conversion terminal-prefix propagation, exact WORD invalidation and conditional
 scoped surroundings remain pending; public BROKEN registration stays deferred.
+
+## Conversion terminal groups (M9.5X)
+
+Installed convert.lua:329-381 creates/registers products before removing the old
+source (476). RW_PlanConversions now returns a fifth result, terminal_reason,
+when a rule/status query reaches a compile limit. Earlier source groups stay
+committed. The interrupted group rolls back its speculative primary identity reuse
+and materializes its initialized/trigger product prefix at fresh IDs while retaining
+the original source. This preserves both the old parent and registered newborns
+without persisting our negative-ID query witness. Subsequent sources/cells stop.
+The triggering product has initial zero BROKEN status; earlier prefix status is kept.
+
+If a relation-condition query fails before creation, the interrupted group emits
+no births. Ordinary invalid queries/frontiers still reject the complete operation.
+Successful groups retain their existing identity-preserving behavior. WRITE retypes,
+same-name BECOME, duplicate products, links/facing and frozen EMPTY occupancy all
+use the same prefix adapter. No HAS is triggered by this conversion interruption.
+
+The scheduler consumes terminal_reason after validating the full stage sequence,
+sets the top-level only-Undo flag and skips later compilation/creation/contacts and
+scoped outcomes. Tests exercise real nested FEELING limits at the primary and later
+products, prior allocated duplicate groups, source-query limits, WRITE/BECOME/EMPTY,
+metadata, allocator and Undo. TOO COMPLEX propagation has a separate injected case.
+The adapter's interrupted-group fresh IDs deliberately differ from its ordinary
+primary-ID reuse; they are required to represent both parent and newborn at once.
+Conditional scoped surroundings and exact WORD dependency invalidation remain;
+public BROKEN registration stays deferred pending the remaining integration audit.

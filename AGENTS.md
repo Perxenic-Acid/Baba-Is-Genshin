@@ -404,3 +404,9 @@
   birth_products in the frozen pre-delete frame; movement uses recorded death frames.
   Propagate terminal flags from every destruction slot before later phases. Keep
   allocation, metadata and whole-tree Undo atomic; conversion limits remain pending.
+
+- RW_PlanConversions fifth result reports a compile-limit terminal reason with
+  valid prefix ops/allocation. Interrupted groups retain the original parent and
+  allocate completed/trigger newborns separately; successful groups still reuse
+  primary identity. Stop later sources/phases and scoped outcomes, preserve earlier
+  groups, never commit negative source witnesses or trigger HAS. See BROKEN.md.

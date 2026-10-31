@@ -328,7 +328,7 @@ local function plan_turn(world, action, services, initial_frame)
         if #level_targets == 1 then target_type=level_targets[1]
         elseif #level_targets > 1 then target_type=level_targets end
     end
-    local operations, conversion_error, allocation, converted_ids = services.convert(preview, entity_conversions, post_rules)
+    local operations, conversion_error, allocation, converted_ids, conversion_terminal = services.convert(preview, entity_conversions, post_rules)
     if not operations then return fail("conversions", conversion_error) end
 
     -- Keep phase-local preconditions: conversion reads the movement snapshot,
@@ -350,6 +350,10 @@ local function plan_turn(world, action, services, initial_frame)
     trace[#trace + 1] = "preview_complete"
     local complete, complete_error, phase = services.preview(world, plan)
     if not complete then return fail("preview_complete", complete_error,phase) end
+    if conversion_terminal then
+        if conversion_terminal~="word_rule_limit" and conversion_terminal~="word_rule_cycle" and conversion_terminal~="rule_complexity_limit" then return fail("conversions",conversion_terminal) end
+        lock_compile_failure(plan,conversion_terminal);return plan,nil,trace
+    end
     local more_frame
     if services.more or services.fall or services.follow or (services.status and reading_changed(preview,operations,post_rules)) then
         local effects,why,relations,rules,code_status=services.evaluate(complete)
@@ -1999,7 +2003,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5W initialized")
+    print("[RuleWorld] M9.5X initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

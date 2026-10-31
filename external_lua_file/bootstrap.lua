@@ -512,7 +512,7 @@ local function plan_turn(world, action, services, initial_frame)
         end
         more_frame=frame
     end
-    local final_world,final_effects,final_relations
+    local final_world,final_effects,final_relations,final_rules
     if services.contact ~= nil or services.refresh ~= nil then
         if type(services.contact) ~= "function" or type(services.refresh) ~= "function" then
             return fail("contacts","invalid_contact_services")
@@ -630,7 +630,7 @@ local function plan_turn(world, action, services, initial_frame)
         if not final then return fail("preview_contacts",why,phase) end
         -- Contacts can remove the grounding Text of a WORD rule. Detect a loop
         -- in the final board before Commit/render, without changing frozen contacts.
-        local checked,check_error,checked_relations,_,code_status=services.evaluate(final)
+        local checked,check_error,checked_relations,checked_rules,code_status=services.evaluate(final)
         if checked and code_status and #code_status.changes>0 then
             local contact_changes={}
             for i=contact_change_start+1,#plan.changes do contact_changes[#contact_changes+1]=plan.changes[i] end
@@ -641,10 +641,10 @@ local function plan_turn(world, action, services, initial_frame)
                 for _,change in ipairs(code_status.changes) do plan.changes[#plan.changes+1]=change end
                 trace[#trace+1]="code_status_after_contacts"
                 final=updated
-                checked,check_error,checked_relations=services.evaluate(final)
+                checked,check_error,checked_relations,checked_rules=services.evaluate(final)
             end
         end
-        final_world,final_effects,final_relations=final,checked,checked_relations
+        final_world,final_effects,final_relations,final_rules=final,checked,checked_relations,checked_rules
         if not checked then
             if check_error == "word_rule_limit" or check_error == "word_rule_cycle" or check_error == "rule_complexity_limit" then
                 lock_compile_failure(plan,check_error)
@@ -659,8 +659,8 @@ local function plan_turn(world, action, services, initial_frame)
         local final,why,phase=final_world
         if not final then final,why,phase=services.preview(world,plan) end
         if not final then return fail("orientation_preview",why,phase) end
-        local effects,relations=final_effects,final_relations
-        if not effects then effects,why,relations=services.evaluate(final) end
+        local effects,relations,rules=final_effects,final_relations,final_rules
+        if not effects then effects,why,relations,rules=services.evaluate(final) end
         if not effects then
             if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
                 lock_compile_failure(plan,why);return plan,nil,trace
@@ -683,7 +683,15 @@ local function plan_turn(world, action, services, initial_frame)
             for _,change in ipairs(orientation.changes) do plan.changes[#plan.changes+1]=change end
             local checked,why,phase=services.preview(world,plan)
             if not checked then return fail("orientation_complete",why,phase) end
-            local verified,why=services.evaluate(checked)
+            local verified,why,_,_,status=services.evaluate(checked)
+            if verified and status and #status.changes>0 and reading_changed(final,orientation.changes,rules) then
+                local updated,err=services.preview(checked,status)
+                if not updated then return fail("code_status_after_orientation",err) end
+                plan.stages[#plan.stages+1]={name="code_status_after_orientation",plan=status}
+                for _,change in ipairs(status.changes) do plan.changes[#plan.changes+1]=change end
+                trace[#trace+1]="code_status_after_orientation"
+                verified,why=services.evaluate(updated)
+            end
             if not verified then
                 if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then lock_compile_failure(plan,why)
                 else return fail("orientation_final_rules",why) end
@@ -2003,7 +2011,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5X initialized")
+    print("[RuleWorld] M9.5Y initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

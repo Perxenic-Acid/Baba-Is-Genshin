@@ -1,4 +1,12 @@
-# BROKEN status infrastructure (M9.5L)
+# BROKEN (current integration: M9.5Y)
+
+BROKEN is now registered in the default vocabulary and official coverage audit
+within the documented engine scope. Entries below record incremental historical
+work; their earlier public-registration and lifecycle pending notes are superseded
+by the later sections. Remaining gaps: exact WORD dependency invalidation (the
+scheduler uses conservative reading-change detection), conditional scoped LEVEL
+surroundings, original native unit-list ordering, and advanced chance/ID queries
+on conversion source shadows. Frontend work and native acceptance remain separate.
 
 Primary references: installed base Data/blocks.lua `brokenblock` (157-181),
 Data/conditions.lua `testcond` (1-83), Data/rules.lua `codecheck` (858 onward)
@@ -307,3 +315,21 @@ The adapter's interrupted-group fresh IDs deliberately differ from its ordinary
 primary-ID reuse; they are required to represent both parent and newborn at once.
 Conditional scoped surroundings and exact WORD dependency invalidation remain;
 public BROKEN registration stays deferred pending the remaining integration audit.
+
+## Orientation and public integration (M9.5Y)
+
+Installed tools.lua updatedir:351-370 invalidates Text code on facing changes.
+The existing post-orientation compile now applies its pure Text/WORD code-status
+plan when reading changed, then verifies the updated board without rerunning
+orientation or contacts. Ordinary non-WORD status remains latched until input.
+WORD invalidation remains conservative rather than an exact original dependency
+list; this is a known timing gap, not a claim of complete original parity.
+
+The default BROKEN token now reaches the complete status/query/lifecycle execution
+path, and the official audit marks it implemented within documented scope. Tests
+use public vocabulary for directional conditions, Text/WORD acquisition, ordinary
+latching, post-barrier TOO COMPLEX and Undo, F selector disable/release, independent
+YOU/WIN contact, boundary initialization and whole-tree Undo. No native acceptance
+is inferred. Full regression startup with the new vocabulary costs 1,926,000 Lua
+instructions, below the 2,000,000 production ceiling. Fifteen catalog properties
+remain pending (3D separately excluded); frontend/level design stay deferred.

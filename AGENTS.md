@@ -410,3 +410,8 @@
   allocate completed/trigger newborns separately; successful groups still reuse
   primary identity. Stop later sources/phases and scoped outcomes, preserve earlier
   groups, never commit negative source witnesses or trigger HAS. See BROKEN.md.
+
+- BROKEN is publicly registered as of M9.5Y; earlier registration/lifecycle pending
+  notes above are historical. Post-orientation reading changes apply one code-status
+  barrier without rerunning orientation/contacts. Exact WORD invalidation remains
+  conservative and conditional scoped LEVEL surroundings remain deferred. See BROKEN.md.

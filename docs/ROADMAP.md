@@ -510,3 +510,12 @@ Conversion returns a fifth terminal reason, preserving earlier sources and the
 interrupted group's product prefix alongside its retained parent at fresh IDs.
 Scheduler commits/locks before later phases; WRITE/BECOME/EMPTY, duplicate allocation,
 source conditions and Undo are covered. Remaining BROKEN integration audit follows.
+
+## M9.5Y — BROKEN public integration and orientation status
+
+Registered default BROKEN and official documented-scope coverage after lifecycle,
+terminal and navigation integration. Post-orientation code status now commits
+atomically. Startup 1,926,000 instructions; remaining catalog properties: ANGRY,
+AUTO, BACK, BEST, BONUS, CHILL, DONE, END, HAPPY, PARTY, PET, REVERT, SAD, WONDER,
+YOU2. 3D is excluded; letters and frontend/level design remain deferred. Exact WORD
+invalidation and conditional LEVEL scope remain documented semantic gaps.

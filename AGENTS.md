@@ -422,3 +422,9 @@
   and freeze after defeat; SELECT remains independent. Projection-only Empty channel
   metadata must never persist. Simultaneous playerid=3/native keys remain deferred.
   See docs/YOU2.md and the installed selection oracle in tests/you2.lua.
+
+- CHILL real-unit draws occur during automatic collection before displacement;
+  SLEEP suppresses draws, STILL/locks may suppress impulses but retain facing.
+  Duplicate CHILL grants and MOVE share final facing/impulse counts. Carry automatic
+  random_state through scheduled stage plans, including RNG-only turns and Undo.
+  EMPTY/scoped LEVEL and original mutable scheduling remain gaps; see CHILL.md.

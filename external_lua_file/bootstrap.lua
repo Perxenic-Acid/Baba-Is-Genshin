@@ -250,7 +250,7 @@ local function plan_turn(world, action, services, initial_frame)
     local automatic_active=false
     for _,effect in ipairs(effects) do
         local trait=effect.trait
-        if effect.op=="grant_trait" and (trait=="move" or trait=="nudgeright" or trait=="nudgeup" or trait=="nudgeleft" or trait=="nudgedown") then
+        if effect.op=="grant_trait" and (trait=="move" or trait=="chill" or trait=="nudgeright" or trait=="nudgeup" or trait=="nudgeleft" or trait=="nudgedown") then
             automatic_active=true;break
         end
     end
@@ -266,7 +266,7 @@ local function plan_turn(world, action, services, initial_frame)
         if not shift then return fail(motion_phase,shift_error) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,
             changes=movement.changes,board_shift=movement.board_shift}}}
-        stages[#stages+1]={name=motion_phase,plan={consumes_turn=true,changes=shift.changes}}
+        stages[#stages+1]={name=motion_phase,plan={consumes_turn=true,changes=shift.changes,random_state=shift.random_state}}
         local after,problem=services.preview(preview,stages[#stages].plan)
         if not after then return fail("preview_"..motion_phase,problem) end
         local destruction_terminal
@@ -2013,7 +2013,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5Z initialized")
+    print("[RuleWorld] M9.6A initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

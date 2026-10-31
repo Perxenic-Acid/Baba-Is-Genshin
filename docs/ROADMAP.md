@@ -527,3 +527,11 @@ fallback, including sleeping/EMPTY-list behavior; both channels count for contac
 and scoped WIN, remain separate from SELECT, and freeze on Defeat. Installed input
 selection oracle: 256 cases. Simultaneous playerid=3 and native secondary bindings
 remain deferred. Fourteen catalog properties remain pending; see YOU2.md.
+
+## M9.6A — CHILL transactional random motion
+
+Real-unit CHILL draws before displacement, shares MOVE counts/final facing,
+reverses on blockage and respects sleep/locks. Random state survives scheduler
+stages, Preview/Commit/Undo and RNG-only turns. Installed collection oracle: 384
+cases. Virtual EMPTY/scoped LEVEL and exact original unitlist scheduling remain
+recorded in CHILL.md. Thirteen official catalog properties remain pending.

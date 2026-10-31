@@ -90,7 +90,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | BOOM | implemented within documented scope |
 | property | BROKEN | implemented within documented scope |
 | property | BROWN | implemented within documented scope |
-| property | CHILL | pending |
+| property | CHILL | implemented within documented scope |
 | property | CYAN | implemented within documented scope |
 | property | DEFEAT | implemented within documented scope |
 | property | DETURN | implemented within documented scope |

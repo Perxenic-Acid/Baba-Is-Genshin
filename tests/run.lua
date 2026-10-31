@@ -505,3 +505,5 @@ dofile("tests/broken_has_limits.lua")
 dofile("tests/broken_conversion_limits.lua")
 dofile("tests/broken_integration.lua")
 dofile("tests/you2.lua")
+
+dofile("tests/chill.lua")

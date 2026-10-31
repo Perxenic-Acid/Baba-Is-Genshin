@@ -49,7 +49,7 @@ local PRESENTATION_EFFECTS={
 }
 function RW_GetPresentationEffectCatalog() return clone(PRESENTATION_EFFECTS) end
 local BEHAVIORS = {
-    power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
+    bonus={bonus=true}, power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
     reverse={reverse=true}, pull={pull=true}, swap={swap=true}, phantom={phantom=true},
     sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, chill={chill=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
@@ -439,4 +439,34 @@ function RW_ResolveEatVictims(world,targets)
     end
     local victims={};for id in pairs(removed) do victims[#victims+1]=id end;table.sort(victims)
     return victims
+end
+
+-- BONUS awards per physical property instance and YOU instance, before deleting
+-- unsafe products. SAFE protects removal only; duplicate pickup events survive.
+function RW_ResolveBonusContacts(world)
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local registry=world.behavior_registry or BEHAVIORS
+    local function count(id,capability)
+        local e=world.entities[id];if not e.behaviors[capability] then return 0 end
+        local total=0
+        for trait,n in pairs((world.trait_counts or {})[id] or {}) do
+            if (registry[trait] or {})[capability] then total=total+n end
+        end
+        return total>0 and total or 1
+    end
+    local removed,events={},{}
+    for _,id in ipairs(ids) do local actor=world.entities[id]
+        local controls=count(id,"control")+count(id,"control2")
+        if controls>0 then for _,other_id in ipairs(ids) do local target=world.entities[other_id]
+            local grants=count(other_id,"bonus")
+            if grants>0 and actor.x==target.x and actor.y==target.y
+                and (actor.behaviors.float==true)==(target.behaviors.float==true) then
+                for i=1,controls*grants do events[#events+1]={kind="bonus",entity_id=other_id,
+                    collector_id=id,x=target.x,y=target.y,amount=1} end
+                if not target.behaviors.safe then removed[other_id]=true end
+            end
+        end end
+    end
+    local victims={};for _,id in ipairs(ids) do if removed[id] then victims[#victims+1]=id end end
+    return victims,events
 end

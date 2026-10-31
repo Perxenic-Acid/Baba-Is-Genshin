@@ -433,3 +433,10 @@
   RW_GetPresentationEffectCatalog is a pure cloned original-effect description;
   no simulation RNG or persisted emitters. Native particle timing/placement and
   duplicate-declaration emission remain frontend work; see PRESENTATION_WORDS.md.
+
+- BONUS resolves real-unit YOU/YOU2 contacts after MAKE before CRASH. Preserve
+  physical declaration multiplicity, same-FLOAT/self pickup, SAFE rewards without
+  removal, once-per-victim HAS and pre-delete WIN evidence. Local bonus_state
+  counters are stale-checked atomic stage metadata; campaign tree bonus_count
+  accumulates accepted deltas across reload/navigation and whole-tree Undo.
+  Creation limits retain issued rewards/actual HAS prefix; see docs/BONUS.md.

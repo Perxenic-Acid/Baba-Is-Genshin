@@ -151,6 +151,18 @@ function RW_PlanContactPhase(world, effective, kind, contents, services, rules)
     return RW_PlanDestructionPhase(world,ids,contents,kind,services,nil,rules)
 end
 
+-- Counters and destruction share one atomic stage; status-limit partial births
+-- still retain rewards already issued before the original handledels barrier.
+function RW_PlanBonusPhase(world,effective,contents,rules,services)
+    local ids,events=services.contacts(effective)
+    if not ids then return nil,events end
+    local plan,why=RW_PlanDestructionPhase(world,ids,contents,"bonus",services,nil,rules)
+    if not plan then return nil,why end
+    if #events>0 then plan.bonus_state={from=world.bonus_count or 0,to=(world.bonus_count or 0)+#events} end
+    for _,event in ipairs(events) do plan.events[#plan.events+1]=event end
+    return plan
+end
+
 -- M9.3F: host-independent turn planning. Services adapt mapped scripts;
 -- no UI calls, logging, session ownership or Commit occur in this function.
 -- Services must treat world/context inputs as read-only.
@@ -618,6 +630,40 @@ local function plan_turn(world, action, services, initial_frame)
                 end
             end
         end
+        local bonus_declared=false
+        if services.bonus then
+            for _,rules in ipairs({complete.rule_sources or {},frozen_rules}) do for _,rule in ipairs(rules) do
+                for _,effect in ipairs(rule.effects or {}) do
+                    local spec=(complete.behavior_registry or {})[effect.trait]
+                    if effect.op=="grant_trait" and (effect.trait=="bonus" or (spec and spec.bonus)) then bonus_declared=true;break end
+                end
+                if bonus_declared then break end
+            end;if bonus_declared then break end end
+        end
+        if services.bonus and bonus_declared then
+            local refreshed,why=services.refresh(complete,frozen_rules)
+            if not refreshed then return after_failure(plan,"bonus_rules",why) end
+            local projected,why=services.project(complete,refreshed,plan.level_traits)
+            if not projected then return fail("bonus_project",why) end
+            local active=false
+            for _,e in pairs(projected.entities) do if e.behaviors.bonus then active=true;break end end
+            if active then
+                local bonus,why=services.bonus(complete,projected,contents,frozen_rules)
+                if not bonus then return fail("bonus",why) end
+                local next_world,why=services.preview(complete,bonus)
+                if not next_world then return fail("bonus_preview",why) end
+                plan.stages[#plan.stages+1]={name="bonus",plan=bonus}
+                for _,change in ipairs(bonus.changes) do plan.changes[#plan.changes+1]=change end
+                plan.events=plan.events or {}
+                for _,event in ipairs(bonus.events or {}) do if event.kind=="bonus" then plan.events[#plan.events+1]=event end end
+                plan.bonus_win_contact=bonus.win_contact
+                complete=next_world;trace[#trace+1]="bonus"
+                if bonus.infinite_loop or bonus.too_complex then
+                    plan.infinite_loop,plan.too_complex,plan.reason=bonus.infinite_loop,bonus.too_complex,bonus.reason
+                    return plan,nil,trace
+                end
+            end
+        end
         -- CRASH is checked on surviving units after destruction, against the frozen rules.
         local crash_effects,crash_error=services.refresh(complete,frozen_rules)
         if not crash_effects then return after_failure(plan,"crash",crash_error) end
@@ -899,6 +945,11 @@ function RW_PlanLevelAction(tree, action, services)
     if not accepted.accepted then return fail(accepted.reason) end
     local next_tree, update_error = services.update(tree,completed)
     if not next_tree then return fail(update_error) end
+    local earned=(completed.world.bonus_count or 0)-(session.world.bonus_count or 0)
+    if earned>0 then
+        local updated={};for k,v in pairs(next_tree) do updated[k]=v end
+        updated.bonus_count=(tree.bonus_count or 0)+earned;next_tree=updated
+    end
     if turn.infinite_loop or turn.too_complex then
         return {before=tree,after=next_tree,reason=turn.too_complex and "too_complex" or "infinite_loop",changes=turn.changes,events=turn.events}
     end
@@ -917,7 +968,7 @@ function RW_PlanLevelAction(tree, action, services)
     local level_outcome, outcome_error = services.level_outcome(post,turn.level_traits)
     if outcome_error then return fail(outcome_error) end
     local outcome = turn.level_transform and "transform" or level_outcome
-        or (services.win(post) and "win" or nil)
+        or ((turn.bonus_win_contact or services.win(post)) and "win" or nil)
     if select_after_defeat and outcome == "defeat" then outcome = nil end
     local outcome_diagnostic
     if outcome == "win" then
@@ -1432,6 +1483,13 @@ local function start(run_self_tests)
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
+    turn_services.bonus=function(world,projected,contents,rules)
+        local adapted={};for k,v in pairs(contact_services) do adapted[k]=v end
+        adapted.contacts=function(w) return properties_api:Invoke("RW_ResolveBonusContacts",w) end
+        local plan,why=RW_PlanBonusPhase(world,projected,contents,rules,adapted)
+        if plan then plan.win_contact=movement_api:Invoke("RW_HasWinContact",projected) end
+        return plan,why
+    end
     turn_services.eat=function(world,projected,relations,contents,rules)
         local targets=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"eat")
         local ids=properties_api:Invoke("RW_ResolveEatVictims",projected,targets)
@@ -1921,6 +1979,8 @@ local function start(run_self_tests)
         if not result.accepted then printerr("[RuleWorld] Tree commit rejected:",result.reason); return false, result.reason end
         for _,event in ipairs(plan.events or {}) do if event.kind=="play" then
             print(string.format("[RuleWorld] PLAY %s %s frequency=%s sources=%d",event.source_type,event.note,tostring(event.frequency),#event.positions))
+        elseif event.kind=="bonus" then
+            print(string.format("[RuleWorld] BONUS unit=%d collector=%d total=%d",event.entity_id,event.collector_id,next_tree.bonus_count or 0))
         end end
         if plan.outcome_diagnostic then print("[RuleWorld] WIN evidence: " .. plan.outcome_diagnostic) end
         level_tree = next_tree
@@ -2013,7 +2073,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6B initialized")
+    print("[RuleWorld] M9.6C initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

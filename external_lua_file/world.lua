@@ -145,6 +145,12 @@ local function validate_plan(world, plan)
         or not is_list(plan.changes) then
         return false, "invalid_plan"
     end
+    if plan.bonus_state~=nil then
+        local b=plan.bonus_state
+        if type(b)~="table" or not is_integer(b.from) or not is_integer(b.to)
+            or b.from<0 or b.to<b.from or b.to>MAX_ID then return false,"invalid_bonus_state" end
+        if b.from~=(world.bonus_count or 0) then return false,"stale_bonus_state" end
+    end
     if plan.input_state~=nil then
         local input=plan.input_state
         local function valid_input(v) return v=="none" or v=="move" or v=="wait" end
@@ -175,7 +181,7 @@ local function validate_plan(world, plan)
         if not same_state(current,shift.from) then return false,"stale_board_shift" end
     end
     if not plan.consumes_turn then
-        if #plan.changes ~= 0 or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil then
+        if #plan.changes ~= 0 or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil then
             return false, "invalid_no_turn_plan"
         end
         return true
@@ -330,6 +336,7 @@ local function apply_plan(world, plan)
     end
     if plan.id_allocation then projected.next_entity_id = plan.id_allocation.to end
     if plan.board_shift then projected.board_offset = clone(plan.board_shift.to) end
+    if plan.bonus_state then projected.bonus_count=plan.bonus_state.to end
     if plan.random_state then projected.random_state=plan.random_state.to end
     if plan.input_state then projected.last_input=plan.input_state.to end
     if plan.chance_state then projected.chance_seed=plan.chance_state.to end
@@ -554,7 +561,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", YOU2="you2", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", HIDE="hide", POWER="power", POWER2="power2", POWER3="power3", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", TELE="tele", HOLD="hold", BROKEN="broken", RED="red", ORANGE="orange", YELLOW="yellow", LIME="lime", GREEN="green", CYAN="cyan", BLUE="blue", PURPLE="purple", PINK="pink", ROSY="rosy", BLACK="black", GREY="grey", SILVER="silver", WHITE="white", BROWN="brown", BOOM="boom", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",CHILL="chill",ANGRY="angry",HAPPY="happy",SAD="sad",WONDER="wonder",BEST="best",PARTY="party",PET="pet",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
+                    STOP="block_entry", HIDE="hide", POWER="power", POWER2="power2", POWER3="power3", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", TELE="tele", HOLD="hold", BROKEN="broken",BONUS="bonus", RED="red", ORANGE="orange", YELLOW="yellow", LIME="lime", GREEN="green", CYAN="cyan", BLUE="blue", PURPLE="purple", PINK="pink", ROSY="rosy", BLACK="black", GREY="grey", SILVER="silver", WHITE="white", BROWN="brown", BOOM="boom", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",CHILL="chill",ANGRY="angry",HAPPY="happy",SAD="sad",WONDER="wonder",BEST="best",PARTY="party",PET="pet",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {FEELING="feeling",SEEING="seeing",FACEDBY="facedby",WITHOUT="without",ON="on",NEAR="near",NEXTTO="nextto",ABOVE="above",BELOW="below",BESIDELEFT="besideleft",BESIDERIGHT="besideright",FACING="facing"},
@@ -567,7 +574,7 @@ end
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
 local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, infinite_loop=true, too_complex=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
-    behavior_registry=true,board_offset=true,random_state=true,last_input=true,chance_seed=true}
+    behavior_registry=true,board_offset=true,random_state=true,last_input=true,chance_seed=true,bonus_count=true}
 
 local function plain_data(value, visiting)
     local kind = type(value)
@@ -597,6 +604,7 @@ local function validate_definition(definition)
     if not is_integer(world.width) or world.width < 1
         or not is_integer(world.height) or world.height < 1
         or type(world.entities) ~= "table" or not valid_frontier(world) then return false end
+    if world.bonus_count~=nil and (not is_integer(world.bonus_count) or world.bonus_count<0 or world.bonus_count>MAX_ID) then return false end
     if world.random_state~=nil and not valid_random_state(world.random_state) then return false end
     if world.chance_seed~=nil and not valid_random_state(world.chance_seed) then return false end
     if world.last_input~=nil and world.last_input~="none" and world.last_input~="wait" and world.last_input~="move" then return false end
@@ -680,10 +688,10 @@ local function preview_transaction(world, plan)
         local result=apply_plan(world,plan)
         if plan.infinite_loop then result.infinite_loop=true end
         if plan.too_complex then result.too_complex=true end
-        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.infinite_loop == true or plan.too_complex == true
+        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.infinite_loop == true or plan.too_complex == true
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
-        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil
+        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil
         or not is_list(plan.stages) or #plan.stages == 0 or #plan.stages > 32 then
         return nil,"invalid_stage_sequence"
     end
@@ -699,7 +707,7 @@ local function preview_transaction(world, plan)
         if not stage.plan.consumes_turn then return nil,"non_consuming_stage",nil,stage.name end
         for _, change in ipairs(stage.plan.changes) do summary[#summary+1]=change end
         current = apply_plan(current,stage.plan)
-        changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil or stage.plan.random_state~=nil or stage.plan.input_state~=nil or stage.plan.chance_state~=nil
+        changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil or stage.plan.random_state~=nil or stage.plan.input_state~=nil or stage.plan.chance_state~=nil or stage.plan.bonus_state~=nil
     end
     if not same_state(plan.changes,summary) then return nil,"stage_summary_mismatch" end
     if plan.infinite_loop then current.infinite_loop=true; changed=true end
@@ -1092,7 +1100,7 @@ function RW_CreateLevelTree(definitions, root_definition_id)
     if not definition then return nil, "unknown_definition" end
     local root = RW_InstantiateLevel(definition, "instance:1")
     return {definitions=clone(definitions), instances={[root.instance_id]=root},
-        children={}, active_id=root.instance_id, stack={}, entry_links={}, outcomes={}, level_transforms={},
+        bonus_count=0, children={}, active_id=root.instance_id, stack={}, entry_links={}, outcomes={}, level_transforms={},
         history={}, next_instance_id=2}
 end
 
@@ -1311,6 +1319,7 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
 end
 
 local function valid_tree_candidate(tree)
+    if tree.bonus_count~=nil and (not is_integer(tree.bonus_count) or tree.bonus_count<0 or tree.bonus_count>MAX_ID) then return false end
     if type(tree) ~= "table" or type(tree.instances) ~= "table"
         or type(tree.definitions) ~= "table" or type(tree.children) ~= "table"
         or type(tree.entry_links) ~= "table" or type(tree.outcomes) ~= "table"

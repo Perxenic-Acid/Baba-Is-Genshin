@@ -543,3 +543,12 @@ an original-source-checked pure effect catalog. Conditions, FEELING, MIMIC, stac
 NOT and BROKEN are exercised. Native particle playback and timing remain frontend
 work, explicitly distinguished in the catalog audit. Remaining property backends:
 AUTO, BACK, BONUS, DONE, END, REVERT; letters/3D/frontend/level design stay deferred.
+
+## M9.6C — BONUS atomic collection and campaign total
+
+Real-unit BONUS collects after MAKE before CRASH, retains YOU/BONUS multiplicity,
+SAFE rewards, self/FLOAT behavior, HAS and pre-delete WIN evidence. Local counters
+and persistent tree totals participate in Preview/Commit/whole-tree Undo and real
+enter/return boundaries, including terminal HAS prefix commits. Installed contact
+oracle: 72 cases. Scoped LEVEL/EMPTY and host reward presentation remain gaps.
+Remaining property backends: AUTO, BACK, DONE, END, REVERT.

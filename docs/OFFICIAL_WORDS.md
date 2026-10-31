@@ -86,7 +86,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | BEST | rule capability/catalog implemented; frontend deferred |
 | property | BLACK | implemented within documented scope |
 | property | BLUE | implemented within documented scope |
-| property | BONUS | pending |
+| property | BONUS | implemented within documented scope |
 | property | BOOM | implemented within documented scope |
 | property | BROKEN | implemented within documented scope |
 | property | BROWN | implemented within documented scope |

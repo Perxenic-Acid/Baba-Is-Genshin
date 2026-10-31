@@ -45,7 +45,8 @@ M9.6G supplies simultaneous per-channel movement. M9.6H adds:
 
 Services include existing level action services plus `auto_count` (normally
 `RW_GetAutoTurnCount`). YOU2 fallback for queue collection uses generated
-property-declaration presence, including failed/negative declarations, rather
+property-declaration presence (physical and authored/default sources), including
+failed/negative declarations, rather
 than the set of currently qualifying units. Each new input replaces its channel;
 it does not overwrite an already queued primary fallback. No input consumes RNG.
 All pulse events are returned for dispatch only after successful outer Commit.
@@ -66,7 +67,9 @@ players in timed levels. No native timer cadence is claimed. The catalog remains
 partial for this integration. Frontend timing is deferred with the frontend work.
 Pulses stop on navigation boundaries or defeat, rather than applying remaining
 old-room commands to a newly entered parent. The original defers MF_update until
-all pulse turns complete; exact deferred boundary/result ordering remains a gap.
+all pulse turns complete. movement.lua queues LEVEL conversions and convert.lua
+exposes dolevelconversions() through native callbacks; their native dispatch timing
+is not established from Lua alone. Exact boundary/result ordering remains a gap.
 Conditional scoped LEVEL evaluation and the full mutable original collision
 scheduler retain their documented shared limits.
 

@@ -605,3 +605,16 @@ triggering prefix; ordinary late failure rejects the entire pulse. Added 60
 installed syntax.lua command/command_auto adapter cases plus queue, weighted dual
 movement, wait, stale/invalid commit, terminal and rollback tests. Native routing/
 clock and exact deferred boundary/result ordering remain explicit AUTO gaps.
+
+
+## M9.6I — conversion provenance and authored AUTO fallback
+
+Added intrinsic optional original_name with implicit authored/newborn origins,
+validation and immutable conversion preservation through primary/duplicate IS,
+TEXT/WRITE/BECOME, virtual EMPTY and scoped LEVEL product/boundary paths. Normal
+boot adds no initialization traversal. HAS/MORE/MAKE remain fresh lineages,
+matching original addunit/create versus doconvert. REVERT is still pending;
+see REVERT.md for exact source references and next steps. Also fixed AUTO input
+fallback to inspect authored/default YOU2 declarations even with no matching unit.
+Installed provenance assignment and new regressions verify source tracking,
+creation resets, Preview/Commit/Undo and malformed/stale data rejection.

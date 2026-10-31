@@ -1095,7 +1095,7 @@ local function auto_frame(tree,services)
     if not projected then return nil,why end
     if session.defeated and #services.selectors(projected)==0 then return nil,"level_defeated_undo_only" end
     local count=services.auto_count(projected)
-    return {count=count,rules=rules or {},select_after_defeat=session.defeated==true}
+    return {count=count,rules=rules or {},authored_rules=session.world.rule_sources or {},select_after_defeat=session.defeated==true}
 end
 local function input_direction(action)
     if action.type=="wait" then return 4 end
@@ -1111,9 +1111,9 @@ function RW_PlanAutoCommand(tree,action,services)
     if frame.count>0 and queue[1]==nil then
         -- featureindex checks declaration presence, not qualifying YOU2 units.
         local you2=false
-        for _,rule in ipairs(frame.rules) do for _,effect in ipairs(rule.effects or {}) do
+        for _,rules in ipairs({frame.rules,frame.authored_rules}) do for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
             if effect.trait=="you2" then you2=true end
-        end end
+        end end end
         if not you2 then queue[1]=queue[player] end
     end
     if frame.count==0 then
@@ -2230,7 +2230,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6H initialized")
+    print("[RuleWorld] M9.6I initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

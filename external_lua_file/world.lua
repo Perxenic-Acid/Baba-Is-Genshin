@@ -81,6 +81,13 @@ local function same_state(a, b, seen)
     return true
 end
 
+-- Authored and ordinary newborn units may omit the stored field: their current
+-- concrete name is their origin until a conversion first changes it.
+local function original_name(entity)
+    return entity.original_name or (entity.class=="text" and entity.text and "text_"..entity.text.name or entity.archetype)
+end
+function RW_GetOriginalName(entity) return original_name(entity) end
+
 local function valid_new_entity(world, entity, id)
     if not is_integer(world.width) or not is_integer(world.height)
         or world.width < 1 or world.height < 1
@@ -94,6 +101,7 @@ local function valid_new_entity(world, entity, id)
         or entity.traits ~= nil or entity.behaviors ~= nil or entity.symbol ~= nil then
         return false
     end
+    if entity.original_name~=nil and (type(entity.original_name)~="string" or entity.original_name=="") then return false end
     if entity.broken ~= nil and entity.broken ~= 0 and entity.broken ~= 1 then return false end
     if entity.holder ~= nil and entity.holder ~= 0 and not valid_id(entity.holder) then return false end
     if entity.followed ~= nil and entity.followed ~= -1 and not valid_id(entity.followed) then return false end
@@ -223,6 +231,7 @@ local function validate_plan(world, plan)
 
             if change.kind == "retype" then
                 if not same_state(entity,change.from) or not valid_new_entity(world,change.to,id)
+                    or (change.to.original_name~=nil and change.to.original_name~=original_name(entity))
                     or same_state(change.from,change.to) or change.to.x ~= entity.x or change.to.y ~= entity.y
                     or change.to.direction ~= entity.direction or not same_state(change.to.level_link,entity.level_link) then
                     return false,"invalid_or_stale_retype"
@@ -316,6 +325,7 @@ local function apply_plan(world, plan)
             projected.entities[change.entity_id] = clone(change.to)
         elseif change.kind == "retype" then
             projected.entities[change.entity_id] = clone(change.to)
+            projected.entities[change.entity_id].original_name=original_name(entity)
         elseif change.kind == "move" then
             entity.x, entity.y = change.to.x, change.to.y
             entity.direction = change.to.direction or entity.direction
@@ -328,6 +338,7 @@ local function apply_plan(world, plan)
         elseif change.kind == "followed" then
             entity.followed=change.to
         elseif change.kind == "transform" then
+            entity.original_name=original_name(entity)
             entity.archetype = change.to
         end
     end
@@ -1144,6 +1155,7 @@ function RW_ReloadLevel(tree,id)
         else
             if not session.world.entities[entity_id] then return nil,"persistent_level_block_missing" end
             local entity=session.world.entities[entity_id]
+            entity.original_name=original_name(entity)
             if archetype == "text_level" then
                 entity.class,entity.archetype,entity.text="text",nil,{name="LEVEL"}
             else entity.archetype = archetype end
@@ -1266,6 +1278,7 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
         local products={}
         for _,target in ipairs(targets) do
             local product=clone(block)
+            product.original_name=original_name(block)
             product.id=nil
             if target == "text_level" then
                 product.class,product.archetype,product.text="text",nil,{name="LEVEL"}

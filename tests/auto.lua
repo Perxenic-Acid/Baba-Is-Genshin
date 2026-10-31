@@ -196,3 +196,10 @@ failing.resolve=function(w,a) calls=calls+1;if calls==2 then return {consumes_tu
 local rejected,why=RW_PlanAutoPulse(queued,failing);assert(not rejected and why.reason=="test_late_failure")
 assert(RW_GetActiveLevel(queued).world==base and base.entities[1].x==12 and #queued.history==0 and queued.auto_input[1]==0)
 print("PASS: AUTO triggering CRASH pulse prefix/Undo and atomic late failure")
+
+-- Original featureindex includes authored/default declarations too.
+t=tree_for({{"LEVEL","IS","AUTO"},{"AVATAR","IS","YOU"}})
+RW_GetActiveLevel(t).world.rule_sources[#RW_GetActiveLevel(t).world.rule_sources+1]={when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="missing"},trait="you2"}}}
+queued=command(t,{type="move",dx=0,dy=1,player=2});assert(queued.auto_input[1]==nil and queued.auto_input[2]==3)
+finished=pulse(queued);assert(RW_GetActiveLevel(finished).world.entities[1].y==18)
+print("PASS: authored YOU2 declaration prevents AUTO primary fallback without qualifying units")

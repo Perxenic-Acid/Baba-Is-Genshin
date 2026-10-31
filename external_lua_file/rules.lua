@@ -1483,6 +1483,7 @@ function RW_PlanConversions(world, conversions, generated_rules)
         local used=false
         for _,target in ipairs(products) do
             local product=query_clone(entity)
+            product.original_name=entity.original_name or (virtual and "@empty" or entity.class=="text" and "text_"..entity.text.name or entity.archetype)
             product.traits,product.behaviors,product.symbol=nil,nil,nil
             if target == "@text" or type(target) == "table" then
                 product.class,product.archetype,product.text="text",nil,

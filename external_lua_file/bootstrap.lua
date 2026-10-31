@@ -332,7 +332,7 @@ local function plan_turn(world, action, services, initial_frame)
         if conversion.op == "transform_level" then level_targets[#level_targets+1] = conversion.target_type
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
-        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" or conversion.op=="play" then -- Consumed by their scheduled phases, not conversion.
+        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" or conversion.op=="play" or conversion.op=="all_done" then -- Consumed by their scheduled phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     level_traits=level_traits_from(conversions)
@@ -368,7 +368,7 @@ local function plan_turn(world, action, services, initial_frame)
         lock_compile_failure(plan,conversion_terminal);return plan,nil,trace
     end
     local more_frame
-    if services.more or services.fall or services.follow or (services.status and reading_changed(preview,operations,post_rules)) then
+    if services.more or services.fall or services.follow or services.done or (services.status and reading_changed(preview,operations,post_rules)) then
         local effects,why,relations,rules,code_status=services.evaluate(complete)
         if not effects then
             if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
@@ -450,6 +450,37 @@ local function plan_turn(world, action, services, initial_frame)
                 return fail("fall_rules",why)
             end
         end
+        local done_changed=false
+        if services.done then
+            local active=false
+            for _,effect in ipairs(effects) do
+                local spec=(complete.behavior_registry or {})[effect.trait]
+                if effect.op=="grant_trait" and (effect.trait=="done" or (spec and spec.done)) then active=true;break end
+            end
+            for _,trait in ipairs(level_traits_from(relations)) do
+                local spec=(complete.behavior_registry or {})[trait]
+                if trait=="done" or (spec and spec.done) then active=true;break end
+            end
+            if active then
+                local projected,why=services.project(complete,effects,level_traits_from(relations))
+                if not projected then return fail("done_project",why) end
+                local done,why=services.done(complete,projected,relations)
+                if not done then return fail("done",why) end
+                local after,why=services.preview(complete,done)
+                if not after then return fail("done_preview",why) end
+                plan.stages[#plan.stages+1]={name="done",plan=done}
+                for _,change in ipairs(done.changes) do plan.changes[#plan.changes+1]=change end
+                plan.events=plan.events or {}
+                for _,event in ipairs(done.events or {}) do plan.events[#plan.events+1]=event end
+                plan.done_win=done.done_win
+                done_changed=#done.changes>0
+                complete=after;trace[#trace+1]="done"
+                -- Re-evaluate surviving identities with the original code frame.
+                -- Do not reparse Text removed in the middle of block()/MORE.
+                effects,why=services.refresh(complete,rules)
+                if not effects then return after_failure(plan,"done_rules",why) end
+            end
+        end
         local has_more=false
         for _,effect in ipairs(effects) do
             if effect.op=="grant_trait" and effect.trait=="more" and #effect.entity_ids>0 then has_more=true;break end
@@ -461,7 +492,7 @@ local function plan_turn(world, action, services, initial_frame)
             local why;more,why=services.more(complete,projected,rules)
             if not more then return fail("more",why) end
         end
-        if #more.changes==0 then more_frame={effects=effects,relations=relations,rules=rules} end
+        if #more.changes==0 and not done_changed then more_frame={effects=effects,relations=relations,rules=rules} end
         local after,err=services.preview(complete,more)
         if not after then return fail("more",err) end
         plan.stages[#plan.stages+1]={name="more",plan=more}
@@ -554,7 +585,7 @@ local function plan_turn(world, action, services, initial_frame)
             if active then
                 local events,why=services.play(complete,frozen_relations)
                 if not events then return fail("play",why) end
-                plan.events=events;trace[#trace+1]="play"
+                plan.events=plan.events or {};for _,event in ipairs(events) do plan.events[#plan.events+1]=event end;trace[#trace+1]="play"
             end
         end
         local weak_new={}
@@ -968,7 +999,7 @@ function RW_PlanLevelAction(tree, action, services)
     local level_outcome, outcome_error = services.level_outcome(post,turn.level_traits)
     if outcome_error then return fail(outcome_error) end
     local outcome = turn.level_transform and "transform" or level_outcome
-        or ((turn.bonus_win_contact or services.win(post)) and "win" or nil)
+        or ((turn.done_win or turn.bonus_win_contact or services.win(post)) and "win" or nil)
     if select_after_defeat and outcome == "defeat" then outcome = nil end
     local outcome_diagnostic
     if outcome == "win" then
@@ -1483,6 +1514,12 @@ local function start(run_self_tests)
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
+    turn_services.done=function(world,projected,relations)
+        local ids,events,win=properties_api:Invoke("RW_ResolveDone",projected,relations)
+        local plan,why=world_api:Invoke("RW_PlanDelete",world,ids)
+        if plan then plan.events,plan.done_win=events,win end
+        return plan,why
+    end
     turn_services.bonus=function(world,projected,contents,rules)
         local adapted={};for k,v in pairs(contact_services) do adapted[k]=v end
         adapted.contacts=function(w) return properties_api:Invoke("RW_ResolveBonusContacts",w) end
@@ -1979,6 +2016,10 @@ local function start(run_self_tests)
         if not result.accepted then printerr("[RuleWorld] Tree commit rejected:",result.reason); return false, result.reason end
         for _,event in ipairs(plan.events or {}) do if event.kind=="play" then
             print(string.format("[RuleWorld] PLAY %s %s frequency=%s sources=%d",event.source_type,event.note,tostring(event.frequency),#event.positions))
+        elseif event.kind=="done" then
+            print(string.format("[RuleWorld] DONE unit=%d",event.entity_id))
+        elseif event.kind=="all_done" then
+            print(string.format("[RuleWorld] ALL DONE matched=%d required=%d",event.matched,event.required))
         elseif event.kind=="bonus" then
             print(string.format("[RuleWorld] BONUS unit=%d collector=%d total=%d",event.entity_id,event.collector_id,next_tree.bonus_count or 0))
         end end
@@ -2073,7 +2114,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6C initialized")
+    print("[RuleWorld] M9.6D initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

@@ -94,7 +94,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | CYAN | implemented within documented scope |
 | property | DEFEAT | implemented within documented scope |
 | property | DETURN | implemented within documented scope |
-| property | DONE | pending |
+| property | DONE | implemented within documented scope |
 | property | DOWN | implemented within documented scope |
 | property | END | pending |
 | property | FALL | implemented within documented scope |

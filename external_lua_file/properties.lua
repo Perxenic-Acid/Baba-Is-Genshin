@@ -49,7 +49,7 @@ local PRESENTATION_EFFECTS={
 }
 function RW_GetPresentationEffectCatalog() return clone(PRESENTATION_EFFECTS) end
 local BEHAVIORS = {
-    bonus={bonus=true}, power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
+    done={done=true}, bonus={bonus=true}, power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
     reverse={reverse=true}, pull={pull=true}, swap={swap=true}, phantom={phantom=true},
     sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, chill={chill=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
@@ -469,4 +469,37 @@ function RW_ResolveBonusContacts(world)
     end
     local victims={};for _,id in ipairs(ids) do if removed[id] then victims[#victims+1]=id end end
     return victims,events
+end
+
+-- DONE calls original delunit rather than delete: no SAFE or HAS lifecycle.
+-- ALL IS DONE's levelpack check counts declaration instances, not unique units.
+function RW_ResolveDone(world,relations)
+    local scoped=world.level_behaviors and world.level_behaviors.done
+    local ids,matched,required,found={},0,0,false
+    local registry=world.behavior_registry or BEHAVIORS
+    local block=world.language and world.language.nouns and world.language.nouns.LEVEL
+    local block_type=type(block)=="table" and block.block_type or "level_block"
+    for id,e in pairs(world.entities) do
+        local level=e.class~="text" and e.archetype==block_type
+        if e.class~="text" and not level then required=required+1 end
+        if e.behaviors.done then
+            local n=0
+            for trait,count in pairs((world.trait_counts or {})[id] or {}) do
+                if (registry[trait] or {}).done then n=n+count end
+            end
+            matched=matched+(n>0 and n or 1)
+            if not level then found=true end
+        end
+        if scoped or e.behaviors.done then ids[#ids+1]=id end
+    end
+    table.sort(ids)
+    local all=false
+    for _,r in ipairs(relations or {}) do if r.op=="all_done" then all=true;break end end
+    local events={}
+    for _,id in ipairs(ids) do local e=world.entities[id]
+        events[#events+1]={kind="done",entity_id=id,x=e.x,y=e.y,direction=e.direction or "None"}
+    end
+    local win=all and found and matched>=required
+    if win then events[#events+1]={kind="all_done",matched=matched,required=required} end
+    return ids,events,win
 end

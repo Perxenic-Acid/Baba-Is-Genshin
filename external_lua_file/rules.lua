@@ -1998,6 +1998,12 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             end
         else subjects={subj} end
         local sem=registry[ast.verb]
+        -- Keep the literal ALL directive for the original levelpack completion
+        -- query; its ordinary property expansions alone lose that distinction.
+        if sem and sem.property=="grant_trait" and not subnot and not objnot
+            and subj.tag=="special" and subj.name=="all" and obj.tag=="property" and obj.name=="done" then
+            relations[#relations+1]={op="all_done",source=ast.source}
+        end
         local supported=false
         local generated_start,relations_start=#generated+1,#relations+1
         local contextual=ast.when.op == "spatial"

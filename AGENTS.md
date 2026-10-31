@@ -440,3 +440,10 @@
   counters are stale-checked atomic stage metadata; campaign tree bonus_count
   accumulates accepted deltas across reload/navigation and whole-tree Undo.
   Creation limits retain issued rewards/actual HAS prefix; see docs/BONUS.md.
+
+- DONE retires units after FALL before MORE without SAFE or HAS. Scoped LEVEL DONE
+  clears all real identities. MORE re-evaluates the pre-DONE declarations, then
+  force recompilation rather than reusing that frame after Text removal. Later
+  newborns wait until the next DONE phase. Compiler-only all_done preserves literal
+  ALL's custom/editor completion threshold, including duplicate target counts;
+  keep done_win/events atomic and preserve them when adding PLAY. See docs/DONE.md.

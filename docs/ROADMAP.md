@@ -552,3 +552,12 @@ and persistent tree totals participate in Preview/Commit/whole-tree Undo and rea
 enter/return boundaries, including terminal HAS prefix commits. Installed contact
 oracle: 72 cases. Scoped LEVEL/EMPTY and host reward presentation remain gaps.
 Remaining property backends: AUTO, BACK, DONE, END, REVERT.
+
+## M9.6D — DONE retirement and ALL completion
+
+DONE retires real units without SAFE/HAS before MORE, preserves the frozen code
+frame through MORE, and supports unconditional scoped LEVEL clearing. Literal ALL
+DONE retains the original custom/editor target-count completion rule (including
+duplicates), emitted as atomic win/event facts. PLAY preserves earlier DONE events.
+112 installed oracle cases plus conversion/newborn/conditions/status/Undo routes.
+Remaining property backends: AUTO, BACK, END, REVERT. See DONE.md for host/EMPTY gaps.

@@ -52,7 +52,7 @@ local BEHAVIORS = {
     ["end"]={["end"]=true}, done={done=true}, bonus={bonus=true}, power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
     reverse={reverse=true}, pull={pull=true}, swap={swap=true}, phantom={phantom=true},
-    sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, chill={chill=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
+    sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, auto={auto=true}, chill={chill=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
     you = {control = true}, you2 = {control2 = true}, select = {select = true}, path = {select_path = true},
     hold = {hold = true}, boom = {boom = true}, tele = {tele = true}, more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
@@ -583,4 +583,15 @@ function RW_ResolveEndContact(world,mode)
         end
     end
     return nil
+end
+
+-- Original AUTO_ON is the count of scoped LEVEL AUTO declarations. SLEEP/STILL
+-- do not disable that clock; its host pulse/input adapter is a separate concern.
+function RW_GetAutoTurnCount(world,traits)
+    local registry=world.behavior_registry or BEHAVIORS
+    local count=0
+    for _,trait in ipairs(traits or world.level_traits or {}) do
+        if (registry[trait] or {}).auto then count=count+1 end
+    end
+    return count
 end

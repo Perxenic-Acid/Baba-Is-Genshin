@@ -515,3 +515,5 @@ dofile("tests/bonus.lua")
 dofile("tests/done.lua")
 
 dofile("tests/end.lua")
+
+dofile("tests/auto.lua")

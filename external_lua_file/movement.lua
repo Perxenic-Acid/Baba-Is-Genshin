@@ -11,7 +11,7 @@ local function has_capability(world, entity, capability)
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", control2="you2", select = "select", select_path = "path",
         win = "win", ["end"]="end", done="done", push = "pushable", block_entry = "block_entry",
-        open="open",shut="shut",safe="safe",weak="weak",float="float",tele="tele",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",reverse="reverse",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",chill="chill",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
+        open="open",shut="shut",safe="safe",weak="weak",float="float",tele="tele",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",reverse="reverse",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",auto="auto",chill="chill",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
@@ -987,9 +987,9 @@ function RW_ResolveAutomatic(world)
     end
     table.sort(ids)
     local state=world.random_state or 1;local original_state=state
-    local autonomous={}
-    -- MOVE is collected before CHILL; CHILL draws happen before any displacement.
-    -- Duplicate grants each draw, and share the resulting final facing/move count.
+    local autonomous,reasons={},{}
+    -- MOVE/AUTO are collected before CHILL; CHILL draws happen before any displacement.
+    -- Duplicate CHILL grants each draw; all collected properties share final facing/count.
     for _,id in ipairs(ids) do
         local entity=working.entities[id]
         local counts=world.trait_counts and world.trait_counts[id] or {}
@@ -997,12 +997,18 @@ function RW_ResolveAutomatic(world)
         local total=0
         if not has_capability(world,entity,"sleep") then
             local v=vectors[entity.direction]
-            if v and not intent_immobile(world,entity,v[1],v[2]) then total=count("move") end
+            if v and not intent_immobile(world,entity,v[1],v[2]) then
+                local moves,autos=count("move"),count("auto")
+                total=moves+autos
+                if moves>0 then reasons[id]="move" elseif autos>0 then reasons[id]="auto" end
+            end
             for i=1,count("chill") do
                 state=(state*48271)%2147483647
                 entity.direction=({"Right","Up","Left","Down"})[state%4+1]
                 v=vectors[entity.direction]
-                if not intent_immobile(world,entity,v[1],v[2]) then total=total+1 end
+                if not intent_immobile(world,entity,v[1],v[2]) then
+                    total=total+1;reasons[id]=reasons[id] or "chill"
+                end
             end
         end
         autonomous[id]=total
@@ -1033,7 +1039,7 @@ function RW_ResolveAutomatic(world)
                 if vector and not intent_immobile(world,entity,vector[1],vector[2]) then
                     local old_direction=entity.direction or "None"
                     local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
-                    if spec[1]=="move" and #part.changes==0 and #(part.destructions or {})==0 then
+                    if spec[1]=="move" and reasons[id]~="auto" and #part.changes==0 and #(part.destructions or {})==0 then
                         direction=opposite[direction];vector=vectors[direction]
                         entity.direction=direction
                         part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})

@@ -571,3 +571,11 @@ ending facts with win/navigation in whole-tree transactions. Scoped YOU WIN also
 uses real/Empty map-layer contacts. 337 installed source oracle cases; host credits/
 base-game choreography and broader Empty lifecycle remain gaps. Remaining property
 backends: AUTO, BACK, REVERT.
+
+## M9.6F — AUTO unit motion and scoped count
+
+Real AUTO now preserves original MOVE/AUTO/CHILL collection/reason precedence,
+nonbouncing AUTO, duplicate impulses, common movement/destruction and atomic Undo.
+576 installed collection/guard oracle cases plus native-pipeline simulations and
+scoped AUTO_ON count checks. AUTO remains explicitly partial: next is LEVEL AUTO
+queued input/pulses and simultaneous YOU/YOU2. BACK and REVERT also remain pending.

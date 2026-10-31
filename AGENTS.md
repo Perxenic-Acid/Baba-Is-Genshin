@@ -455,3 +455,10 @@
   Keep Empty declaration placeholders/global FLOAT and asymmetric END-before-YOU
   pair state transient. Chosen nonterminal END wins persist tree.ending and dispatch
   only after Commit; whole-tree Undo restores it. See docs/END.md for host/Empty gaps.
+
+- AUTO unit impulses collect between MOVE and CHILL; first eligible reason owns
+  bounce policy. AUTO never reverses on blockage, a preceding MOVE does, and a
+  locked/uncollected AUTO cannot suppress CHILL reversal. Share final CHILL facing,
+  multiplicity, death frames/HAS and atomic RNG/Undo. RW_GetAutoTurnCount publishes
+  scoped multiplicity only; LEVEL AUTO queue/pulse and playerid=3 remain pending.
+  Keep audit status partial until those are implemented; see docs/AUTO.md.

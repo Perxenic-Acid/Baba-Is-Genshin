@@ -81,7 +81,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | prefix | SELDOM | implemented within documented scope |
 | property | 3D | excluded by user request |
 | property | ANGRY | rule capability/catalog implemented; frontend deferred |
-| property | AUTO | pending |
+| property | AUTO | real-unit motion/scoped count implemented; LEVEL clock/input pending |
 | property | BACK | pending |
 | property | BEST | rule capability/catalog implemented; frontend deferred |
 | property | BLACK | implemented within documented scope |

@@ -262,7 +262,7 @@ local function plan_turn(world, action, services, initial_frame)
     local automatic_active=false
     for _,effect in ipairs(effects) do
         local trait=effect.trait
-        if effect.op=="grant_trait" and (trait=="move" or trait=="chill" or trait=="nudgeright" or trait=="nudgeup" or trait=="nudgeleft" or trait=="nudgedown") then
+        if effect.op=="grant_trait" and (trait=="move" or trait=="auto" or trait=="chill" or trait=="nudgeright" or trait=="nudgeup" or trait=="nudgeleft" or trait=="nudgedown") then
             automatic_active=true;break
         end
     end
@@ -2162,7 +2162,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6E initialized")
+    print("[RuleWorld] M9.6F initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

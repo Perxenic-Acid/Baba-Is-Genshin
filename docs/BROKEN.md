@@ -257,3 +257,26 @@ Tests construct 83 distinct nested FEELING declarations to trigger the productio
 80-query guard (not an injected error), verify prefix products and allocator purity,
 and exercise both scheduler slots, terminal lockout, RNG and Undo. An injected
 complexity limit separately verifies TOO COMPLEX classification.
+
+## HAS terminal-prefix propagation (M9.5W)
+
+Installed tools.lua delete calls inside() before delunit/MF_remove; syntax.lua
+initializes the newborn after registration. For a status recursion limit in HAS,
+retain initialized products through the triggering newborn, retain its parent and
+later victims, and commit only earlier completed parent deletions. Movement death
+frames retain their recorded source coordinates and shifted birth allocator.
+
+Ordinary contacts still select victims and HAS products in the existing frozen
+pre-delete frame. On a limit, birth_products locates the triggering parent's group
+without rerunning status queries; the adapter does not replace ordinary simultaneous
+victim selection with a new serialized contact model. Only completed deletions emit
+destroy events. Creation and deletion validation remains atomic; ordinary errors
+reject without leaking a prefix. Missing product-group services also reject.
+
+All movement/automatic/FEAR/SHIFT/FALL destruction slots, contact phases and EAT
+propagate terminal child plans to the top-level transaction and stop later phases.
+Tests use real nested FEELING recursion, multiple products/parents, first-victim and
+zero-product cases, death frames, links/facing, allocator, events, each scheduler
+slot and Undo. An injected TOO COMPLEX result verifies separate classification.
+Conversion terminal-prefix propagation, exact WORD invalidation and conditional
+scoped surroundings remain pending; public BROKEN registration stays deferred.

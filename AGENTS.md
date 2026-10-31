@@ -398,3 +398,9 @@
   that prefix and stop later phases with a top-level only-Undo terminal flag. Other
   errors reject atomically. HAS/conversion prefix propagation remains pending;
   preserve input/RNG/allocator Undo and never silently ignore the limit diagnostic.
+
+- HAS status-limit prefixes retain the triggering parent and later victims; only
+  earlier completed deaths emit destroy events. Contacts locate product groups via
+  birth_products in the frozen pre-delete frame; movement uses recorded death frames.
+  Propagate terminal flags from every destruction slot before later phases. Keep
+  allocation, metadata and whole-tree Undo atomic; conversion limits remain pending.

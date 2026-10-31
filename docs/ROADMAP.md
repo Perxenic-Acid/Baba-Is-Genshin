@@ -496,3 +496,10 @@ Recursive status limits preserve products through the triggering newborn and sto
 later phases. Atomic Commit/Undo retains allocator, input and planned RNG changes.
 Real nested FEELING queries exercise the guard; HAS/conversion propagation remains
 pending alongside other BROKEN gaps. See BROKEN.md.
+
+## M9.5W — HAS status-limit trigger preservation
+
+HAS preserves the triggering newborn and parent, earlier completed products/deaths,
+and later unprocessed victims. All destruction slots stop and commit only-Undo
+terminal plans; source frames, events, links and allocation restore with Undo.
+Conversion status-limit propagation remains pending. See BROKEN.md.

@@ -80,13 +80,21 @@ local function reading_changed(world,changes,rules)
     return false
 end
 
+local function lock_compile_failure(plan, reason)
+    if reason == "rule_complexity_limit" then plan.too_complex=true;plan.reason="too_complex"
+    else plan.infinite_loop=true;plan.reason="infinite_loop" end
+end
+
 -- Contact destruction and HAS share one flat phase: births use the pre-delete
 -- snapshot, and IDs are allocated only in the returned plan.
 function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, rules)
-    local specifications,err
+    local specifications,err,terminal,removed_ids
+    local function is_limit(reason)
+        return reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit"
+    end
     if deaths then
         specifications={}
-        for _,death in ipairs(deaths) do
+        for index,death in ipairs(deaths) do
             if type(death.frame) ~= "table" or not death.frame[death.entity_id] then return nil,"invalid_death_frame" end
             local context={};for key,value in pairs(world) do context[key]=value end
             context.entities={};for id,entity in pairs(death.frame) do context.entities[id]=entity end
@@ -96,22 +104,44 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
                 entity.id=world.next_entity_id+index-1;context.entities[entity.id]=entity
             end
             context.next_entity_id=world.next_entity_id+#specifications
-            local born,why=services.births(context,{death.entity_id},contents,rules)
-            if not born then return nil,why end
+            local born,why,prefix=services.births(context,{death.entity_id},contents,rules)
+            if not born then
+                if not prefix or not is_limit(why) then return nil,why end
+                born=prefix;terminal=why;removed_ids={}
+                for prior=1,index-1 do removed_ids[#removed_ids+1]=deaths[prior].entity_id end
+            end
             for _,spec in ipairs(born) do specifications[#specifications+1]=spec end
+            if terminal then break end
         end
     else
-        specifications,err=services.births(world,ids,contents,rules)
-        if not specifications then return nil,err end
+        local prefix
+        specifications,err,prefix=services.births(world,ids,contents,rules)
+        if not specifications then
+            if not prefix or not is_limit(err) or not services.birth_products then return nil,err end
+            -- Products have already been selected in the frozen pre-delete frame.
+            -- Locate the triggering parent's group without re-running status queries.
+            local count=0;removed_ids={}
+            for _,id in ipairs(ids) do
+                local products,why=services.birth_products(world,{id},contents)
+                if not products then return nil,why end
+                count=count+#products
+                if count>=#prefix then break end
+                removed_ids[#removed_ids+1]=id
+            end
+            if #prefix==0 or count<#prefix then return nil,"invalid_birth_terminal_prefix" end
+            specifications=prefix;terminal=err
+        end
     end
-    local removal,remove_error=services.delete(world,ids)
+    removed_ids=removed_ids or ids
+    local removal,remove_error=services.delete(world,removed_ids)
     if not removal then return nil,remove_error end
     local creation,create_error=services.create(world,specifications)
     if not creation then return nil,create_error end
     local plan={consumes_turn=true,changes={},id_allocation=creation.id_allocation,events={}}
     for _,change in ipairs(removal.changes) do plan.changes[#plan.changes+1]=change end
     for _,change in ipairs(creation.changes) do plan.changes[#plan.changes+1]=change end
-    for index,id in ipairs(ids) do plan.events[#plan.events+1]={kind="destroy",cause=(deaths and deaths[index] and deaths[index].cause) or kind,entity_id=id} end
+    for index,id in ipairs(removed_ids) do plan.events[#plan.events+1]={kind="destroy",cause=(deaths and deaths[index] and deaths[index].cause) or kind,entity_id=id} end
+    if terminal then lock_compile_failure(plan,terminal) end
     return plan
 end
 
@@ -124,10 +154,6 @@ end
 -- M9.3F: host-independent turn planning. Services adapt mapped scripts;
 -- no UI calls, logging, session ownership or Commit occur in this function.
 -- Services must treat world/context inputs as read-only.
-local function lock_compile_failure(plan, reason)
-    if reason == "rule_complexity_limit" then plan.too_complex=true;plan.reason="too_complex"
-    else plan.infinite_loop=true;plan.reason="infinite_loop" end
-end
 -- MORE/MAKE creation preserves the installed addunit-before-status order on a
 -- recursion limit. Ordinary errors still reject without a partial creation plan.
 function RW_PlanInitializedCreation(world,specifications,rules,services)
@@ -215,6 +241,10 @@ local function plan_turn(world, action, services, initial_frame)
             for _,change in ipairs(stage.plan.changes) do movement_prefix.changes[#movement_prefix.changes+1]=change end
         end
         preview=after
+        if destruction.infinite_loop or destruction.too_complex then
+            movement_prefix.infinite_loop,movement_prefix.too_complex,movement_prefix.reason=destruction.infinite_loop,destruction.too_complex,destruction.reason
+            return movement_prefix,nil,trace
+        end
     end
     local automatic_active=false
     for _,effect in ipairs(effects) do
@@ -238,6 +268,7 @@ local function plan_turn(world, action, services, initial_frame)
         stages[#stages+1]={name=motion_phase,plan={consumes_turn=true,changes=shift.changes}}
         local after,problem=services.preview(preview,stages[#stages].plan)
         if not after then return fail("preview_"..motion_phase,problem) end
+        local destruction_terminal
         if #(shift.destructions or {})>0 then
             local ids,contents={},{}
             for _,death in ipairs(shift.destructions) do ids[#ids+1]=death.entity_id end
@@ -248,6 +279,7 @@ local function plan_turn(world, action, services, initial_frame)
             local next_world,err=services.preview(after,destruction)
             if not next_world then return fail(motion_phase.."_destruction",err) end
             stages[#stages+1]={name=motion_phase.."_destruction",plan=destruction};after=next_world
+            if destruction.infinite_loop or destruction.too_complex then destruction_terminal=destruction end
         end
         movement_prefix={consumes_turn=true,reason=movement.reason,changes={},stages=stages}
         for _,stage in ipairs(stages) do for _,change in ipairs(stage.plan.changes) do
@@ -255,6 +287,10 @@ local function plan_turn(world, action, services, initial_frame)
         end end
         preview=after
         trace[#trace+1]=motion_phase
+        if destruction_terminal then
+            movement_prefix.infinite_loop,movement_prefix.too_complex,movement_prefix.reason=destruction_terminal.infinite_loop,destruction_terminal.too_complex,destruction_terminal.reason
+            return movement_prefix,nil,trace
+        end
     end
     end
     trace[#trace + 1] = "rules_after"
@@ -384,6 +420,10 @@ local function plan_turn(world, action, services, initial_frame)
                 plan.stages[#plan.stages+1]={name="fall_destruction",plan=destruction}
                 for _,change in ipairs(destruction.changes) do plan.changes[#plan.changes+1]=change end
                 after=next_world
+                if destruction.infinite_loop or destruction.too_complex then
+                    plan.infinite_loop,plan.too_complex,plan.reason=destruction.infinite_loop,destruction.too_complex,destruction.reason
+                    return plan,nil,trace
+                end
             end
             complete=after;trace[#trace+1]="fall"
             if fall.infinite_loop then plan.infinite_loop=true;plan.reason="infinite_loop";return plan,nil,trace end
@@ -524,6 +564,10 @@ local function plan_turn(world, action, services, initial_frame)
                 if change.kind == "create" then weak_new[change.entity_id]=true end
             end
             complete=next_world
+            if contact.infinite_loop or contact.too_complex then
+                plan.infinite_loop,plan.too_complex,plan.reason=contact.infinite_loop,contact.too_complex,contact.reason
+                return plan,nil,trace
+            end
         end
         if services.eat then
             local active=false
@@ -540,6 +584,10 @@ local function plan_turn(world, action, services, initial_frame)
                 plan.stages[#plan.stages+1]={name="eat",plan=eat}
                 for _,change in ipairs(eat.changes) do plan.changes[#plan.changes+1]=change end
                 complete=next_world;trace[#trace+1]="eat"
+                if eat.infinite_loop or eat.too_complex then
+                    plan.infinite_loop,plan.too_complex,plan.reason=eat.infinite_loop,eat.too_complex,eat.reason
+                    return plan,nil,trace
+                end
             end
         end
         -- Late creation reads surviving sources with the frozen contact declarations.
@@ -1345,6 +1393,7 @@ local function start(run_self_tests)
 
     local contact_services = {
         victims=function(world,kind) return properties_api:Invoke("RW_ResolveContactVictims",world,kind) end,
+        birth_products=function(world,ids,contents) return rules_api:Invoke("RW_PlanHasBirths",world,ids,contents) end,
         births=function(world,ids,contents,rules)
             local products,why=rules_api:Invoke("RW_PlanHasBirths",world,ids,contents)
             if not products then return nil,why end
@@ -1950,7 +1999,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5V initialized")
+    print("[RuleWorld] M9.5W initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

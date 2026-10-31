@@ -9,7 +9,7 @@ local function has_capability(world, entity, capability)
         return type(entity.behaviors) == "table" and entity.behaviors[capability] == true
     end
     if world.behavior_registry ~= nil then return false end
-    local legacy = {control = "you", select = "select", select_path = "path",
+    local legacy = {control = "you", control2="you2", select = "select", select_path = "path",
         win = "win", push = "pushable", block_entry = "block_entry",
         open="open",shut="shut",safe="safe",weak="weak",float="float",tele="tele",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",reverse="reverse",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
     return entity.traits and entity.traits[legacy[capability]] == true
@@ -1101,9 +1101,48 @@ function RW_ResolveFall(world)
     return {consumes_turn=true,changes=changes,destructions=deaths,infinite_loop=iterations>=6000,reason="fall"}
 end
 
+-- Project the selected input channel only for displacement. Contact/outcome
+-- consumers keep both independent capabilities on the original rule projection.
+local function input_control_world(world,player)
+    if player~=2 then return world end
+    local has_second=world.empty_control2_declared==true
+    for _,e in pairs(world.entities) do if has_capability(world,e,"control2") then has_second=true;break end end
+    local result={};for k,v in pairs(world) do result[k]=v end
+    result.entities={}
+    local capability=has_second and "control2" or "control"
+    for id,e in pairs(world.entities) do
+        local unit={};for k,v in pairs(e) do unit[k]=v end
+        if e.behaviors then
+            unit.behaviors={};for k,v in pairs(e.behaviors) do unit.behaviors[k]=v end
+            unit.behaviors.control=has_capability(world,e,capability)
+        else
+            unit.traits={};for k,v in pairs(e.traits or {}) do unit.traits[k]=v end
+            unit.traits.you=has_capability(world,e,capability)
+        end
+        result.entities[id]=unit
+    end
+    if world.empty_cells then
+        result.empty_cells={}
+        for key,cell in pairs(world.empty_cells) do
+            local copy={};for k,v in pairs(cell) do copy[k]=v end
+            copy.behaviors={};for k,v in pairs(cell.behaviors) do copy.behaviors[k]=v end
+            copy.behaviors.control=cell.behaviors[capability]==true
+            result.empty_cells[key]=copy
+        end
+    end
+    if world.level_behaviors then
+        result.level_behaviors={};for k,v in pairs(world.level_behaviors) do result.level_behaviors[k]=v end
+        -- Original LEVEL fallback is independent of the real-unit list.
+        result.level_behaviors.control=world.level_behaviors.control2 or world.level_behaviors.control
+    end
+    return result
+end
 -- SELECT is not YOU: it follows traversable map objects without pushing them.
 function RW_ResolveTurn(world, action)
+    if type(action)=="table" and action.player~=nil and action.player~=1 and action.player~=2 then return invalid("invalid_player") end
     if type(action)=="table" and action.type=="wait" then return {consumes_turn=true,changes={},reason="wait"} end
+    if type(world)~="table" or type(world.entities)~="table" then return invalid("invalid_world") end
+    world=input_control_world(world,type(action)=="table" and action.player or 1)
     local movement_world=world
     if world.empty_cells then
         -- Ephemeral movement agents, never part of a Plan/Commit or allocator.
@@ -1191,10 +1230,10 @@ end
 
 function RW_HasWinContact(world)
     for _,cell in pairs(world.empty_cells or {}) do
-        if cell.behaviors.control and cell.behaviors.win and not cell.behaviors.defeat then return true end
+        if (cell.behaviors.control or cell.behaviors.control2) and cell.behaviors.win and not cell.behaviors.defeat then return true end
     end
     for _, actor in pairs(world.entities) do
-        if has_capability(world, actor, "control") then
+        if has_capability(world, actor, "control") or has_capability(world,actor,"control2") then
             for _, target in pairs(world.entities) do
                 if actor.x == target.x and actor.y == target.y and same_layer(world,actor,target)
                     and has_capability(world, target, "win") then return true end

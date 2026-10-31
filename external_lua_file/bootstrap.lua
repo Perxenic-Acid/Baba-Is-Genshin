@@ -168,7 +168,7 @@ function RW_PlanInitializedCreation(world,specifications,rules,services)
 end
 
 local function valid_turn_action(action)
-    if type(action)~="table" then return false end
+    if type(action)~="table" or (action.player~=nil and action.player~=1 and action.player~=2) then return false end
     if action.type=="wait" then return true end
     return action.type=="move" and ((action.dx==1 or action.dx==-1) and action.dy==0
         or (action.dy==1 or action.dy==-1) and action.dx==0)
@@ -189,6 +189,7 @@ local function plan_turn(world, action, services, initial_frame)
     if type(world) ~= "table" or type(world.entities) ~= "table" then
         return fail("input", "invalid_world")
     end
+    if type(action)=="table" and action.player~=nil and action.player~=1 and action.player~=2 then return fail("input","invalid_player") end
     if type(services) ~= "table" then
         return fail("input", "invalid_services")
     end
@@ -840,8 +841,9 @@ function RW_PlanLevelAction(tree, action, services)
         adapted.project = function(world,active_effects,traits)
             local projected, why = original_project(world,active_effects,traits)
             if not projected then return nil,why end
-            for _, entity in pairs(projected.entities) do entity.behaviors.control = nil end
-            projected.level_behaviors.control = nil
+            for _, entity in pairs(projected.entities) do entity.behaviors.control = nil;entity.behaviors.control2=nil end
+            projected.level_behaviors.control = nil;projected.level_behaviors.control2=nil
+            for _,cell in pairs(projected.empty_cells or {}) do cell.behaviors.control=nil;cell.behaviors.control2=nil end
             return projected
         end
         services = adapted
@@ -2011,7 +2013,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.5Y initialized")
+    print("[RuleWorld] M9.5Z initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

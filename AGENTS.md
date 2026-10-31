@@ -415,3 +415,10 @@
   notes above are historical. Post-orientation reading changes apply one code-status
   barrier without rerunning orientation/contacts. Exact WORD invalidation remains
   conservative and conditional scoped LEVEL surroundings remain deferred. See BROKEN.md.
+
+- YOU2 projects independent control2. Optional action.player=1/2 selects displacement;
+  absent is 1. Channel 2 falls back to YOU only without a YOU2 real/EMPTY list;
+  sleeping units and Empty placeholders prevent fallback. Both count for WIN/DEFEAT
+  and freeze after defeat; SELECT remains independent. Projection-only Empty channel
+  metadata must never persist. Simultaneous playerid=3/native keys remain deferred.
+  See docs/YOU2.md and the installed selection oracle in tests/you2.lua.

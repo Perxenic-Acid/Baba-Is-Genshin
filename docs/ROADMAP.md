@@ -519,3 +519,11 @@ atomically. Startup 1,926,000 instructions; remaining catalog properties: ANGRY,
 AUTO, BACK, BEST, BONUS, CHILL, DONE, END, HAPPY, PARTY, PET, REVERT, SAD, WONDER,
 YOU2. 3D is excluded; letters and frontend/level design remain deferred. Exact WORD
 invalidation and conditional LEVEL scope remain documented semantic gaps.
+
+## M9.5Z — YOU2 independent backend channel
+
+Public YOU2 projects control2. Actions select player 1/2 with original secondary
+fallback, including sleeping/EMPTY-list behavior; both channels count for contacts
+and scoped WIN, remain separate from SELECT, and freeze on Defeat. Installed input
+selection oracle: 256 cases. Simultaneous playerid=3 and native secondary bindings
+remain deferred. Fourteen catalog properties remain pending; see YOU2.md.

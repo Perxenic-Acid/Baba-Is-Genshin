@@ -41,7 +41,7 @@ local BEHAVIORS = {
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
     reverse={reverse=true}, pull={pull=true}, swap={swap=true}, phantom={phantom=true},
     sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
-    you = {control = true}, select = {select = true}, path = {select_path = true},
+    you = {control = true}, you2 = {control2 = true}, select = {select = true}, path = {select_path = true},
     hold = {hold = true}, boom = {boom = true}, tele = {tele = true}, more = {more = true}, shift = {shift = true}, float = {float = true}, weak = {weak = true}, open = {open = true}, shut = {shut = true}, hot = {hot = true}, melt = {melt = true}, safe = {safe = true}, crash = {crash = true}, win = {win = true}, defeat = {defeat = true}, sink = {sink = true}, word = {word = true}, pushable = {push = true}, block_entry = {block_entry = true}
 }
 for _,colour in ipairs(COLOUR_FILTERS) do BEHAVIORS[colour[1]]={[colour[1]]=true} end
@@ -129,6 +129,16 @@ function RW_ProjectWorld(world, effects, level_traits)
         if type(trait) ~= "string" or trait == "" then return nil,"invalid_level_property" end
     end
     local projected = clone(world)
+    -- findallfeature includes an EMPTY placeholder even when its eligible cell
+    -- list is empty; that placeholder prevents player-two fallback to YOU.
+    local empty_second,empty_second_denied=false,false
+    for _,effect in ipairs(effects) do
+        if effect.target and effect.target.kind=="empty" and (registry[effect.trait] or {}).control2 then
+            if effect.op=="grant_trait" then empty_second=true
+            elseif not effect.when then empty_second_denied=true end
+        end
+    end
+    projected.empty_control2_declared=empty_second and not empty_second_denied
     projected.empty_cells={}
     projected.trait_counts={}
     projected.level_traits, projected.level_behaviors = {}, {}
@@ -244,12 +254,12 @@ function RW_ResolveLevelPropertyOutcome(world, traits)
     for _, trait in ipairs(traits) do
         if type(trait) ~= "string" or trait == "" then return nil,"invalid_level_property" end
     end
-    local has_you = world.level_behaviors and world.level_behaviors.control == true
+    local has_you = world.level_behaviors and (world.level_behaviors.control == true or world.level_behaviors.control2 == true)
     for _, entity in pairs(world.entities or {}) do
-        if entity.behaviors and entity.behaviors.control then has_you = true end
+        if entity.behaviors and (entity.behaviors.control or entity.behaviors.control2) then has_you = true end
     end
     for _,cell in pairs(world.empty_cells or {}) do
-        if cell.behaviors.control then has_you=true end
+        if cell.behaviors.control or cell.behaviors.control2 then has_you=true end
     end
     for _, trait in ipairs(traits) do
         local capabilities = registry[trait] or {}
@@ -345,7 +355,7 @@ function RW_ResolveContactVictims(world, kind)
     else
         for _,id in ipairs(ids) do
             local actor=world.entities[id]
-            if actor.behaviors.control and not actor.behaviors.safe then
+            if (actor.behaviors.control or actor.behaviors.control2) and not actor.behaviors.safe then
                 for _,other_id in ipairs(ids) do
                     if world.entities[other_id].behaviors.defeat
                         and overlap(actor,world.entities[other_id]) then removed[id]=true; break end

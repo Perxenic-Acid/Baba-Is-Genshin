@@ -96,7 +96,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | DETURN | implemented within documented scope |
 | property | DONE | implemented within documented scope |
 | property | DOWN | implemented within documented scope |
-| property | END | pending |
+| property | END | implemented within documented scope |
 | property | FALL | implemented within documented scope |
 | property | FALLLEFT | implemented within documented scope |
 | property | FALLRIGHT | implemented within documented scope |

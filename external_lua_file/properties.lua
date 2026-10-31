@@ -49,7 +49,7 @@ local PRESENTATION_EFFECTS={
 }
 function RW_GetPresentationEffectCatalog() return clone(PRESENTATION_EFFECTS) end
 local BEHAVIORS = {
-    done={done=true}, bonus={bonus=true}, power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
+    ["end"]={["end"]=true}, done={done=true}, bonus={bonus=true}, power={power=true}, power2={power2=true}, power3={power3=true}, hide={hide=true},
     fall={fall=true}, fallright={fallright=true}, fallup={fallup=true}, fallleft={fallleft=true},
     reverse={reverse=true}, pull={pull=true}, swap={swap=true}, phantom={phantom=true},
     sleep={sleep=true}, still={still=true}, lockedright={lockedright=true}, lockedup={lockedup=true}, lockedleft={lockedleft=true}, lockeddown={lockeddown=true}, move={move=true}, chill={chill=true}, right={right=true}, up={up=true}, left={left=true}, down={down=true}, turn={turn=true}, deturn={deturn=true}, nudgeright={nudgeright=true}, nudgeup={nudgeup=true}, nudgeleft={nudgeleft=true}, nudgedown={nudgedown=true},
@@ -144,14 +144,23 @@ function RW_ProjectWorld(world, effects, level_traits)
     local projected = clone(world)
     -- findallfeature includes an EMPTY placeholder even when its eligible cell
     -- list is empty; that placeholder prevents player-two fallback to YOU.
-    local empty_second,empty_second_denied=false,false
+    local empty_declared,empty_banned,empty_grants={},{},{}
     for _,effect in ipairs(effects) do
-        if effect.target and effect.target.kind=="empty" and (registry[effect.trait] or {}).control2 then
-            if effect.op=="grant_trait" then empty_second=true
-            elseif not effect.when then empty_second_denied=true end
+        if effect.target and effect.target.kind=="empty" then
+            if effect.op=="grant_trait" then empty_grants[#empty_grants+1]=effect
+            elseif not effect.when then empty_banned[effect.trait]=true end
         end
     end
-    projected.empty_control2_declared=empty_second and not empty_second_denied
+    for _,effect in ipairs(empty_grants) do if not empty_banned[effect.trait] then
+        for capability,enabled in pairs(registry[effect.trait] or {}) do
+            if enabled and (capability=="control" or capability=="control2" or capability=="end" or capability=="float" or capability=="win") then
+                empty_declared[capability]=true
+            end
+        end
+    end end
+    for _,capability in ipairs({"control","control2","end","float","win"}) do
+        projected["empty_"..capability.."_declared"]=empty_declared[capability]==true
+    end
     projected.empty_cells={}
     projected.trait_counts={}
     projected.level_traits, projected.level_behaviors = {}, {}
@@ -180,7 +189,14 @@ function RW_ProjectWorld(world, effects, level_traits)
             for _,cell in ipairs(effect.cells or {}) do
                 local key=cell.x .. ":" .. cell.y
                 if not (empty_denied[key] and empty_denied[key][effect.trait]) then
-                    local empty=projected.empty_cells[key] or {x=cell.x,y=cell.y,traits={},behaviors={}}
+                    local empty=projected.empty_cells[key] or {x=cell.x,y=cell.y,traits={},behaviors={},end_contact=false}
+                    -- Original EMPTY END tests endpair in the YOU branch, but
+                    -- bonuspair in the END branch: a leading YOU never completes.
+                    if behavior["end"] and not empty.end_pair then empty.end_pair="you" end
+                    if behavior.control or behavior.control2 then
+                        if not empty.end_pair then empty.end_pair="end"
+                        elseif empty.end_pair=="you" then empty.end_contact=true end
+                    end
                     empty.traits[effect.trait]=true
                     for capability,enabled in pairs(behavior) do if enabled then empty.behaviors[capability]=true end end
                     projected.empty_cells[key]=empty
@@ -277,6 +293,7 @@ function RW_ResolveLevelPropertyOutcome(world, traits)
     for _, trait in ipairs(traits) do
         local capabilities = registry[trait] or {}
         if capabilities.win and has_you then return "win" end
+        if capabilities["end"] and RW_ResolveEndContact(world,"level_end") then return "end" end
         if capabilities.defeat and not (world.level_behaviors and world.level_behaviors.safe) then return "defeat" end
     end
     return nil
@@ -502,4 +519,68 @@ function RW_ResolveDone(world,relations)
     local win=all and found and matched>=required
     if win then events[#events+1]={kind="all_done",matched=matched,required=required} end
     return ids,events,win
+end
+
+-- Custom/editor levelpack END evidence. No host ending/credits side effects here.
+function RW_ResolveEndContact(world,mode)
+    local level=world.level_behaviors or {}
+    local map_float=level.float==true
+    local function you(b) return b.control or b.control2 end
+    local function point(kind,id,e)
+        return {kind=kind,entity_id=id,x=e and e.x or nil,y=e and e.y or nil}
+    end
+    local function evidence(a,b) return {source=a,target=b} end
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local keys={};for key in pairs(world.empty_cells or {}) do keys[#keys+1]=key end;table.sort(keys)
+    local function empty_has(capability)
+        local declared=world["empty_"..capability.."_declared"]
+        if declared~=nil then return declared end
+        for _,cell in pairs(world.empty_cells or {}) do if cell.behaviors[capability] then return true end end
+        return false
+    end
+    local empty_layer=empty_has("float")==map_float
+    -- Scoped END accepts a matching-layer YOU (or the map itself).
+    if level["end"] then
+        if you(level) then return evidence(point("level"),point("level")) end
+        for _,id in ipairs(ids) do local e=world.entities[id];local b=e.behaviors
+            if you(b) and (b.float==true)==map_float then
+                return evidence(point("unit",id,e),point("level"))
+            end
+        end
+        if (empty_has("control") or empty_has("control2")) and empty_layer then
+            return evidence(point("empty"),point("level"))
+        end
+    end
+    if mode=="level_end" then return nil end
+    -- A scoped YOU observes END real units on the map's contact layer.
+    if you(level) then
+        -- Original LEVEL YOU resolves WIN before END, even on an END+WIN target.
+        if level.win then return nil end
+        for _,id in ipairs(ids) do local e=world.entities[id]
+            if e.behaviors.win and (e.behaviors.float==true)==map_float then return nil end
+        end
+        if empty_has("win") and empty_layer then return nil end
+        for _,id in ipairs(ids) do local e=world.entities[id];local b=e.behaviors
+            if b["end"] and (b.float==true)==map_float then
+                return evidence(point("level"),point("unit",id,e))
+            end
+        end
+        if empty_has("end") and empty_layer then
+            return evidence(point("level"),point("empty"))
+        end
+    end
+    for _,id in ipairs(ids) do local actor=world.entities[id];local a=actor.behaviors
+        if you(a) then for _,other_id in ipairs(ids) do local target=world.entities[other_id];local b=target.behaviors
+            if b["end"] and actor.x==target.x and actor.y==target.y and (a.float==true)==(b.float==true) then
+                return evidence(point("unit",id,actor),point("unit",other_id,target))
+            end
+        end end
+    end
+    for _,key in ipairs(keys) do local e=world.empty_cells[key];local b=e.behaviors
+        if you(b) and b["end"] and not b.win and (not b.defeat or b.safe)
+            and (e.end_contact==true or e.end_contact==nil) then
+            return evidence(point("empty",nil,e),point("empty",nil,e))
+        end
+    end
+    return nil
 end

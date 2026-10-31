@@ -49,7 +49,8 @@ Unit retirements, tree outcomes, navigation, history and IDs undo atomically.
 Base-game-specific MF_allisdone/save/credits choreography and DONE falling animations
 are deferred host/frontend work; our backend models the custom/editor levelpack
 completion route. Conditional scoped LEVEL context remains deferred. Virtual EMPTY
-DONE's within-phase alive suppression is not implemented. Exact original call order
+DONE has no unit retirement: the original emptydone flag only requests a DONE
+sound, which remains deferred frontend work. Exact original call order
 between levelblock() host callbacks and unit block() is not claimed; synthetic scoped
 retirement is integrated at the shared pre-MORE barrier. Existing authored ALL palette
 rules still apply; this does not globally register all official noun types.

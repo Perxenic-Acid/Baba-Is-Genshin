@@ -447,3 +447,11 @@
   newborns wait until the next DONE phase. Compiler-only all_done preserves literal
   ALL's custom/editor completion threshold, including duplicate target counts;
   keep done_win/events atomic and preserve them when adding PLAY. See docs/DONE.md.
+
+- END captures real/scoped/Empty YOU contact before BONUS removal, after earlier
+  destruction/MAKE. Same-FLOAT/self applies; SELECT does not. END real targets do
+  not also trigger ordinary WIN. Scoped END joins ordered LEVEL terminal properties;
+  conversion/earlier terminals retain priority. Scoped YOU checks WIN before END.
+  Keep Empty declaration placeholders/global FLOAT and asymmetric END-before-YOU
+  pair state transient. Chosen nonterminal END wins persist tree.ending and dispatch
+  only after Commit; whole-tree Undo restores it. See docs/END.md for host/Empty gaps.

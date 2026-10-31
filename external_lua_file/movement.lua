@@ -10,7 +10,7 @@ local function has_capability(world, entity, capability)
     end
     if world.behavior_registry ~= nil then return false end
     local legacy = {control = "you", control2="you2", select = "select", select_path = "path",
-        win = "win", push = "pushable", block_entry = "block_entry",
+        win = "win", ["end"]="end", done="done", push = "pushable", block_entry = "block_entry",
         open="open",shut="shut",safe="safe",weak="weak",float="float",tele="tele",shift="shift",fall="fall",fallright="fallright",fallup="fallup",fallleft="fallleft",pull="pull",swap="swap",phantom="phantom",reverse="reverse",sleep="sleep",still="still",lockedright="lockedright",lockedup="lockedup",lockedleft="lockedleft",lockeddown="lockeddown",move="move",chill="chill",right="right",up="up",left="left",down="down",turn="turn",deturn="deturn",nudgeright="nudgeright",nudgeup="nudgeup",nudgeleft="nudgeleft",nudgedown="nudgedown"}
     return entity.traits and entity.traits[legacy[capability]] == true
 end
@@ -1251,6 +1251,18 @@ function RW_LevelSelectionCandidates(world)
 end
 
 function RW_HasWinContact(world)
+    local level=world.level_behaviors or {}
+    if level.control or level.control2 then
+        if level.win then return true end
+        for _,target in pairs(world.entities) do
+            if has_capability(world,target,"win") and (has_capability(world,target,"float")== (level.float==true)) then return true end
+        end
+        local empty_win=world.empty_win_declared
+        local empty_float=world.empty_float_declared
+        if empty_win==nil then empty_win=world.empty_behaviors and world.empty_behaviors.win end
+        if empty_float==nil then empty_float=world.empty_behaviors and world.empty_behaviors.float or false end
+        if empty_win and (empty_float==true)==(level.float==true) then return true end
+    end
     for _,cell in pairs(world.empty_cells or {}) do
         if (cell.behaviors.control or cell.behaviors.control2) and cell.behaviors.win and not cell.behaviors.defeat then return true end
     end
@@ -1258,7 +1270,8 @@ function RW_HasWinContact(world)
         if has_capability(world, actor, "control") or has_capability(world,actor,"control2") then
             for _, target in pairs(world.entities) do
                 if actor.x == target.x and actor.y == target.y and same_layer(world,actor,target)
-                    and has_capability(world, target, "win") then return true end
+                    and has_capability(world, target, "win") and not has_capability(world,target,"end")
+                    and not has_capability(world,target,"done") then return true end
             end
         end
     end

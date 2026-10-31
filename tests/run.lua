@@ -513,3 +513,5 @@ dofile("tests/presentation_words.lua")
 dofile("tests/bonus.lua")
 
 dofile("tests/done.lua")
+
+dofile("tests/end.lua")

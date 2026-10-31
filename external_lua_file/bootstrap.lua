@@ -661,6 +661,30 @@ local function plan_turn(world, action, services, initial_frame)
                 end
             end
         end
+        local late_contact_world
+        if services.ending then
+            local active=false
+            for _,rules in ipairs({complete.rule_sources or {},frozen_rules}) do for _,rule in ipairs(rules) do
+                for _,effect in ipairs(rule.effects or {}) do
+                    local spec=(complete.behavior_registry or {})[effect.trait]
+                    if effect.op=="grant_trait" and (effect.trait=="end" or (spec and spec["end"])) then active=true;break end
+                end
+                if active then break end
+            end;if active then break end end
+            for _,trait in ipairs(plan.level_traits or {}) do
+                local spec=(complete.behavior_registry or {})[trait]
+                if trait=="end" or (spec and spec["end"]) then active=true;break end
+            end
+            if active then
+                local effects,why=services.refresh(complete,frozen_rules)
+                if not effects then return after_failure(plan,"end_rules",why) end
+                late_contact_world,why=services.project(complete,effects,plan.level_traits)
+                if not late_contact_world then return fail("end_project",why) end
+                local contact,why=services.ending(late_contact_world)
+                if why then return fail("end_contact",why) end
+                plan.end_contact=contact;trace[#trace+1]="end_contact"
+            end
+        end
         local bonus_declared=false
         if services.bonus then
             for _,rules in ipairs({complete.rule_sources or {},frozen_rules}) do for _,rule in ipairs(rules) do
@@ -672,10 +696,13 @@ local function plan_turn(world, action, services, initial_frame)
             end;if bonus_declared then break end end
         end
         if services.bonus and bonus_declared then
-            local refreshed,why=services.refresh(complete,frozen_rules)
-            if not refreshed then return after_failure(plan,"bonus_rules",why) end
-            local projected,why=services.project(complete,refreshed,plan.level_traits)
-            if not projected then return fail("bonus_project",why) end
+            local projected,why=late_contact_world
+            if not projected then
+                local refreshed;refreshed,why=services.refresh(complete,frozen_rules)
+                if not refreshed then return after_failure(plan,"bonus_rules",why) end
+                projected,why=services.project(complete,refreshed,plan.level_traits)
+                if not projected then return fail("bonus_project",why) end
+            end
             local active=false
             for _,e in pairs(projected.entities) do if e.behaviors.bonus then active=true;break end end
             if active then
@@ -998,8 +1025,14 @@ function RW_PlanLevelAction(tree, action, services)
     if not post then return fail(projection_error) end
     local level_outcome, outcome_error = services.level_outcome(post,turn.level_traits)
     if outcome_error then return fail(outcome_error) end
+    local level_ending=level_outcome=="end"
+    if level_ending then level_outcome="win" end
+    if level_outcome and not level_ending and turn.end_contact then
+        local contact=turn.end_contact
+        if contact.source.kind=="level" or contact.target.kind=="level" then turn.end_contact=nil end
+    end
     local outcome = turn.level_transform and "transform" or level_outcome
-        or ((turn.done_win or turn.bonus_win_contact or services.win(post)) and "win" or nil)
+        or ((turn.end_contact or turn.done_win or turn.bonus_win_contact or services.win(post)) and "win" or nil)
     if select_after_defeat and outcome == "defeat" then outcome = nil end
     local outcome_diagnostic
     if outcome == "win" then
@@ -1021,6 +1054,18 @@ function RW_PlanLevelAction(tree, action, services)
     if outcome then
         next_tree, update_error = services.outcome(next_tree,outcome,turn.level_transform)
         if not next_tree then return fail(update_error) end
+        if outcome=="win" and (turn.end_contact or level_ending) then
+            local contact=turn.end_contact
+            if not contact and services.ending then contact=services.ending(post,"level_end") end
+            if contact then
+                local updated={};for k,v in pairs(next_tree) do updated[k]=v end
+                local record={kind="end",instance_id=tree.active_id,source=contact.source,target=contact.target}
+                updated.ending=record;next_tree=updated
+                local events={};for _,event in ipairs(turn.events or {}) do events[#events+1]=event end
+                events[#events+1]={kind="end",instance_id=tree.active_id,source=contact.source,target=contact.target}
+                turn.events=events
+            end
+        end
         if outcome ~= "defeat" and #next_tree.stack > 0 then
             next_tree,update_error = return_to_parent(next_tree)
             if not next_tree then return fail(update_error) end
@@ -1514,6 +1559,7 @@ local function start(run_self_tests)
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
+    turn_services.ending=function(world,mode) return properties_api:Invoke("RW_ResolveEndContact",world,mode) end
     turn_services.done=function(world,projected,relations)
         local ids,events,win=properties_api:Invoke("RW_ResolveDone",projected,relations)
         local plan,why=world_api:Invoke("RW_PlanDelete",world,ids)
@@ -2016,6 +2062,8 @@ local function start(run_self_tests)
         if not result.accepted then printerr("[RuleWorld] Tree commit rejected:",result.reason); return false, result.reason end
         for _,event in ipairs(plan.events or {}) do if event.kind=="play" then
             print(string.format("[RuleWorld] PLAY %s %s frequency=%s sources=%d",event.source_type,event.note,tostring(event.frequency),#event.positions))
+        elseif event.kind=="end" then
+            print(string.format("[RuleWorld] END instance=%s source=%s target=%s",event.instance_id,event.source.kind,event.target.kind))
         elseif event.kind=="done" then
             print(string.format("[RuleWorld] DONE unit=%d",event.entity_id))
         elseif event.kind=="all_done" then
@@ -2114,7 +2162,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6D initialized")
+    print("[RuleWorld] M9.6E initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

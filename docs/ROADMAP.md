@@ -561,3 +561,13 @@ DONE retains the original custom/editor target-count completion rule (including
 duplicates), emitted as atomic win/event facts. PLAY preserves earlier DONE events.
 112 installed oracle cases plus conversion/newborn/conditions/status/Undo routes.
 Remaining property backends: AUTO, BACK, END, REVERT. See DONE.md for host/EMPTY gaps.
+
+## M9.6E — END contacts and persistent ending facts
+
+END supports ordinary/self/YOU2, scoped LEVEL/map FLOAT and virtual Empty contact
+queries, including original Empty ordering/placeholder behavior. Capture before
+BONUS removal; DONE/destruction and late CRASH retain priority. Record historical
+ending facts with win/navigation in whole-tree transactions. Scoped YOU WIN also
+uses real/Empty map-layer contacts. 337 installed source oracle cases; host credits/
+base-game choreography and broader Empty lifecycle remain gaps. Remaining property
+backends: AUTO, BACK, REVERT.

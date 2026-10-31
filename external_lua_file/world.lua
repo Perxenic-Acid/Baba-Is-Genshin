@@ -561,7 +561,7 @@ local function default_world()
                 properties = {
                     PUSH = "pushable",
                     YOU = "you", YOU2="you2", DEFEAT = "defeat", SINK = "sink", WORD = "word",
-                    STOP="block_entry", HIDE="hide", POWER="power", POWER2="power2", POWER3="power3", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", TELE="tele", HOLD="hold", BROKEN="broken",BONUS="bonus",DONE="done", RED="red", ORANGE="orange", YELLOW="yellow", LIME="lime", GREEN="green", CYAN="cyan", BLUE="blue", PURPLE="purple", PINK="pink", ROSY="rosy", BLACK="black", GREY="grey", SILVER="silver", WHITE="white", BROWN="brown", BOOM="boom", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",CHILL="chill",ANGRY="angry",HAPPY="happy",SAD="sad",WONDER="wonder",BEST="best",PARTY="party",PET="pet",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
+                    STOP="block_entry", HIDE="hide", POWER="power", POWER2="power2", POWER3="power3", WIN="win", SAFE="safe", CRASH="crash", HOT="hot", MELT="melt", OPEN="open", SHUT="shut", WEAK="weak", FLOAT="float", SHIFT="shift", TELE="tele", HOLD="hold", BROKEN="broken",BONUS="bonus",DONE="done",END="end", RED="red", ORANGE="orange", YELLOW="yellow", LIME="lime", GREEN="green", CYAN="cyan", BLUE="blue", PURPLE="purple", PINK="pink", ROSY="rosy", BLACK="black", GREY="grey", SILVER="silver", WHITE="white", BROWN="brown", BOOM="boom", MORE="more",FALL="fall",FALLRIGHT="fallright",FALLUP="fallup",FALLLEFT="fallleft",PULL="pull",SWAP="swap",PHANTOM="phantom",REVERSE="reverse",SLEEP="sleep",STILL="still",LOCKEDRIGHT="lockedright",LOCKEDUP="lockedup",LOCKEDLEFT="lockedleft",LOCKEDDOWN="lockeddown",MOVE="move",CHILL="chill",ANGRY="angry",HAPPY="happy",SAD="sad",WONDER="wonder",BEST="best",PARTY="party",PET="pet",RIGHT="right",UP="up",LEFT="left",DOWN="down",TURN="turn",DETURN="deturn",NUDGERIGHT="nudgeright",NUDGEUP="nudgeup",NUDGELEFT="nudgeleft",NUDGEDOWN="nudgedown"
                 },
                 specials = {TEXT="text",ALL="all",EMPTY="empty"},
                 prepositions = {FEELING="feeling",SEEING="seeing",FACEDBY="facedby",WITHOUT="without",ON="on",NEAR="near",NEXTTO="nextto",ABOVE="above",BELOW="below",BESIDELEFT="besideleft",BESIDERIGHT="besideright",FACING="facing"},
@@ -1319,6 +1319,22 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
 end
 
 local function valid_tree_candidate(tree)
+    if type(tree)=="table" and tree.ending~=nil then
+        local ending=tree.ending
+        local function valid_point(p)
+            if type(p)~="table" or (p.kind~="unit" and p.kind~="level" and p.kind~="empty") then return false end
+            for key in pairs(p) do if key~="kind" and key~="entity_id" and key~="x" and key~="y" then return false end end
+            if p.kind=="unit" and not valid_id(p.entity_id) then return false end
+            if p.kind~="unit" and p.entity_id~=nil then return false end
+            if p.x~=nil or p.y~=nil then
+                if not valid_id(p.x) or not valid_id(p.y) then return false end
+            elseif p.kind=="unit" then return false end
+            return p.kind~="level" or p.x==nil
+        end
+        if type(ending)~="table" or ending.kind~="end" or not plain_data(ending)
+            or type(tree.instances)~="table" or not tree.instances[ending.instance_id]
+            or not valid_point(ending.source) or not valid_point(ending.target) then return false end
+    end
     if tree.bonus_count~=nil and (not is_integer(tree.bonus_count) or tree.bonus_count<0 or tree.bonus_count>MAX_ID) then return false end
     if type(tree) ~= "table" or type(tree.instances) ~= "table"
         or type(tree.definitions) ~= "table" or type(tree.children) ~= "table"

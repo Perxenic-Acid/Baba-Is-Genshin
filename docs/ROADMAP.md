@@ -955,3 +955,12 @@ Compiler/tree tests cover grounding, input-dependent power/BROKEN, frozen source
 deletion, channels and Undo. The installed POWERED oracle uses conditional scoped
 declarations across 1,080 cases. Full regressions pass; startup stays 1,979,000.
 Parent surroundings and FEELING instance semantics remain explicit gaps.
+
+## M9.7N — scoped LEVEL LONELY
+
+Installed conditions.lua lonely() explicitly sets failure=true for unitid=1.
+Support scoped LONELY/NOT LONELY without inventing parent occupancy; preserve
+ordinary physical Level per-identity queries. Compiler/tree/Undo tests and the
+expanded 30-case installed oracle cover both paths. Parent-dependent spatial
+conditions and FEELING instance counting remain deferred.
+Full regressions and catalog/layout audits pass; startup is 1,980,000 instructions.

@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7M)
+# Scoped LEVEL conditions (M9.7N)
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -38,7 +38,9 @@ physical decisions. Installed prefix oracles now include LEVEL: 24 IDLE cases an
 Parent-dependent spatial conditions (including mixes with the supported prefixes)
 remain explicitly deferred. FEELING needs scoped property-instance counting;
 other parent-dependent queries need actual surroundings.
-LONELY needs actual parent occupancy. Scoped HAS lifecycle and other unrelated
+LONELY is supported: installed lonely() explicitly returns false for unitid=1,
+regardless of surroundings; NOT LONELY returns true. Physical blocks keep their
+ordinary identity-based occupancy query. Scoped HAS lifecycle and other unrelated
 LEVEL consumers keep their existing subsystem limits. No child-grid coordinate
 substitution is used to fake parent surroundings; native acceptance is unclaimed.
 
@@ -58,3 +60,7 @@ BROKEN suppression/release, conversion/Undo and frozen-frame source deletion.
 reference_powered.lua now uses raw conditional scoped declarations in its 1,080
 installed-source comparisons. Startup remains 1,979,000 instructions. Parent
 spatial conditions, FEELING instance accounting and native acceptance remain open.
+
+M9.7N adds scoped LONELY/NOT LONELY to the shared condition path. Compiler/tree
+conversion and Undo tests keep physical Level behavior separate; the installed
+LONELY oracle includes synthetic LEVEL with zero through four co-occupants.

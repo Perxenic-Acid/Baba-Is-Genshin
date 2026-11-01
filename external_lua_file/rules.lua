@@ -625,7 +625,7 @@ function RW_TestEntityCondition(world,node,entity)
             result=result and (clause.negated and not found or not clause.negated and found)
         elseif clause.relation=="lonely" then
             if #parameters~=0 then return nil,"invalid_prefix_parameters" end
-            local found=true
+            local found=entity.class~="level"
             for id,other in pairs(world.entities) do
                 if id~=entity.id and other.x==entity.x and other.y==entity.y then found=false;break end
             end
@@ -2127,7 +2127,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         if node.op~="spatial" or not dense_list(node.clauses) then return false end
         for _,clause in ipairs(node.clauses) do
             if clause.relation~="idle" and clause.relation~="often" and clause.relation~="seldom"
-                and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3" then return false end
+                and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3"
+                and clause.relation~="lonely" then return false end
         end
         for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
         return true

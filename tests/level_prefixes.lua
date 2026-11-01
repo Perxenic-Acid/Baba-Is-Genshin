@@ -128,3 +128,13 @@ local map={id=0,class='level',x=0,y=0,direction='None'}
 assert(RW_TestEntityCondition(context,powered,map)==false)
 assert(not w._condition_guard and not w._condition_rules)
 print('PASS: scoped POWERED channels see complete real/map declarations, conditional input/BROKEN, grounded recursion, frozen-frame source deletion and Undo')
+
+for _,negative in ipairs({false,true}) do
+ local words=negative and {'NOT','LONELY','LEVEL','BECOME','FLAG'} or {'LONELY','LEVEL','BECOME','FLAG'}
+ local tree,parent=fixture({words});local w=RW_GetActiveLevel(tree).world
+ local frame=assert(RW_CompileWorld(w,cs));assert(#frame.deferred==0)
+ local n=act(tree,wait);assert((n.active_id==parent)==negative)
+ -- Physical Level remains an ordinary, isolated unit and uses its own identity.
+ if not negative then assert(RW_GetActiveLevel(n).world.entities[2].archetype=='flag') end
+end
+print('PASS: scoped LEVEL LONELY is always false, NOT LONELY is true, physical Level stays per-identity and Undo restores both')

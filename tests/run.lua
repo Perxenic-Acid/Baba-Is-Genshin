@@ -537,3 +537,5 @@ dofile("tests/back_frames.lua")
 dofile("tests/back_lifecycle.lua")
 
 dofile("tests/back_conversion_sources.lua")
+
+dofile("tests/back_branches.lua")

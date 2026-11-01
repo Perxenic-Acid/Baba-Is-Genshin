@@ -1424,6 +1424,7 @@ function RW_PlanConversions(world, conversions, generated_rules)
         if type(next_id) ~= "number" or next_id % 1 ~= 0 or next_id < 1 or world.entities[next_id] then return nil,"invalid_conversion_frontier" end
         if next_id >= 9007199254740991 then return nil,"entity_id_exhausted" end
         product.id=next_id
+        product.back_identity=nil
         local ok,err=initialize_product(product,next_id)
         if not ok then return nil,err end
         changes[#changes+1]={kind="create",entity_id=next_id,to=product}
@@ -1564,11 +1565,11 @@ function RW_PlanConversions(world, conversions, generated_rules)
         next_id,created=frontier,allocated
         for index=#back_conversions,event_start+1,-1 do back_conversions[index]=nil end
         local event={source=not virtual and query_clone(entity) or nil,
-            empty=virtual and {x=entity.x,y=entity.y} or nil,product_ids={},removed=false}
+            empty=virtual and {x=entity.x,y=entity.y} or nil,product_ids={},removed=false,retained_conversion=true}
         for _,product in ipairs(group_products) do
             if type(next_id)~="number" or next_id%1~=0 or next_id<1 or world.entities[next_id] then return nil,"invalid_conversion_frontier" end
             if next_id>=9007199254740991 then return nil,"entity_id_exhausted" end
-            local born=query_clone(product);born.id=next_id
+            local born=query_clone(product);born.id=next_id;born.back_identity=nil
             changes[#changes+1]={kind="create",entity_id=next_id,to=born}
             event.product_ids[#event.product_ids+1]=next_id
             next_id,created=next_id+1,created+1

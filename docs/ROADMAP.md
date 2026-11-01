@@ -724,3 +724,18 @@ Commit/Undo. BACK primary playback now recognizes recorded same-name conversions
 48 installed convert() identity-order cases and pipeline/terminal/ownership tests
 pass. Branch restoration/native duplicate logical identity and production BACK
 scheduling remain pending; see BACK.md.
+
+
+## M9.6S — full-frame BACK branch and repeated conversion playback
+
+Added native logical history identities alongside unique instances, full-frame
+update/create/remove normalization and clock-selected branch playback. Match every
+create with every removal partner, preserving repeated restoration multiplicity,
+source-base paradox guards and current-position source restoration. Ordinary births
+without partners disappear without HAS. Extra products allocate atomically; aliases,
+source facts, native create/back bases and allocators restore with Undo. Fresh
+conversion/scoped copies do not inherit aliases. New-format journals distinguish
+ordinary births; ambiguous legacy creation provenance rejects explicitly. Added 24
+unchanged installed branch/repeated/birth oracle cases and alias/motion/clock/Undo
+tests. Production scheduling/status timing, shared-ID FOLLOW/HOLD lookups and
+TELE/reading integration remain pending. See BACK.md for scope and limits.

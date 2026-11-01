@@ -87,9 +87,14 @@ local function original_name(entity)
     return entity.original_name or (entity.class=="text" and entity.text and "text_"..entity.text.name or entity.archetype)
 end
 function RW_GetOriginalName(entity) return original_name(entity) end
+local function back_identity(entity) return entity.back_identity or entity.id end
+function RW_GetBackIdentity(entity) return back_identity(entity) end
 local function back_restored(source,current)
     local product=clone(source)
     product.x,product.y=current.x,current.y
+    product.id=current.id
+    local identity=back_identity(source)
+    product.back_identity=identity~=current.id and identity or nil
     product.original_name=nil
     product.broken,product.holder=nil,nil
     product.traits,product.behaviors,product.symbol=nil,nil,nil
@@ -113,6 +118,7 @@ local function valid_new_entity(world, entity, id)
     end
     if entity.original_name~=nil and (type(entity.original_name)~="string" or entity.original_name=="") then return false end
     if entity.broken ~= nil and entity.broken ~= 0 and entity.broken ~= 1 then return false end
+    if entity.back_identity~=nil and not valid_id(entity.back_identity) then return false end
     if entity.back_init ~= nil and (not is_integer(entity.back_init) or entity.back_init<0) then return false end
     if entity.holder ~= nil and entity.holder ~= 0 and not valid_id(entity.holder) then return false end
     if entity.followed ~= nil and entity.followed ~= -1 and not valid_id(entity.followed) then return false end
@@ -227,6 +233,8 @@ local function validate_plan(world, plan)
             if change.from ~= nil or not valid_new_entity(world, change.to, id) then
                 return false, "invalid_creation"
             end
+            if change.back_source_identity~=nil and (not valid_id(change.back_source_identity)
+                or change.back_source_identity~=back_identity(change.to)) then return false,"invalid_back_creation_source" end
             created[id] = true
             create_count = create_count + 1
         else
@@ -241,8 +249,8 @@ local function validate_plan(world, plan)
             end
 
             if change.kind == "back_restore" then
-                if not same_state(entity,change.from) or type(change.source)~="table"
-                    or not valid_new_entity(world,change.source,id) or not valid_new_entity(world,change.to,id)
+                if not same_state(entity,change.from) or type(change.source)~="table" or not valid_id(change.source.id)
+                    or not valid_new_entity(world,change.source,change.source.id) or not valid_new_entity(world,change.to,id)
                     or not same_state(change.to,back_restored(change.source,entity)) then return false,"invalid_or_stale_back_restore" end
             elseif change.kind == "retype" then
                 if not same_state(entity,change.from) or not valid_new_entity(world,change.to,id)
@@ -314,7 +322,8 @@ local function validate_plan(world, plan)
         local products,sources={},{}
         for _,event in ipairs(plan.back_conversions) do
             if type(event)~="table" or type(event.removed)~="boolean" or not is_list(event.product_ids)
-                or (event.source==nil)==(event.empty==nil) then return false,"invalid_back_conversions" end
+                or (event.source==nil)==(event.empty==nil)
+                or (event.retained_conversion~=nil and event.retained_conversion~=true) then return false,"invalid_back_conversions" end
             local source=event.source
             if source then
                 if type(source)~="table" or not valid_id(source.id) or not same_state(world.entities[source.id],source)
@@ -817,14 +826,15 @@ local function valid_turn_records(records,count)
                 or (record.reason~=nil and type(record.reason)~="string") then return false end
             for _,phase in ipairs(record.phases) do
                 if type(phase)~="table" or not is_list(phase.changes)
-                    or (phase.name~=nil and type(phase.name)~="string") then return false end
+                    or (phase.name~=nil and type(phase.name)~="string")
+                    or (phase.back_format~=nil and phase.back_format~=1) then return false end
             end
         end
     end
     return true
 end
 local function journal_phase(plan,name)
-    local phase={name=type(name)=="string" and name or nil,changes=clone(plan.changes)}
+    local phase={name=type(name)=="string" and name or nil,changes=clone(plan.changes),back_format=1}
     for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","infinite_loop","too_complex","back_conversions"}) do
         if plan[key]~=nil then phase[key]=clone(plan[key]) end
     end
@@ -1487,6 +1497,7 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
             products[#products+1]=product
         end
         local first=table.remove(products,1);first.id=block.id
+        for _,product in ipairs(products) do product.back_identity=nil end
         local creation,why=RW_PlanCreate(parent.world,products)
         if not creation then return nil,why end
         -- The first product keeps the entrance identity; all other products are
@@ -2509,4 +2520,68 @@ function RW_GetNavigationDefinitions()
         end
     end
     return definitions, "navigation.root"
+end
+
+
+-- Translate owned phase journals into the native newest-first BACK row model.
+-- Logical history identities may be shared; entity IDs remain unique instances.
+function RW_BackHistoryRows(before,record)
+    if type(before)~="table" or type(before.entities)~="table" or type(record)~="table"
+        or not is_list(record.phases) or #record.phases==0 then return nil,"invalid_back_history" end
+    local current,rows=before,{}
+    local function add(row) rows[#rows+1]=row end
+    for _,phase in ipairs(record.phases) do
+        if type(phase)~="table" or not is_list(phase.changes) then return nil,"invalid_back_history" end
+        local plan={consumes_turn=true,changes=phase.changes}
+        for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","back_conversions"}) do plan[key]=phase[key] end
+        local after,reason=RW_PreviewPlan(current,plan)
+        if not after then return nil,reason end
+        local covered={}
+        for _,event in ipairs(phase.back_conversions or {}) do
+            local source=event.source
+            for _,id in ipairs(event.product_ids) do
+                local identity=source and id==source.id and back_identity(source) or id
+                add({kind="create",identity=identity,base=source and (event.removed or event.retained_conversion) and back_identity(source) or -1})
+                covered[id]=true
+            end
+            if event.removed then
+                add({kind="remove",identity=back_identity(source),source=clone(source)})
+                covered[source.id]=true
+            end
+        end
+        local cursor=clone(current.entities)
+        for _,op in ipairs(phase.changes) do
+            local id=op.entity_id;local entity=cursor[id]
+            if op.kind=="move" or op.kind=="direction" then
+                add({kind="update",identity=back_identity(entity),x=entity.x,y=entity.y,direction=entity.direction,
+                    moved=op.kind=="move" and (entity.x~=op.to.x or entity.y~=op.to.y) or false})
+                if op.kind=="move" then entity.x,entity.y=op.to.x,op.to.y;entity.direction=op.to.direction or entity.direction
+                else entity.direction=op.to end
+            elseif op.kind=="back_restore" then
+                add({kind="remove",identity=back_identity(entity),source=clone(entity)})
+                add({kind="create",identity=back_identity(op.to),base=back_identity(op.to)})
+                cursor[id]=clone(op.to)
+            elseif not covered[id] then
+                if op.kind=="create" then
+                    if phase.back_format~=1 and op.back_source_identity==nil then return nil,"back_creation_provenance_unavailable" end
+                    add({kind="create",identity=back_identity(op.to),base=op.back_source_identity or -1})
+                    cursor[id]=clone(op.to)
+                elseif op.kind=="delete" then
+                    add({kind="remove",identity=back_identity(entity),source=clone(entity)})
+                    cursor[id]=nil
+                elseif op.kind=="transform" or op.kind=="retype" then
+                    -- Legacy journals lack explicit no-op/branch provenance.
+                    add({kind="create",identity=back_identity(entity),base=back_identity(entity)})
+                    add({kind="remove",identity=back_identity(entity),source=clone(entity)})
+                    cursor[id]=clone(after.entities[id])
+                elseif op.kind=="broken" then entity.broken=op.to
+                elseif op.kind=="back_init" then entity.back_init=op.to
+                elseif op.kind=="holder" then entity.holder=op.to
+                elseif op.kind=="followed" then entity.followed=op.to end
+            end
+        end
+        current=after
+    end
+    local result={};for i=#rows,1,-1 do result[#result+1]=rows[i] end
+    return result
 end

@@ -1713,12 +1713,11 @@ function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox)
             retain=true
             local record,before=RW_GetBackFrame(session,index,current_plan)
             if record then
-                if not before.entities[id] then return nil,"back_conversion_history_pending" end
-                selections[#selections+1]={entity_id=id,before=before.entities[id],record=record}
+                selections[#selections+1]={entity_id=id,before_world=before,record=record}
             elseif before~="back_frame_absent" then return nil,before end
         elseif why~="back_inactive" then return nil,why end
     end
-    local plan,why=RW_PlanBackPlayback(world,selections,paradox)
+    local plan,why=RW_PlanBackFramePlayback(world,selections,paradox)
     if not plan then return nil,why end
     plan.back_retain=retain
     return plan
@@ -1801,5 +1800,75 @@ function RW_PlanBackPlayback(world,selections,paradox)
     if not plan then return nil,err end
     for _,restore in ipairs(restores) do plan.changes[#plan.changes+1]=restore end
     table.sort(plan.changes,function(a,b) return a.entity_id<b.entity_id end)
+    return plan
+end
+
+
+-- Replay complete native logical-identity frames against unique current instances.
+-- Multiple matching create/remove rows deliberately multiply restored products.
+function RW_PlanBackFramePlayback(world,selections,paradox)
+    local checked,reason=RW_PlanBackMotion(world,{},paradox)
+    if not checked then return nil,reason end
+    if type(selections)~="table" then return nil,"invalid_back_selection" end
+    local count=0;for key in pairs(selections) do
+        if type(key)~="number" or key%1~=0 or key<1 then return nil,"invalid_back_selection" end
+        count=count+1
+    end
+    if count~=#selections then return nil,"invalid_back_selection" end
+    local function copy(v) if type(v)~="table" then return v end;local r={};for k,x in pairs(v) do r[k]=copy(x) end;return r end
+    paradox=paradox or {}
+    local ordered,seen={},{}
+    for _,selection in ipairs(selections) do
+        if type(selection)~="table" or not world.entities[selection.entity_id] or seen[selection.entity_id] then return nil,"invalid_back_identity" end
+        seen[selection.entity_id]=true;ordered[#ordered+1]=selection
+    end
+    table.sort(ordered,function(a,b) return a.entity_id<b.entity_id end)
+    local changes,suppressed,next_id={}, {},world.next_entity_id
+    for _,selection in ipairs(ordered) do
+        local id=selection.entity_id;local entity=world.entities[id]
+        local rows,why=RW_BackHistoryRows(selection.before_world,selection.record)
+        if not rows then return nil,why end
+        local identity=RW_GetBackIdentity(entity)
+        local x,y,d=entity.x,entity.y,entity.direction
+        local products,retired={},false
+        for _,row in ipairs(rows) do
+            if row.identity==identity then
+                if row.kind=="update" and paradox[identity]==nil then
+                    if row.moved then x,y=row.x,row.y end
+                    d=row.direction;suppressed[id]=true
+                elseif row.kind=="create" and paradox[row.base]==nil then
+                    retired=true
+                    for _,remove in ipairs(rows) do
+                        if remove.kind=="remove" and remove.identity==row.base then products[#products+1]=remove.source end
+                    end
+                end
+            end
+        end
+        if retired then
+            -- Queued actions/TELE marks belong to the retired native handle.
+            suppressed[id]=nil
+            if #products==0 then
+                changes[#changes+1]={kind="delete",entity_id=id,from=copy(entity)}
+            else
+                local source=products[1]
+                changes[#changes+1]={kind="back_restore",entity_id=id,from=copy(entity),source=copy(source),to=RW_BackRestoredEntity(source,entity)}
+                for index=2,#products do
+                    if type(next_id)~="number" or next_id%1~=0 or next_id<1 or next_id>=9007199254740991 or world.entities[next_id] then return nil,"invalid_back_frontier" end
+                    local source=products[index]
+                    local product=RW_BackRestoredEntity(source,{id=next_id,x=entity.x,y=entity.y})
+                    changes[#changes+1]={kind="create",entity_id=next_id,to=product,back_source_identity=RW_GetBackIdentity(product)}
+                    next_id=next_id+1
+                end
+            end
+        elseif x~=entity.x or y~=entity.y then
+            changes[#changes+1]={kind="move",entity_id=id,from={x=entity.x,y=entity.y,direction=entity.direction},to={x=x,y=y,direction=d}}
+        elseif d~=entity.direction then
+            changes[#changes+1]={kind="direction",entity_id=id,from=entity.direction,to=d}
+        end
+    end
+    local plan={consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back"}
+    if next_id~=world.next_entity_id then plan.id_allocation={from=world.next_entity_id,to=next_id} end
+    local after,why=RW_PreviewPlan(world,plan)
+    if not after then return nil,why end
     return plan
 end

@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6R)
+# BACK infrastructure progress (M9.6S)
 
 ## Installed primary references
 
@@ -125,11 +125,10 @@ combined playback path. 54 unchanged installed create/remove branch cases verify
 shape, position/direction, link, origin/default resets and paradox presence, with
 additional staged motion, stale/conflicting operation and clock/Undo tests.
 
-Allocated conversion branches, ordinary births/removals and repeated conversion
-rows still return back_conversion_history_pending. In particular, the native source
-can be restored more than once with the same logical ID from multiple branches;
-this engine's unique identity map needs explicit source/handle tracking before
-that case can be reproduced. Do not guess provenance from noun or original_name.
+The older selected-entity RW_PlanBackPlayback helper still reports allocated
+branches/repeated rows as pending; full-frame playback below supersedes that limit. The native source can be restored more than once with the same logical ID from
+multiple branches. Full-frame playback below now tracks those identities explicitly;
+do not guess provenance from noun or original_name.
 Native host disposal details and mixed queued-update disposal are not covered by
 the isolated branch oracle; current behavior preserves distinct old/new handles.
 No public BACK registration or production scheduling is enabled.
@@ -154,14 +153,45 @@ transform/retype rows retain the existing fallback. 48 unchanged installed
 convert() cases verify source/product identity order; integration tests cover the
 real compiler/turn/Commit path, ownership/Undo, stale metadata, EMPTY/ALL/deletion
 and interrupted groups. This records branch provenance without yet restoring
-branch copies or introducing native duplicate logical IDs.
+branch copies or introducing native duplicate logical IDs by itself. The full-frame
+playback added below consumes these records.
+
+## Full-frame logical identity and branch playback
+
+RW_BackHistoryRows validates each phase against its preceding full snapshot and
+translates source journals/operations into native newest-first update/create/remove
+rows. RW_PlanBackFramePlayback uses those rows, including every matching removal
+partner for every matching creation. Branches restore their source at the current
+position; repeated conversions can restore multiple old shapes. Ordinary births
+and EMPTY creations without a removal partner disappear without HAS. Retained ALL
+products use ordinary creation's -1 base; interrupted conversion prefixes retain
+their actual conversion base. Source-base paradox guards differ from update guards.
+
+Entity IDs remain unique physical instances. Optional intrinsic back_identity
+holds a shared native history identity after branch restoration. Primary replacement
+reuses the current instance; extra restored products allocate fresh instances with
+the same history identity. Every alias participates in older matching update rows,
+including frames with multiple aliased movers. Conversions preserve a primary's
+history identity and give allocated products fresh identities. HAS/MORE/MAKE births
+already build fresh specs. Allocated scoped products clear inherited aliases.
+The allocator, aliases, restore source facts and extra create/back bases all remain
+atomic and undoable. Motion/TELE marks on retired handles are not inherited.
+
+RW_PlanBackHistoryMotion now invokes full-frame playback, including branches absent
+from the paired pre-frame snapshot. New phase journals mark back_format=1; older
+unannotated creation rows reject as ambiguous, rather than guess whether they were
+births or conversion copies. Legacy unambiguous primary motion/shape rows remain
+readable. 24 unchanged installed BACK branch/repeated/birth cases verify ordered
+products/identity/source guards, plus shared-ID older motion, allocation/Undo,
+clock selection and legacy rejection tests. The prior isolated 54-case primary
+oracle remains useful but its selected-entity helper is no longer the scheduler path.
 
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
 word yet. Automatic activation/status timing, scheduler retain decisions and
-branched/repeated conversion playback, born/dead handling,
-TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
+production status/birth timing, FOLLOW/HOLD memory lookup when native identities
+are shared, TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
 still need implementation and source-oracle verification. Exact production
 updateundo/pruning decisions and history beyond this engine's existing 128-turn
 window remain explicit integration limits. Do not treat the journal infrastructure as completed BACK.

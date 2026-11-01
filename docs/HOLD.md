@@ -58,3 +58,15 @@ scoped LEVEL evaluator gap. Projection uses the existing scoped LEVEL trait fram
 Physical level_block objects remain real units, unlike the native synthetic map ID.
 Tests cover map/unit FLOAT combinations, active movement, passive PUSH/PULL, SHIFT
 and FALL. The existing entire suite covers transaction/Undo behavior.
+
+
+## M9.6T — shared BACK identities
+
+Holder memory and HOLD-presence keys now use native history identity. Resolve
+following through the first matching unit in the complete unit list, even if that
+alias does not grant HOLD; retain actual-instance locks/FLOAT checks. Another
+physical instance may share the rider's native ID, so acquisition can validly
+store a holder equal to the rider's entity ID. A separate matching partner is
+required for that update. 128 unchanged installed HOLD/getunitid cases plus atomic
+memory tests cover this. Current list order is ascending entity ID; native creation/
+reinsertion order after replacement remains a gap, documented in BACK.md.

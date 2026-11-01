@@ -1466,12 +1466,13 @@ function RW_ResolveFollow(world,targets)
                         if dist<=distance and dist>0 then
                             distance,targetdir=dist,facing
                             if dist==1 then
-                                if followed==other_id then found=true;break end
-                                priority,prioritydir=other_id,facing
-                                if facing==dir then high,highdir=other_id,facing;highest=true
+                                local identity=other.back_identity or other_id
+                                if followed==identity then found=true;break end
+                                priority,prioritydir=identity,facing
+                                if facing==dir then high,highdir=identity,facing;highest=true
                                 elseif not highest then
-                                    if facing==(dir+1)%4 then high,highdir=other_id,facing;counterclockwise=true
-                                    elseif not counterclockwise and facing==(dir+3)%4 then high,highdir=other_id,facing end
+                                    if facing==(dir+1)%4 then high,highdir=identity,facing;counterclockwise=true
+                                    elseif not counterclockwise and facing==(dir+3)%4 then high,highdir=identity,facing end
                                 end
                             end
                         end
@@ -1540,22 +1541,28 @@ function RW_ResolveTele(world)
 end
 
 function RW_ResolveHold(world)
-    local ids,holders,positions,held={},{},{},{}
+    local ids,holders,positions,held,first={},{},{},{},{}
     for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
     for _,id in ipairs(ids) do local e=world.entities[id]
+        local identity=e.back_identity or id
+        first[identity]=first[identity] or id
         positions[id]={x=e.x,y=e.y};held[id]=e.holder or 0
-        if has_capability(world,e,"hold") then holders[id]=true end
+        if has_capability(world,e,"hold") then holders[identity]=true end
     end
-    for _,id in ipairs(ids) do if holders[id] then local source=world.entities[id]
-        for _,other in ipairs(ids) do local e=world.entities[other]
-            if other~=id and source.x==e.x and source.y==e.y and same_layer(world,source,e) then held[other]=id end
+    for _,id in ipairs(ids) do local source=world.entities[id]
+        if has_capability(world,source,"hold") then
+            local identity=source.back_identity or id
+            for _,other in ipairs(ids) do local e=world.entities[other]
+                if other~=id and source.x==e.x and source.y==e.y and same_layer(world,source,e) then held[other]=identity end
+            end
         end
-    end end
+    end
     for _,id in ipairs(ids) do local holder=held[id]
         if holder~=0 then
             if not holders[holder] then held[id]=0
             else
-                local p,target=positions[id],positions[holder];local e=world.entities[id]
+                local source_id=first[holder]
+                local p,target=positions[id],positions[source_id];local e=world.entities[id]
                 local dx,dy=target.x-p.x,target.y-p.y
                 local locked=held_by_level(world,e) or has_capability(world,e,"still")
                 if (dx==0)~=(dy==0) then
@@ -1565,7 +1572,7 @@ function RW_ResolveHold(world)
                 end
                 if locked then held[id]=0
                 else positions[id]={x=target.x,y=target.y}
-                    if not same_layer(world,e,world.entities[holder]) then held[id]=0 end
+                    if not same_layer(world,e,world.entities[source_id]) then held[id]=0 end
                 end
             end
         end

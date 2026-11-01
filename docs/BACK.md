@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6S)
+# BACK infrastructure progress (M9.6T)
 
 ## Installed primary references
 
@@ -186,12 +186,32 @@ products/identity/source guards, plus shared-ID older motion, allocation/Undo,
 clock selection and legacy rejection tests. The prior isolated 54-case primary
 oracle remains useful but its selected-entity helper is no longer the scheduler path.
 
+## FOLLOW and HOLD shared-identity memory
+
+FOLLOW compares and stores a target's native history identity, while retaining
+physical-instance self exclusion. Adjacent aliased targets can satisfy remembered
+followed IDs even when their entity slot differs. HOLD records the source's history
+identity and keys capability presence by that identity. Its follow step resolves
+the first matching unit from the complete ordered unit list, including a non-HOLD
+alias, matching blocks.lua plus tools.lua getunitid(). Locks and final FLOAT checks
+apply to that actual resolved instance. Acquisition still excludes the source's
+physical instance, so another instance sharing the rider's native ID can produce
+a holder value equal to the rider's entity ID. Validation allows this only with a
+separate matching partner and retains stale/atomic checks.
+
+750 additional unchanged installed FOLLOW cases and 128 installed HOLD/getunitid
+cases cover alias memory, first/non-HOLD matches, stale physical IDs, shared source
+IDs, layers, locks and acquisition. Commit/Undo tests cover both memory fields.
+Unit traversal uses this engine's existing ascending entity order. Native unit-list
+creation/reinsertion order after primary replacement is not yet represented; exact
+order-sensitive alias ties remain a documented integration gap.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
 word yet. Automatic activation/status timing, scheduler retain decisions and
-production status/birth timing, FOLLOW/HOLD memory lookup when native identities
-are shared, TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
+production status/birth timing, native creation/reinsertion ordering for alias ties,
+TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
 still need implementation and source-oracle verification. Exact production
 updateundo/pruning decisions and history beyond this engine's existing 128-turn
 window remain explicit integration limits. Do not treat the journal infrastructure as completed BACK.

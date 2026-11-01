@@ -267,7 +267,14 @@ local function validate_plan(world, plan)
                 if not is_integer(change.to) or change.to<0 or change.to==(change.from or 0) then return false,"invalid_back_init" end
             elseif change.kind == "holder" then
                 if entity.holder ~= change.from then return false,"stale_holder" end
-                if (change.to ~= 0 and not valid_id(change.to)) or change.to==change.from or change.to==id then return false,"invalid_holder" end
+                if (change.to ~= 0 and not valid_id(change.to)) or change.to==change.from then return false,"invalid_holder" end
+                if change.to==id then
+                    local partner=false
+                    for other_id,other in pairs(world.entities) do
+                        if other_id~=id and back_identity(other)==change.to then partner=true;break end
+                    end
+                    if not partner then return false,"invalid_holder" end
+                end
             elseif change.kind == "followed" then
                 if entity.followed ~= change.from then return false,"stale_followed" end
                 if (change.to ~= -1 and not valid_id(change.to)) or change.to==change.from then return false,"invalid_followed" end

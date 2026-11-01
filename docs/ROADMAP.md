@@ -739,3 +739,15 @@ ordinary births; ambiguous legacy creation provenance rejects explicitly. Added 
 unchanged installed branch/repeated/birth oracle cases and alias/motion/clock/Undo
 tests. Production scheduling/status timing, shared-ID FOLLOW/HOLD lookups and
 TELE/reading integration remain pending. See BACK.md for scope and limits.
+
+
+## M9.6T — FOLLOW/HOLD shared-identity memory
+
+FOLLOW now remembers native history identity across restored aliases while
+excluding only the physical source. HOLD acquires logical source IDs, checks HOLD
+presence by logical ID and follows the first matching unit from the full list,
+even a non-HOLD alias. Retain actual-instance locks/FLOAT checks and atomic stale
+memory updates. Allow logical self-ID acquisition only with another matching
+instance. Added 750 installed FOLLOW and 128 HOLD/getunitid oracle cases plus
+Commit/Undo tests. Native creation/reinsertion list order remains separate work;
+see BACK.md. BACK production scheduling remains pending.

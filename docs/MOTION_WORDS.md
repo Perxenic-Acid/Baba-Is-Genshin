@@ -222,3 +222,11 @@ EMPTY sources remain deferred, and the original SHIFT final-alignment ordering a
 FOLLOW differs from our earlier SHIFT phase. Target traversal uses stable entity IDs
 rather than original mutable unit-list insertion order in exotic conversion cases.
 These are documented limits, not whole-game parity claims.
+
+
+### M9.6T — BACK-shared FOLLOW identities
+
+FOLLOW stores/compares back_identity (falling back to entity ID) for adjacent
+memory and priorities. Physical self-exclusion remains by instance. Added 750
+unchanged original FOLLOW cases with aliased targets and memory IDs. See BACK.md
+for shared HOLD lookup and the remaining native unit-list ordering gap.

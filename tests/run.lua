@@ -539,3 +539,5 @@ dofile("tests/back_lifecycle.lua")
 dofile("tests/back_conversion_sources.lua")
 
 dofile("tests/back_branches.lua")
+
+dofile("tests/back_identity_memory.lua")

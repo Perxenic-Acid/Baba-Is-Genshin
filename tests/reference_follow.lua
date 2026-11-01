@@ -24,13 +24,13 @@ env.findall=function(spec)
 end
 env.featureindex={rock={{{'rock','follow','avatar'},{}}}}
 local checked=0
-local function compare(points,dir,memory,sleeping)
+local function compare(points,dir,memory,sleeping,aliases)
     units={[10]={fixed=10,strings={'rock','object'},values={5,5,dir,10},flags={[1]=false},followed=memory}}
     sleep=sleeping
     local w={entities={[10]={id=10,class='object',archetype='rock',x=5,y=5,direction=names[dir+1],followed=memory,behaviors={sleep=sleeping}}}}
     for id,point in pairs(points) do
-        units[id]={fixed=id,strings={'avatar','object'},values={point[1],point[2],0,id},flags={[1]=false}}
-        w.entities[id]={id=id,class='object',archetype='avatar',x=point[1],y=point[2],direction='Right',behaviors={}}
+        units[id]={fixed=id,strings={'avatar','object'},values={point[1],point[2],0,aliases and aliases[id] or id},flags={[1]=false}}
+        w.entities[id]={id=id,class='object',archetype='avatar',x=point[1],y=point[2],direction='Right',back_identity=aliases and aliases[id] or nil,behaviors={}}
     end
     env.moveblock(true)
     local plan=RW_ResolveFollow(w,{[10]={'avatar'}})
@@ -49,3 +49,11 @@ for dx=-3,3 do for dy=-3,3 do for dir=0,3 do
     compare({[1]={5+dx,5+dy},[2]={5-dx,5-dy}},dir,-1,false)
 end end end
 print('PASS: installed FOLLOW nearest/ties/adjacent memory/SLEEP matrix ('..checked..' cases)')
+
+local old_checked=checked
+for mask=1,15 do for dir=0,4 do for _,memory in ipairs({-1,1,7,10,99}) do for _,sleeping in ipairs({false,true}) do
+ local points={};for i=1,4 do if math.floor(mask/2^(i-1))%2==1 then points[i]={5+vectors[i][1],5+vectors[i][2]} end end
+ compare(points,dir,memory,sleeping,{[1]=7,[2]=7,[3]=10,[4]=7})
+end end end end
+assert(checked-old_checked==750)
+print('PASS: installed FOLLOW shared history-identity memory oracle (750 additional cases)')

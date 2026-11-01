@@ -145,3 +145,8 @@ Avatar 保留，不分配新实体、不产生 WIN。原作 convert.lua 也不�
 下次复现可据此定位，不改变目前判胜语义。
 
 M9.3U 新增 WRITE/SAFE/CRASH 与独立 Too Complex，真机路线及边界见 [TERMINAL_WORDS.md](TERMINAL_WORDS.md)。
+
+M9.8E: EMPTY conversion products no longer default to None. They query the shared
+current-frame direction/FOLLOW declarations and draw only when unset; ALL groups
+share a direction. Conversion RNG is atomic with Commit/Undo. See EMPTY_CONVERSIONS.md.
+EMPTY destruction/HAS and virtual movement orientation remain pending.

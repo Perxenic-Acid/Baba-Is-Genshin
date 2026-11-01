@@ -414,13 +414,13 @@ local function plan_turn(world, action, services, initial_frame,back_context)
     if reverting then target_type="@revert"
     elseif #level_targets==1 then target_type=level_targets[1]
     elseif #level_targets>1 then target_type=level_targets end
-    local operations, conversion_error, allocation, converted_ids, conversion_terminal, back_conversions = services.convert(preview, entity_conversions, post_rules,back_count)
+    local operations, conversion_error, allocation, converted_ids, conversion_terminal, back_conversions, conversion_random = services.convert(preview, entity_conversions, post_rules,back_count)
     if not operations then return fail("conversions", conversion_error) end
 
     -- Keep phase-local preconditions: conversion reads the movement snapshot,
     -- while the transaction still has a single Commit/Undo boundary.
     local movement_stage = {consumes_turn=true,changes={},board_shift=movement.board_shift}
-    local conversion_stage = {consumes_turn=true,changes={},id_allocation=allocation,back_conversions=back_conversions}
+    local conversion_stage = {consumes_turn=true,changes={},id_allocation=allocation,back_conversions=back_conversions,random_state=conversion_random}
     for _, change in ipairs(movement.changes) do movement_stage.changes[#movement_stage.changes+1]=change end
     for _, change in ipairs(operations) do conversion_stage.changes[#conversion_stage.changes+1]=change end
     local stages=movement_prefix.stages or {{name="movement",plan=movement_stage}}
@@ -1911,9 +1911,9 @@ local function start(run_self_tests)
         probe.world.entities[2].text.name="EMPTY"
         probe.world.entities[6].text.name="TEXT"
         local e,_,_,relations=evaluate(probe.world)
-        local changes,err,allocation=rules_api:Invoke("RW_PlanConversions",probe.world,relations)
+        local changes,err,allocation,_,_,_,rng=rules_api:Invoke("RW_PlanConversions",probe.world,relations)
         if not e or not changes then printerr("[RuleWorld] TEST FAILED: EMPTY TEXT plan",err); return end
-        local completed,status=world_api:Invoke("RW_Commit",probe,{consumes_turn=true,changes=changes,id_allocation=allocation})
+        local completed,status=world_api:Invoke("RW_Commit",probe,{consumes_turn=true,changes=changes,id_allocation=allocation,random_state=rng})
         if not status.accepted or not completed.world.entities[probe.world.next_entity_id]
             or completed.world.entities[probe.world.next_entity_id].text.name ~= "EMPTY" then
             printerr("[RuleWorld] TEST FAILED: EMPTY TEXT births"); return

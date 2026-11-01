@@ -1119,3 +1119,12 @@ Compiler/turn tests cover occlusion, FOLLOW, complements, occupied observers and
 Undo. Source matrices cover 3,920 EMPTY FACING, 640 FACEDBY and 59,904 real/EMPTY
 SEEING cases. Cell-based recursive invalidation differs from native checkedconds;
 conversion/movement orientation remains separate work. See MAKE.md.
+
+## M9.8E — EMPTY conversion direction and random transactions
+
+Query EMPTY direction for IS/BECOME/WRITE products. Ordinary products draw separately
+when unset; ALL groups share one draw, including fully denied selected groups.
+Carry optional seventh-result random_state in the conversion stage, preserving
+serial MAKE RNG, allocation atomicity and Undo. Retain raw frames for legacy
+relation-only callers. Turn tests and 180+30 installed conversion/ALL oracle cases
+cover direction, draws, replay, stale metadata and late failure. See EMPTY_CONVERSIONS.md.

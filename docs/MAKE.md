@@ -147,3 +147,7 @@ Installed-source comparisons add 3,920 EMPTY FACING and 640 EMPTY-observer FACED
 cases; the real/EMPTY SEEING matrix now covers 59,904 cases. Existing direction
 and MAKE source oracles remain separate checks. Startup remains 1,980,000 offline
 instructions. No native-rendering or manual acceptance is inferred.
+
+M9.8E also connects the direction query to EMPTY conversion products and carries
+conversion RNG through the scheduled stage. See EMPTY_CONVERSIONS.md for per-product
+versus shared ALL draws, tests and remaining lifecycle/parity limits.

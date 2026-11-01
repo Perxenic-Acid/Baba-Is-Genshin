@@ -1537,6 +1537,10 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
     if type(world) ~= "table" or type(world.entities) ~= "table"
         or not dense_list(conversions) then return nil,"invalid_conversion_input" end
     if back_count~=nil and (type(back_count)~="number" or back_count%1~=0 or back_count<0) then return nil,"invalid_back_clock" end
+    local direction_rules=generated_rules
+    if direction_rules==nil then for _,relation in ipairs(conversions) do
+        if type(relation)=="table" and relation.condition_rules then direction_rules=relation.condition_rules;break end
+    end end
     local targets,protected,forbidden,conditional={},{},{},{}
     for _,relation in ipairs(conversions) do
         if type(relation) ~= "table" or type(relation.source_type) ~= "string" or relation.source_type == "" then
@@ -1578,6 +1582,8 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
         ids={};for _,id in ipairs(world.unit_order) do ids[#ids+1]=id end
     else table.sort(ids) end
     local changes,next_id,created={},world.next_entity_id,0
+    local random_state=world.random_state or 1
+    local original_random_state=random_state
     local converted_ids={}
     local back_conversions={}
     local terminal_reason,group_products
@@ -1683,13 +1689,17 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
                 and not (becoming and target=="@all" and become_bans["@all"]) then
                 if target=="@all" then
                     if not virtual and entity.class~="text" then retain=true end
+                    local empty_all
+                    if virtual then empty_all={};products[#products+1]={empty_all=empty_all} end
                     for _,name in ipairs(RW_NounPalette(world)) do
                         if name~=source and not denied[name] then
                             local exists=false
                             for _,other in pairs(world.entities) do
                                 if other.x==entity.x and other.y==entity.y and other.class~="text" and other.archetype==name then exists=true end
                             end
-                            if not exists then products[#products+1]=name end
+                            if not exists then
+                                if empty_all then empty_all[#empty_all+1]=name else products[#products+1]=name end
+                            end
                         end
                     end
                     if becoming and not virtual then converted_ids[entity.id]=true end
@@ -1711,8 +1721,20 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
         local used=false
         local event={source=not virtual and query_clone(entity) or nil,
             empty=virtual and {x=entity.x,y=entity.y} or nil,product_ids={},removed=false}
-        for _,target in ipairs(products) do
+        for _,entry in ipairs(products) do
+            local direction
+            if virtual then
+                local why;direction,why=RW_QueryEmptyDirection(world,entity.x,entity.y,direction_rules)
+                if not direction then return nil,why end
+                if direction=="None" or direction=="Mid" then
+                    random_state=(random_state*48271)%2147483647
+                    direction=({"Right","Up","Left","Down"})[random_state%4+1]
+                end
+            end
+            local group=type(entry)=="table" and entry.empty_all or nil
+            for _,target in ipairs(group or {entry}) do
             local product=query_clone(entity)
+            if virtual then product.direction=direction end
             product.original_name=entity.original_name or (virtual and "@empty" or entity.class=="text" and "text_"..entity.text.name or entity.archetype)
             product.traits,product.behaviors,product.symbol=nil,nil,nil
             if target == "@text" or type(target) == "table" then
@@ -1743,6 +1765,7 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
                 local id=next_id
                 local ok,err=create(product); if not ok then return nil,err end
                 event.product_ids[#event.product_ids+1]=id
+            end
             end
         end
         event.removed=not virtual and not retain and (used or remove) or false
@@ -1798,7 +1821,8 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
         end; if terminal_reason then break end end
     end
     return changes,nil,created > 0 and {from=world.next_entity_id,to=next_id} or nil,converted_ids,terminal_reason,
-        #back_conversions>0 and back_conversions or nil
+        #back_conversions>0 and back_conversions or nil,
+        random_state~=original_random_state and {from=original_random_state,to=random_state} or nil
 end
 
 -- The authored vocabulary is the palette, not the objects remaining this frame.
@@ -2551,7 +2575,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         if effect.trait=="broken" then has_broken=true end
     end end
     for _,relation in ipairs(filtered) do
-        local needed=has_broken or (relation.op=="make" and relation.source_type=="@empty") or contains_rule_query(relation.when)
+        local needed=has_broken or relation.source_type=="@empty" or contains_rule_query(relation.when)
         for _,condition in ipairs(relation.exclusions or {}) do needed=needed or contains_rule_query(condition) end
         if needed then relation.condition_rules=generated end
     end

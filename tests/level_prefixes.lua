@@ -170,3 +170,23 @@ assert(RW_TestEntityCondition(context,condition,map)==true)
 context.last_input='move';assert(RW_TestEntityCondition(context,condition,map)==false)
 assert(not w._feeling_checked and not w._condition_guard and not w._condition_rules)
 print('PASS: scoped FEELING frozen declarations re-evaluate current input without persisting query caches')
+
+for _,case in ipairs({
+ {params={'ROCK'},rock=false,fires=true},
+ {params={'ROCK'},rock=true,fires=false},
+ {params={'ROCK','AND','ROCK'},rock=true,fires=true},
+ {params={'LEVEL'},fires=false},
+ {params={'LEVEL','AND','LEVEL'},fires=true},
+ {params={'NOT','LEVEL'},fires=false},
+ {params={'ROCK'},negative=true,rock=false,fires=false},
+ {params={'ROCK'},negative=true,rock=true,fires=true},
+ {params={'ROCK','AND','FLAG'},negative=true,rock=true,fires=false}
+}) do
+ local row=case.negative and {'LEVEL','NOT','WITHOUT'} or {'LEVEL','WITHOUT'};for _,word in ipairs(case.params) do row[#row+1]=word end
+ row[#row+1]='BECOME';row[#row+1]='FLAG'
+ local tree,parent=fixture({row});local w=RW_GetActiveLevel(tree).world
+ if case.rock then w.entities[3]={id=3,kind='object',class='object',archetype='rock',x=25,y=25,direction='Right'} end
+ local f=assert(RW_CompileWorld(w,cs));assert(#f.deferred==0)
+ local n=act(tree,wait);assert((n.active_id==parent)==case.fires,table.concat(row,' '))
+end
+print('PASS: scoped LEVEL WITHOUT global shortages, duplicate quotas, synthetic/physical LEVEL counts, complements and Undo')

@@ -974,3 +974,15 @@ Tree conversion/Undo and frozen-input queries pass; installed normalized FEELING
 comparisons now include the map (5,760 cases). Full regressions and catalog/layout
 audits pass; startup remains 1,980,000. Parent-dependent spatial conditions and
 pathological recursion/postrules equivalence remain documented gaps.
+
+## M9.7P — scoped LEVEL WITHOUT and real level count mapping
+
+Admit global WITHOUT/NOT WITHOUT in scoped conditions. Normalize real level_block
+names and synthetic source identity for original LEVEL quota/self adjustment.
+Tree conversion/Undo cases cover ordinary/duplicate/complement/negative clauses;
+the installed normalized oracle expands to 20,736 cases across map, real levels,
+Text, Empty and ordinary observers. Preserve the documented stable complement
+witness order instead of native table hash ordering. Parent spatial conditions
+remain deferred; no frontend or authored layout changes.
+Full regressions, catalog/layout audits and diff checks pass; startup remains
+1,980,000 instructions. Native acceptance is not inferred from offline checks.

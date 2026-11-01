@@ -476,7 +476,7 @@ local function without_condition(world,parameters,entity,negated)
         else
             local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
             for _,id in ipairs(ids) do local e=world.entities[id]
-                local name=e.class=="text" and "@text" or e.archetype
+                local name=e.class=="text" and "@text" or e.archetype=="level_block" and "@level" or e.archetype
                 if p.negative then
                     if name~=p.name and e.class~="text" and id~=entity.id and not used[id] then
                         used[id]=true;count=count+1
@@ -484,7 +484,7 @@ local function without_condition(world,parameters,entity,negated)
                     end
                 elseif name==p.name then count=count+1 end
             end
-            local own=entity.class=="text" and "@text" or entity.class=="empty" and "@empty" or entity.archetype
+            local own=entity.class=="text" and "@text" or entity.class=="empty" and "@empty" or (entity.class=="level" or entity.archetype=="level_block") and "@level" or entity.archetype
             if not p.negative and own==p.name then threshold=threshold+1 end
         end
         if count<threshold then allfound=allfound+1 end
@@ -2140,7 +2140,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         for _,clause in ipairs(node.clauses) do
             if clause.relation~="idle" and clause.relation~="often" and clause.relation~="seldom"
                 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3"
-                and clause.relation~="lonely" and clause.relation~="feeling" then return false end
+                and clause.relation~="lonely" and clause.relation~="feeling"
+                and clause.relation~="without" then return false end
         end
         for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
         return true

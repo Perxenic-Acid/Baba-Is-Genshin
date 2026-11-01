@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7O)
+# Scoped LEVEL conditions (M9.7P)
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -69,3 +69,9 @@ parameters through raw scoped condition instances. Mixes with other supported
 input/chance/POWERED/LONELY clauses use the shared path. Frozen queries re-evaluate
 conditions and BROKEN dynamically; they do not read old projections. See FEELING.md
 for the 5,760-case normalized source oracle and remaining recursive/postrules gaps.
+
+M9.7P adds global WITHOUT/NOT WITHOUT, including noun/Text/Empty/LEVEL counts,
+repeated quotas and complement parameters. It needs no parent coordinates.
+Physical level_block counts map to LEVEL while the synthetic observer stays
+unallocated. See WITHOUT.md for the normalized 20,736-case installed oracle and
+its documented native complement-order difference.

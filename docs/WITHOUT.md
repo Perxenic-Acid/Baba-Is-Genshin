@@ -41,3 +41,19 @@ is waived, so offline results do not establish native runtime parity.
 
 The sparse MOTION room adds a loose WITHOUT, replacing one redundant loose IS;
 room dimensions and three-cell word spacing remain unchanged. Next: FACEDBY/SEEING.
+
+## M9.7P scoped LEVEL and physical count mapping
+
+WITHOUT is global and does not consume parent surroundings. Scoped LEVEL now uses
+the same raw condition path as input/chance/POWERED/FEELING. Preserve the original
+single-LEVEL parameter adjustment and source-name threshold for synthetic LEVEL;
+physical level_block units count under the LEVEL name, including complementary
+parameters and self-exclusion. The synthetic observer is never an occupied cell
+or allocated unit. Test conditional scoped conversion and whole-tree Undo.
+
+The expanded installed oracle includes synthetic and physical LEVEL observers,
+zero through two physical levels, duplicate LEVEL parameters and mixed quotas
+(20,736 cases). Complement traversal is explicitly normalized to stable identity
+order, matching the existing documented deliberate difference from native pairs
+ordering. Native direct noun counts remain untouched in the oracle. Full native
+postrules parity and virtual EMPTY lifecycle remain outside this change.

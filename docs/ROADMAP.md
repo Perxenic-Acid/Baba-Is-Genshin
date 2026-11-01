@@ -1100,3 +1100,12 @@ identities. Preserve planned RNG, error propagation, late terminal checks and Un
 Tests cover vacancy changes, BROKEN, exclusions, ALL, replay and CRASH; 15 installed
 MAKE branch cases compare unset-facing products/draws. The shared virtual emptydir
 directional/FOLLOW subsystem remains pending, as documented in MAKE.md.
+
+## M9.8C — queried EMPTY direction for MAKE
+
+Retain mixed cardinal/FOLLOW declaration order in transient compiler metadata.
+Query per cell from the current frozen frame: SLEEP/BROKEN, conditions/exclusions,
+nearest/last-tie targets, positive FACING/SEEING autofail and later IS overrides.
+Known directions avoid RNG draws; retain normal allocation/Commit/Undo. Full turn
+regressions and 2,744 installed emptydir oracle cases pass; startup stays 1,980,000.
+General virtual observers/conversion/movement orientation remains a separate gap.

@@ -88,9 +88,38 @@ Tests cover duplicate overlap, Text, spatial/negative rules, BROKEN, ALL, replay
 late CRASH and Undo. Fifteen cases execute the installed EMPTY branch including
 random draws for a non-producing EMPTY target.
 
-EMPTY direction remains the current virtual None convention: MAKE draws a pure
-planned direction. Original emptydir's directional/FOLLOW declarations and its
-FACING/SEEING condition suppression still need the shared virtual orientation
-subsystem; this milestone does not claim that parity. Scoped LEVEL sources and
+At this milestone EMPTY used the virtual None convention and a planned random
+direction; M9.8C below supersedes that MAKE limitation. Scoped LEVEL sources and
 EMPTY destruction/HAS are separate remaining lifecycle work. No native acceptance
 is inferred from offline tests.
+
+## M9.8C queried EMPTY direction for MAKE
+
+RW_QueryEmptyDirection follows installed tools.lua:1339 emptydir over the current
+raw/frozen declaration frame. Ordered cardinal IS declarations overwrite facing;
+the first FOLLOW target list with an eligible non-overlapping target locks further
+FOLLOW searches, while later cardinal IS declarations still overwrite it. Nearest
+Manhattan targets use the last equal-distance witness and favor the vertical axis
+on a diagonal. Physical traversal is normalized to stable ID order. FOLLOW ALL,
+EMPTY and LEVEL are not orientation targets. SLEEP or dynamic BROKEN yields None.
+
+The compiler retains the mixed direction/FOLLOW declaration order as transient
+empty_directions metadata, including source conditions and target exclusions.
+EMPTY MAKE receives this frame even without other rule-query conditions. MAKE
+queries direction before drawing; a known direction consumes no RNG. No virtual
+identity, saved facing, inherited behavior cache or additional mapped script is
+introduced. Positive FACING/SEEING clauses autofail during the direct direction
+declaration query, as testcond's native autofail list specifies; they are not simply
+ignored. Negated clauses retain their normal query behavior.
+
+Compiler/turn tests cover order, conditions/NOT, SLEEP/BROKEN, FOLLOW, RNG-free
+products and Undo. tests/reference_empty_direction.lua executes the installed
+emptydir across 2,744 ordering/target/condition/SLEEP cases. Existing 1,200 real-unit
+and 15 EMPTY MAKE source-oracle cases continue passing. Startup remains 1,980,000
+instructions. Native acceptance is not inferred.
+
+This connects the shared query to MAKE only. General virtual EMPTY condition
+observers, conversions and movement still use their documented None convention;
+their recursive emptydir/testcond invalidation must be integrated separately.
+Original postrules condition rewrites and mutable native unit-list ordering beyond
+the explicit normalized cases remain known parity boundaries.

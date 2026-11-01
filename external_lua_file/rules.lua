@@ -605,7 +605,7 @@ local function facedby_condition(world,parameters,entity,negated)
     return negated and not found or not negated and found
 end
 -- Contextual conditions are tested against one identity (or one virtual Empty cell).
-function RW_TestEntityCondition(world,node,entity)
+function RW_TestEntityCondition(world,node,entity,emptydir_autofail)
     if type(entity)=="table" and entity.broken==1 then return false end
     if type(entity)=="table" then
         local disabled,err=virtual_broken(world,entity)
@@ -615,13 +615,13 @@ function RW_TestEntityCondition(world,node,entity)
     if type(node) ~= "table" then return nil,"invalid_condition" end
     if node.op == "always" then return true end
     if node.op == "not" then
-        local value,err=RW_TestEntityCondition(world,node.condition,entity)
+        local value,err=RW_TestEntityCondition(world,node.condition,entity,emptydir_autofail)
         if value == nil then return nil,err end;return not value
     end
     if node.op == "all" then
         if not dense_list(node.terms) then return nil,"invalid_condition_terms" end
         local result=true
-        for _,term in ipairs(node.terms) do local v,e=RW_TestEntityCondition(world,term,entity)
+        for _,term in ipairs(node.terms) do local v,e=RW_TestEntityCondition(world,term,entity,emptydir_autofail)
             if v == nil then return nil,e end;result=result and v end
         return result
     end
@@ -649,7 +649,7 @@ function RW_TestEntityCondition(world,node,entity)
     end
     local result=true
     for _,condition in ipairs(node.requirements or {}) do
-        local enabled,err=RW_TestEntityCondition(world,condition,entity)
+        local enabled,err=RW_TestEntityCondition(world,condition,entity,emptydir_autofail)
         if enabled==nil then return nil,err end
         result=result and enabled
     end
@@ -699,7 +699,9 @@ function RW_TestEntityCondition(world,node,entity)
             end
         end
         for _,index in ipairs(remove) do table.remove(parameters,index-offset);offset=offset+1 end
-        if entity.class=="level" and (clause.relation=="facing" or clause.relation=="seeing") then
+        if emptydir_autofail and not clause.negated and (clause.relation=="facing" or clause.relation=="seeing") then
+            return false
+        elseif entity.class=="level" and (clause.relation=="facing" or clause.relation=="seeing") then
             result=result and level_facing_condition(world,parameters,clause.negated)
         elseif entity.class=="level" and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto"
             or clause.relation=="above" or clause.relation=="below" or clause.relation=="besideleft" or clause.relation=="besideright") then
@@ -2204,6 +2206,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     local predicate_bans={}
     local play_bans={}
     local scoped_write_bans,scoped_text_bans={},{}
+    local empty_directions={}
     local function add_ban(store,verb,key,target,condition)
         store[verb]=store[verb] or {};local bans=store[verb]
         bans[key]=bans[key] or {};bans[key][target]=bans[key][target] or {}
@@ -2268,6 +2271,10 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local level_subject=subject.tag=="noun" and subject.type and subject.type.tag=="level"
             if level_subject and sem and sem.noun=="write_text" then key=subject.type.block_type or "level_block" end
             local special=key == "@text" or key == "@empty"
+            if key=="@empty" and sem and sem.property=="grant_trait" and not objnot and obj.tag=="property"
+                and (obj.name=="right" or obj.name=="up" or obj.name=="left" or obj.name=="down") then
+                empty_directions[#empty_directions+1]={op="direction",trait=obj.name,when=query_clone(ast.when)}
+            end
             local has_start=#relations+1
             if level_subject and sem and sem.noun=="transform" and objnot and obj.tag=="special" and obj.name=="text" and level_conditions(ast.when) then
                 scoped_text_bans[#scoped_text_bans+1]=query_clone(ast.when)
@@ -2294,7 +2301,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 if objnot then add_ban(play_bans,ast.verb,key,obj.name,ast.when)
                 else relations[#relations+1]={op="play",source_type=key,note=obj.name,when=query_clone(ast.when),verb=ast.verb} end
                 supported=true
-            elseif sem and key and (key~="@empty" or sem.noun=="make") and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
+            elseif sem and key and (key~="@empty" or sem.noun=="make" or sem.noun=="follow") and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
                 and (not objnot or sem.negative_noun=="forbid_"..sem.noun) then
                 local target=subject_key(obj)
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
@@ -2307,6 +2314,9 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                         for _,name in ipairs(targets) do
                             relations[#relations+1]={op=sem.noun,source_type=key,target_type=name,
                                 origin=target,verb=ast.verb,source=ast.source,when=query_clone(ast.when)}
+                            if key=="@empty" and sem.noun=="follow" and target~="@all" and name~="@empty" and name~="level_block" then
+                                empty_directions[#empty_directions+1]={op="follow",relation=relations[#relations]}
+                            end
                             if sem.noun=="make" and subj.tag=="special" and subj.name=="all" and not subnot
                                 and obj.tag=="special" and obj.name=="all" then
                                 relations[#relations+1]=query_clone(relations[#relations])
@@ -2480,6 +2490,9 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     if #scoped_conditions>0 then
         generated[#generated+1]={when={op="always"},effects={},scoped_conditions=scoped_conditions}
     end
+    if #empty_directions>0 then
+        generated[#generated+1]={when={op="always"},effects={},empty_directions=query_clone(empty_directions)}
+    end
     local context=condition_context(world,generated)
     local level_broken,why=query_level_trait(context,"broken")
     if level_broken==nil then return nil,why end
@@ -2522,7 +2535,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         if effect.trait=="broken" then has_broken=true end
     end end
     for _,relation in ipairs(filtered) do
-        local needed=has_broken or contains_rule_query(relation.when)
+        local needed=has_broken or (relation.op=="make" and relation.source_type=="@empty") or contains_rule_query(relation.when)
         for _,condition in ipairs(relation.exclusions or {}) do needed=needed or contains_rule_query(condition) end
         if needed then relation.condition_rules=generated end
     end
@@ -2891,6 +2904,70 @@ end
 
 function RW_ResolveFearTargets(world,relations) return RW_ResolveVerbTargets(world,relations,"fear") end
 
+-- Original emptydir is a query over ordered declarations, not saved EMPTY state.
+-- FOLLOW locks its first successful target list; later IS directions still win.
+function RW_QueryEmptyDirection(world,x,y,rules)
+    local context=condition_context(world,rules)
+    local source={class="empty",x=x,y=y,direction="None"}
+    local sleeping,why=query_trait(context,source,"sleep")
+    if sleeping==nil then return nil,why end
+    if sleeping then return "None" end
+    local disabled;disabled,why=virtual_broken(context,source)
+    if disabled==nil then return nil,why end
+    if disabled then return "None" end
+    local direction,followed="None",false
+    local names={right="Right",up="Up",left="Left",down="Down"}
+    for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+        local declarations,explicit={},false
+        for _,row in ipairs(frame) do if row.empty_directions then
+            explicit=true
+            for _,d in ipairs(row.empty_directions) do declarations[#declarations+1]=d end
+        end end
+        if not explicit then
+            for _,row in ipairs(frame) do for _,effect in ipairs(row.effects or {}) do
+                if effect.op=="grant_trait" and names[effect.trait] and effect.target and effect.target.kind=="empty" then
+                    declarations[#declarations+1]={op="direction",trait=effect.trait,when=row.when}
+                end
+            end end
+        end
+        for _,d in ipairs(declarations) do
+            if d.op=="direction" then
+                local active;active,why=RW_TestEntityCondition(context,d.when,source,true)
+                if active==nil then return nil,why end
+                if active then
+                    local granted;granted,why=query_trait(context,source,d.trait)
+                    if granted==nil then return nil,why end
+                    if granted then direction=names[d.trait] end
+                end
+            elseif d.op=="follow" and not followed then
+                local relation=d.relation
+                local active;active,why=RW_TestEntityCondition(context,relation.when,source,true)
+                if active==nil then return nil,why end
+                for _,condition in ipairs(relation.exclusions or {}) do
+                    local excluded;excluded,why=RW_TestEntityCondition(context,condition,source,true)
+                    if excluded==nil then return nil,why end
+                    if excluded then active=false end
+                end
+                if active then
+                    local selector=relation.target_type=="@text" and {kind="class",value="text"}
+                        or {kind="archetype",value=relation.target_type}
+                    local distance=9999
+                    for _,id in ipairs(RW_SelectEntities(world,selector)) do
+                        local target=world.entities[id];local dx,dy=target.x-x,target.y-y
+                        local dist=math.abs(dx)+math.abs(dy)
+                        if dist>0 and dist<=distance then
+                            distance=dist;followed=true
+                            if math.abs(dx)<=math.abs(dy) then direction=dy>=0 and "Down" or "Up"
+                            else direction=dx>0 and "Right" or "Left" end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return direction
+end
+
 -- Original block() MAKE: inspect existing non-converted occupants only. Products
 -- of this same MAKE phase do not inhibit later duplicate declarations.
 function RW_PlanMakeProducts(world,relations,converted)
@@ -2925,6 +3002,10 @@ function RW_PlanMakeProducts(world,relations,converted)
                 if enabled==nil then return nil,why end
                 if enabled then
                     local direction=source.direction
+                    if source.class=="empty" then
+                        direction,why=RW_QueryEmptyDirection(world,source.x,source.y,relation.condition_rules)
+                        if not direction then return nil,why end
+                    end
                     if direction=="None" or direction=="Mid" then direction=random_direction() end
                     local target=relation.target_type
                     local blocked=false

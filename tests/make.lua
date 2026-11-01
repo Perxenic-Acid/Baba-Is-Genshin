@@ -170,3 +170,38 @@ s=empty_fixture({{'EMPTY','MAKE','FLAG'},{'EMPTY','MAKE','NOT','FLAG'}})
 n=step(s);assert(n.world.next_entity_id==s.world.next_entity_id and n.world.random_state==nil)
 local bad,why=RW_PlanMakeProducts(s.world,{{op='make',source_type='@empty',target_type='flag',when={op='invalid'}}})
 assert(not bad and why=='invalid_spatial_condition' and s.world.random_state==nil,tostring(why))
+
+-- EMPTY orientation is queried from the frozen declaration frame, without an ID.
+s=empty_fixture({{'EMPTY','NEAR','ROCK','MAKE','FLAG'},{'EMPTY','IS','LEFT'}})
+n=step(s);births=0
+for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id then assert(e.direction=='Left');births=births+1 end end
+assert(births==8 and n.world.random_state==nil)
+s=empty_fixture({{'EMPTY','NEAR','ROCK','MAKE','FLAG'},{'EMPTY','FOLLOW','ROCK'}})
+n=step(s)
+for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id then
+    local dx,dy=6-e.x,3-e.y
+    local expected=math.abs(dx)<=math.abs(dy) and (dy>=0 and 'Down' or 'Up') or (dx>0 and 'Right' or 'Left')
+    assert(e.direction==expected)
+end end
+assert(n.world.random_state==nil)
+local function empty_direction(rows,x,y)
+    local s=empty_fixture(rows);local frame=assert(RW_CompileWorld(s.world,cs))
+    return assert(RW_QueryEmptyDirection(s.world,x or 6,y or 4,frame.rules)),s,frame
+end
+assert(empty_direction({{'EMPTY','IS','RIGHT'},{'EMPTY','IS','UP'}})=='Up')
+assert(empty_direction({{'EMPTY','IS','UP'},{'EMPTY','IS','RIGHT'}})=='Right')
+assert(empty_direction({{'EMPTY','FOLLOW','ROCK'},{'EMPTY','IS','LEFT'}})=='Left')
+assert(empty_direction({{'EMPTY','IS','LEFT'},{'EMPTY','FOLLOW','ROCK'}})=='Up')
+assert(empty_direction({{'EMPTY','FOLLOW','ROCK'},{'EMPTY','FOLLOW','AVATAR'}})=='Up')
+assert(empty_direction({{'EMPTY','FOLLOW','ALL'}})=='None')
+assert(empty_direction({{'EMPTY','FOLLOW','EMPTY'}})=='None')
+assert(empty_direction({{'EMPTY','IS','UP'},{'EMPTY','IS','NOT','UP'}})=='None')
+assert(empty_direction({{'EMPTY','FOLLOW','ROCK'},{'EMPTY','FOLLOW','NOT','ROCK'}})=='None')
+assert(empty_direction({{'EMPTY','IS','UP'},{'EMPTY','IS','SLEEP'}})=='None')
+assert(empty_direction({{'EMPTY','IS','UP'},{'EMPTY','IS','BROKEN'}})=='None')
+assert(empty_direction({{'EMPTY','FACING','ROCK','IS','UP'}})=='None')
+assert(empty_direction({{'EMPTY','SEEING','ROCK','IS','UP'}})=='None')
+assert(empty_direction({{'EMPTY','NOT','FACING','ROCK','IS','UP'}})=='Up')
+assert(empty_direction({{'EMPTY','NEAR','ROCK','IS','LEFT'}},1,1)=='None')
+assert(empty_direction({{'EMPTY','NEAR','ROCK','IS','LEFT'}})=='Left')
+print('PASS: EMPTY MAKE ordered directions/FOLLOW/NOT, per-cell conditions, SLEEP/BROKEN, positive FACING/SEEING autofail, RNG-free facing and Undo')

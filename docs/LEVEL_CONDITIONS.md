@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7W)
+# Scoped LEVEL conditions (M9.7X)
 
 Current status: all condition/prefix syntax currently registered by this engine
 can lower for scoped LEVEL consumers that already have typed scoped semantics.
@@ -227,3 +227,18 @@ Tree tests cover LEVEL ON ROCK IS WIN and NOT ON activation/retraction after SIN
 whole-tree Undo and atomic injected late failure. Scoped conversions still retain
 their pre-contact selection and existing conversion-before-terminal priority;
 this change does not rerun earlier conversion phases.
+
+## M9.7X newborn witnesses and no-op query reuse
+
+MAKE/HAS newborns are current child witnesses for later frozen scoped condition
+queries: newly created ROCK/FLAG can activate LEVEL ON ... IS WIN in the same turn,
+without re-running earlier destruction or conversion. Compiler/tree regressions
+cover MAKE positive/NOT changes, HAS after SINK and whole-tree Undo.
+
+Reuse the scoped traits selected by the immediately preceding contact compilation
+for the first projection. Thereafter refresh only when the phase has actual change
+operations; zero-change contact/EAT/MAKE/BONUS plans cannot alter child witnesses,
+status or fixed input/chance/surroundings. The final tree projection still queries
+once to include later code-status/orientation work. A counter test requires exactly
+one scoped query for a clean no-op wait, with accepted Commit/Undo. This supersedes
+M9.7W's redundant first/no-op refresh calls; mutation and error semantics remain.

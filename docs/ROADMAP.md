@@ -1060,3 +1060,13 @@ tree Undo and injected late query failure preserve atomicity. No conversion repl
 Text recompile or query cache persistence is introduced.
 Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
 instructions. Tests also preserve ordered WIN/DEFEAT and duplicate grants.
+
+## M9.7X — newborn scoped witnesses and no-op refresh reuse
+
+Verify MAKE/HAS products affect same-turn scoped WIN/NOT conditions after their
+creation phases, retaining frozen declarations and whole-tree Undo. Reuse freshly
+compiled scoped traits for first/no-op contact projections instead of repeating
+queries through all six empty phases. Keep mutation refreshes and final tree query;
+a call-count/accepted Commit/Undo test guards the optimization.
+Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
+instructions. No real-device result is inferred from offline checks.

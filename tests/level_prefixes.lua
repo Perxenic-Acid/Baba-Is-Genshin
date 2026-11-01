@@ -321,3 +321,28 @@ for _,traits in ipairs({{'WIN','DEFEAT'},{'DEFEAT','WIN'},{'WIN','WIN'}}) do
  assert(#projected==2 and projected[1]==traits[1]:lower() and projected[2]==traits[2]:lower())
 end
 print('PASS: frozen scoped projection preserves WIN/DEFEAT declaration order and duplicate property instances')
+
+services.make=function(w,r,c,rules)
+ local products,rng=RW_PlanMakeProducts(w,r,c)
+ local plan,why=RW_PlanCreate(w,products);if not plan then return nil,why end
+ plan.random_state=rng;return plan
+end
+for _,negative in ipairs({false,true}) do
+ local row=negative and {'LEVEL','NOT','ON','ROCK','IS','WIN'} or {'LEVEL','ON','ROCK','IS','WIN'}
+ local tree,parent=fixture({row,{'AVATAR','MAKE','ROCK'}})
+ local n=act(tree,wait);assert((n.active_id==parent)==not negative)
+end
+local tree,parent=fixture({{'LEVEL','ON','FLAG','IS','WIN'},{'ROCK','HAS','FLAG'}})
+local w=RW_GetActiveLevel(tree).world
+w.entities[3]={id=3,kind='object',class='object',archetype='rock',x=25,y=25,direction='Right'}
+w.entities[4]={id=4,kind='object',class='object',archetype='crate',x=25,y=25,direction='Right'}
+w.rule_sources[#w.rule_sources+1]={when={op='always'},effects={{op='grant_trait',trait='sink',target={kind='id',value=4}}}}
+local n=act(tree,wait);assert(n.active_id==parent)
+local tree=fixture({{'LEVEL','IS','SAFE'}});local count=0
+local counted={};for k,v in pairs(services) do counted[k]=v end
+counted.level_traits=function(w,rules) count=count+1;return RW_QueryLevelTraits(w,rules) end
+local p,e=RW_PlanLevelAction(tree,wait,counted);assert(p,e and e.reason)
+assert(count==1,'no-op contact phases must reuse the freshly compiled scoped traits')
+local committed,result=RW_CommitLevelTree(tree,p);assert(result.accepted)
+assert(RW_GetActiveLevel(RW_UndoLevelTree(committed)).world==RW_GetActiveLevel(tree).world)
+print('PASS: MAKE/HAS newborn witnesses refresh scoped WIN; no-op contacts reuse compiled traits with one final query')

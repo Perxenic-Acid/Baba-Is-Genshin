@@ -696,8 +696,6 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             if not traits then return nil,why end
             plan.level_traits=traits;return true
         end
-        local scoped_ok,scoped_error=refresh_scoped()
-        if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
         if services.play then
             local active=false
             for _,relation in ipairs(frozen_relations or {}) do if relation.op=="play" then active=true;break end end
@@ -732,8 +730,10 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 if change.kind == "create" then weak_new[change.entity_id]=true end
             end
             complete=next_world
-            local scoped_ok,scoped_error=refresh_scoped()
-            if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
+            if #contact.changes>0 then
+                local scoped_ok,scoped_error=refresh_scoped()
+                if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
+            end
             if contact.infinite_loop or contact.too_complex then
                 plan.infinite_loop,plan.too_complex,plan.reason=contact.infinite_loop,contact.too_complex,contact.reason
                 return plan,nil,trace
@@ -754,8 +754,10 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 plan.stages[#plan.stages+1]={name="eat",plan=eat}
                 for _,change in ipairs(eat.changes) do plan.changes[#plan.changes+1]=change end
                 complete=next_world
-                local scoped_ok,scoped_error=refresh_scoped()
-                if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
+                if #eat.changes>0 then
+                    local scoped_ok,scoped_error=refresh_scoped()
+                    if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
+                end
                 trace[#trace+1]="eat"
                 if eat.infinite_loop or eat.too_complex then
                     plan.infinite_loop,plan.too_complex,plan.reason=eat.infinite_loop,eat.too_complex,eat.reason
@@ -780,8 +782,10 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 plan.stages[#plan.stages+1]={name="make",plan=creation}
                 for _,change in ipairs(creation.changes) do plan.changes[#plan.changes+1]=change end
                 complete=next_world
-                local scoped_ok,scoped_error=refresh_scoped()
-                if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
+                if #creation.changes>0 then
+                    local scoped_ok,scoped_error=refresh_scoped()
+                    if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
+                end
                 trace[#trace+1]="make"
                 if creation.infinite_loop or creation.too_complex then
                     plan.infinite_loop,plan.too_complex,plan.reason=creation.infinite_loop,creation.too_complex,creation.reason
@@ -844,8 +848,10 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 for _,event in ipairs(bonus.events or {}) do if event.kind=="bonus" then plan.events[#plan.events+1]=event end end
                 plan.bonus_win_contact=bonus.win_contact
                 complete=next_world
-                local scoped_ok,scoped_error=refresh_scoped()
-                if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
+                if #bonus.changes>0 then
+                    local scoped_ok,scoped_error=refresh_scoped()
+                    if not scoped_ok then return after_failure(plan,"contact_level_traits",scoped_error) end
+                end
                 trace[#trace+1]="bonus"
                 if bonus.infinite_loop or bonus.too_complex then
                     plan.infinite_loop,plan.too_complex,plan.reason=bonus.infinite_loop,bonus.too_complex,bonus.reason
@@ -2449,7 +2455,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7W initialized")
+    print("[RuleWorld] M9.7X initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

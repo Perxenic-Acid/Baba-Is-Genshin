@@ -66,6 +66,27 @@ local function valid_id(id)
     return is_integer(id) and id > 0 and id <= MAX_ID
 end
 
+local function valid_unit_order(world)
+    if world.unit_order==nil then return true end
+    if not is_list(world.unit_order) then return false end
+    local seen,count={},0
+    for _,id in ipairs(world.unit_order) do
+        if not valid_id(id) or not world.entities[id] or seen[id] then return false end
+        seen[id]=true;count=count+1
+    end
+    for id in pairs(world.entities) do if not seen[id] then return false end end
+    return true
+end
+local function unit_ids(world)
+    if world.unit_order then return clone(world.unit_order) end
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids);return ids
+end
+function RW_UnitIds(world)
+    if type(world)~="table" or type(world.entities)~="table" or not valid_unit_order(world) then return nil,"invalid_unit_order" end
+    return unit_ids(world)
+end
+
+
 local function same_state(a, b, seen)
     if type(a) ~= type(b) then return false end
     if type(a) ~= "table" then return a == b end
@@ -170,6 +191,7 @@ local function validate_plan(world, plan)
         or not is_list(plan.changes) then
         return false, "invalid_plan"
     end
+    if not valid_unit_order(world) then return false,"invalid_unit_order" end
     if plan.bonus_state~=nil then
         local b=plan.bonus_state
         if type(b)~="table" or not is_integer(b.from) or not is_integer(b.to)
@@ -362,6 +384,19 @@ local function validate_plan(world, plan)
         end
     end
 
+    if plan.unit_sequence~=nil then
+        if not is_list(plan.unit_sequence) then return false,"invalid_unit_sequence" end
+        local expected,actual={},{}
+        for _,op in ipairs(plan.changes) do
+            if op.kind=="create" or op.kind=="delete" or op.kind=="transform" or op.kind=="retype" or op.kind=="back_restore" then expected[op.entity_id]=true end
+        end
+        for _,id in ipairs(plan.unit_sequence) do
+            if not expected[id] or actual[id] then return false,"invalid_unit_sequence" end
+            actual[id]=true
+        end
+        for id in pairs(expected) do if not actual[id] then return false,"invalid_unit_sequence" end end
+    end
+
     for _,operations in pairs(seen) do
         if operations.retype or operations.back_restore then
             local exclusive=operations.retype and "retype" or "back_restore"
@@ -391,6 +426,37 @@ end
 -- if it precedes a movement/transform in the operation list.
 local function apply_plan(world, plan)
     local projected = clone(world)
+    local structural=plan.back_conversions~=nil
+    if not structural then for _,op in ipairs(plan.changes) do
+        if op.kind=="create" or op.kind=="delete" or op.kind=="transform" or op.kind=="retype" or op.kind=="back_restore" then structural=true;break end
+    end end
+    if structural then
+        local order=unit_ids(world)
+        local function remove(id) for i=#order,1,-1 do if order[i]==id then table.remove(order,i) end end end
+        local function append(id) remove(id);order[#order+1]=id end
+        local covered={}
+        for _,event in ipairs(plan.back_conversions or {}) do
+            if event.removed then remove(event.source.id);covered[event.source.id]=true end
+            for _,id in ipairs(event.product_ids) do append(id);covered[id]=true end
+        end
+        local lifetime,ids={},{}
+        for _,op in ipairs(plan.changes) do if not covered[op.entity_id] then
+            if op.kind=="delete" or op.kind=="create" or op.kind=="transform" or op.kind=="retype" or op.kind=="back_restore" then
+                if not lifetime[op.entity_id] then lifetime[op.entity_id]={};ids[#ids+1]=op.entity_id end
+                lifetime[op.entity_id][#lifetime[op.entity_id]+1]=op
+            end
+        end end
+        table.sort(ids)
+        if plan.unit_sequence then ids=plan.unit_sequence end
+        for _,id in ipairs(ids) do for _,op in ipairs(lifetime[id] or {}) do
+            if op.kind=="delete" then remove(id) else append(id) end
+        end end
+        -- Terminal deletes win even when another operation writes the same ID.
+        for _,op in ipairs(plan.changes) do if op.kind=="delete" then remove(op.entity_id) end end
+        local canonical=true
+        for i=2,#order do if order[i]<order[i-1] then canonical=false;break end end
+        projected.unit_order=not canonical and order or nil
+    end
     for _, change in ipairs(plan.changes) do
         local entity = projected.entities[change.entity_id]
         if change.kind == "create" then
@@ -659,7 +725,7 @@ end
 
 -- Level definitions are reusable data; sessions own independent runtime snapshots.
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
-local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, infinite_loop=true, too_complex=true,
+local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, unit_order=true, infinite_loop=true, too_complex=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
     behavior_registry=true,board_offset=true,random_state=true,last_input=true,chance_seed=true,bonus_count=true}
 
@@ -690,7 +756,7 @@ local function validate_definition(definition)
     for key in pairs(world) do if not WORLD_FIELDS[key] then return false end end
     if not is_integer(world.width) or world.width < 1
         or not is_integer(world.height) or world.height < 1
-        or type(world.entities) ~= "table" or not valid_frontier(world) then return false end
+        or type(world.entities) ~= "table" or not valid_frontier(world) or not valid_unit_order(world) then return false end
     if world.bonus_count~=nil and (not is_integer(world.bonus_count) or world.bonus_count<0 or world.bonus_count>MAX_ID) then return false end
     if world.random_state~=nil and not valid_random_state(world.random_state) then return false end
     if world.chance_seed~=nil and not valid_random_state(world.chance_seed) then return false end
@@ -775,10 +841,10 @@ local function preview_transaction(world, plan)
         local result=apply_plan(world,plan)
         if plan.infinite_loop then result.infinite_loop=true end
         if plan.too_complex then result.too_complex=true end
-        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.infinite_loop == true or plan.too_complex == true
+        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.infinite_loop == true or plan.too_complex == true or not same_state(world.unit_order,result.unit_order)
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
-        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.back_conversions~=nil
+        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.back_conversions~=nil or plan.unit_sequence~=nil
         or not is_list(plan.stages) or #plan.stages == 0 or #plan.stages > 32 then
         return nil,"invalid_stage_sequence"
     end
@@ -793,7 +859,9 @@ local function preview_transaction(world, plan)
         if not valid then return nil,reason,nil,stage.name end
         if not stage.plan.consumes_turn then return nil,"non_consuming_stage",nil,stage.name end
         for _, change in ipairs(stage.plan.changes) do summary[#summary+1]=change end
-        current = apply_plan(current,stage.plan)
+        local next_world = apply_plan(current,stage.plan)
+        changed = changed or not same_state(current.unit_order,next_world.unit_order)
+        current = next_world
         changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil or stage.plan.random_state~=nil or stage.plan.input_state~=nil or stage.plan.chance_state~=nil or stage.plan.bonus_state~=nil
     end
     if not same_state(plan.changes,summary) then return nil,"stage_summary_mismatch" end
@@ -842,7 +910,7 @@ local function valid_turn_records(records,count)
 end
 local function journal_phase(plan,name)
     local phase={name=type(name)=="string" and name or nil,changes=clone(plan.changes),back_format=1}
-    for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","infinite_loop","too_complex","back_conversions"}) do
+    for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","infinite_loop","too_complex","back_conversions","unit_sequence"}) do
         if plan[key]~=nil then phase[key]=clone(plan[key]) end
     end
     return phase
@@ -1350,6 +1418,13 @@ function RW_ReloadLevel(tree,id)
                 entity.class,entity.archetype,entity.text="text",nil,{name="LEVEL"}
             else entity.archetype = archetype end
         end
+    end
+    if session.world.unit_order then
+        local order,seen={},{}
+        for _,entity_id in ipairs(session.world.unit_order) do if session.world.entities[entity_id] then order[#order+1]=entity_id;seen[entity_id]=true end end
+        local extra={};for entity_id in pairs(session.world.entities) do if not seen[entity_id] then extra[#extra+1]=entity_id end end;table.sort(extra)
+        for _,entity_id in ipairs(extra) do order[#order+1]=entity_id end
+        session.world.unit_order=order
     end
     local result = copy_map(tree)
     result.instances = copy_map(tree.instances)
@@ -2540,7 +2615,7 @@ function RW_BackHistoryRows(before,record)
     for _,phase in ipairs(record.phases) do
         if type(phase)~="table" or not is_list(phase.changes) then return nil,"invalid_back_history" end
         local plan={consumes_turn=true,changes=phase.changes}
-        for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","back_conversions"}) do plan[key]=phase[key] end
+        for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","back_conversions","unit_sequence"}) do plan[key]=phase[key] end
         local after,reason=RW_PreviewPlan(current,plan)
         if not after then return nil,reason end
         local covered={}

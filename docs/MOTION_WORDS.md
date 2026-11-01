@@ -230,3 +230,9 @@ FOLLOW stores/compares back_identity (falling back to entity ID) for adjacent
 memory and priorities. Physical self-exclusion remains by instance. Added 750
 unchanged original FOLLOW cases with aliased targets and memory IDs. See BACK.md
 for shared HOLD lookup and the remaining native unit-list ordering gap.
+
+
+M9.6U adds optional world.unit_order to FOLLOW source/target traversal after
+replacement or creation, with 750 additional noncanonical-order installed cases.
+This resolves the shared-identity tie gap described above for FOLLOW/HOLD/BACK;
+other native mutable movement scheduling remains separate work.

@@ -751,3 +751,16 @@ memory updates. Allow logical self-ID acquisition only with another matching
 instance. Added 750 installed FOLLOW and 128 HOLD/getunitid oracle cases plus
 Commit/Undo tests. Native creation/reinsertion list order remains separate work;
 see BACK.md. BACK production scheduling remains pending.
+
+
+## M9.6U — persistent unit-list order for BACK/FOLLOW/HOLD
+
+Track optional physical unit_order through structural Preview/Commit, including
+same-name conversion reorder without shape changes. Keep flat independent plans
+permutation-invariant and preserve explicit native lifetime order via unit_sequence.
+FOLLOW/HOLD, conversion sources and BACK selection/playback now consume that order.
+Validate complete lists, persist phase metadata and restore order with local/tree
+Undo or authored boundary reload. Added 80 installed append/remove/lookup structural
+turns, 750 noncanonical FOLLOW and 128 HOLD cases, plus ordering/validation/boundary
+tests. Existing BROKEN and other solver scheduling contracts stay unchanged;
+production BACK status/scheduling/TELE/reading barriers remain pending.

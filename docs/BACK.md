@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6T)
+# BACK infrastructure progress (M9.6U)
 
 ## Installed primary references
 
@@ -202,16 +202,42 @@ separate matching partner and retains stale/atomic checks.
 750 additional unchanged installed FOLLOW cases and 128 installed HOLD/getunitid
 cases cover alias memory, first/non-HOLD matches, stale physical IDs, shared source
 IDs, layers, locks and acquisition. Commit/Undo tests cover both memory fields.
-Unit traversal uses this engine's existing ascending entity order. Native unit-list
-creation/reinsertion order after primary replacement is not yet represented; exact
-order-sensitive alias ties remain a documented integration gap.
+The next section adds creation/reinsertion order for these consumers; unrelated
+motion solvers retain their existing deterministic scheduling.
+
+## Native unit-list ordering
+
+Optional world.unit_order records physical instance traversal; omission means
+ascending authored IDs. Structural Preview/Commit updates append new/replaced
+instances and remove retired ones, using ordered conversion source/product events.
+Same-name conversions can change order without shape operations, and those changes
+count as real world changes. Canonical ascending orders need no extra stored list.
+The list is validated as a complete unique permutation at plan/definition/tree gates.
+RW_UnitIds returns owned IDs; projected worlds preserve the list.
+
+Ordinary flat independent operations keep their simultaneous, permutation-invariant
+contract with a deterministic default. A phase may supply validated unit_sequence
+for native lifetime order; full-frame BACK records its actual restoration/allocation
+sequence there. Journals preserve that metadata and full historical snapshots carry
+unit order. FOLLOW, HOLD, conversion-source traversal and BACK selection/playback
+consume the order. Existing sorted BROKEN status and other movement scheduling
+contracts are intentionally unchanged; this is not a claim of universal native
+mutable-list scheduling parity.
+
+Boundary reload restores authored order, filters removed slots and appends persistent
+allocations; whole-tree Undo restores pre-boundary order. 80 unchanged installed
+addunit/delunit/getunitid structural turns verify replacement, no-op conversion,
+births/deletions and shared lookup. Added 750 noncanonical FOLLOW cases and 128
+noncanonical HOLD cases, plus order-only changes, simultaneous/explicit sequences,
+malformed data, late failure and tree/boundary Undo tests. Native delunit() also
+explicitly marks queued actions DELETED, confirming restored handles must not
+inherit the retired unit's queued motion.
 
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
 word yet. Automatic activation/status timing, scheduler retain decisions and
-production status/birth timing, native creation/reinsertion ordering for alias ties,
-TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
+production status/birth timing, TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
 still need implementation and source-oracle verification. Exact production
 updateundo/pruning decisions and history beyond this engine's existing 128-turn
 window remain explicit integration limits. Do not treat the journal infrastructure as completed BACK.

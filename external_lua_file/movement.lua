@@ -2,6 +2,14 @@
 -- movement.lua
 -- RuleWorld M2: Movement intentions and constraints
 
+-- Unit-list consumers keep physical instances separate from native history IDs.
+local function unit_ids(world)
+    local ids={}
+    if world.unit_order then for _,id in ipairs(world.unit_order) do ids[#ids+1]=id end
+    else for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids) end
+    return ids
+end
+
 -- Projected capability sets are authoritative for movement. Raw trait fixtures
 -- retain a default-only compatibility path; custom registries require projection.
 local function has_capability(world, entity, capability)
@@ -1441,7 +1449,7 @@ end
 
 -- FOLLOW turns toward a nearest target; it never adds displacement itself.
 function RW_ResolveFollow(world,targets)
-    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local ids=unit_ids(world)
     local dirs={Right=0,Up=1,Left=2,Down=3}
     local names={"Right","Up","Left","Down"}
     local changes={}
@@ -1541,8 +1549,7 @@ function RW_ResolveTele(world)
 end
 
 function RW_ResolveHold(world)
-    local ids,holders,positions,held,first={},{},{},{},{}
-    for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local ids,holders,positions,held,first=unit_ids(world),{},{},{},{}
     for _,id in ipairs(ids) do local e=world.entities[id]
         local identity=e.back_identity or id
         first[identity]=first[identity] or id
@@ -1712,7 +1719,8 @@ function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox)
         if value~=true or not world.entities[id] then return nil,"invalid_back_identity" end
         ids[#ids+1]=id
     end
-    table.sort(ids)
+    local rank={};for index,id in ipairs(unit_ids(world)) do rank[id]=index end
+    table.sort(ids,function(a,b) return rank[a]<rank[b] end)
     local selections,retain={},false
     for _,id in ipairs(ids) do
         local index,why=RW_BackFrameIndex(world.entities[id].back_init or 0,count,false)
@@ -1829,7 +1837,12 @@ function RW_PlanBackFramePlayback(world,selections,paradox)
         if type(selection)~="table" or not world.entities[selection.entity_id] or seen[selection.entity_id] then return nil,"invalid_back_identity" end
         seen[selection.entity_id]=true;ordered[#ordered+1]=selection
     end
-    table.sort(ordered,function(a,b) return a.entity_id<b.entity_id end)
+    if world.unit_order then
+        local valid,why=RW_PreviewPlan(world,{consumes_turn=true,changes={}})
+        if not valid then return nil,why end
+    end
+    local rank={};for index,id in ipairs(unit_ids(world)) do rank[id]=index end
+    table.sort(ordered,function(a,b) return rank[a.entity_id]<rank[b.entity_id] end)
     local changes,suppressed,next_id={}, {},world.next_entity_id
     for _,selection in ipairs(ordered) do
         local id=selection.entity_id;local entity=world.entities[id]
@@ -1873,7 +1886,9 @@ function RW_PlanBackFramePlayback(world,selections,paradox)
             changes[#changes+1]={kind="direction",entity_id=id,from=entity.direction,to=d}
         end
     end
-    local plan={consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back"}
+    local sequence={}
+    for _,op in ipairs(changes) do if op.kind=="back_restore" or op.kind=="create" or op.kind=="delete" then sequence[#sequence+1]=op.entity_id end end
+    local plan={consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back",unit_sequence=#sequence>0 and sequence or nil}
     if next_id~=world.next_entity_id then plan.id_allocation={from=world.next_entity_id,to=next_id} end
     local after,why=RW_PreviewPlan(world,plan)
     if not after then return nil,why end

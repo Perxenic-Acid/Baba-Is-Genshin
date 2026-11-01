@@ -1383,7 +1383,9 @@ function RW_PlanConversions(world, conversions, generated_rules)
     for id,entity in pairs(world.entities) do
         ids[#ids+1]=id; if entity.x and entity.y then occupied[entity.x .. ":" .. entity.y]=true end
     end
-    table.sort(ids)
+    if world.unit_order then
+        ids={};for _,id in ipairs(world.unit_order) do ids[#ids+1]=id end
+    else table.sort(ids) end
     local changes,next_id,created={},world.next_entity_id,0
     local converted_ids={}
     local back_conversions={}

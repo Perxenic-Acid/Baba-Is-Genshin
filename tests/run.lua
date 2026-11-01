@@ -541,3 +541,5 @@ dofile("tests/back_conversion_sources.lua")
 dofile("tests/back_branches.lua")
 
 dofile("tests/back_identity_memory.lua")
+
+dofile("tests/unit_order.lua")

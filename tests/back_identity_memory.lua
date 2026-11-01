@@ -4,21 +4,23 @@ local f=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is Y
 local lookup=assert(tools:match("(function getunitid%(id%).-)\nfunction newid"))
 local function clone(v) if type(v)~="table" then return v end;local r={};for k,x in pairs(v) do r[k]=clone(x) end;return r end
 local count=0
-for scenario=1,4 do for mask=0,31 do
+for permutation=0,1 do for scenario=1,4 do for mask=0,31 do
  local function bit(n) return math.floor(mask/2^n)%2==1 end
  local w={width=12,height=10,next_entity_id=10,entities={
   [1]={id=1,kind="object",class="object",archetype="avatar",x=2,y=2,direction="Down",holder=scenario==3 and 2 or 7,back_identity=scenario==2 and 7 or nil,behaviors={still=bit(2),float=false}},
   [2]={id=2,kind="object",class="object",archetype="rock",x=7,y=2,direction="Right",back_identity=7,behaviors={hold=bit(0),float=bit(3)}},
   [3]={id=3,kind="object",class="object",archetype="rock",x=9,y=2,direction="Up",back_identity=7,behaviors={hold=bit(1),float=bit(4)}}}}
  if scenario==4 then w.entities[1].x=9;w.entities[1].holder=0 end
+ local order=permutation==0 and {1,2,3} or {3,2,1}
+ if permutation==1 then w.unit_order=order end
  local units,handles={},{}
- for id=1,3 do local e=w.entities[id];local u={fixed=id,values={e.x,e.y,id==1 and 3 or id==2 and 0 or 1,RW_GetBackIdentity(e)},strings={e.archetype},holder=e.holder or 0}
+ for _,id in ipairs(order) do local e=w.entities[id];local u={fixed=id,values={e.x,e.y,id==1 and 3 or id==2 and 0 or 1,RW_GetBackIdentity(e)},strings={e.archetype},holder=e.holder or 0}
   units[#units+1]=u;handles[id]=u
  end
  local env=setmetatable({XPOS=1,YPOS=2,DIR=3,ID=4,roomsizex=12,unitmap={},units=units},{__index=_G})
  for _,e in pairs(w.entities) do env.unitmap[e.x+e.y*12]=true end
- env.getunitswitheffect=function() local r={};for id=1,3 do if w.entities[id].behaviors.hold then r[#r+1]=handles[id] end end;return r end
- env.findallhere=function(x,y) local r={};for id=1,3 do local u=handles[id];if u.values[1]==x and u.values[2]==y then r[#r+1]=id end end;return r end
+ env.getunitswitheffect=function() local r={};for _,id in ipairs(order) do if w.entities[id].behaviors.hold then r[#r+1]=handles[id] end end;return r end
+ env.findallhere=function(x,y) local r={};for _,id in ipairs(order) do local u=handles[id];if u.values[1]==x and u.values[2]==y then r[#r+1]=id end end;return r end
  env.mmf={newObject=function(id) return assert(handles[id]) end}
  env.getname=function(u) return u.strings[1] end
  env.floating=function(a,b) return (w.entities[a].behaviors.float==true)==(w.entities[b].behaviors.float==true) end
@@ -33,8 +35,8 @@ for scenario=1,4 do for mask=0,31 do
   assert(actual.x==native.values[1] and actual.y==native.values[2] and (actual.holder or 0)==native.holder,"shared HOLD lookup mismatch")
  end
  assert(RW_Undo(n).world==w);count=count+1
-end end
-assert(count==128);print("PASS: installed HOLD/getunitid shared-identity oracle (128 cases), first non-HOLD alias, stale handles, layers, locks, acquisition and Undo")
+end end end
+assert(count==256);print("PASS: installed HOLD/getunitid shared-identity and unit-order oracle (256 cases), first non-HOLD alias, stale handles, layers, locks, acquisition and Undo")
 
 -- Physical self-ID is a valid stored holder only when another instance shares
 -- that native identity; fixed-handle self-exclusion still applies to acquisition.

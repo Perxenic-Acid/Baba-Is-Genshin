@@ -5,7 +5,7 @@ local env=setmetatable({},{__index=_G})
 local f=assert(io.open(base..'blocks.lua','rb'));local source=f:read('*a');f:close()
 assert(load(source,'@original_blocks','t',env))()
 env.XPOS=1;env.YPOS=2;env.DIR=3;env.ID=4;env.UNITNAME=1;env.UNITTYPE=2;env.DEAD=1
-local units,sleep
+local units,sleep,traversal
 local names={'Right','Up','Left','Down','None'}
 local vectors={{1,0},{0,-1},{-1,0},{0,1},{0,0}}
 env.ndirs=vectors
@@ -20,11 +20,16 @@ env.xthis=function(lookup,name,verb)
 end
 env.findall=function(spec)
     local ids={};for id,u in pairs(units) do if u.strings[1]==spec[1] then ids[#ids+1]=id end end
-    table.sort(ids);return ids
+    if traversal then
+        local rank={};for index,id in ipairs(traversal) do rank[id]=index end
+        table.sort(ids,function(a,b) return rank[a]<rank[b] end)
+    else table.sort(ids) end
+    return ids
 end
 env.featureindex={rock={{{'rock','follow','avatar'},{}}}}
 local checked=0
-local function compare(points,dir,memory,sleeping,aliases)
+local function compare(points,dir,memory,sleeping,aliases,order)
+    traversal=order
     units={[10]={fixed=10,strings={'rock','object'},values={5,5,dir,10},flags={[1]=false},followed=memory}}
     sleep=sleeping
     local w={entities={[10]={id=10,class='object',archetype='rock',x=5,y=5,direction=names[dir+1],followed=memory,behaviors={sleep=sleeping}}}}
@@ -32,6 +37,7 @@ local function compare(points,dir,memory,sleeping,aliases)
         units[id]={fixed=id,strings={'avatar','object'},values={point[1],point[2],0,aliases and aliases[id] or id},flags={[1]=false}}
         w.entities[id]={id=id,class='object',archetype='avatar',x=point[1],y=point[2],direction='Right',back_identity=aliases and aliases[id] or nil,behaviors={}}
     end
+    w.unit_order=order
     env.moveblock(true)
     local plan=RW_ResolveFollow(w,{[10]={'avatar'}})
     local facing,followed=w.entities[10].direction,memory
@@ -57,3 +63,12 @@ for mask=1,15 do for dir=0,4 do for _,memory in ipairs({-1,1,7,10,99}) do for _,
 end end end end
 assert(checked-old_checked==750)
 print('PASS: installed FOLLOW shared history-identity memory oracle (750 additional cases)')
+
+local previous=checked
+for mask=1,15 do for dir=0,4 do for _,memory in ipairs({-1,1,7,10,99}) do for _,sleeping in ipairs({false,true}) do
+ local points,order={},{}
+ for i=4,1,-1 do if math.floor(mask/2^(i-1))%2==1 then points[i]={5+vectors[i][1],5+vectors[i][2]};order[#order+1]=i end end
+ order[#order+1]=10
+ compare(points,dir,memory,sleeping,{[1]=7,[2]=7,[3]=10,[4]=7},order)
+end end end end
+assert(checked-previous==750);print('PASS: installed FOLLOW noncanonical unit-list/aliased memory oracle (750 additional cases)')

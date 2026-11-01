@@ -70,3 +70,10 @@ store a holder equal to the rider's entity ID. A separate matching partner is
 required for that update. 128 unchanged installed HOLD/getunitid cases plus atomic
 memory tests cover this. Current list order is ascending entity ID; native creation/
 reinsertion order after replacement remains a gap, documented in BACK.md.
+
+
+M9.6U closes the FOLLOW/HOLD unit-list ordering gap above: world.unit_order follows
+structural replacement/creation/deletion and is used by HOLD acquisition and first
+logical-ID lookup. Added 128 noncanonical-order installed HOLD/getunitid cases.
+Boundary reload and whole-tree Undo preserve the intended authored/runtime split.
+Other motion solvers retain their existing scheduling contracts; see BACK.md.

@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7T)
+# Scoped LEVEL conditions (M9.7U)
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -162,3 +162,18 @@ Compiler/tree tests cover six intrinsic directions, repeated names, complements,
 literal direction arguments and conversion/Undo. Installed facing() comparisons
 cover 1,040 direction/region/parameter/NOT cases. FACEDBY and SEEING remain scoped
 gaps; the surrounding snapshot and other conditional subsystems are unchanged.
+
+## M9.7U SEEING
+
+Installed testcond() leaves synthetic LEVEL coordinates at (0,0). seeing() starts
+its ordinary ray only inside inbounds(...,1), so that ray does not run for the map
+observer. Its unitid=1 parameter branch then matches names in the saved entrance
+region selected by dir, just as FACING does. Reuse the same pure snapshot matcher:
+no child identities, parent ray continuation, FLOAT or current child HIDE/opacity
+query influences this branch. Keep physical SEEING's live ray/occlusion behavior.
+
+The combined installed FACING/SEEING oracle covers 2,080 cases and uses original
+seeing() with normal interior bounds and fresh checked conditions. Tree tests
+cover both clauses across six directions, repeated/literal names, complements and
+conversion/Undo. Native checked-condition/postrules edge cases retain the existing
+SEEING query scope; FACEDBY is the remaining scoped spatial syntax gap.

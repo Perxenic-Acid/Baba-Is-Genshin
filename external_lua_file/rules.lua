@@ -678,7 +678,7 @@ function RW_TestEntityCondition(world,node,entity)
             end
         end
         for _,index in ipairs(remove) do table.remove(parameters,index-offset);offset=offset+1 end
-        if entity.class=="level" and clause.relation=="facing" then
+        if entity.class=="level" and (clause.relation=="facing" or clause.relation=="seeing") then
             result=result and level_facing_condition(world,parameters,clause.negated)
         elseif entity.class=="level" and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto"
             or clause.relation=="above" or clause.relation=="below" or clause.relation=="besideleft" or clause.relation=="besideright") then
@@ -2206,7 +2206,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 and clause.relation~="near" and clause.relation~="nextto"
                 and clause.relation~="above" and clause.relation~="below"
                 and clause.relation~="besideleft" and clause.relation~="besideright"
-                and clause.relation~="facing" then return false end
+                and clause.relation~="facing" and clause.relation~="seeing" then return false end
         end
         for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
         return true

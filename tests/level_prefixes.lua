@@ -256,9 +256,10 @@ for _,side in ipairs({'ABOVE','BELOW','BESIDELEFT','BESIDERIGHT'}) do
 end
 print('PASS: scoped directional EMPTY retains native lookup asymmetry without crashing on a missing unitlists.empty')
 
+for _,relation in ipairs({'FACING','SEEING'}) do
 for _,direction in ipairs({'Right','Up','Left','Down','Mid','None'}) do
  for _,params in ipairs({{'ROCK'},{'ROCK','AND','ROCK'},{'RIGHT'},{'NOT','ROCK'}}) do
-  local row={'LEVEL','FACING'};for _,word in ipairs(params) do row[#row+1]=word end
+  local row={'LEVEL',relation};for _,word in ipairs(params) do row[#row+1]=word end
   row[#row+1]='BECOME';row[#row+1]='FLAG'
   local tree,parent=fixture({row},{{'rock',-1,0}})
   local w=RW_GetActiveLevel(tree).world
@@ -269,4 +270,5 @@ for _,direction in ipairs({'Right','Up','Left','Down','Mid','None'}) do
   assert((n.active_id==parent)==expected,direction..':'..table.concat(params,' '))
  end
 end
-print('PASS: scoped LEVEL FACING uses saved entrance direction/region, repeatable names, literal direction arguments, none-facing and whole-tree Undo')
+end
+print('PASS: scoped LEVEL FACING/SEEING uses saved entrance direction/region, repeatable names, literal direction arguments, none-facing and whole-tree Undo')

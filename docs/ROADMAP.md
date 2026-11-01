@@ -1028,3 +1028,13 @@ Compiler/tree conversion/Undo and 1,040 installed source cases cover the change.
 FACEDBY/SEEING remain explicit scoped gaps.
 Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
 instructions. Native acceptance is not inferred from offline checks.
+
+## M9.7U — scoped LEVEL SEEING
+
+Use native synthetic observer (0,0) ray-boundary behavior and saved entrance
+name/direction matching. Keep physical ray/occlusion queries separate. Combined
+FACING/SEEING original function comparisons cover 2,080 cases; compiler/tree
+conversion and Undo tests run both conditions. FACEDBY remains the next scoped
+spatial gap; frontend and authored layouts remain deferred.
+Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
+instructions. No native acceptance claim follows from offline checks.

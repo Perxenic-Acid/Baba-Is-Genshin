@@ -59,3 +59,7 @@ acceptance is waived, and offline checks do not establish native runtime parity.
 Loose SEEING and HIDE replace redundant AND/IS in MOTION, preserving its dimensions
 and three-cell spacing. Next: remaining conditions (FEELING and POWERED families),
 then prefixes, GROUP and the remaining properties in the agreed user order.
+
+M9.7U supports synthetic LEVEL SEEING through the entry-time direction/name
+snapshot, matching the original (0,0) observer branch rather than physical rays.
+See LEVEL_CONDITIONS.md for source evidence, tests and remaining query limits.

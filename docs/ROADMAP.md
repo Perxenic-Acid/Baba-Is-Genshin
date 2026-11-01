@@ -924,3 +924,14 @@ BECOME NOT ALL and honor per-noun bans. Recognize EMPTY as no scoped product whi
 retaining physical Level-block deletion. Compiler/tree/Undo tests plus unchanged
 installed subrules/conversion queue oracles cover these paths. Conditional scoped
 LEVEL and self-negative level destruction remain explicit BECOME gaps.
+
+## M9.7K — scoped LEVEL BECOME NOT LEVEL destruction
+
+Lower the self-negative conversion to the original error/destroylevel request,
+then atomically clear real units at the end of ordinary turn phases. Ignore SAFE,
+never run HAS, retain allocators and full Undo, and do not create a new terminal
+lock. Suppress stale outcomes for destruction-only turns while preserving separate
+conversion/revert requests and the existing boundary reset. Scope BROKEN and
+prior-DEFEAT SELECT authorization remain effective. Compiler/tree/rollback tests
+and installed total-delete/error-selection oracles cover the change; exact native
+callback timing and conditional scoped surroundings stay documented gaps.

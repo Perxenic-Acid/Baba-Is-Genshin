@@ -6,6 +6,7 @@ services.active=RW_GetActiveLevel;services.update=RW_UpdateActiveLevel;services.
 services.selectors=RW_LevelSelectorIDs;services.place_selectors=RW_PlaceLevelSelectors;services.bind_entry=RW_BindLevelEntry
 services.commit_session=RW_Commit;services.outcome=RW_RecordLevelOutcome;services.candidates=RW_LevelSelectionCandidates
 services.win=RW_HasWinContact;services.level_outcome=RW_ResolveLevelPropertyOutcome
+services.erase=function(w) local ids={};for id in pairs(w.entities) do ids[#ids+1]=id end;return RW_PlanDelete(w,ids) end
 local function fixture(extra,converted,copy_entry,base)
  local root=RW_CreateSession().world;root.language.nouns.ROCK="rock";root.language.nouns.FLAG="flag"
  root.entities={[1]={id=1,kind="object",class="object",archetype="rock",x=3,y=3,direction="Left",level_link={target="child",definition_id="child",source_type="rock"}},
@@ -164,13 +165,14 @@ for _,target in ipairs({'FLAG','TEXT','LEVEL'}) do
  else assert(unit.archetype==(target=='LEVEL' and 'level_block' or 'flag')) end
  assert(RW_Undo(n).world==session.world)
 end
--- Unsupported synthetic self-negation must remain explicitly deferred rather
--- than silently becoming a REVERT ban (native selects error/destroylevel).
+-- Synthetic self-negation is an error/destroylevel request, not a REVERT ban.
 local tree=fixture({},false,false,{{'LEVEL','BECOME','NOT','LEVEL'}})
 local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs))
-assert(#frame.deferred>0)
-for _,relation in ipairs(frame.relations) do assert(relation.op~='forbid_become_level') end
-print('PASS: real LEVEL BECOME preserves facing/origin/links and Undo; synthetic self-negative destruction stays explicitly deferred')
+assert(#frame.deferred==0)
+local destructive=false
+for _,relation in ipairs(frame.relations) do assert(relation.op~='forbid_become_level');if relation.op=='destroy_level' then destructive=true end end
+assert(destructive)
+print('PASS: real LEVEL BECOME preserves facing/origin/links and Undo; synthetic self-negative selects level destruction')
 
 -- Scoped ALL products use the authored ordinary palette; NOT ALL only denies
 -- that expansion, while ordinary negative targets filter matching products.
@@ -253,3 +255,98 @@ print('PASS: installed subrules/conversion scoped BECOME ALL expansion oracle (6
 native_env.features={{{'level','become','empty'},{}}}
 native_env.featureindex={level=native_env.features};native_env.levelconversions={}
 native_env.conversion(true);assert(#native_env.levelconversions==0)
+
+local rows={{'LEVEL','BECOME','NOT','LEVEL'},{'AVATAR','IS','YOU'},{'AVATAR','HAS','FLAG'},
+ {'AVATAR','IS','SAFE'},{'CURSOR','IS','SELECT'},{'LEVEL','IS','WIN'},{'LEVEL','IS','DEFEAT'}}
+local tree,parent=fixture({},false,false,rows);local session=RW_GetActiveLevel(tree)
+session.world.language.nouns.CURSOR='cursor'
+session.world.entities[1]={id=1,kind='object',class='object',archetype='avatar',x=18,y=18,direction='Down'}
+session.world.entities[2]={id=2,kind='object',class='object',archetype='cursor',x=17,y=18,direction='Left'}
+local before=session.world;local frontier=before.next_entity_id
+local p,e=RW_PlanLevelAction(tree,{type='move',dx=1,dy=0},services);assert(p,e and e.reason)
+local n,r=RW_CommitLevelTree(tree,p);assert(r.accepted,r.reason)
+local cleared=RW_GetActiveLevel(n)
+assert(n.active_id==tree.active_id and p.reason=='level_destroy' and not next(cleared.world.entities))
+assert(not cleared.defeated and not cleared.world.infinite_loop and not cleared.world.too_complex)
+assert(cleared.world.next_entity_id==frontier and not n.outcomes[tree.active_id])
+assert(n.instances[parent].world==tree.instances[parent].world and n.level_transforms==tree.level_transforms)
+assert(cleared.world.last_input=='move' and cleared.world.chance_seed==48271)
+local record=assert(RW_GetTurnRecord(cleared,1));assert(record.phases[#record.phases].name=='level_destroy')
+for _,op in ipairs(record.phases[#record.phases].changes) do assert(op.kind=='delete') end
+local waited,err=RW_PlanLevelAction(n,{type='wait'},services);assert(waited,err and err.reason)
+local after_wait,result=RW_CommitLevelTree(n,waited);assert(result.accepted and not next(RW_GetActiveLevel(after_wait).world.entities))
+assert(RW_GetActiveLevel(RW_UndoLevelTree(after_wait)).world==cleared.world)
+assert(RW_GetActiveLevel(RW_UndoLevelTree(n)).world==before)
+local failing={};for k,v in pairs(services) do failing[k]=v end
+failing.erase=function() return nil,'injected_level_erase_failure' end
+local rejected,why=RW_PlanLevelAction(tree,{type='wait'},failing)
+assert(not rejected and why.stage=='level_destroy' and why.reason=='injected_level_erase_failure')
+assert(session.world==before and before.entities[1].x==18 and not before.last_input and not before.chance_seed)
+failing.erase=function(w) return RW_PlanDelete(w,{1}) end
+local rejected,why=RW_PlanLevelAction(tree,{type='wait'},failing)
+assert(not rejected and why.reason=='incomplete_level_destruction' and session.world==before)
+for _,extra in ipairs({{{'LEVEL','BECOME','FLAG'}},{{'LEVEL','BECOME','LEVEL'}},{{'LEVEL','IS','BROKEN'}}}) do
+ local t,parent=fixture(extra,false,false,{{'LEVEL','BECOME','NOT','LEVEL'}})
+ local p,e=RW_PlanLevelAction(t,{type='wait'},services);assert(p,e and e.reason)
+ local committed,r=RW_CommitLevelTree(t,p);assert(r.accepted,r.reason)
+ if extra[1][3]=='BROKEN' then assert(committed.active_id==t.active_id and next(RW_GetActiveLevel(committed).world.entities))
+ else
+  assert(committed.active_id==parent and committed.outcomes[t.active_id])
+  assert(next(committed.instances[t.active_id].world.entities)) -- authored boundary reload
+ end
+ assert(RW_GetActiveLevel(RW_UndoLevelTree(committed)).world==RW_GetActiveLevel(t).world)
+end
+print('PASS: self-negative scoped level destruction clears SAFE/YOU/SELECT/Text without HAS, suppresses stale outcomes, preserves conversion requests, accepts later waits and atomically Undoes/rejects')
+
+-- Run original destroylevel()/destroylevel_do() and delete(total=true), with
+-- presentation/native identity removal stubbed, to verify total deletion and
+-- the absence of inside()/HAS even for SAFE units.
+local f=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/tools.lua]],'rb'))
+local tools_source=f:read('*a');f:close()
+local destruction_code=assert(tools_source:match('(function destroylevel%(special_%).-)\nfunction findunitat'))
+local deletion_code=assert(tools_source:match('(function delete%(unitid,x_,y_,total_,noinside_%).-)\nfunction writerules'))
+local scoped_env=env
+local env=setmetatable({MODE='mode',NOPLAYER='noplayer',XPOS='x',YPOS='y',DIR='dir',ID='id',UNITNAME='name',CAMTARGET='camera',
+ generaldata={values={mode=0}},generaldata2={values={}},spritedata={values={camera=0}},
+ setsoundname=function() end,MF_musicstate=function() end,MF_particles=function() end,MF_removeblockeffect=function() end,
+ getcolour=function() return 1,2 end,checkeffecthistory=function() return 1 end,
+ inbounds=function() return true end,dynamicat=function() end,MF_remove=function() end,
+ inside=function() error('total level destruction must not invoke HAS/inside') end,
+ getname=function(unit) return unit.strings.name end,addundo=function() end},{__index=_G})
+assert(load(deletion_code,'@installed_total_delete','t',env))()
+assert(load(destruction_code,'@installed_level_destruction','t',env))()
+for count=0,4 do
+ local units,deleted={},{};env.units={};env.deleted={}
+ for id=1,count do units[id]={fixed=id+100,values={id=id,x=2,y=2,dir=0},strings={name='rock'},flags={safe=true}}
+  env.units[#env.units+1]=units[id] end
+ env.mmf={newObject=function(id) return assert(units[id-100]) end}
+ env.delunit=function(id) deleted[id-100]=true end
+ env.features={1};env.featureindex={safe={1},has={1}};env.visualfeatures={1};env.notfeatures={1}
+ env.destroylevel();assert(env.destroylevel_check and env.generaldata2.values.noplayer==1)
+ env.destroylevel_do();assert(not env.destroylevel_check and env.updatecode==1)
+ for id=1,count do assert(deleted[id] and env.deleted[id+100]) end
+ assert(not next(env.features) and not next(env.featureindex) and not next(env.visualfeatures) and not next(env.notfeatures))
+end
+print('PASS: installed destroylevel/total-delete oracle (5 cases), all identities, SAFE independence, no HAS and cleared rule indexes')
+native_env.features={{{'level','become','not level'},{}}}
+native_env.featureindex={level=native_env.features};native_env.levelconversions={}
+native_env.conversion(true)
+assert(#native_env.levelconversions==1 and native_env.levelconversions[1][1]=='error' and native_env.levelconversions[1][3]=='become')
+for enabled=0,1 do for _,other in ipairs({'none','flag','level'}) do
+ local requested=false;scoped_env.destroylevel=function() requested=true end
+ scoped_env.levelconversions={{'error',{enabled=enabled==1},'become'}}
+ if other~='none' then scoped_env.levelconversions[#scoped_env.levelconversions+1]={other,{},'become'} end
+ local products,reverting=oracle();assert(requested==(enabled==1))
+ if other=='level' then assert(reverting and products[1]=='revert')
+ elseif other=='flag' then assert(not reverting and #products==1 and products[1]=='flag')
+ else assert(not reverting and #products==0) end
+end end
+print('PASS: installed self-negative error queue and scoped destruction/product coexistence selection oracle (6 cases)')
+
+-- A pre-existing DEFEAT still permits the live SELECT to consume the turn;
+-- whole-tree Commit must preserve that authorization for the destruction result.
+session.defeated=true
+local p,e=RW_PlanLevelAction(tree,{type='wait'},services);assert(p,e and e.reason)
+local n,r=RW_CommitLevelTree(tree,p);assert(r.accepted,r.reason)
+assert(p.select_after_defeat and not next(RW_GetActiveLevel(n).world.entities))
+assert(RW_GetActiveLevel(RW_UndoLevelTree(n)).world==session.world)

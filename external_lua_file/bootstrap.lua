@@ -385,7 +385,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
 
     trace[#trace + 1] = "conversions"
     local entity_conversions, level_targets, protected, level_traits = {}, {}, false, {}
-    local become_revert,become_bans=false,{}
+    local become_revert,become_bans,level_destroy=false,{},false
     for _,conversion in ipairs(conversions or {}) do
         if conversion.op=="forbid_become_level" then become_bans[conversion.target_type]=true end
         if conversion.op=="protect_level" then protected=true end
@@ -399,6 +399,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 else level_targets[#level_targets+1]=conversion.target_type end
             end
         elseif conversion.op=="forbid_become_level" then -- Verb-specific scoped denial.
+        elseif conversion.op=="destroy_level" then level_destroy=true
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
         elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" or conversion.op=="play" or conversion.op=="all_done" then -- Consumed by their scheduled phases, not conversion.
@@ -915,6 +916,21 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         end
         end
     end
+    if level_destroy and not plan.infinite_loop and not plan.too_complex then
+        local final,why,phase=services.preview(world,plan)
+        if not final then return fail("level_destroy_preview",why,phase) end
+        if type(services.erase)~="function" then return fail("level_destroy","missing_erase_service") end
+        local removal,why=services.erase(final)
+        if not removal then return fail("level_destroy",why) end
+        local cleared,why=services.preview(final,removal)
+        if not cleared then return fail("level_destroy",why) end
+        if next(cleared.entities) then return fail("level_destroy","incomplete_level_destruction") end
+        plan.stages[#plan.stages+1]={name="level_destroy",plan=removal}
+        for _,change in ipairs(removal.changes) do plan.changes[#plan.changes+1]=change end
+        plan.level_destroy=true;plan.level_traits={};plan.contact_frame=nil
+        plan.end_contact,plan.done_win,plan.bonus_win_contact=nil,nil,nil
+        trace[#trace+1]="level_destroy"
+    end
     return plan, nil, trace
 end
 
@@ -1175,6 +1191,9 @@ function RW_PlanLevelAction(tree, action, services)
     end
     if turn.infinite_loop or turn.too_complex then
         return {before=tree,after=next_tree,reason=turn.too_complex and "too_complex" or "infinite_loop",changes=turn.changes,events=turn.events}
+    end
+    if turn.level_destroy and not turn.level_transform then
+        return {before=tree,after=next_tree,reason="level_destroy",changes=turn.changes,events=turn.events,select_after_defeat=select_after_defeat}
     end
     local post_effects, post_error, post_traits
     if turn.contact_frame then
@@ -1777,6 +1796,10 @@ local function start(run_self_tests)
         return RW_PlanInitializedCreation(world,products,rules,{
             initialize=function(w,p,r,c) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r,c) end,
             create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end},count)
+    end
+    turn_services.erase=function(world)
+        local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end
+        return world_api:Invoke("RW_PlanDelete",world,ids)
     end
     turn_services.play=function(world,relations) return rules_api:Invoke("RW_ResolvePlayEvents",world,relations) end
     turn_services.hold=function(world) return movement_api:Invoke("RW_ResolveHold",world) end
@@ -2401,7 +2424,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7J initialized")
+    print("[RuleWorld] M9.7K initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

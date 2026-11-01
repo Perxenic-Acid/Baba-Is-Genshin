@@ -1,4 +1,4 @@
-# BECOME (M9.7J)
+# BECOME (M9.7K)
 
 Primary reference: installed Baba Is You `Data/convert.lua`, conversion() and
 convert(), and `Data/rules.lua` identity-protection and negative-rule processing.
@@ -26,8 +26,8 @@ Native acceptance is waived by the user; offline results do not establish native
 runtime parity. BECOME is available as a loose full-name word in the sparse MOTION
 room.
 
-Deliberate gaps: conditional scoped LEVEL BECOME and synthetic self-negative
-destruction remain deferred (see M9.7I/J below). Existing IS self-negation
+Deliberate gaps: conditional scoped LEVEL BECOME remains deferred (see M9.7I/K
+below). Existing IS self-negation
 precedence is preserved; mixed negative self-conversions beyond the tested matrix
 are not claimed as exhaustive original parity. EMPTY lifecycle/HAS limitations and
 ALL authored-vocabulary boundaries remain as documented in SPECIAL_NOUNS.md.
@@ -91,3 +91,39 @@ queue assertion verifies its lack of scoped products. Conditional scoped LEVEL
 and self-negative destroylevel remain open. Broader ordinary ALL conversion
 lifecycle differences remain in their existing subsystem scope; this batch does
 not claim native objectlist iteration order or frontend acceptance.
+
+## Scoped self-negative destruction (M9.7K)
+
+LEVEL BECOME NOT LEVEL now emits destroy_level, plus the physical level-block
+self-negative conversion. Installed conversion(true) produces an error material;
+dolevelconversions() calls destroylevel() when its condition passes. This is not
+a BECOME LEVEL/REVERT denial. Scoped BROKEN suppresses the request. Conditional
+scoped surroundings remain outside the existing compiler scope.
+
+Installed tools.lua destroylevel_do() collects all unit handles then calls
+ delete(...,total=true). SAFE is not queried and delete skips inside()/HAS. It
+clears rule indexes and sets updatecode. The runtime adapter appends one final
+level_destroy deletion stage after the completed ordinary phases, using the
+explicit erase service bound through the world script. No HAS products, virtual
+EMPTY entities, allocator reset or persistent third terminal flag are introduced.
+The empty board accepts later ordinary commands; a prior DEFEAT keeps its normal
+SELECT authorization/restrictions. Both existing compile-limit terminal states
+retain their earlier triggering prefix and skip this later deletion stage.
+
+The tree path suppresses stale WIN/DEFEAT/END contact outcomes when only destruction
+was selected. Separate selected noun/REVERT products remain queued as in the
+original dolevelconversions selection; their normal boundary resets the exited
+child and returns to the parent. Whole-tree Undo restores the pre-turn board,
+input/chance state, scoped persistence and active room. Late erase failure or a
+partially cleared result rejects the entire turn. No parser query runs between
+individual removals.
+
+Tests cover safe YOU, SELECT and Text removal with HAS present, unchanged frontier,
+no spurious outcome/parent edits, subsequent waits, prior-DEFEAT SELECT commit,
+BROKEN, co-selected conversions/revert, complete Undo and injected/partial failure.
+Five cases execute unchanged installed destroylevel/total-delete code with host
+presentation/removal adapters and a forbidden inside() callback. Six cases execute
+original error/product selection together, plus an original error-queue assertion.
+The portable adapter chooses an explicit end-of-turn deletion barrier: exact
+native MF callback/win-timer timing and audiovisual effects remain unclaimed.
+Earlier synthetic self-negative deferral notes are superseded here.

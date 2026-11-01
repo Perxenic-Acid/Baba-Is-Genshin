@@ -1056,7 +1056,11 @@ local function lower_simple(ast_rules, registry,world)
                 if term.name=="text" then physical="@text";scoped="text_level"
                 elseif term.name=="all" or term.name=="empty" then physical="@"..term.name;scoped=physical end
             end
-            if scoped and not (negated and scoped=="@revert") and (scoped~="@all" or negated or world)
+            if negated and scoped=="@revert" and semantics.negative_noun=="forbid_become" then
+                conversions[#conversions+1]={op="destroy_level",source=ast.source}
+                conversions[#conversions+1]={op="forbid_become",source_type=subject_type.block_type or "level_block",
+                    target_type=physical,source=ast.source,when={op="always"}}
+            elseif scoped and (scoped~="@all" or negated or world)
                 and (not negated or semantics.negative_noun=="forbid_become") then
                 if scoped=="@all" and not negated then
                     for _,name in ipairs(RW_NounPalette(world)) do
@@ -2299,7 +2303,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         for _,relation in ipairs(filtered) do
             if relation.op~="level_trait" and relation.op~="deny_level_trait"
                 and relation.op~="transform_level" and relation.op~="protect_level"
-                and relation.op~="become_level" and relation.op~="forbid_become_level" then
+                and relation.op~="become_level" and relation.op~="forbid_become_level" and relation.op~="destroy_level" then
                 enabled[#enabled+1]=relation
             end
         end

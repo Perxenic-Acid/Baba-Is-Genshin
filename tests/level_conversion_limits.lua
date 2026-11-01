@@ -24,11 +24,11 @@ local function act(t)
  local p,e=RW_PlanLevelAction(t,{type="move",dx=1,dy=0},services);assert(p,e and e.reason)
  local n,r=RW_CommitLevelTree(t,p);assert(r.accepted,r.reason);return n,p
 end
-for _,verb in ipairs({"IS","BECOME"}) do for _,count in ipairs({49,50,51}) do
+for _,verb in ipairs({"IS","BECOME","WRITE"}) do for _,count in ipairs({49,50,51}) do
  local t,parent_id=fixture(count,nil,verb);local before=RW_GetActiveLevel(t).world
  local n,p=act(t);assert(not before.too_complex and #t.history==0)
  if count==49 then
-  assert(n.active_id==parent_id and p.reason=="transform");local total=0;for _,u in pairs(RW_GetActiveLevel(n).world.entities) do if u.archetype=="flag" then total=total+1 end end;assert(total==49)
+  assert(n.active_id==parent_id and p.reason=="transform");local total=0;for _,u in pairs(RW_GetActiveLevel(n).world.entities) do if (verb=="WRITE" and u.class=="text" and u.text.name=="FLAG") or (verb~="WRITE" and u.archetype=="flag") then total=total+1;assert(u.level_link.target=="child" and u.direction=="Down") end end;assert(total==49)
  else
   local w=RW_GetActiveLevel(n).world
   assert(n.active_id==t.active_id and w.too_complex and not w.infinite_loop and p.reason=="too_complex")
@@ -40,6 +40,18 @@ for _,verb in ipairs({"IS","BECOME"}) do for _,count in ipairs({49,50,51}) do
  end
  local u=RW_UndoLevelTree(n);assert(u.active_id==t.active_id and RW_GetActiveLevel(u).world==before and u.level_transforms==t.level_transforms)
 end end
+-- Count selected products, after WRITE vetoes, across mixed verbs.
+local mixed,parent=fixture(49,{{"LEVEL","WRITE","FLAG"}})
+local mixed_next,mixed_plan=act(mixed)
+assert(RW_GetActiveLevel(mixed_next).world.too_complex and mixed_plan.reason=="too_complex")
+assert(mixed_next.instances[parent].world==mixed.instances[parent].world)
+local vetoed=fixture(49,{{"LEVEL","WRITE","FLAG"},{"LEVEL","WRITE","NOT","FLAG"}})
+local veto_next,veto_plan=act(vetoed)
+assert(veto_plan.reason=="transform" and not RW_GetActiveLevel(veto_next).world.too_complex)
+local text_veto=fixture(50,{{"LEVEL","IS","NOT","TEXT"}},"WRITE")
+local text_next,text_plan=act(text_veto)
+assert(text_next.active_id==text_veto.active_id and not RW_GetActiveLevel(text_next).world.too_complex)
+assert(RW_UndoLevelTree(text_next).instances[text_veto.active_id].world==RW_GetActiveLevel(text_veto).world)
 local t,parent_id=fixture(51,{{"LEVEL","IS","REVERT"}});local n,p=act(t)
 assert(n.active_id==parent_id and p.reason=="revert" and not RW_GetActiveLevel(n).world.too_complex)
 t=fixture(50,{{"LEVEL","IS","LEVEL"}});n,p=act(t);assert(n.active_id==t.active_id and not RW_GetActiveLevel(n).world.too_complex)

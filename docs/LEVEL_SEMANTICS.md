@@ -192,3 +192,14 @@ Tests cover compiler/tree/physical paths, conditional bans, identity, mixed orde
 ALL, duplicates and Undo; 16 cases execute original dolevelconversions selection
 for ordered/conditional/duplicate mixed WRITE/IS targets. Native postrules/lexical
 catalog handling is normalized to the engine's registered token vocabulary.
+
+## M9.8A scoped WRITE conversion limits
+
+Installed convert.lua dolevelconversions counts selected WRITE text products in the
+same levelmats array as IS/BECOME: 49 products convert, 50 or more are TOO COMPLEX.
+Regression coverage now includes WRITE at 49/50/51, mixed IS/WRITE totals, WRITE
+NOT target and IS NOT TEXT filtering before counting. Terminal cases preserve the
+triggering movement/input/RNG, leave the parent and allocator untouched, reject
+move/wait/confirm/direct Commit, and restore the prior tree through Undo. Successful
+products retain entrance links and facing. Full offline regression and catalog/layout
+audits pass; no native acceptance is inferred. No runtime changes were necessary.

@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6V)
+# BACK infrastructure progress (M9.6W)
 
 ## Installed primary references
 
@@ -247,6 +247,26 @@ The installed TELE loop passes 6,144 cases across suppression/order/network vari
 Sequential BACK then TELE Commit/Undo tests cover the handoff, replacement and
 failure purity. This closes the solver handoff; production BACK scheduler placement
 and transient-set routing remain pending, rather than exposing a partial public word.
+
+## Isolated mapped-script services
+
+Mapped movement/world scripts do not share Lua globals. BACK history selection,
+full-frame playback and the legacy conversion helper now accept explicit world
+services: preview, frame, rows, restore and identity (the legacy helper needs only
+preview/restore). Calls inside movement use that supplied table exclusively;
+omission retains combined-module compatibility for offline callers. Missing or
+invalid services fail with a diagnostic instead of a nil global call.
+
+Bootstrap supplies Invoke adapters in turn_services.back_history/back_status;
+its TELE adapter also forwards the transient suppression set. These are service
+bindings only: they do not schedule BACK or enable the public word yet.
+
+An isolated-host test loads world, movement and properties into separate global
+tables with only standard Lua libraries. It exercises activation clocks, current
+and past native-frame queries, primary/branch/repeated conversions, legacy
+playback, shared identities, TELE handoff, Commit/Undo and missing/failing service
+diagnostics. It explicitly verifies movement has no world globals and compares
+results with the combined-module reference path. No native success is inferred.
 
 ## Still pending
 

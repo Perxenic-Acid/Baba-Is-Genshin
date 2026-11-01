@@ -545,3 +545,5 @@ dofile("tests/back_identity_memory.lua")
 dofile("tests/unit_order.lua")
 
 dofile("tests/back_tele.lua")
+
+dofile("tests/back_isolation.lua")

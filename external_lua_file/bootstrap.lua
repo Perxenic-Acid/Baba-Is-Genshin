@@ -1631,7 +1631,20 @@ local function start(run_self_tests)
     end
     turn_services.play=function(world,relations) return rules_api:Invoke("RW_ResolvePlayEvents",world,relations) end
     turn_services.hold=function(world) return movement_api:Invoke("RW_ResolveHold",world) end
-    turn_services.tele=function(world) return movement_api:Invoke("RW_ResolveTele",world) end
+    turn_services.tele=function(world,suppressed) return movement_api:Invoke("RW_ResolveTele",world,suppressed) end
+    local back_services={
+        preview=turn_services.preview,
+        frame=function(...) return world_api:Invoke("RW_GetBackFrame",...) end,
+        rows=function(...) return world_api:Invoke("RW_BackHistoryRows",...) end,
+        restore=function(...) return world_api:Invoke("RW_BackRestoredEntity",...) end,
+        identity=function(...) return world_api:Invoke("RW_GetBackIdentity",...) end
+    }
+    turn_services.back_status=function(world,eligible,count)
+        return movement_api:Invoke("RW_PlanBackStatus",world,eligible,count)
+    end
+    turn_services.back_history=function(session,prefix,eligible,paradox)
+        return movement_api:Invoke("RW_PlanBackHistoryMotion",session,prefix,eligible,paradox,back_services)
+    end
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
@@ -2238,7 +2251,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6V initialized")
+    print("[RuleWorld] M9.6W initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

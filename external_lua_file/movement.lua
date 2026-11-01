@@ -1601,6 +1601,16 @@ end
 -- BACK motion primitive for explicitly selected historical frames. Activation,
 -- eligibility and age selection belong to the future status/scheduler integration.
 -- Conversion rows deliberately fail until their create/remove playback is ready.
+local function back_services(services,names)
+    if services~=nil and type(services)~="table" then return nil,"invalid_back_services" end
+    local resolved=services or {preview=RW_PreviewPlan,frame=RW_GetBackFrame,
+        rows=RW_BackHistoryRows,restore=RW_BackRestoredEntity,identity=RW_GetBackIdentity}
+    for _,name in ipairs(names) do
+        if type(resolved[name])~="function" then return nil,"missing_back_service_"..name end
+    end
+    return resolved
+end
+
 function RW_PlanBackMotion(world,selections,paradox)
     if type(world)~="table" or type(world.entities)~="table" then return nil,"invalid_world" end
     if type(world.width)~="number" or world.width%1~=0 or world.width<1
@@ -1713,11 +1723,13 @@ end
 
 -- Select per-unit BACK frames from the native-clock ledger and the current
 -- pre-BACK phase prefix. Eligibility and status refresh are supplied by the caller.
-function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox)
+function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox,services)
     if type(session)~="table" or type(eligible)~="table" then return nil,"invalid_back_selection" end
     local count=session.back_frame_count
     if count==nil then return nil,"back_history_unavailable" end
-    local world,reason=RW_PreviewPlan(session.world,current_plan)
+    local api,reason=back_services(services,{"preview","frame","rows","restore","identity"})
+    if not api then return nil,reason end
+    local world,reason=api.preview(session.world,current_plan)
     if not world then return nil,reason end
     local ids={}
     for id,value in pairs(eligible) do
@@ -1731,13 +1743,13 @@ function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox)
         local index,why=RW_BackFrameIndex(world.entities[id].back_init or 0,count,false)
         if index~=nil then
             retain=true
-            local record,before=RW_GetBackFrame(session,index,current_plan)
+            local record,before=api.frame(session,index,current_plan)
             if record then
                 selections[#selections+1]={entity_id=id,before_world=before,record=record}
             elseif before~="back_frame_absent" then return nil,before end
         elseif why~="back_inactive" then return nil,why end
     end
-    local plan,why=RW_PlanBackFramePlayback(world,selections,paradox)
+    local plan,why=RW_PlanBackFramePlayback(world,selections,paradox,api)
     if not plan then return nil,why end
     plan.back_retain=retain
     return plan
@@ -1746,10 +1758,12 @@ end
 
 -- Identity-preserving conversion playback. Branch copies and repeated lifecycle
 -- rows need source/handle provenance and remain explicit unsupported history.
-function RW_PlanBackPlayback(world,selections,paradox)
+function RW_PlanBackPlayback(world,selections,paradox,services)
     -- Reuse the motion primitive's input/terminal checks before examining records.
     local checked,why=RW_PlanBackMotion(world,{},paradox)
     if not checked then return nil,why end
+    local api,why=back_services(services,{"preview","restore"})
+    if not api then return nil,why end
     if type(selections)~="table" then return nil,"invalid_back_selection" end
     local motion,restores,seen={},{},{}
     local function list(value)
@@ -1803,7 +1817,7 @@ function RW_PlanBackPlayback(world,selections,paradox)
                         source=copy(cursor)
                     end
                     local temporary={width=world.width,height=world.height,next_entity_id=world.next_entity_id,entities={[id]=cursor}}
-                    local after,err=RW_PreviewPlan(temporary,{consumes_turn=true,changes={op}})
+                    local after,err=api.preview(temporary,{consumes_turn=true,changes={op}})
                     if not after then return nil,err end
                     cursor=after.entities[id]
                 end
@@ -1812,7 +1826,7 @@ function RW_PlanBackPlayback(world,selections,paradox)
         if source then
             if not paradox or paradox[id]==nil then
                 local current=world.entities[id]
-                restores[#restores+1]={kind="back_restore",entity_id=id,from=copy(current),source=source,to=RW_BackRestoredEntity(source,current)}
+                restores[#restores+1]={kind="back_restore",entity_id=id,from=copy(current),source=source,to=api.restore(source,current)}
             end
         else motion[#motion+1]=selection end
     end
@@ -1826,9 +1840,11 @@ end
 
 -- Replay complete native logical-identity frames against unique current instances.
 -- Multiple matching create/remove rows deliberately multiply restored products.
-function RW_PlanBackFramePlayback(world,selections,paradox)
+function RW_PlanBackFramePlayback(world,selections,paradox,services)
     local checked,reason=RW_PlanBackMotion(world,{},paradox)
     if not checked then return nil,reason end
+    local api,reason=back_services(services,{"preview","rows","restore","identity"})
+    if not api then return nil,reason end
     if type(selections)~="table" then return nil,"invalid_back_selection" end
     local count=0;for key in pairs(selections) do
         if type(key)~="number" or key%1~=0 or key<1 then return nil,"invalid_back_selection" end
@@ -1843,7 +1859,7 @@ function RW_PlanBackFramePlayback(world,selections,paradox)
         seen[selection.entity_id]=true;ordered[#ordered+1]=selection
     end
     if world.unit_order then
-        local valid,why=RW_PreviewPlan(world,{consumes_turn=true,changes={}})
+        local valid,why=api.preview(world,{consumes_turn=true,changes={}})
         if not valid then return nil,why end
     end
     local rank={};for index,id in ipairs(unit_ids(world)) do rank[id]=index end
@@ -1851,9 +1867,9 @@ function RW_PlanBackFramePlayback(world,selections,paradox)
     local changes,suppressed,next_id={}, {},world.next_entity_id
     for _,selection in ipairs(ordered) do
         local id=selection.entity_id;local entity=world.entities[id]
-        local rows,why=RW_BackHistoryRows(selection.before_world,selection.record)
+        local rows,why=api.rows(selection.before_world,selection.record)
         if not rows then return nil,why end
-        local identity=RW_GetBackIdentity(entity)
+        local identity=api.identity(entity)
         local x,y,d=entity.x,entity.y,entity.direction
         local products,retired={},false
         for _,row in ipairs(rows) do
@@ -1876,12 +1892,12 @@ function RW_PlanBackFramePlayback(world,selections,paradox)
                 changes[#changes+1]={kind="delete",entity_id=id,from=copy(entity)}
             else
                 local source=products[1]
-                changes[#changes+1]={kind="back_restore",entity_id=id,from=copy(entity),source=copy(source),to=RW_BackRestoredEntity(source,entity)}
+                changes[#changes+1]={kind="back_restore",entity_id=id,from=copy(entity),source=copy(source),to=api.restore(source,entity)}
                 for index=2,#products do
                     if type(next_id)~="number" or next_id%1~=0 or next_id<1 or next_id>=9007199254740991 or world.entities[next_id] then return nil,"invalid_back_frontier" end
                     local source=products[index]
-                    local product=RW_BackRestoredEntity(source,{id=next_id,x=entity.x,y=entity.y})
-                    changes[#changes+1]={kind="create",entity_id=next_id,to=product,back_source_identity=RW_GetBackIdentity(product)}
+                    local product=api.restore(source,{id=next_id,x=entity.x,y=entity.y})
+                    changes[#changes+1]={kind="create",entity_id=next_id,to=product,back_source_identity=api.identity(product)}
                     next_id=next_id+1
                 end
             end
@@ -1895,7 +1911,7 @@ function RW_PlanBackFramePlayback(world,selections,paradox)
     for _,op in ipairs(changes) do if op.kind=="back_restore" or op.kind=="create" or op.kind=="delete" then sequence[#sequence+1]=op.entity_id end end
     local plan={consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back",unit_sequence=#sequence>0 and sequence or nil}
     if next_id~=world.next_entity_id then plan.id_allocation={from=world.next_entity_id,to=next_id} end
-    local after,why=RW_PreviewPlan(world,plan)
+    local after,why=api.preview(world,plan)
     if not after then return nil,why end
     return plan
 end

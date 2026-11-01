@@ -773,3 +773,13 @@ handle semantics and source transport independent from rider suppression. Expand
 the installed TELE oracle to 6,144 cases and added sequential BACK/TELE atomic
 Commit/Undo tests. Production BACK activation/scheduling and transient routing
 remain pending; no public BACK registration yet.
+
+## M9.6W — isolated mapped BACK services
+
+Remove BACK's reliance on world globals inside the separately mapped movement
+script. Inject validated preview/frame/row/restore/identity services, bind native
+Invoke adapters and forward suppression through the native TELE adapter. Separate
+Lua environments verify status, native clocks, historical/current playback,
+branches/repeated conversions, aliases, TELE handoff, diagnostics and Commit/Undo.
+This fixes the host boundary before production scheduling; public BACK activation,
+retain decisions, birth clocks and reading barriers remain pending.

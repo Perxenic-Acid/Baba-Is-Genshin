@@ -98,8 +98,8 @@ Conditional scoped LEVEL evaluation retains its existing subsystem gap. Root
 rooms without a parent entrance use the existing no_parent_level_block rejection;
 runtime-only entrances lacking an authored origin reject missing_authored_level_origin
 without changing progress. Arbitrary metadata must not invent missing history.
-The native dolevelconversions() >=50 ordinary-product TOO COMPLEX boundary remains
-a shared scoped-conversion gap; an effective REVERT preempts such product lists.
+The dolevelconversions() >=50 ordinary-product TOO COMPLEX boundary is implemented
+at level dispatch (M9.6L); an effective REVERT preempts such product lists.
 Exact self-negated conversion/native host failure interactions and AUTO boundary
 dispatch retain the documented shared engine limits. Native success is not inferred.
 

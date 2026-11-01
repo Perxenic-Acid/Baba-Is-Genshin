@@ -644,3 +644,14 @@ restores the full pre-return transaction. Missing authored provenance rejects.
 48 installed scoped selection-loop cases plus tree tests verify priority, shapes,
 links, copy groups, reload/reset and Undo. Conditional/root scope and native save/
 AUTO dispatch/general scoped >=50-product limits remain documented shared gaps.
+
+
+## M9.6L — scoped conversion TOO COMPLEX boundary
+
+Added original dolevelconversions() >=50 selected-product dispatch limit. Commit
+the triggering child turn into TOO COMPLEX, leave parent products/progress intact,
+and allow only whole-tree Undo. REVERT and identity protection apply before count;
+earlier CRASH/terminal states remain authoritative. Preserved the project's
+conversion-before-WIN order. Added 49/50/51 pipeline and AUTO prefix/queue tests,
+plus six unchanged original dispatch branch cases. Native callback/WINTIMER timing
+remains deferred with the previously recorded integration gaps.

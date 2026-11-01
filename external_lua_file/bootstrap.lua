@@ -1009,6 +1009,12 @@ function RW_PlanLevelAction(tree, action, services)
     local turn, planning_error = RW_PlanTurn(session.world,action,services)
     if not turn then return nil, planning_error end
     if not turn.consumes_turn then return fail(turn.reason) end
+    -- dolevelconversions() rejects 50 or more selected ordinary products.
+    -- Decide at the level boundary, after retaining the completed triggering turn.
+    -- An effective REVERT is a singleton marker, not an ordinary product list.
+    if not turn.infinite_loop and not turn.too_complex and type(turn.level_transform)=="table" and #turn.level_transform>=50 then
+        turn.too_complex,turn.reason,turn.level_transform=true,"too_complex",nil
+    end
     local completed, accepted = services.commit_session(session,turn)
     if not accepted.accepted then return fail(accepted.reason) end
     local next_tree, update_error = services.update(tree,completed)
@@ -2232,7 +2238,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6K initialized")
+    print("[RuleWorld] M9.6L initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

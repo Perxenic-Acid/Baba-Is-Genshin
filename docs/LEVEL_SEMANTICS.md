@@ -129,3 +129,32 @@ tests/level_transactions.lua 的旧“多目标拒绝”断言已替换为拆分
 
 tests/level_text.lua 覆盖 Text+Flag / Text+2Flag 经 Text 或 Flag 进入后收缩成
 单 Text、F 直接进入不再弹多选、边界重载、分配器、整树 Undo 及重做。
+
+
+## M9.6L: scoped conversion product limit
+
+Installed Data/convert.lua dolevelconversions() calls native conversion for 1–49
+selected products and destroys the level with `toocomplex` at >=50. The selected
+list is measured after scoped identity protection/REVERT priority. REVERT remains
+a singleton marker, even when ordinary alternatives exceed 50.
+
+RW_PlanLevelAction applies this limit after RW_PlanTurn has completed the triggering
+movement, conversions and contacts, before committing any parent entrance products.
+The whole child turn, its input/chance/RNG/allocators, and TOO COMPLEX flag commit
+in one transaction; parent runtime, persistence and outcomes remain untouched.
+SELECT, movement, wait, confirmation and direct tree Commit then reject, while
+whole-tree Undo restores the pre-turn tree. Prior Infinite Loop/Too Complex from
+other phases retains its existing result rather than creating conflicting flags.
+
+The project-required conversion-before-terminal ordering governs this boundary,
+including an ordinary WIN in the same completed turn. The original outer
+WINTIMER/native callback timing is not simulated. This ordering is intentional,
+consistent with the existing LEVEL conversion priority requested by the user.
+Raw RW_PlanTurn exposes selected scoped products; level dispatch owns their
+conversion/navigation and this terminal limit, as it does other scoped outcomes.
+
+Tests cover public 49/50/51 physical rules, retained YOU/SELECT movement and input,
+unchanged child allocation/parent state, F/wait/direct-Commit lockout, Undo,
+REVERT/identity, prior CRASH, same-turn WIN and AUTO's triggering pulse/queue Undo.
+Six cases execute the unchanged installed dispatch branch with editor/native
+callbacks captured; no real-device success is inferred.

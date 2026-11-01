@@ -236,3 +236,8 @@ M9.6U adds optional world.unit_order to FOLLOW source/target traversal after
 replacement or creation, with 750 additional noncanonical-order installed cases.
 This resolves the shared-identity tie gap described above for FOLLOW/HOLD/BACK;
 other native mutable movement scheduling remains separate work.
+
+M9.8F: EMPTY YOU projections now retain per-cell declaration counts and type their
+transient agents as Empty. Duplicate REVERSE parity and the project's scoped HOLD
+exemption are covered with transactional/source tests; see EMPTY_MOTION.md.
+Virtual automatic MOVE/AUTO/CHILL/nudges and destruction/HAS remain pending.

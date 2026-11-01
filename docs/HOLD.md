@@ -77,3 +77,8 @@ structural replacement/creation/deletion and is used by HOLD acquisition and fir
 logical-ID lookup. Added 128 noncanonical-order installed HOLD/getunitid cases.
 Boundary reload and whole-tree Undo preserve the intended authored/runtime split.
 Other motion solvers retain their existing scheduling contracts; see BACK.md.
+
+M9.8F types EMPTY YOU proxies as virtual Empty, making the existing real-unit-only
+scoped HOLD exemption effective. Real pushed targets still use their own layer.
+Native floating_level can query EMPTY; our exemption is an explicit project scope
+contract, not a claim that native cantmove excludes it. See EMPTY_MOTION.md.

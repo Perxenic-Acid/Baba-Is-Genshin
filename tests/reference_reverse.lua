@@ -44,3 +44,19 @@ for n=0,4 do for dir=0,3 do for _,locked in ipairs(opts) do
     assert((#p.changes==0)==blocked)
 end end end
 print('PASS: original cantmove/REVERSE directional-lock matrix (80 cases)')
+
+local empty_checked=0
+env.hasfeature_count=function(name,verb,trait,unitid) assert(name=='empty' and unitid==2);return count end
+for n=0,4 do for dir=0,3 do for _,locked in ipairs(opts) do
+ count=n;lock=locked
+ local v=vectors[dir+1];local actual_dir=env.reversecheck(2,dir,4,4);local travel=vectors[actual_dir+1]
+ local blocked=env.cantmove('empty',2,actual_dir,4,4)==true
+ local w={width=9,height=9,entities={[10]={id=10,kind='object',class='object',archetype='rock',x=4+travel[1],y=4+travel[2],direction='None',behaviors={push=true}}},
+  empty_cells={['4:4']={x=4,y=4,behaviors={control=true,reverse=n>0,[locked]=true},trait_counts={reverse=n}}}}
+ local p=RW_ResolveTurn(w,{type='move',dx=v[1],dy=v[2]});local moved=false
+ for _,c in ipairs(p.changes) do assert(c.entity_id==10);if c.kind=='move' then moved=true;assert(c.to.x==4+2*travel[1] and c.to.y==4+2*travel[2]) end end
+ assert(moved~=blocked,'EMPTY reverse/lock:'..n..':'..dir..':'..locked)
+ assert(not w.trait_counts and w.empty_cells['4:4'].trait_counts.reverse==n)
+ empty_checked=empty_checked+1
+end end end
+print('PASS: installed EMPTY reversecheck/cantmove counts and virtual PUSH/lock parity ('..empty_checked..' cases)')

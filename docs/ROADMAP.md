@@ -1128,3 +1128,12 @@ Carry optional seventh-result random_state in the conversion stage, preserving
 serial MAKE RNG, allocation atomicity and Undo. Retain raw frames for legacy
 relation-only callers. Turn tests and 180+30 installed conversion/ALL oracle cases
 cover direction, draws, replay, stale metadata and late failure. See EMPTY_CONVERSIONS.md.
+
+## M9.8F — counted and typed EMPTY YOU agents
+
+Retain EMPTY trait_counts in projection and copy them to temporary typed Empty
+agents. Fix duplicate REVERSE parity and the project's explicit scoped HOLD
+exemption without weakening real dependency restrictions. Compiler/turn tests
+cover conditions/NOT, layers, locks, positive-only plans, allocators and Undo; 80
+installed reversecheck/cantmove cases cover virtual count/lock mapping. Startup
+stays 1,980,000. Automatic EMPTY motion and virtual lifecycle remain pending.

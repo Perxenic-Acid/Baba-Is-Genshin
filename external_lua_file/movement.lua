@@ -1204,13 +1204,15 @@ function RW_ResolveTurn(world, action)
         -- Ephemeral movement agents, never part of a Plan/Commit or allocator.
         movement_world={}; for k,v in pairs(world) do movement_world[k]=v end
         movement_world.entities={}; for id,e in pairs(world.entities) do movement_world.entities[id]=e end
+        movement_world.trait_counts={};for id,counts in pairs(world.trait_counts or {}) do movement_world.trait_counts[id]=counts end
         local next_virtual=-1
         local keys={}; for key in pairs(world.empty_cells) do keys[#keys+1]=key end; table.sort(keys)
         for _,key in ipairs(keys) do
             local cell=world.empty_cells[key]
             if (cell.behaviors.control or action.player==3 and cell.behaviors.control2) and not cell.behaviors.sleep then
-                movement_world.entities[next_virtual]={id=next_virtual,kind="object",class="object",
+                movement_world.entities[next_virtual]={id=next_virtual,kind="object",class="empty",
                     x=cell.x,y=cell.y,direction="None",behaviors=cell.behaviors}
+                movement_world.trait_counts[next_virtual]=cell.trait_counts or {}
                 next_virtual=next_virtual-1
             end
         end

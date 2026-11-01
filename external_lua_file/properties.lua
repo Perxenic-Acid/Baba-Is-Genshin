@@ -189,7 +189,7 @@ function RW_ProjectWorld(world, effects, level_traits)
             for _,cell in ipairs(effect.cells or {}) do
                 local key=cell.x .. ":" .. cell.y
                 if not (empty_denied[key] and empty_denied[key][effect.trait]) then
-                    local empty=projected.empty_cells[key] or {x=cell.x,y=cell.y,traits={},behaviors={},end_contact=false}
+                    local empty=projected.empty_cells[key] or {x=cell.x,y=cell.y,traits={},trait_counts={},behaviors={},end_contact=false}
                     -- Original EMPTY END tests endpair in the YOU branch, but
                     -- bonuspair in the END branch: a leading YOU never completes.
                     if behavior["end"] and not empty.end_pair then empty.end_pair="you" end
@@ -198,6 +198,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                         elseif empty.end_pair=="you" then empty.end_contact=true end
                     end
                     empty.traits[effect.trait]=true
+                    empty.trait_counts[effect.trait]=(empty.trait_counts[effect.trait] or 0)+1
                     for capability,enabled in pairs(behavior) do if enabled then empty.behaviors[capability]=true end end
                     projected.empty_cells[key]=empty
                 end

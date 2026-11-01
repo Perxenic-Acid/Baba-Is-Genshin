@@ -700,3 +700,15 @@ selection, absent-frame retention and transient scheduler hints. 1,260 unchanged
 installed newundo() oracle queries plus staged playback, rejection, cap, local/tree
 Undo and boundary tests pass. Public registration, production retain decisions,
 status timing and lifecycle playback remain pending; see BACK.md.
+
+
+## M9.6Q — BACK primary conversion restoration
+
+Added exclusive stale-checked back_restore transactions and combined historical
+playback for one primary transform/retype. Restore the preceding source shape,
+facing/links/follow memory/BACK clock at the current position, with fresh origin,
+BROKEN/holder and display defaults; no HAS. Clock-ledger motion selection now uses
+this path. 54 unchanged installed create/remove branch oracle cases plus atomic
+stale/conflict, motion-handle and source-clock/Undo tests pass. Branched/repeated
+lifecycle history remains explicit pending provenance/identity work; production
+BACK registration/scheduling and host disposal parity are not claimed. See BACK.md.

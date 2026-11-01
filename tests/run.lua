@@ -533,3 +533,5 @@ dofile("tests/back_motion.lua")
 dofile("tests/back_clock.lua")
 
 dofile("tests/back_frames.lua")
+
+dofile("tests/back_lifecycle.lua")

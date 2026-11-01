@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6P)
+# BACK infrastructure progress (M9.6Q)
 
 ## Installed primary references
 
@@ -106,11 +106,39 @@ playback, ownership, stale/late rejection, local/tree Undo, sibling isolation an
 boundary reset. Native retain decisions/rule eligibility are supplied explicitly;
 production turns do not enable this ledger or schedule BACK yet.
 
+## Primary conversion restoration
+
+RW_PlanBackPlayback reconstructs selected identities through ordered phase rows.
+A single primary transform/retype restores the immediately preceding source shape
+at the current position, with the source direction, link, followed identity and
+BACK clock. It resets original_name to the restored concrete name (implicit field),
+holder/BROKEN to their fresh defaults and drops projected traits. This follows
+blocks.lua's create/remove branch and syntax.lua addunit(...,true), rather than
+copying the old snapshot wholesale or applying ordinary REVERT/IS conversion.
+
+The exclusive back_restore operation validates complete current/source/product
+snapshots before atomic replacement and journals its source. It triggers no HAS.
+Queued motion refers to the retired native handle; it does not displace the restored
+one. Restoration itself does not suppress TELE on the new handle. Motion-only
+selections retain their earlier behavior. Clock-ledger selection invokes this
+combined playback path. 54 unchanged installed create/remove branch cases verify
+shape, position/direction, link, origin/default resets and paradox presence, with
+additional staged motion, stale/conflicting operation and clock/Undo tests.
+
+Allocated conversion branches, ordinary births/removals and repeated conversion
+rows still return back_conversion_history_pending. In particular, the native source
+can be restored more than once with the same logical ID from multiple branches;
+this engine's unique identity map needs explicit source/handle tracking before
+that case can be reproduced. Do not guess provenance from noun or original_name.
+Native host disposal details and mixed queued-update disposal are not covered by
+the isolated branch oracle; current behavior preserves distinct old/new handles.
+No public BACK registration or production scheduling is enabled.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
 word yet. Automatic activation/status timing, scheduler retain decisions and
-conversion playback, born/dead handling,
+branched/repeated conversion playback, born/dead handling,
 TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
 still need implementation and source-oracle verification. Exact production
 updateundo/pruning decisions and history beyond this engine's existing 128-turn

@@ -87,6 +87,16 @@ local function original_name(entity)
     return entity.original_name or (entity.class=="text" and entity.text and "text_"..entity.text.name or entity.archetype)
 end
 function RW_GetOriginalName(entity) return original_name(entity) end
+local function back_restored(source,current)
+    local product=clone(source)
+    product.x,product.y=current.x,current.y
+    product.original_name=nil
+    product.broken,product.holder=nil,nil
+    product.traits,product.behaviors,product.symbol=nil,nil,nil
+    return product
+end
+function RW_BackRestoredEntity(source,current) return back_restored(source,current) end
+
 
 local function valid_new_entity(world, entity, id)
     if not is_integer(world.width) or not is_integer(world.height)
@@ -202,7 +212,7 @@ local function validate_plan(world, plan)
         if type(change) ~= "table"
             or (change.kind ~= "move" and change.kind ~= "transform"
                 and change.kind ~= "direction" and change.kind ~= "create"
-                and change.kind ~= "delete" and change.kind ~= "retype" and change.kind ~= "followed" and change.kind ~= "holder" and change.kind ~= "broken" and change.kind ~= "back_init") then
+                and change.kind ~= "delete" and change.kind ~= "retype" and change.kind ~= "followed" and change.kind ~= "holder" and change.kind ~= "broken" and change.kind ~= "back_init" and change.kind ~= "back_restore") then
             return false, "invalid_operation"
         end
         local id = change.entity_id
@@ -230,7 +240,11 @@ local function validate_plan(world, plan)
                 seen[id].direction_write = true
             end
 
-            if change.kind == "retype" then
+            if change.kind == "back_restore" then
+                if not same_state(entity,change.from) or type(change.source)~="table"
+                    or not valid_new_entity(world,change.source,id) or not valid_new_entity(world,change.to,id)
+                    or not same_state(change.to,back_restored(change.source,entity)) then return false,"invalid_or_stale_back_restore" end
+            elseif change.kind == "retype" then
                 if not same_state(entity,change.from) or not valid_new_entity(world,change.to,id)
                     or (change.to.original_name~=nil and change.to.original_name~=original_name(entity))
                     or same_state(change.from,change.to) or change.to.x ~= entity.x or change.to.y ~= entity.y
@@ -296,8 +310,9 @@ local function validate_plan(world, plan)
     end
 
     for _,operations in pairs(seen) do
-        if operations.retype then
-            for kind in pairs(operations) do if kind ~= "retype" then return false,"conflicting_retype" end end
+        if operations.retype or operations.back_restore then
+            local exclusive=operations.retype and "retype" or "back_restore"
+            for kind in pairs(operations) do if kind ~= exclusive then return false,"conflicting_retype" end end
         end
     end
     if create_count == 0 then
@@ -326,6 +341,8 @@ local function apply_plan(world, plan)
     for _, change in ipairs(plan.changes) do
         local entity = projected.entities[change.entity_id]
         if change.kind == "create" then
+            projected.entities[change.entity_id] = clone(change.to)
+        elseif change.kind == "back_restore" then
             projected.entities[change.entity_id] = clone(change.to)
         elseif change.kind == "retype" then
             projected.entities[change.entity_id] = clone(change.to)

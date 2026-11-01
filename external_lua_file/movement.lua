@@ -1718,8 +1718,67 @@ function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox)
             elseif before~="back_frame_absent" then return nil,before end
         elseif why~="back_inactive" then return nil,why end
     end
-    local plan,why=RW_PlanBackMotion(world,selections,paradox)
+    local plan,why=RW_PlanBackPlayback(world,selections,paradox)
     if not plan then return nil,why end
     plan.back_retain=retain
+    return plan
+end
+
+
+-- Identity-preserving conversion playback. Branch copies and repeated lifecycle
+-- rows need source/handle provenance and remain explicit unsupported history.
+function RW_PlanBackPlayback(world,selections,paradox)
+    -- Reuse the motion primitive's input/terminal checks before examining records.
+    local checked,why=RW_PlanBackMotion(world,{},paradox)
+    if not checked then return nil,why end
+    if type(selections)~="table" then return nil,"invalid_back_selection" end
+    local motion,restores,seen={},{},{}
+    local function list(value)
+        if type(value)~="table" then return false end
+        local count=0;for key in pairs(value) do
+            if type(key)~="number" or key%1~=0 or key<1 then return false end
+            count=count+1
+        end
+        return count==#value
+    end
+    if not list(selections) then return nil,"invalid_back_selection" end
+    local function copy(value)
+        if type(value)~="table" then return value end
+        local result={};for k,v in pairs(value) do result[k]=copy(v) end;return result
+    end
+    for _,selection in ipairs(selections) do
+        if type(selection)~="table" or not world.entities[selection.entity_id] or seen[selection.entity_id] then return nil,"invalid_back_identity" end
+        local id=selection.entity_id;seen[id]=true
+        if type(selection.before)~="table" or selection.before.id~=id
+            or type(selection.record)~="table" or not list(selection.record.phases) or #selection.record.phases==0 then return nil,"invalid_back_history" end
+        local cursor,source=copy(selection.before),nil
+        for _,phase in ipairs(selection.record.phases) do
+            if type(phase)~="table" or not list(phase.changes) then return nil,"invalid_back_history" end
+            for _,op in ipairs(phase.changes) do
+                if type(op)~="table" then return nil,"invalid_back_history" end
+                if op.entity_id==id then
+                    if op.kind=="create" or op.kind=="delete" or op.kind=="back_restore" then return nil,"back_conversion_history_pending" end
+                    if op.kind=="transform" or op.kind=="retype" then
+                        if source then return nil,"back_conversion_history_pending" end
+                        source=copy(cursor)
+                    end
+                    local temporary={width=world.width,height=world.height,next_entity_id=world.next_entity_id,entities={[id]=cursor}}
+                    local after,err=RW_PreviewPlan(temporary,{consumes_turn=true,changes={op}})
+                    if not after then return nil,err end
+                    cursor=after.entities[id]
+                end
+            end
+        end
+        if source then
+            if not paradox or paradox[id]==nil then
+                local current=world.entities[id]
+                restores[#restores+1]={kind="back_restore",entity_id=id,from=copy(current),source=source,to=RW_BackRestoredEntity(source,current)}
+            end
+        else motion[#motion+1]=selection end
+    end
+    local plan,err=RW_PlanBackMotion(world,motion,paradox)
+    if not plan then return nil,err end
+    for _,restore in ipairs(restores) do plan.changes[#plan.changes+1]=restore end
+    table.sort(plan.changes,function(a,b) return a.entity_id<b.entity_id end)
     return plan
 end

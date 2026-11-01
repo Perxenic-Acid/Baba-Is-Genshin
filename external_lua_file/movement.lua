@@ -1743,7 +1743,7 @@ end
 
 -- Select per-unit BACK frames from the native-clock ledger and the current
 -- pre-BACK phase prefix. Eligibility and status refresh are supplied by the caller.
-function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox,services)
+function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox,services,instances)
     if type(session)~="table" or type(eligible)~="table" then return nil,"invalid_back_selection" end
     local count=session.back_frame_count
     if count==nil then return nil,"back_history_unavailable" end
@@ -1758,7 +1758,17 @@ function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox,services
     end
     local rank={};for index,id in ipairs(unit_ids(world)) do rank[id]=index end
     table.sort(ids,function(a,b) return rank[a]<rank[b] end)
-    local selections,retain={},false
+    if instances~=nil then
+        if type(instances)~="table" then return nil,"invalid_back_instances" end
+        local n,seen=0,{}
+        for key,id in pairs(instances) do
+            if type(key)~="number" or key%1~=0 or key<1 or eligible[id]~=true then return nil,"invalid_back_instances" end
+            n=n+1;seen[id]=true
+        end
+        if n~=#instances then return nil,"invalid_back_instances" end
+        for _,id in ipairs(ids) do if not seen[id] then return nil,"invalid_back_instances" end end
+    end
+    local selections,retain,selected={},false,{}
     for _,id in ipairs(ids) do
         local index,why=RW_BackFrameIndex(world.entities[id].back_init or 0,count,false)
         if index~=nil then
@@ -1766,10 +1776,13 @@ function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox,services
             local record,before=api.frame(session,index,current_plan)
             if record then
                 selections[#selections+1]={entity_id=id,before_world=before,record=record}
+                selected[id]=true
             elseif before~="back_frame_absent" then return nil,before end
         elseif why~="back_inactive" then return nil,why end
     end
-    local plan,why=RW_PlanBackFramePlayback(world,selections,paradox,api)
+    local order
+    if instances then order={};for _,id in ipairs(instances) do if selected[id] then order[#order+1]=id end end end
+    local plan,why=RW_PlanBackFramePlayback(world,selections,paradox,api,order)
     if not plan then return nil,why end
     plan.back_retain=retain
     return plan
@@ -1861,7 +1874,7 @@ end
 
 -- Replay complete native logical-identity frames against unique current instances.
 -- Multiple matching create/remove rows deliberately multiply restored products.
-function RW_PlanBackFramePlayback(world,selections,paradox,services)
+function RW_PlanBackFramePlayback(world,selections,paradox,services,instances)
     local checked,reason=RW_PlanBackMotion(world,{},paradox)
     if not checked then return nil,reason end
     local api,reason=back_services(services,{"preview","rows","restore","identity"})
@@ -1885,14 +1898,29 @@ function RW_PlanBackFramePlayback(world,selections,paradox,services)
     end
     local rank={};for index,id in ipairs(unit_ids(world)) do rank[id]=index end
     table.sort(ordered,function(a,b) return rank[a.entity_id]<rank[b.entity_id] end)
+    local unique=ordered
+    if instances~=nil then
+        if type(instances)~="table" then return nil,"invalid_back_instances" end
+        local selected={};for _,selection in ipairs(ordered) do selected[selection.entity_id]=selection end
+        local n,present=0,{}
+        for key,id in pairs(instances) do
+            if type(key)~="number" or key%1~=0 or key<1 or not selected[id] then return nil,"invalid_back_instances" end
+            n=n+1;present[id]=true
+        end
+        if n~=#instances then return nil,"invalid_back_instances" end
+        for id in pairs(selected) do if not present[id] then return nil,"invalid_back_instances" end end
+        ordered={};for _,id in ipairs(instances) do ordered[#ordered+1]=selected[id] end
+    end
     local changes,suppressed,next_id={}, {},world.next_entity_id
-    local history={}
+    local history,positions,retired_ids={},{},{}
     for _,selection in ipairs(ordered) do
         local id=selection.entity_id;local entity=world.entities[id]
+        if not retired_ids[id] then
         local rows,why=api.rows(selection.before_world,selection.record)
         if not rows then return nil,why end
         local identity=api.identity(entity)
-        local x,y,d=entity.x,entity.y,entity.direction
+        local position=positions[id] or entity
+        local x,y,d=position.x,position.y,position.direction
         local products,retired,path={},false,{}
         for _,row in ipairs(rows) do
             if row.identity==identity then
@@ -1912,6 +1940,7 @@ function RW_PlanBackFramePlayback(world,selections,paradox,services)
             end
         end
         if retired then
+            retired_ids[id]=true;positions[id]=nil
             -- Queued actions/TELE marks belong to the retired native handle.
             suppressed[id]=nil
             if #products==0 then
@@ -1929,6 +1958,14 @@ function RW_PlanBackFramePlayback(world,selections,paradox,services)
             end
         else
             for _,row in ipairs(path) do history[#history+1]=row end
+            positions[id]={x=x,y=y,direction=d}
+        end
+        end
+    end
+    for _,selection in ipairs(unique) do
+        local id=selection.entity_id;local entity=world.entities[id];local position=positions[id]
+        if position then
+            local x,y,d=position.x,position.y,position.direction
             if x~=entity.x or y~=entity.y then
                 changes[#changes+1]={kind="move",entity_id=id,from={x=entity.x,y=entity.y,direction=entity.direction},to={x=x,y=y,direction=d}}
             elseif d~=entity.direction then
@@ -1936,6 +1973,7 @@ function RW_PlanBackFramePlayback(world,selections,paradox,services)
             end
         end
     end
+    local retained={};for _,row in ipairs(history) do if not retired_ids[row.entity_id] then retained[#retained+1]=row end end;history=retained
     local sequence={}
     for _,op in ipairs(changes) do if op.kind=="back_restore" or op.kind=="create" or op.kind=="delete" then sequence[#sequence+1]=op.entity_id end end
     -- Native create/remove is immediate, while update/updatedir actions are

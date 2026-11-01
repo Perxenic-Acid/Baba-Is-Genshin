@@ -856,3 +856,15 @@ the final queued movement dispatch, including mixed unrelated physical identitie
 144 installed queue/dispatch history oracles, a retained-frame scheduler replay,
 mixed restoration, anchor/stale rejection and Undo tests cover the change.
 Duplicate declaration/native phase/lifetime gaps remain; BACK stays catalog-partial.
+
+## M9.7D — repeated BACK declaration motion queues
+
+Separate per-unit eligibility/clocks from ordered declaration instances. Forward
+the optional instance list through production and isolated Invoke adapters; replay
+each surviving handle's matched actions in declaration then unit-list order.
+Keep one atomic final write per physical ID while journaling repeated intermediate
+updates, preserving separate handles with shared logical identity. Validate list
+coverage and filter inactive/absent-frame selections without fabricating history.
+The installed dispatch-history oracle expands to 432 cases. Physical duplicate
+sentences, ordering, aliases, malformed instances and Undo are covered. Repeated
+retired MF_* handle behavior/native phase gaps remain; BACK stays catalog-partial.

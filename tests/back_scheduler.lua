@@ -199,3 +199,37 @@ two,plan=step(rearmed);back=plan.stages[stages(plan).back].plan
 assert(#back.changes==0 and #back.motion_history==2 and back.tele_suppressed[1] and two.back_frame_count==6)
 assert(RW_Undo(two).world==rearmed.world and RW_Undo(rearmed).world==one.world)
 print("PASS: scheduled retained zero-net BACK journal selected again through native frame ledger, clocks and Undo")
+
+for copies=2,3 do
+ local rows={};for i=1,copies do rows[i]={"AVATAR","IS","BACK"} end
+ s=fixture(rows);s.world.entities[1].back_init=2
+ s,r=RW_Commit(s,cycle);assert(r.accepted,r.reason)
+ s,r=RW_Commit(s,{consumes_turn=true,changes={},back_frame={from=2,retain=true}});assert(r.accepted,r.reason)
+ one,plan=step(s);local back=plan.stages[stages(plan).back].plan
+ assert(#back.changes==0 and #back.motion_history==2*copies,"physical BACK declarations must each enqueue playback")
+ rows[#rows+1]={"AVATAR","IS","NOT","BACK"}
+ s=fixture(rows);s.world.entities[1].back_init=2
+ s,r=RW_Commit(s,cycle);assert(r.accepted,r.reason)
+ s,r=RW_Commit(s,{consumes_turn=true,changes={},back_frame={from=2,retain=true}});assert(r.accepted,r.reason)
+ one,plan=step(s);assert(not stages(plan).back and one.world.entities[1].back_init==0 and one.back_frame_count==3)
+end
+
+-- Declaration order comes before unit-list order within each declaration.
+s=fixture({{"ROCK","IS","BACK"},{"AVATAR","IS","BACK"},{"ROCK","IS","BACK"}})
+s.world.unit_order={3,2,1};for id=10,s.world.next_entity_id-1 do s.world.unit_order[#s.world.unit_order+1]=id end
+local out,home={},{}
+for id=1,3 do local u=s.world.entities[id];u.back_init=2
+ out[#out+1]={kind="move",entity_id=id,from={x=u.x,y=u.y,direction=u.direction},to={x=u.x+1,y=u.y,direction=u.direction}}
+ home[#home+1]={kind="move",entity_id=id,from={x=u.x+1,y=u.y,direction=u.direction},to={x=u.x,y=u.y,direction=u.direction}}
+end
+local history=assert(RW_PlanStages(s.world,{{name="out",plan={consumes_turn=true,changes=out}},{name="home",plan={consumes_turn=true,changes=home}}}))
+history.back_frame={from=1,retain=true};s,r=RW_Commit(s,history);assert(r.accepted,r.reason)
+s,r=RW_Commit(s,{consumes_turn=true,changes={},back_frame={from=2,retain=true}});assert(r.accepted,r.reason)
+one,plan=step(s);local back=plan.stages[stages(plan).back].plan
+local expected={3,3,2,2,1,1,3,3,2,2};assert(#back.motion_history==#expected)
+for i,id in ipairs(expected) do assert(back.motion_history[i].entity_id==id,"BACK declaration/unit-list queue order mismatch") end
+for _,invalid in ipairs({false,{1},{1,2,3,999},{[2]=1,[3]=2}}) do
+ local p,e=RW_PlanBackHistoryMotion(s,{consumes_turn=true,changes={}},{[1]=true,[2]=true,[3]=true},nil,nil,invalid)
+ assert(not p and e=="invalid_back_instances")
+end
+print("PASS: scheduled repeated BACK declarations, declaration-before-unit-list queue order, instance validation and Undo")

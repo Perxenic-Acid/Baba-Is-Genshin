@@ -1,4 +1,4 @@
-# BACK integration progress (M9.7C)
+# BACK integration progress (M9.7D)
 
 BACK is now available in the default property vocabulary and behavior registry.
 The official catalog explicitly marks its public real-unit history execution as
@@ -491,12 +491,45 @@ session scheduler also selects a retained zero-net BACK journal again through
 its native frame ledger; the earlier updates remain available to future BACK.
 Native duplicate-declaration and other pending phase/lifetime gaps are unchanged.
 
+## M9.7D: repeated declaration motion queues
+
+Installed findfeature/findallfeature preserves one selection per matching
+declaration, then enumerates unitlists within each declaration. moveblock queues
+the matched update actions for each selection before one final doupdate. Repeating
+a zero-net movement/facing cycle therefore repeats its emitted intermediate rows,
+even if the board's final shape is unchanged.
+
+The scheduler still derives one Boolean eligibility set for per-unit clock status,
+but separately builds the ordered declaration-instance list for playback. NOT
+denials filter every occurrence; each grant orders physical targets by the current
+unit list. RW_PlanBackHistoryMotion accepts this optional list as its sixth argument
+(fifth remains the explicit world-services slot). Production Invoke adapters carry
+it across isolated scripts. Inactive/absent-frame selections are filtered after
+validation, never assigned fabricated history.
+
+RW_PlanBackFramePlayback accepts an optional fifth instance list alongside unique
+frame selections. It validates complete selected-ID coverage and preserves every
+specified occurrence, instead of sorting occurrences back into per-unit groups.
+Motion accumulates per physical handle across queued occurrences; history keeps
+the global queue order. One final aggregate write per identity preserves atomic
+flat-plan validation. Handles sharing a logical BACK identity remain distinct.
+Without the optional list, existing unique/unit-order helper calls are unchanged.
+
+When a handle is retired, its queue/marks are discarded and later occurrences do
+not route to the replacement now occupying the reused physical slot. Exact
+repeated selection of an already retired native MF_* handle remains an explicit
+host-lifetime gap; this batch does not claim to establish that opaque behavior.
+
+The installed queue/update/updatedir emitted-history oracle expands from 144 to
+432 cases (one/two/three occurrences). Real physical duplicate BACK sentences,
+declaration-before-unit ordering, shared logical identities, malformed/sparse/
+incomplete instance lists, isolated Invoke routing and Undo have regressions.
+
 ## Still pending
 
-Broader native phase-graph/conditional intra-phase differences remain. The
-installed selection oracle preserves repeated declarations, while the current
-scheduler coalesces eligibility per physical unit; exact duplicate processing
-against retiring/replaced native handles remains a declaration/lifetime gap.
+Broader native phase-graph/conditional intra-phase differences remain. Repeated
+motion declaration instances now execute, but exact duplicate processing against
+already retired native MF_* handles remains a declaration/lifetime gap.
 Future native host evidence of a nonempty paradox writer would require an
 explicit transaction-owned integration rather than guessing new persistent facts.
 Opaque host lifetime updateundo behavior and history beyond this engine's existing

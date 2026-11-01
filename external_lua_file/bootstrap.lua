@@ -194,7 +194,7 @@ local function valid_turn_action(action)
         or (action.dy==1 or action.dy==-1) and action.dx==0)
 end
 local function back_eligible(world,effects)
-    local eligible,denied={},{}
+    local eligible,denied,instances={},{},{}
     for _,effect in ipairs(effects or {}) do if effect.trait=="back" then
         for _,id in ipairs(effect.entity_ids or {}) do if world.entities[id] then
             if effect.op=="grant_trait" then eligible[id]=true
@@ -202,7 +202,13 @@ local function back_eligible(world,effects)
         end end
     end end
     for id in pairs(denied) do eligible[id]=nil end
-    return eligible
+    local order={};if world.unit_order then for i,id in ipairs(world.unit_order) do order[id]=i end end
+    for _,effect in ipairs(effects or {}) do if effect.trait=="back" and effect.op=="grant_trait" then
+        local ids={};for _,id in ipairs(effect.entity_ids or {}) do if eligible[id] then ids[#ids+1]=id end end
+        table.sort(ids,function(a,b) return (order[a] or a)<(order[b] or b) end)
+        for _,id in ipairs(ids) do instances[#instances+1]=id end
+    end end
+    return eligible,instances
 end
 
 -- Keep before-input status/input metadata in current-frame BACK history without
@@ -447,10 +453,12 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         end
         end
         if back_context then
-            local eligible=back_eligible(complete,effects)
+            local eligible,instances=back_eligible(complete,effects)
             if next(eligible)~=nil then
             local prefix=prepend_turn(plan,back_context.before)
-            local playback,why=services.back_history(back_context.session,prefix,eligible)
+            -- Share the primitive's six-argument contract; the mapped adapter
+            -- supplies world services in slot five, leaving instances in six.
+            local playback,why=services.back_history(back_context.session,prefix,eligible,nil,nil,instances)
             if not playback then return fail("back",why) end
             local prior=complete
             local next_world,why=services.preview(complete,playback)
@@ -1751,8 +1759,8 @@ local function start(run_self_tests)
     turn_services.back_status=function(world,eligible,count)
         return movement_api:Invoke("RW_PlanBackStatus",world,eligible,count)
     end
-    turn_services.back_history=function(session,prefix,eligible,paradox)
-        return movement_api:Invoke("RW_PlanBackHistoryMotion",session,prefix,eligible,paradox,back_services)
+    turn_services.back_history=function(session,prefix,eligible,paradox,_,instances)
+        return movement_api:Invoke("RW_PlanBackHistoryMotion",session,prefix,eligible,paradox,back_services,instances)
     end
     turn_services.back_retain=function(world,plan,active) return world_api:Invoke("RW_BackRetainDecision",world,plan,active) end
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
@@ -2361,7 +2369,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7C initialized")
+    print("[RuleWorld] M9.7D initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

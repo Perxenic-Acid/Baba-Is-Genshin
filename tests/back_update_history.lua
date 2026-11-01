@@ -21,7 +21,7 @@ local records={
 }
 local original=fixture(2,2,"Right").world;local cases=0
 for _,record in ipairs(records) do for _,at in ipairs({{2,2},{3,2},{8,6}}) do
-for _,facing in ipairs({"Right","Up","Down","None"}) do for guard=0,1 do for _,class in ipairs({"object","text"}) do
+for _,facing in ipairs({"Right","Up","Down","None"}) do for guard=0,1 do for _,class in ipairs({"object","text"}) do for copies=1,3 do
  local s=fixture(at[1],at[2],facing);if class=="text" then s.world.entities[1].class="text";s.world.entities[1].archetype=nil;s.world.entities[1].text={name="FLAG"} end
  local oldrows=assert(RW_BackHistoryRows(original,record));local native_rows={}
  -- BACK decides update vs updatedir using historical displacement, while the
@@ -32,9 +32,9 @@ for _,facing in ipairs({"Right","Up","Down","None"}) do for guard=0,1 do for _,c
  local actions,logged={},{};env.addaction=function(_,a) actions[#actions+1]=a end
  env.addundo=function(row) table.insert(logged,1,copy(row)) end
  local paradox=guard==1 and {[1]=true} or {}
- native(native_rows,unit,101,paradox)
+ local instances={};for i=1,copies do native(native_rows,unit,101,paradox);instances[#instances+1]=1 end
  for _,a in ipairs(actions) do if a[1]=="update" then env.update(101,a[2],a[3],a[4]) else env.updatedir(101,a[2]) end end
- local plan=assert(RW_PlanBackFramePlayback(s.world,{{entity_id=1,before_world=original,record=record}},paradox))
+ local plan=assert(RW_PlanBackFramePlayback(s.world,{{entity_id=1,before_world=original,record=record}},paradox,nil,instances))
  local after,r=RW_Commit(s,plan);assert(r.accepted,r.reason)
  local rows=assert(RW_BackHistoryRows(s.world,RW_GetTurnRecord(after,1)))
  assert(#rows==#logged,"BACK must journal the dispatched effective path, not just its final delta")
@@ -45,9 +45,9 @@ for _,facing in ipairs({"Right","Up","Down","None"}) do for guard=0,1 do for _,c
  local e=after.world.entities[1];assert(e.x==unit.values.XPOS and e.y==unit.values.YPOS and e.direction==unit.values.DIR)
  assert((plan.tele_suppressed[1]==true)==(env.objectdata[101]~=nil));assert(RW_Undo(after).world==s.world)
  cases=cases+1
-end end end end end
-assert(cases==144)
-print("PASS: installed BACK queue plus update/updatedir emitted-history oracle (144 cases), net-zero paths, filtered no-ops, Object/Text, paradox and Undo")
+end end end end end end
+assert(cases==432)
+print("PASS: installed repeated BACK queue plus update/updatedir emitted-history oracle (432 cases), duplicate declarations, net-zero paths, filtered no-ops, Object/Text, paradox and Undo")
 
 -- A retained zero-net BACK phase remains an input to later BACK, including TELE
 -- suppression. A pure dispatched no-op instead produces no new history row.
@@ -93,3 +93,19 @@ for _,mutate in ipairs({
 }) do local bad=copy(p);mutate(bad);local rejected,r=RW_Commit({world=mixed,history={}},bad);assert(not r.accepted) end
 assert(RW_Undo(after).world==mixed)
 print("PASS: repeated BACK net-zero history, diagnostic parity, no-op filtering, mixed motion/restoration dispatch order, retired handles, anchor validation and Undo")
+
+local aliases=fixture(2,2,"Right");aliases.world.entities[2]=copy(aliases.world.entities[1]);aliases.world.entities[2].id=2;aliases.world.entities[2].back_identity=1
+local selections={{entity_id=1,before_world=original,record=records[1]},{entity_id=2,before_world=original,record=records[1]}}
+local repeated=assert(RW_PlanBackFramePlayback(aliases.world,selections,nil,nil,{1,2,1}))
+local physical={1,1,2,2,1,1};assert(#repeated.changes==0 and #repeated.motion_history==#physical)
+for i,id in ipairs(physical) do assert(repeated.motion_history[i].entity_id==id) end
+local after,r=RW_Commit(aliases,repeated);assert(r.accepted,r.reason)
+assert(repeated.tele_suppressed[1] and repeated.tele_suppressed[2] and RW_Undo(after).world==aliases.world)
+for _,bad in ipairs({false,{}, {1,999}, {[1]=1,[3]=2}}) do
+ local p,e=RW_PlanBackFramePlayback(aliases.world,selections,nil,nil,bad);assert(not p and e=="invalid_back_instances")
+end
+local retired=assert(RW_PlanBackFramePlayback(mixed,{{entity_id=1,before_world=original,record=records[1]},
+ {entity_id=2,before_world=source.world,record=RW_GetTurnRecord(converted,1)}},nil,nil,{1,2,1,2}))
+assert(#retired.changes==1 and retired.changes[1].entity_id==2 and #retired.motion_history==4)
+assert(not retired.tele_suppressed[2] and not retired.id_allocation)
+print("PASS: BACK duplicate instance order keeps aliased physical handles distinct, validates coverage and never routes old selections onto replacements")

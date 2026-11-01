@@ -118,7 +118,7 @@ local scheduled={project=compile.project,preview=api.preview,
  convert=function(...) return rules:Invoke("RW_PlanConversions",...) end,
  tele=function(...) return movement:Invoke("RW_ResolveTele",...) end,
  back_status=function(...) return movement:Invoke("RW_PlanBackStatus",...) end,
- back_history=function(s,p,e,guard) return movement:Invoke("RW_PlanBackHistoryMotion",s,p,e,guard,api) end,
+ back_history=function(s,p,e,guard,_,instances) return movement:Invoke("RW_PlanBackHistoryMotion",s,p,e,guard,api,instances) end,
  back_retain=function(...) return world:Invoke("RW_BackRetainDecision",...) end,
  evaluate=function(w)
   local f,e=bootstrap:Invoke("RW_CompileWorld",w,compile);if not f then return nil,e.reason end
@@ -174,3 +174,16 @@ end end
 assert(found and n.world.entities[1].x==2 and not n.world.random_state)
 assert(world:Invoke("RW_Undo",n).world==s.world)
 print("PASS: isolated SHIFT history-only phase, current BACK frame, TELE suppression and Undo")
+
+s=fixture();s.world.entities[1].back_init=2
+for i=1,2 do s.world.rule_sources[#s.world.rule_sources+1]={when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="avatar"},trait="back"}}} end
+local cycle=assert(world:Invoke("RW_PlanStages",s.world,{
+ {name="out",plan={consumes_turn=true,changes={{kind="move",entity_id=1,from={x=2,y=2,direction="Right"},to={x=3,y=2,direction="Right"}}}}},
+ {name="home",plan={consumes_turn=true,changes={{kind="move",entity_id=1,from={x=3,y=2,direction="Right"},to={x=2,y=2,direction="Right"}}}}}}))
+cycle.back_frame={from=1,retain=true};s=commit(s,cycle)
+s=commit(s,{consumes_turn=true,changes={},back_frame={from=2,retain=true}})
+plan,e=bootstrap:Invoke("RW_PlanTurn",s.world,{type="wait"},scheduled,s);assert(plan,e and e.reason)
+n=commit(s,plan);local found=false
+for _,stage in ipairs(plan.stages) do if stage.name=="back" then assert(#stage.plan.motion_history==4 and #stage.plan.changes==0);found=true end end
+assert(found and n.back_frame_count==4 and world:Invoke("RW_Undo",n).world==s.world)
+print("PASS: isolated duplicate BACK instance sequence crosses scheduler/Invoke/world journal and Undo")

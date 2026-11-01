@@ -345,3 +345,7 @@ compiled and contacts/BACK are not repeated. Pure no-op dispatch does not trigge
 this refresh. Tests cover real spatial BROKEN rules, zero-net displacement and
 turning, no-op latching, both compile-limit terminal states, atomic rejection and
 Undo. Existing conservative WORD dependency detection remains a documented gap.
+
+M9.7M: conditional scoped LEVEL POWER channels and dynamic synthetic BROKEN now
+use raw current/frozen declarations; see LEVEL_CONDITIONS.md. No saved synthetic
+status or persistent query cache is introduced.

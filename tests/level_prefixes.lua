@@ -92,3 +92,39 @@ for _,words in ipairs({{'LEVEL','ON','ROCK','IS','SAFE'},{'IDLE','LEVEL','ON','R
  local tree=fixture({words});local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#frame.deferred>0)
 end
 print('PASS: scoped input-prefix BROKEN/protection/destruction, 64 pure chance plans with independent map/physical identities, and explicit spatial deferral')
+
+for _,case in ipairs({
+ {prefix='POWERED',source={'AVATAR','IS','POWER'},fires=true},
+ {prefix='POWERED',source={'LEVEL','IS','POWER'},fires=true},
+ {prefix='POWERED2',source={'LEVEL','IS','POWER'},fires=false},
+ {prefix='POWERED2',source={'LEVEL','IS','POWER2'},fires=true},
+ {prefix='POWERED3',source={'LEVEL','IS','POWER3'},fires=true},
+ {prefix='POWERED',source={'POWERED','LEVEL','IS','POWER'},fires=false},
+ {prefix='POWERED',source={'IDLE','LEVEL','IS','POWER'},fires=true},
+ {prefix='POWERED',source={'LEVEL','IS','POWER'},extra={'LEVEL','IS','BROKEN'},fires=false},
+ {prefix='POWERED',source={'LEVEL','IS','POWER'},extra={'IDLE','LEVEL','IS','BROKEN'},fires=false}
+}) do
+ local rows={{case.prefix,'LEVEL','BECOME','FLAG'},case.source}
+ if case.extra then rows[#rows+1]=case.extra end
+ local tree,parent=fixture(rows);RW_GetActiveLevel(tree).world.entities[2]=nil
+ local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#frame.deferred==0)
+ local n=act(tree,wait);assert((n.active_id==parent)==case.fires,case.prefix..':'..case.source[1])
+end
+local tree,parent=fixture({{'POWERED','LEVEL','BECOME','FLAG'},{'IDLE','LEVEL','IS','POWER'}})
+RW_GetActiveLevel(tree).world.entities[2]=nil
+local n=act(tree,right);assert(n.active_id==tree.active_id)
+local tree,parent=fixture({{'POWERED','LEVEL','BECOME','FLAG'},{'LEVEL','IS','POWER'},{'IDLE','LEVEL','IS','BROKEN'}})
+RW_GetActiveLevel(tree).world.entities[2]=nil
+local n=act(tree,right);assert(n.active_id==parent)
+-- A frozen rule frame carries declarations, never a latched map POWER Boolean.
+local tree=fixture({{'POWERED','LEVEL','IS','POWER'},{'AVATAR','IS','POWER'}})
+local w=RW_GetActiveLevel(tree).world;w.entities[2]=nil
+local frame=assert(RW_CompileWorld(w,cs));assert(#frame.deferred==0)
+local powered={op='spatial',clauses={{relation='powered',negated=false,parameters={}}}}
+local context={};for k,v in pairs(w) do context[k]=v end
+context._condition_rules=frame.rules;context.entities={}
+for id,e in pairs(w.entities) do if id~=1 then context.entities[id]=e end end
+local map={id=0,class='level',x=0,y=0,direction='None'}
+assert(RW_TestEntityCondition(context,powered,map)==false)
+assert(not w._condition_guard and not w._condition_rules)
+print('PASS: scoped POWERED channels see complete real/map declarations, conditional input/BROKEN, grounded recursion, frozen-frame source deletion and Undo')

@@ -151,6 +151,7 @@ local function condition_context(world,rules)
     return context
 end
 local virtual_broken
+local query_level_trait
 -- Query this rule frame, never stale entity.behaviors from a previous turn.
 local function query_trait(world,entity,trait)
     if entity.broken==1 then return false end
@@ -184,7 +185,40 @@ local function query_trait(world,entity,trait)
 end
 -- EMPTY has no saved unit status. Original testcond -> isitbroken queries the
 -- current declaration frame with ignorebroken=true for that nested query.
+query_level_trait=function(world,trait)
+    local guard=world._condition_guard or {};local key="level:"..trait
+    if guard[key] then return false end
+    if (world._condition_depth or 0)>=80 then return nil,"word_rule_limit" end
+    guard[key]=true
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
+    context._ignore_level_broken=trait=="broken"
+    if trait~="broken" then
+        local disabled,why=query_level_trait(context,"broken")
+        if disabled==nil then guard[key]=nil;return nil,why end
+        if disabled then guard[key]=nil;return false end
+    end
+    local granted,denied=false,false
+    local entity={id=0,class="level",archetype="level_block",x=0,y=0,direction="None"}
+    for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
+        for _,rule in ipairs(rules) do for _,declaration in ipairs(rule.scoped_conditions or {}) do
+            if declaration.trait==trait then
+                local active,why=RW_TestEntityCondition(context,declaration.when,entity)
+                if active==nil then guard[key]=nil;return nil,why end
+                if active then
+                    if declaration.op=="level_trait" then granted=true
+                    elseif declaration.op=="deny_level_trait" then denied=true end
+                end
+            end
+        end end
+    end
+    guard[key]=nil;return granted and not denied
+end
 virtual_broken=function(world,entity)
+    if entity.class=="level" then
+        if world._ignore_level_broken then return false end
+        return query_level_trait(world,"broken")
+    end
     if entity.class~="empty" or world._ignore_virtual_broken then return false end
     local context={};for k,v in pairs(world) do context[k]=v end
     context._ignore_virtual_broken=true
@@ -259,6 +293,9 @@ local function powered_condition(world,trait,negated)
     local context={};for k,v in pairs(world) do context[k]=v end
     context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
     local found,empty_source=false,false
+    local level_power,why=query_level_trait(context,trait)
+    if level_power==nil then guard[key]=nil;return nil,why end
+    found=level_power
     for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
         for _,rule in ipairs(rules) do
             if rule.scoped_power and rule.scoped_power[trait] then found=true end
@@ -2089,7 +2126,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         end
         if node.op~="spatial" or not dense_list(node.clauses) then return false end
         for _,clause in ipairs(node.clauses) do
-            if clause.relation~="idle" and clause.relation~="often" and clause.relation~="seldom" then return false end
+            if clause.relation~="idle" and clause.relation~="often" and clause.relation~="seldom"
+                and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3" then return false end
         end
         for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
         return true
@@ -2129,9 +2167,6 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local has_start=#relations+1
             if subject.tag=="noun" and subject.type and subject.type.tag=="level"
                 and ast.when.op~="always" and input_prefixes(ast.when) then
-                local enabled,why=RW_TestEntityCondition(world,ast.when,
-                    {id=0,class="level",archetype=subject.type.block_type or "level_block",x=0,y=0,direction="None"})
-                if enabled==nil then return nil,why end
                 local unconditional=query_clone(rule);unconditional.when={op="always"}
                 local g,d,r=lower_simple({unconditional},registry,world)
                 if not g then return nil,d end
@@ -2142,7 +2177,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                         or relation.op=="transform_level" or relation.op=="protect_level"
                         or relation.op=="become_level" or relation.op=="forbid_become_level" or relation.op=="destroy_level"
                     if scoped then
-                        if enabled then relations[#relations+1]=relation end
+                        relation.scoped_when=query_clone(ast.when);relations[#relations+1]=relation
                     else relation.when=query_clone(ast.when);relations[#relations+1]=relation end
                 end
                 supported=supported or #d==0
@@ -2323,36 +2358,38 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         end
         if not blocked then filtered[#filtered+1]=relation end
     end
-    -- Virtual LEVEL has no saved unit flag (testcond unitid=1 -> isitbroken).
-    -- All currently supported scoped declarations are unconditional, so its raw
-    -- BROKEN query reduces to grant/deny precedence before consumer selection.
-    local level_broken,level_not_broken=false,false
+    -- Keep raw scoped properties in the transient declaration frame so query
+    -- prefixes can see later clauses and re-evaluate conditions after movement.
+    local scoped_conditions={}
     for _,relation in ipairs(filtered) do
-        if relation.trait=="broken" then
-            if relation.op=="level_trait" then level_broken=true
-            elseif relation.op=="deny_level_trait" then level_not_broken=true end
+        if relation.op=="level_trait" or relation.op=="deny_level_trait" then
+            scoped_conditions[#scoped_conditions+1]={op=relation.op,trait=relation.trait,
+                when=query_clone(relation.scoped_when or {op="always"})}
         end
     end
-    if level_broken and not level_not_broken then
-        local enabled={}
-        for _,relation in ipairs(filtered) do
-            if relation.op~="level_trait" and relation.op~="deny_level_trait"
-                and relation.op~="transform_level" and relation.op~="protect_level"
-                and relation.op~="become_level" and relation.op~="forbid_become_level" and relation.op~="destroy_level" then
-                enabled[#enabled+1]=relation
-            end
-        end
-        filtered=enabled
+    if #scoped_conditions>0 then
+        generated[#generated+1]={when={op="always"},effects={},scoped_conditions=scoped_conditions}
     end
-    local scoped_power,denied_power={},{}
+    local context=condition_context(world,generated)
+    local level_broken,why=query_level_trait(context,"broken")
+    if level_broken==nil then return nil,why end
+    local enabled={}
     for _,relation in ipairs(filtered) do
-        if relation.trait=="power" or relation.trait=="power2" or relation.trait=="power3" then
-            if relation.op=="level_trait" then scoped_power[relation.trait]=true
-            elseif relation.op=="deny_level_trait" then denied_power[relation.trait]=true end
+        local scoped=relation.op=="level_trait" or relation.op=="deny_level_trait"
+            or relation.op=="transform_level" or relation.op=="protect_level"
+            or relation.op=="become_level" or relation.op=="forbid_become_level" or relation.op=="destroy_level"
+        local active=not scoped or not level_broken
+        if active and scoped and relation.scoped_when then
+            active,why=RW_TestEntityCondition(context,relation.scoped_when,
+                {id=0,class="level",archetype="level_block",x=0,y=0,direction="None"})
+            if active==nil then return nil,why end
+        end
+        if active then
+            if scoped then relation.scoped_when=nil end
+            enabled[#enabled+1]=relation
         end
     end
-    for trait in pairs(denied_power) do scoped_power[trait]=nil end
-    if next(scoped_power) then generated[#generated+1]={when={op="always"},effects={},scoped_power=scoped_power} end
+    filtered=enabled
     local has_broken=false
     for _,rule in ipairs(generated) do for _,effect in ipairs(rule.effects or {}) do
         if effect.trait=="broken" then has_broken=true end

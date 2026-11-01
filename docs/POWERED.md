@@ -54,3 +54,7 @@ COND (root x=8,y=1) expands to 32x28, preserving its original objects and test r
 Fourteen loose prefix/property/utility blocks occupy x=15..27 with three-cell spacing.
 Original motion and official reference layouts remain intact. Next: remaining
 prefixes LONELY/IDLE/OFTEN/SELDOM, then GROUP and ordinary properties.
+
+M9.7M: conditional scoped LEVEL POWER channels and dynamic synthetic BROKEN now
+use raw current/frozen declarations; see LEVEL_CONDITIONS.md. No saved synthetic
+status or persistent query cache is introduced.

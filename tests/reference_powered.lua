@@ -27,7 +27,7 @@ for _,full in ipairs({false,true}) do for _,negated in ipairs({false,true}) do
     local when=enabled and {op='always'} or {op='not',condition={op='always'}}
     local generated={{when={op='spatial',clauses={{relation='powered'..req_suffix,negated=negated,parameters={}}}},effects={{op='grant_trait',trait='safe',target={kind='id',value=10}}}}}
     if kind=='level' then
-        if enabled then generated[#generated+1]={when={op='always'},effects={},scoped_power={[trait]=true}} end
+        generated[#generated+1]={when={op='always'},effects={},scoped_conditions={{op='level_trait',trait=trait,when=when}}}
     else
         local selector=kind=='empty' and {kind='empty',value='empty'} or kind=='text' and {kind='class',value='text'} or {kind='archetype',value=kind}
         w.rule_sources[1]={when=when,effects={{op='grant_trait',trait=trait,target=selector}}}

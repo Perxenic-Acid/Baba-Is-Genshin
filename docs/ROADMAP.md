@@ -945,3 +945,13 @@ state. Existing scoped BROKEN, conversion/protection/outcome/destroy transaction
 consume the selected commands unchanged. Tests cover real compiler/tree actions,
 64 pure chance plans and expanded installed prefix oracles. Parent spatial/query
 conditions remain explicitly deferred; see LEVEL_CONDITIONS.md.
+
+## M9.7M — scoped LEVEL POWERED and dynamic query frame
+
+Extend scoped conditions to all three POWERED channels. Preserve raw conditional
+LEVEL property declarations in the transient query frame; evaluate synthetic
+BROKEN with its nested bypass and remove stale aggregate power snapshots.
+Compiler/tree tests cover grounding, input-dependent power/BROKEN, frozen source
+deletion, channels and Undo. The installed POWERED oracle uses conditional scoped
+declarations across 1,080 cases. Full regressions pass; startup stays 1,979,000.
+Parent surroundings and FEELING instance semantics remain explicit gaps.

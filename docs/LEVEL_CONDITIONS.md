@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7L)
+# Scoped LEVEL conditions (M9.7M)
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -36,8 +36,25 @@ physical decisions. Installed prefix oracles now include LEVEL: 24 IDLE cases an
 1,920 normalized OFTEN/SELDOM cases with repeated-query caching.
 
 Parent-dependent spatial conditions (including mixes with the supported prefixes)
-remain explicitly deferred. POWERED/FEELING and other query-dependent prefixes
-need a complete current-frame scoped declaration query, not this input-only path.
+remain explicitly deferred. FEELING needs scoped property-instance counting;
+other parent-dependent queries need actual surroundings.
 LONELY needs actual parent occupancy. Scoped HAS lifecycle and other unrelated
 LEVEL consumers keep their existing subsystem limits. No child-grid coordinate
 substitution is used to fake parent surroundings; native acceptance is unclaimed.
+
+## POWERED channels and dynamic scoped BROKEN
+
+M9.7M admits POWERED/POWERED2/POWERED3 and their NOT/conjunctions alongside
+input/chance prefixes. Installed conditions.lua powered() queries conditional
+LEVEL sources through testcond(unitid=1), alongside real units and EMPTY.
+Generated frames now carry raw scoped property declarations with their conditions,
+rather than a latched scoped_power Boolean. Query scoped BROKEN dynamically with
+its nested ignorebroken bypass. Conditions therefore see later declarations and
+can lose their power source in a frozen contact frame. Recursion guards and depth
+limits remain transient; no query result enters world state or Undo.
+
+level_prefixes.lua covers conditional map power, channels, ungrounded recursion,
+BROKEN suppression/release, conversion/Undo and frozen-frame source deletion.
+reference_powered.lua now uses raw conditional scoped declarations in its 1,080
+installed-source comparisons. Startup remains 1,979,000 instructions. Parent
+spatial conditions, FEELING instance accounting and native acceptance remain open.

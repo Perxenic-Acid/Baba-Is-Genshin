@@ -346,3 +346,76 @@ assert(count==1,'no-op contact phases must reuse the freshly compiled scoped tra
 local committed,result=RW_CommitLevelTree(tree,p);assert(result.accepted)
 assert(RW_GetActiveLevel(RW_UndoLevelTree(committed)).world==RW_GetActiveLevel(tree).world)
 print('PASS: MAKE/HAS newborn witnesses refresh scoped WIN; no-op contacts reuse compiled traits with one final query')
+
+for _,case in ipairs({
+ {rows={{'LEVEL','WRITE','ROCK'}},fires=true,token='ROCK'},
+ {rows={{'IDLE','LEVEL','WRITE','SAFE'}},fires=true,token='SAFE'},
+ {rows={{'LEVEL','WRITE','IS'}},fires=true,token='IS'},
+ {rows={{'LEVEL','WRITE','LEVEL'}},fires=true,token='LEVEL'},
+ {rows={{'LEVEL','WRITE','ROCK'},{'LEVEL','WRITE','NOT','ROCK'}},fires=false},
+ {rows={{'LEVEL','WRITE','ROCK'},{'LEVEL','IS','NOT','TEXT'}},fires=false},
+ {rows={{'LEVEL','WRITE','ROCK'},{'LEVEL','IS','LEVEL'}},fires=false},
+ {rows={{'LEVEL','WRITE','ROCK'},{'LEVEL','IS','BROKEN'}},fires=false}
+}) do
+ local tree,parent=fixture(case.rows);local w=RW_GetActiveLevel(tree).world
+ local f=assert(RW_CompileWorld(w,cs));assert(#f.deferred==0)
+ local n=act(tree,wait);assert((n.active_id==parent)==case.fires,table.concat(case.rows[1],' '))
+ if case.fires then assert(RW_GetActiveLevel(n).world.entities[1].text.name==case.token) end
+end
+print('PASS: scoped LEVEL WRITE noun/property/syntax/LEVEL products, input conditions, own NOT, IS NOT TEXT, identity/BROKEN and Undo')
+
+local tree,parent=fixture({{'LEVEL','WRITE','ROCK'},{'LEVEL','WRITE','ROCK'}})
+local n=act(tree,wait);local w=RW_GetActiveLevel(n).world
+assert(n.active_id==parent and w.entities[1].text.name=='ROCK' and w.entities[10].text.name=='ROCK')
+local tree,parent=fixture({{'LEVEL','IS','FLAG'},{'LEVEL','WRITE','ROCK'}})
+local n=act(tree,wait);local w=RW_GetActiveLevel(n).world
+assert(n.active_id==parent and w.entities[1].archetype=='flag' and w.entities[10].text.name=='ROCK')
+local tree,parent=fixture({{'LEVEL','WRITE','ALL'},{'LEVEL','WRITE','NOT','ROCK'}})
+local f=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));local count=0
+for _,r in ipairs(f.relations) do if r.op=='transform_level' then assert(r.target_type~='text_rock');count=count+1 end end
+assert(count==#RW_NounPalette(RW_GetActiveLevel(tree).world)-1)
+local tree,parent=fixture({{'LEVEL','WRITE','ALL'},{'LEVEL','WRITE','NOT','ALL'}})
+local n=act(tree,wait);assert(n.active_id==tree.active_id)
+local tree,parent=fixture({{'LEVEL','IS','TEXT'},{'LEVEL','IS','NOT','TEXT'}})
+local n=act(tree,wait);assert(n.active_id==tree.active_id and RW_GetActiveLevel(n).world.entities[2].class=='object')
+local tree,parent=fixture({{'NOT','IDLE','LEVEL','WRITE','ROCK'}})
+local n=act(tree,wait);assert(n.active_id==tree.active_id)
+local n=act(tree,right);assert(n.active_id==parent and RW_GetActiveLevel(n).world.entities[1].text.name=='ROCK')
+-- Physical Level conversions retain their own spatial condition queries.
+local tree=fixture({{'LEVEL','ON','ROCK','WRITE','SAFE'},{'LEVEL','NOT','ON','ROCK','WRITE','NOT','SAFE'}})
+local w=RW_GetActiveLevel(tree).world
+w.entities[3]={id=3,kind='object',class='object',archetype='rock',x=20,y=20,direction='Right'}
+local f=assert(RW_CompileWorld(w,cs));local physical={}
+for _,r in ipairs(f.relations) do if r.op=='write_text' or r.op=='forbid_transform' or r.op=='protect_transform' then physical[#physical+1]=r end end
+local ops=assert(RW_PlanConversions(w,physical,f.rules))
+local retyped=false;for _,op in ipairs(ops) do if op.entity_id==2 and op.kind=='retype' then assert(op.to.text.name=='SAFE');retyped=true end end
+assert(retyped)
+print('PASS: scoped WRITE duplicates/mixed ordered products, ALL own bans, IS Text denial, input refresh and physical Level conversion')
+
+local f=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/convert.lua]],'rb'))
+local source=f:read('*a');f:close()
+local scoped=assert(source:match('function dolevelconversions%(%)%s*if.-then%s*(local mats = levelconversions.-)\n\t\tif %(#levelmats > 0%)'))
+local env=setmetatable({unitreference={flag='flag',text_rock='text_rock'},tileslist={flag={name='flag'},text_rock={name='text_rock'}},
+ changes={},MF_alert=function() end,testcond=function(c) return c.enabled~=false end,destroylevel=function() error('unexpected destruction') end},{__index=_G})
+local oracle=assert(load('return function() '..scoped..' return levelmats end','@original_scoped_WRITE_selection','t',env))()
+local checked=0
+for copies=0,3 do for _,enabled in ipairs({false,true}) do for _,first in ipairs({false,true}) do
+ local rows,mats={},{}
+ if first then rows[#rows+1]={'LEVEL','IS','FLAG'};mats[#mats+1]={'flag',{},'is'} end
+ for i=1,copies do rows[#rows+1]={'IDLE','LEVEL','WRITE','ROCK'};mats[#mats+1]={'rock',{enabled=enabled},'write'} end
+ if not first then rows[#rows+1]={'LEVEL','IS','FLAG'};mats[#mats+1]={'flag',{},'is'} end
+ local tree=fixture(rows);local w=RW_GetActiveLevel(tree).world;w.last_input=enabled and 'wait' or 'move'
+ local frame=assert(RW_CompileWorld(w,cs));local got={}
+ for _,r in ipairs(frame.relations) do if r.op=='transform_level' then got[#got+1]=r.target_type end end
+ env.levelconversions=mats;local expected=oracle();assert(#got==#expected)
+ for i,target in ipairs(expected) do assert(got[i]==target) end
+ checked=checked+1
+end end end
+assert(checked==16);print('PASS: installed scoped WRITE ordered/conditional/duplicate mixed IS product-selection oracle (16 cases)')
+
+for _,ban in ipairs({'WRITE','IS'}) do for _,action in ipairs({wait,right}) do
+ local words=ban=='WRITE' and {'IDLE','LEVEL','WRITE','NOT','ROCK'} or {'IDLE','LEVEL','IS','NOT','TEXT'}
+ local tree,parent=fixture({{'LEVEL','WRITE','ROCK'},words})
+ local n=act(tree,action);assert((n.active_id==parent)==(action==right))
+end end
+print('PASS: scoped WRITE own/IS NOT TEXT conditional bans refresh independently for move versus wait')

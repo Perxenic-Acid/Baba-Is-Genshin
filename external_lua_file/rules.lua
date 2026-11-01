@@ -2203,6 +2203,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     local write_bans,write_origins,write_verbs={},{},{}
     local predicate_bans={}
     local play_bans={}
+    local scoped_write_bans,scoped_text_bans={},{}
     local function add_ban(store,verb,key,target,condition)
         store[verb]=store[verb] or {};local bans=store[verb]
         bans[key]=bans[key] or {};bans[key][target]=bans[key][target] or {}
@@ -2264,9 +2265,15 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         for _,subject in ipairs(subjects) do
             local rule=query_clone(ast); rule.subject=subject; rule.object=objnot and {tag="not",operand=obj} or obj
             local key=subject_key(subject)
+            local level_subject=subject.tag=="noun" and subject.type and subject.type.tag=="level"
+            if level_subject and sem and sem.noun=="write_text" then key=subject.type.block_type or "level_block" end
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
-            if subject.tag=="noun" and subject.type and subject.type.tag=="level"
+            if level_subject and sem and sem.noun=="transform" and objnot and obj.tag=="special" and obj.name=="text" and level_conditions(ast.when) then
+                scoped_text_bans[#scoped_text_bans+1]=query_clone(ast.when)
+                relations[#relations+1]={op="forbid_transform",source_type=subject.type.block_type or "level_block",target_type="@text",when=query_clone(ast.when)}
+                supported=true
+            elseif level_subject and sem and sem.noun~="write_text"
                 and ast.when.op~="always" and level_conditions(ast.when) then
                 local unconditional=query_clone(rule);unconditional.when={op="always"}
                 local g,d,r=lower_simple({unconditional},registry,world)
@@ -2313,6 +2320,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 if token then
                     if objnot then
                         add_ban(write_bans,ast.verb,key,token,ast.when)
+                        if level_subject then scoped_write_bans[#scoped_write_bans+1]={token=token,when=query_clone(ast.when)} end
                     else
                         local products={token}
                         if obj.tag == "special" and obj.name == "all" then
@@ -2320,6 +2328,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                             for _,name in ipairs(RW_NounPalette(world)) do products[#products+1]=written_token(world,noun_term(name)) end
                         end
                         for _,name in ipairs(products) do
+                            if level_subject then relations[#relations+1]={op="write_level",target_text=name,origin=token,scoped_when=query_clone(ast.when)} end
                             relations[#relations+1]={op="write_text",source_type=key,target_text=name,source=ast.source}
                             write_origins[#relations]=token;write_verbs[#relations]=ast.verb
                             if subj.tag == "special" and subj.name == "all" and not subnot
@@ -2478,12 +2487,29 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     for _,relation in ipairs(filtered) do
         local scoped=relation.op=="level_trait" or relation.op=="deny_level_trait"
             or relation.op=="transform_level" or relation.op=="protect_level"
-            or relation.op=="become_level" or relation.op=="forbid_become_level" or relation.op=="destroy_level"
+            or relation.op=="become_level" or relation.op=="forbid_become_level" or relation.op=="destroy_level" or relation.op=="write_level"
         local active=not scoped or not level_broken
         if active and scoped and relation.scoped_when then
             active,why=RW_TestEntityCondition(context,relation.scoped_when,
                 {id=0,class="level",archetype="level_block",x=0,y=0,direction="None"})
             if active==nil then return nil,why end
+        end
+        if active and (relation.op=="write_level" or (relation.op=="transform_level" and relation.target_type:sub(1,5)=="text_")) then
+            for _,condition in ipairs(scoped_text_bans) do
+                local denied;denied,why=RW_TestEntityCondition(context,condition,{id=0,class="level",x=0,y=0,direction="None"})
+                if denied==nil then return nil,why end
+                if denied then active=false end
+            end
+        end
+        if active and relation.op=="write_level" then
+            for _,ban in ipairs(scoped_write_bans) do
+                if ban.token==relation.target_text or ban.token==relation.origin then
+                    local denied;denied,why=RW_TestEntityCondition(context,ban.when,{id=0,class="level",x=0,y=0,direction="None"})
+                    if denied==nil then return nil,why end
+                    if denied then active=false end
+                end
+            end
+            if active then relation.op="transform_level";relation.target_type="text_"..relation.target_text:lower() end
         end
         if active then
             if scoped then relation.scoped_when=nil end

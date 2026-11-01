@@ -174,3 +174,21 @@ whole product-group replacement, allocator tombstones and whole-tree Undo. An
 8-case oracle executes the installed WRITE prefix branch. This batch completes
 product transport, not scoped WRITE rule selection; that remains the next step.
 No letter composition or custom vocabulary policy is introduced.
+
+## M9.7Z scoped WRITE selection
+
+LEVEL WRITE now selects scoped Text products in physical declaration order, using
+the synthetic condition frame independently from ordinary level_block sources.
+Support noun/property/special/syntax-word targets, duplicate products and ALL
+palette expansion. WRITE NOT target/ALL and scoped IS NOT TEXT suppress matching
+products; identity protection/BROKEN retain existing semantics. The new IS NOT TEXT
+lowering also vetoes scoped IS TEXT, while BECOME keeps its verb-specific policy.
+
+Lower selected products to typed transform_level commands and reuse the existing
+boundary product limit, replacement, persistence, links and whole-tree Undo. Keep
+physical WRITE relations and their per-identity conditions/denials. No query cache
+or new mapped script is introduced. Syntax-word WRITE remains the agreed extension.
+Tests cover compiler/tree/physical paths, conditional bans, identity, mixed ordering,
+ALL, duplicates and Undo; 16 cases execute original dolevelconversions selection
+for ordered/conditional/duplicate mixed WRITE/IS targets. Native postrules/lexical
+catalog handling is normalized to the engine's registered token vocabulary.

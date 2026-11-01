@@ -1080,3 +1080,14 @@ record decoding too. Boundary tests and an 8-case installed WRITE prefix oracle
 cover this transport foundation; scoped WRITE rule selection remains pending.
 Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
 instructions. No native acceptance is inferred from offline checks.
+
+## M9.7Z — scoped LEVEL WRITE rule selection
+
+Connect WRITE to arbitrary Text product persistence through ordered typed scoped
+conversion commands. Preserve conditional map/physical identities, duplicates,
+ALL palette expansion, own NOT and IS NOT TEXT vetoes, identity/BROKEN and existing
+conversion-before-terminal/limit/Undo behavior. The IS NOT TEXT scope path now also
+blocks ordinary scoped IS TEXT. Tests cover real tree and physical conversions;
+16 installed selection cases compare mixed conditional/duplicate WRITE/IS order.
+Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
+instructions. Conditional own/IS NOT TEXT bans also pass move/wait tests.

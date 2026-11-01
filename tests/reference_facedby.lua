@@ -60,3 +60,25 @@ for _,source_dir in ipairs(dirs) do for population=0,2 do
  end end
 end end
 print('PASS: installed scoped FACEDBY fixed origin, entrance/facing independence, LEVEL quota and default EMPTY ('..scoped..' cases)')
+
+local empty_checked=0
+for dir=0,4 do for mask=0,15 do
+    local w=RW_CreateSession().world;w.width,w.height=9,9;w.entities={};w.rule_sources={}
+    if dir<4 then w.rule_sources={{when={op='always'},effects={{op='grant_trait',trait=dirs[dir+1]:lower(),target={kind='empty',value='empty'}}}}} end
+    units={};env.unitmap={};env.emptydir=function() return dir end
+    for i,offset in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do if math.floor(mask/2^(i-1))%2==1 then
+        local x,y=4+offset[1],4+offset[2];local id=10+i
+        units[id]={name='rock',values={0,x,y}};env.unitmap[x+y*9]={id}
+        w.entities[id]={id=id,class='object',archetype='rock',x=x,y=y,direction='Right'}
+    end end
+    for _,params in ipairs({{'empty'},{'not empty'},{'empty','empty'},{'not empty','empty'}}) do for _,negative in ipairs({false,true}) do
+        local ordered,terms={},{}
+        for _,p in ipairs(params) do terms[#terms+1]=term(p);if p:sub(1,4)=='not ' then ordered[#ordered+1]=p else table.insert(ordered,1,p) end end
+        local expected=original(ordered,{},{},{unitid=10,x=4,y=4,dir=4,conds={}})
+        if negative then expected=not expected end
+        local actual=RW_TestEntityCondition(w,{op='spatial',clauses={{relation='facedby',negated=negative,parameters=terms}}},{id=10,class='object',archetype='avatar',x=4,y=4,direction='None'})
+        assert(actual==expected,'EMPTY FACEDBY:'..dir..':'..mask..':'..table.concat(params,','))
+        empty_checked=empty_checked+1
+    end end
+end end
+print('PASS: installed FACEDBY queried EMPTY observers, occupied cells, repeated/complement parameters ('..empty_checked..' cases)')

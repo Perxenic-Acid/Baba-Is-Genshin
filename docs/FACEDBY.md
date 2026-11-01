@@ -42,3 +42,8 @@ requires careful rule-derived STOP/PUSH/PULL/HIDE/PHANTOM queries.
 M9.7V admits scoped LEVEL FACEDBY using the original fixed child-grid origin,
 independent of saved entrance surroundings. See LEVEL_CONDITIONS.md for the
 432-case synthetic source oracle, scope and remaining virtual Empty limits.
+
+M9.8D replaces the default-only EMPTY observer behavior with current-frame
+emptydir queries. Direction/FOLLOW can make adjacent vacancies watch a subject;
+occupied cells retain NOT EMPTY semantics. An additional 640 installed-source
+cases cover this path. See MAKE.md for shared query guards and remaining gaps.

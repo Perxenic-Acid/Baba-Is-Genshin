@@ -63,3 +63,7 @@ then prefixes, GROUP and the remaining properties in the agreed user order.
 M9.7U supports synthetic LEVEL SEEING through the entry-time direction/name
 snapshot, matching the original (0,0) observer branch rather than physical rays.
 See LEVEL_CONDITIONS.md for source evidence, tests and remaining query limits.
+
+M9.8D queries current/frozen EMPTY direction before tracing its ray. The installed
+real/EMPTY oracle now covers 59,904 cases. Shared emptydir guards and remaining
+recursive invalidation boundaries are documented in MAKE.md.

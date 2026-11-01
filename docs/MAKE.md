@@ -118,8 +118,32 @@ emptydir across 2,744 ordering/target/condition/SLEEP cases. Existing 1,200 real
 and 15 EMPTY MAKE source-oracle cases continue passing. Startup remains 1,980,000
 instructions. Native acceptance is not inferred.
 
-This connects the shared query to MAKE only. General virtual EMPTY condition
-observers, conversions and movement still use their documented None convention;
-their recursive emptydir/testcond invalidation must be integrated separately.
+At this milestone the shared query was connected to MAKE only. M9.8D extends it
+to condition observers; conversion products and virtual movement still require
+their separate orientation integration.
 Original postrules condition rewrites and mutable native unit-list ordering beyond
 the explicit normalized cases remain known parity boundaries.
+
+## M9.8D EMPTY directional condition observers
+
+Installed conditions.lua:835/960/1020/1071 queries emptydir for EMPTY FACING,
+FACEDBY and SEEING. These consumers now query the current raw/frozen declaration
+frame too. FACING/FACEDBY relations retain condition_rules even when they have no
+other property-query clause. Only temporary observer copies receive direction;
+the source probe/world is never mutated. FACEDBY tests each in-bounds adjacent
+vacancy's facing, preserves occupied-cell complements and permits reuse of a
+watching EMPTY cell for repeated parameters, as the original placeholder path does.
+
+Nested queries share the existing transient guard/depth frame. Re-entering the
+same cell's emptydir returns None, while depth 80 reports word_rule_limit. Guard
+entries clear after successful or failed queries. The direct positive FACING/SEEING
+autofail remains in place. Native checkedconds keys are per condition-table identity;
+our cell-based recursion guard is an explicit remaining parity boundary for
+pathological recursive declarations, not a claim of exact native invalidation.
+
+Turn tests exercise FACING/SEEING MAKE, occlusion, FOLLOW-derived FACEDBY,
+occupied/complement witnesses, repeat-query isolation, failure cleanup and Undo.
+Installed-source comparisons add 3,920 EMPTY FACING and 640 EMPTY-observer FACEDBY
+cases; the real/EMPTY SEEING matrix now covers 59,904 cases. Existing direction
+and MAKE source oracles remain separate checks. Startup remains 1,980,000 offline
+instructions. No native-rendering or manual acceptance is inferred.

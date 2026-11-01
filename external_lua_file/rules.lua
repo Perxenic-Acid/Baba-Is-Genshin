@@ -139,7 +139,7 @@ local function contains_rule_query(node)
             if type(raw)=="table" and raw.tag=="noun" and raw.type and raw.type.tag=="group" then return true end
         end
     end
-    for _,clause in ipairs(node.clauses or {}) do if clause.relation=="seeing" or clause.relation=="feeling" or clause.relation=="powered" or clause.relation=="powered2" or clause.relation=="powered3" then return true end end
+    for _,clause in ipairs(node.clauses or {}) do if clause.relation=="facing" or clause.relation=="facedby" or clause.relation=="seeing" or clause.relation=="feeling" or clause.relation=="powered" or clause.relation=="powered2" or clause.relation=="powered3" then return true end end
     if contains_rule_query(node.condition) then return true end
     for _,term in ipairs(node.terms or {}) do if contains_rule_query(term) then return true end end
     for _,term in ipairs(node.requirements or {}) do if contains_rule_query(term) then return true end end
@@ -584,9 +584,16 @@ local function facedby_condition(world,parameters,entity,negated)
                 if p.name=="@level" and not p.negative and not used.level then
                     used.level=true;matched[index]=true;allfound=allfound+1
                 elseif p.name=="@empty" then
-                    -- Empty has no derived facing in the current virtual-cell model.
-                    -- Its default direction is None, so it cannot watch this source.
-                    if p.negative then matched[index]=true;allfound=allfound+1 end
+                    local watching=false
+                    if #ids==0 and x>=1 and x<=world.width and y>=1 and y<=world.height then
+                        local direction,why=RW_QueryEmptyDirection(world,x,y)
+                        if not direction then return nil,why end
+                        local vector=dirs[direction]
+                        watching=vector and x+vector[1]==entity.x and y+vector[2]==entity.y or false
+                    end
+                    if (not p.negative and #ids==0 and watching) or (p.negative and (#ids>0 or not watching)) then
+                        matched[index]=true;allfound=allfound+1
+                    end
                 else
                     for _,id in ipairs(ids) do if id~=entity.id and not used[id] then
                         local e=world.entities[id];local name=e.class=="text" and "@text" or e.archetype
@@ -701,7 +708,14 @@ function RW_TestEntityCondition(world,node,entity,emptydir_autofail)
         for _,index in ipairs(remove) do table.remove(parameters,index-offset);offset=offset+1 end
         if emptydir_autofail and not clause.negated and (clause.relation=="facing" or clause.relation=="seeing") then
             return false
-        elseif entity.class=="level" and (clause.relation=="facing" or clause.relation=="seeing") then
+        end
+        if entity.class=="empty" and (clause.relation=="facing" or clause.relation=="seeing") then
+            local direction,why=RW_QueryEmptyDirection(world,entity.x,entity.y)
+            if not direction then return nil,why end
+            local observer={};for k,v in pairs(entity) do observer[k]=v end
+            observer.direction=direction;entity=observer
+        end
+        if entity.class=="level" and (clause.relation=="facing" or clause.relation=="seeing") then
             result=result and level_facing_condition(world,parameters,clause.negated)
         elseif entity.class=="level" and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto"
             or clause.relation=="above" or clause.relation=="below" or clause.relation=="besideleft" or clause.relation=="besideright") then
@@ -740,7 +754,9 @@ function RW_TestEntityCondition(world,node,entity,emptydir_autofail)
             if found==nil then return nil,err end
             result=result and found
         elseif clause.relation=="facedby" then
-            result=result and facedby_condition(world,parameters,entity,clause.negated)
+            local found,err=facedby_condition(world,parameters,entity,clause.negated)
+            if found==nil then return nil,err end
+            result=result and found
         elseif clause.relation=="without" then
             result=result and without_condition(world,parameters,entity,clause.negated)
         else
@@ -2906,8 +2922,8 @@ function RW_ResolveFearTargets(world,relations) return RW_ResolveVerbTargets(wor
 
 -- Original emptydir is a query over ordered declarations, not saved EMPTY state.
 -- FOLLOW locks its first successful target list; later IS directions still win.
-function RW_QueryEmptyDirection(world,x,y,rules)
-    local context=condition_context(world,rules)
+local function query_empty_direction(context,x,y)
+    local world,rules=context,context._condition_rules
     local source={class="empty",x=x,y=y,direction="None"}
     local sleeping,why=query_trait(context,source,"sleep")
     if sleeping==nil then return nil,why end
@@ -2966,6 +2982,20 @@ function RW_QueryEmptyDirection(world,x,y,rules)
         end
     end
     return direction
+end
+
+function RW_QueryEmptyDirection(world,x,y,rules)
+    local context=rules and condition_context(world,rules) or world
+    local guard=context._condition_guard or {}
+    local key="emptydir:"..x..":"..y
+    if guard[key] then return "None" end
+    if (context._condition_depth or 0)>=80 then return nil,"word_rule_limit" end
+    local nested={};for k,v in pairs(context) do nested[k]=v end
+    nested._condition_guard=guard;nested._condition_depth=(context._condition_depth or 0)+1
+    guard[key]=true
+    local direction,why=query_empty_direction(nested,x,y)
+    guard[key]=nil
+    return direction,why
 end
 
 -- Original block() MAKE: inspect existing non-converted occupants only. Products

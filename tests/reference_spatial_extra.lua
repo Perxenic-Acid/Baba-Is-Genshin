@@ -42,3 +42,28 @@ for x=1,7 do for y=1,7 do for dir=0,3 do
     end
 end end end end
 print('PASS: original NEXTTO/ABOVE/BELOW/BESIDELEFT/BESIDERIGHT/FACING parity ('..checked..' cases)')
+
+local empty_checked=0
+for x=1,7 do for y=1,7 do for dir=0,3 do
+    objects={[11]={name='rock',values={0,x,y}}};env.unitmap={[x+y*9]={11}}
+    env.emptydir=function() return dir end
+    local w={width=7,height=7,entities={[11]={id=11,class='object',archetype='rock',x=x,y=y,direction='Right'}},
+        rule_sources={{when={op='always'},effects={{op='grant_trait',trait=dirs[dir+1]:lower(),target={kind='empty',value='empty'}}}}}}
+    for _,list in ipairs({{'rock'},{'not rock'},{'empty'},{'not empty'},{'level'},{'rock','rock'},{'empty','empty'},{'right'},{'not right'},{'right','right'}}) do
+        local terms={}
+        for _,p in ipairs(list) do
+            local neg=p:sub(1,4)=='not ';local name=neg and p:sub(5) or p
+            local t=name=='empty' and {tag='special',name=name} or name=='right' and {tag='property',name=name}
+                or {tag='noun',type={tag=name=='level' and 'level' or 'object',name=name}}
+            terms[#terms+1]=neg and {tag='not',operand=t} or t
+        end
+        for _,negative in ipairs({false,true}) do
+            local expected=env.condlist.facing(list,{},nil,{unitid=2,x=4,y=4,dir=4,conds={},surrounds={},extras={'right','up','left','down'}})
+            if negative then expected=not expected end
+            local actual=RW_TestEntityCondition(w,{op='spatial',clauses={{relation='facing',negated=negative,parameters=terms}}},{class='empty',x=4,y=4,direction='None'})
+            assert(actual==expected,'EMPTY facing:'..x..':'..y..':'..dir..':'..table.concat(list,','))
+            empty_checked=empty_checked+1
+        end
+    end
+end end end
+print('PASS: installed EMPTY FACING queried cardinal direction, complements/EMPTY/LEVEL/AND/direction parameters ('..empty_checked..' cases)')

@@ -1109,3 +1109,13 @@ nearest/last-tie targets, positive FACING/SEEING autofail and later IS overrides
 Known directions avoid RNG draws; retain normal allocation/Commit/Undo. Full turn
 regressions and 2,744 installed emptydir oracle cases pass; startup stays 1,980,000.
 General virtual observers/conversion/movement orientation remains a separate gap.
+
+## M9.8D — EMPTY directional condition observers
+
+Connect current/frozen emptydir queries to EMPTY FACING/SEEING and neighboring
+FACEDBY EMPTY witnesses. Preserve raw frames for FACING/FACEDBY relations and use
+transient observer copies, shared depth/recursion guards and error cleanup.
+Compiler/turn tests cover occlusion, FOLLOW, complements, occupied observers and
+Undo. Source matrices cover 3,920 EMPTY FACING, 640 FACEDBY and 59,904 real/EMPTY
+SEEING cases. Cell-based recursive invalidation differs from native checkedconds;
+conversion/movement orientation remains separate work. See MAKE.md.

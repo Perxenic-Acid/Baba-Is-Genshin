@@ -205,3 +205,46 @@ assert(empty_direction({{'EMPTY','NOT','FACING','ROCK','IS','UP'}})=='Up')
 assert(empty_direction({{'EMPTY','NEAR','ROCK','IS','LEFT'}},1,1)=='None')
 assert(empty_direction({{'EMPTY','NEAR','ROCK','IS','LEFT'}})=='Left')
 print('PASS: EMPTY MAKE ordered directions/FOLLOW/NOT, per-cell conditions, SLEEP/BROKEN, positive FACING/SEEING autofail, RNG-free facing and Undo')
+
+-- Directional EMPTY observers use the same declaration frame as their consumers.
+s=empty_fixture({{'EMPTY','IS','UP'},{'EMPTY','FACING','ROCK','MAKE','FLAG'}})
+n=step(s);births=0
+for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id then
+    assert(e.archetype=='flag' and e.x==6 and e.y==4 and e.direction=='Up');births=births+1
+end end
+assert(births==1 and n.world.random_state==nil)
+s=empty_fixture({{'EMPTY','IS','UP'},{'EMPTY','SEEING','ROCK','MAKE','FLAG'}})
+n=step(s);births=0
+for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id then assert(e.x==6 and e.y>3 and e.direction=='Up');births=births+1 end end
+assert(births==13)
+s=empty_fixture({{'EMPTY','IS','UP'},{'EMPTY','SEEING','ROCK','MAKE','FLAG'},{'FLAG','IS','STOP'}})
+object(s.world,3,'flag',6,5)
+n=step(s);births=0
+for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id then assert(e.x==6 and e.y==4);births=births+1 end end
+assert(births==1)
+local function empty_control(rows,populate)
+    local s=empty_fixture(rows);if populate then populate(s.world) end
+    local frame=assert(RW_CompileWorld(s.world,cs));local projected=assert(RW_ProjectWorld(s.world,frame.effects))
+    assert(not s.world._condition_guard and not s.world._condition_rules)
+    return projected.entities[1].behaviors.control==true
+end
+assert(empty_control({{'EMPTY','IS','RIGHT'},{'AVATAR','FACEDBY','EMPTY','IS','YOU'}}))
+assert(not empty_control({{'AVATAR','FACEDBY','EMPTY','IS','YOU'}}))
+assert(not empty_control({{'EMPTY','FOLLOW','AVATAR'},{'AVATAR','FACEDBY','NOT','EMPTY','IS','YOU'}}))
+assert(empty_control({{'EMPTY','FOLLOW','AVATAR'},{'AVATAR','FACEDBY','NOT','EMPTY','IS','YOU'}},function(w) object(w,3,'rock',1,2) end))
+assert(not empty_control({{'EMPTY','IS','RIGHT'},{'AVATAR','FACEDBY','EMPTY','IS','YOU'}},function(w)
+    object(w,3,'rock',1,2);object(w,4,'rock',2,1);object(w,5,'rock',3,2);object(w,6,'rock',2,3)
+end))
+-- Recursion is query-local: repeated calls neither leak guards nor save direction.
+local direction,es,ef=empty_direction({{'EMPTY','NOT','FACING','ROCK','IS','UP'}})
+for i=1,4 do assert(RW_QueryEmptyDirection(es.world,6,4,ef.rules)==direction) end
+assert(not es.world._condition_guard and not es.world._condition_rules)
+print('PASS: queried EMPTY FACING/SEEING/FACEDBY, current-frame direction/FOLLOW, occlusion, occupied observers, recursion isolation and transactional MAKE Undo')
+local guard_world={width=3,height=3,entities={},rule_sources={{when={op='invalid'},effects={{op='grant_trait',trait='left',target={kind='empty',value='empty'}}}}},_condition_guard={}}
+local failed,reason=RW_QueryEmptyDirection(guard_world,2,2)
+assert(not failed and reason=='invalid_spatial_condition' and next(guard_world._condition_guard)==nil)
+guard_world.rule_sources[1].when={op='always'}
+assert(RW_QueryEmptyDirection(guard_world,2,2)=='Left' and next(guard_world._condition_guard)==nil)
+guard_world._condition_depth=80
+failed,reason=RW_QueryEmptyDirection(guard_world,2,2)
+assert(not failed and reason=='word_rule_limit' and next(guard_world._condition_guard)==nil)

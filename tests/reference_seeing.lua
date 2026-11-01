@@ -20,11 +20,17 @@ local function term(name)
     return neg and {tag='not',operand=t} or t
 end
 local count=0
+for _,source_class in ipairs({'object','empty'}) do
 for index,direction in ipairs(dirs) do for bits=0,31 do for _,block_name in ipairs({'rock','flag','text'}) do
 for _,far_hidden in ipairs({false,true}) do
     local w=RW_CreateSession().world;w.width=9;w.height=9;w.entities={};w.rule_sources={}
     local v=env.ndirs[math.min(index,5)];if index>4 then v={1,0} end
-    local e={id=10,kind='object',class='object',archetype='avatar',x=5,y=5,direction=direction};w.entities[10]=e
+    local e={id=10,kind='object',class=source_class,archetype='avatar',x=5,y=5,direction=direction}
+    if source_class=='object' then w.entities[10]=e
+    elseif index<=4 then
+        w.rule_sources={{when={op='always'},effects={{op='grant_trait',trait=direction:lower(),target={kind='empty',value='empty'}}}}}
+    end
+    env.emptydir=function() return math.min(index-1,4) end
     units={};features={};env.unitmap={}
     local function add(id,name,distance)
         local x,y=5+distance*v[1],5+distance*v[2]
@@ -40,11 +46,11 @@ for _,far_hidden in ipairs({false,true}) do
     if far_hidden then grant(12,'hide') end
     for _,params in ipairs(paramslist) do for _,negative in ipairs({false,true}) do
         local ordered,terms={},{};for _,p in ipairs(params) do terms[#terms+1]=term(p);if p:sub(1,4)=='not ' then ordered[#ordered+1]=p else table.insert(ordered,1,p) end end
-        local expected=original(ordered,{},{},{unitid=10,x=5,y=5,dir=math.min(index-1,4),conds={}})
+        local expected=original(ordered,{},{},{unitid=source_class=='empty' and 2 or 10,x=5,y=5,dir=math.min(index-1,4),conds={}})
         if negative then expected=not expected end
         local actual=RW_TestEntityCondition(w,{op='spatial',clauses={{relation='seeing',parameters=terms,negated=negative}}},e)
         assert(actual==expected,direction..':'..bits..':'..block_name..':'..tostring(far_hidden)..':'..table.concat(params,','))
         count=count+1
     end end
-end end end end
-print('PASS: installed SEEING/simplecheck occlusion, HIDE/PHANTOM, six directions, complements/Text/EMPTY/LEVEL/AND matrix ('..count..' cases)')
+end end end end end
+print('PASS: installed real/EMPTY SEEING/simplecheck occlusion, HIDE/PHANTOM, six directions, complements/Text/EMPTY/LEVEL/AND matrix ('..count..' cases)')

@@ -557,3 +557,5 @@ dofile("tests/back_birth_clocks.lua")
 dofile("tests/shift_history.lua")
 
 dofile("tests/back_public.lua")
+
+dofile("tests/back_update_history.lua")

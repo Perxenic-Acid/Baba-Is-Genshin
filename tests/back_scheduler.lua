@@ -183,3 +183,19 @@ assert(#plan.stages[order.shift].plan.motion_history==1 and #plan.stages[order.s
 assert(plan.stages[order.back].plan.tele_suppressed[1] and one.world.entities[1].x==2 and not one.world.random_state)
 assert(order.shift<order.back and order.back<order.tele and one.back_frame_count==2)
 print("PASS: scheduled SHIFT no-op current-frame BACK playback and transient TELE suppression without RNG")
+
+-- Native-ledger playback must retain effective intermediate BACK updates even
+-- when its summary is empty, so another selected retained frame can replay them.
+s=fixture({{"AVATAR","IS","BACK"}});s.world.entities[1].back_init=2
+local cycle=assert(RW_PlanStages(s.world,{
+ {name="out",plan={consumes_turn=true,changes={{kind="move",entity_id=1,from={x=2,y=2,direction="Right"},to={x=3,y=2,direction="Right"}}}}},
+ {name="home",plan={consumes_turn=true,changes={{kind="move",entity_id=1,from={x=3,y=2,direction="Right"},to={x=2,y=2,direction="Right"}}}}}}))
+cycle.back_frame={from=1,retain=true};s,r=RW_Commit(s,cycle);assert(r.accepted,r.reason)
+s,r=RW_Commit(s,{consumes_turn=true,changes={},back_frame={from=2,retain=true}});assert(r.accepted,r.reason)
+one,plan=step(s);local back=plan.stages[stages(plan).back].plan
+assert(#back.changes==0 and #back.motion_history==2 and back.tele_suppressed[1] and one.back_frame_count==4)
+local rearmed,r=RW_Commit(one,{consumes_turn=true,changes={{kind="back_init",entity_id=1,from=2,to=4}},back_frame={from=4,retain=true}});assert(r.accepted,r.reason)
+two,plan=step(rearmed);back=plan.stages[stages(plan).back].plan
+assert(#back.changes==0 and #back.motion_history==2 and back.tele_suppressed[1] and two.back_frame_count==6)
+assert(RW_Undo(two).world==rearmed.world and RW_Undo(rearmed).world==one.world)
+print("PASS: scheduled retained zero-net BACK journal selected again through native frame ledger, clocks and Undo")

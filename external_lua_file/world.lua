@@ -348,21 +348,30 @@ local function validate_plan(world, plan)
 
     if plan.motion_history~=nil then
         if not is_list(plan.motion_history) then return false,"invalid_motion_history" end
+        if plan.back_conversions~=nil then return false,"invalid_motion_history_phase" end
         local expected,actual={},{}
         local function position(entity)
             return {x=entity.x,y=entity.y,direction=entity.direction or "None"}
         end
         for _,op in ipairs(plan.changes) do
-            if op.kind~="move" and op.kind~="direction" then return false,"invalid_motion_history_phase" end
-            local point=expected[op.entity_id] or position(world.entities[op.entity_id])
-            if op.kind=="move" then point.x,point.y=op.to.x,op.to.y;point.direction=op.to.direction or point.direction
-            else point.direction=op.to end
-            expected[op.entity_id]=point
+            if op.kind=="move" or op.kind=="direction" then
+                local point=expected[op.entity_id] or position(world.entities[op.entity_id])
+                if op.kind=="move" then point.x,point.y=op.to.x,op.to.y;point.direction=op.to.direction or point.direction
+                else point.direction=op.to end
+                expected[op.entity_id]=point
+            end
         end
+        local anchor=1
         for _,row in ipairs(plan.motion_history) do
             if type(row)~="table" or row.kind~="move" or not valid_id(row.entity_id)
                 or not world.entities[row.entity_id] or type(row.from)~="table" or type(row.to)~="table"
                 or (row.retain~=nil and type(row.retain)~="boolean") then return false,"invalid_motion_history" end
+            local at=row.before_change;if at==nil then at=1 end
+            if not is_integer(at) or at<anchor or at>#plan.changes+1 then return false,"invalid_motion_history_anchor" end
+            anchor=at
+            for kind in pairs(seen[row.entity_id] or {}) do
+                if kind~="move" and kind~="direction" and kind~="direction_write" then return false,"invalid_motion_history_phase" end
+            end
             for _,point in ipairs({row.from,row.to}) do
                 if type(point)~="table" or not is_integer(point.x) or not is_integer(point.y)
                     or point.x<1 or point.x>world.width or point.y<1 or point.y>world.height
@@ -2697,7 +2706,18 @@ function RW_BackHistoryRows(before,record)
             end
         end
         local cursor=clone(current.entities)
-        for _,op in ipairs(phase.changes) do
+        local history_index=1
+        local function add_motion(at)
+            while phase.motion_history and history_index<=#phase.motion_history do
+                local row=phase.motion_history[history_index]
+                if (row.before_change or 1)~=at then break end
+                add({kind="update",identity=back_identity(current.entities[row.entity_id]),x=row.from.x,y=row.from.y,
+                    direction=row.from.direction,moved=row.from.x~=row.to.x or row.from.y~=row.to.y})
+                history_index=history_index+1
+            end
+        end
+        for op_index,op in ipairs(phase.changes) do
+            add_motion(op_index)
             local id=op.entity_id;local entity=cursor[id]
             if (op.kind=="move" or op.kind=="direction") and not phase.motion_history then
                 add({kind="update",identity=back_identity(entity),x=entity.x,y=entity.y,direction=entity.direction,
@@ -2727,10 +2747,7 @@ function RW_BackHistoryRows(before,record)
                 elseif op.kind=="followed" then entity.followed=op.to end
             end
         end
-        for _,row in ipairs(phase.motion_history or {}) do
-            add({kind="update",identity=back_identity(current.entities[row.entity_id]),x=row.from.x,y=row.from.y,
-                direction=row.from.direction,moved=row.from.x~=row.to.x or row.from.y~=row.to.y})
-        end
+        add_motion(#phase.changes+1)
         current=after
     end
     local result={};for i=#rows,1,-1 do result[#result+1]=rows[i] end

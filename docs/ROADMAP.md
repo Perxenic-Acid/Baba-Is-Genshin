@@ -845,3 +845,14 @@ writer; its sole indexed assignment is commented out. Explicit helper guards sta
 The official catalog marks public BACK partial, retaining native phase, duplicate
 declaration/retired-handle, opaque lifetime and 128-frame integration limitations.
 Startup remains below 2M; no frontend or authored-level changes are included.
+
+## M9.7C — journal effective dispatched BACK paths
+
+Preserve intermediate BACK updates that cancel in the final summary. Use installed
+update/updatedir dispatch behavior: pure no-ops emit no new history, though matched
+historical rows still suppress TELE. Retired handles discard queued paths/marks.
+Validated per-row journal anchors represent native immediate create/remove before
+the final queued movement dispatch, including mixed unrelated physical identities.
+144 installed queue/dispatch history oracles, a retained-frame scheduler replay,
+mixed restoration, anchor/stale rejection and Undo tests cover the change.
+Duplicate declaration/native phase/lifetime gaps remain; BACK stays catalog-partial.

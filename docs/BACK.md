@@ -1,4 +1,4 @@
-# BACK integration progress (M9.7B)
+# BACK integration progress (M9.7C)
 
 BACK is now available in the default property vocabulary and behavior registry.
 The official catalog explicitly marks its public real-unit history execution as
@@ -457,6 +457,39 @@ preserves the configured destination. Source inspection across base Data Lua
 ~443 has its sole indexed write commented out. Production therefore keeps the
 empty/default guard; existing explicit playback helpers still support nonempty
 guard maps for diagnostics. No unsupported native host writer is fabricated.
+
+## M9.7C: history of dispatched BACK updates
+
+The installed BACK update branch (blocks.lua ~599–631) queues update/updatedir
+actions. tools.lua update() ~299–349 and updatedir() ~351–375 add history only when
+the dispatched action actually changes position/facing. A matched historical
+update still sets TELE suppression even if dispatch emits no new row. This
+differs from SHIFT's unconditional final alignment record; do not copy SHIFT's
+equal-row behavior into BACK.
+
+Both full-frame playback and the diagnostic motion helper now emit the effective
+ordered motion_history path instead of losing intermediate updates that cancel
+in the final summary. Replayed pure no-ops are filtered from new history but
+retain their existing transient TELE mark. If creation/removal retires the old
+handle, its queued path and marks are discarded, matching delunit's DELETED
+action handling. The restored physical instance never inherits that old queue.
+
+Full BACK can mix motion of one handle and immediate restoration/deletion of
+another. Motion rows carry a validated before_change journal anchor, default 1
+for prior SHIFT paths. BACK anchors all surviving motion after the final change,
+because native doupdate dispatches only after every immediate BACK create/remove.
+Validation allows unrelated structural/status IDs, but rejects structural/status
+writes on a motion-history identity, unsorted/out-of-range anchors, stale paths,
+final-state disagreement and simultaneous conversion-provenance metadata. The
+owned journal preserves those anchors; no world fields or nested stages are added.
+
+144 unchanged installed BACK-queue plus actual update/updatedir oracle cases
+compare emitted history as well as final Object/Text states, TELE and paradox
+guards. Tests cover inverse zero-net movement/facing, pure no-op filtering,
+mixed restoration/dispatch ordering, retired handles, rejection and Undo. The
+session scheduler also selects a retained zero-net BACK journal again through
+its native frame ledger; the earlier updates remain available to future BACK.
+Native duplicate-declaration and other pending phase/lifetime gaps are unchanged.
 
 ## Still pending
 

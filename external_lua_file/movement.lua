@@ -1644,7 +1644,7 @@ function RW_PlanBackMotion(world,selections,paradox)
         return type(x)=="number" and x%1==0 and type(y)=="number" and y%1==0
             and x>=1 and x<=world.width and y>=1 and y<=world.height and directions[d]==true
     end
-    local changes,suppressed,seen={},{},{}
+    local changes,suppressed,seen,history={},{},{},{}
     for _,selection in ipairs(selections) do
         if type(selection)~="table" then return nil,"invalid_back_selection" end
         local id=selection.entity_id;local entity=world.entities[id]
@@ -1686,8 +1686,12 @@ function RW_PlanBackMotion(world,selections,paradox)
         if paradox[id]==nil then
             for index=#rows,1,-1 do
                 local row=rows[index]
+                local from={x=x,y=y,direction=d}
                 if row.moved then x,y=row.x,row.y end
                 d=row.direction;suppressed[id]=true
+                if from.x~=x or from.y~=y or from.direction~=d then
+                    history[#history+1]={kind="move",entity_id=id,from=from,to={x=x,y=y,direction=d}}
+                end
             end
         end
         if x~=entity.x or y~=entity.y then
@@ -1698,7 +1702,7 @@ function RW_PlanBackMotion(world,selections,paradox)
         end
     end
     table.sort(changes,function(a,b) return a.entity_id<b.entity_id end)
-    return {consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back"}
+    return {consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back",motion_history=#history>0 and history or nil}
 end
 
 
@@ -1850,6 +1854,7 @@ function RW_PlanBackPlayback(world,selections,paradox,services)
     if not plan then return nil,err end
     for _,restore in ipairs(restores) do plan.changes[#plan.changes+1]=restore end
     table.sort(plan.changes,function(a,b) return a.entity_id<b.entity_id end)
+    for _,row in ipairs(plan.motion_history or {}) do row.before_change=#plan.changes+1 end
     return plan
 end
 
@@ -1881,18 +1886,23 @@ function RW_PlanBackFramePlayback(world,selections,paradox,services)
     local rank={};for index,id in ipairs(unit_ids(world)) do rank[id]=index end
     table.sort(ordered,function(a,b) return rank[a.entity_id]<rank[b.entity_id] end)
     local changes,suppressed,next_id={}, {},world.next_entity_id
+    local history={}
     for _,selection in ipairs(ordered) do
         local id=selection.entity_id;local entity=world.entities[id]
         local rows,why=api.rows(selection.before_world,selection.record)
         if not rows then return nil,why end
         local identity=api.identity(entity)
         local x,y,d=entity.x,entity.y,entity.direction
-        local products,retired={},false
+        local products,retired,path={},false,{}
         for _,row in ipairs(rows) do
             if row.identity==identity then
                 if row.kind=="update" and paradox[identity]==nil then
+                    local from={x=x,y=y,direction=d}
                     if row.moved then x,y=row.x,row.y end
                     d=row.direction;suppressed[id]=true
+                    if from.x~=x or from.y~=y or from.direction~=d then
+                        path[#path+1]={kind="move",entity_id=id,from=from,to={x=x,y=y,direction=d}}
+                    end
                 elseif row.kind=="create" and paradox[row.base]==nil then
                     retired=true
                     for _,remove in ipairs(rows) do
@@ -1917,15 +1927,21 @@ function RW_PlanBackFramePlayback(world,selections,paradox,services)
                     next_id=next_id+1
                 end
             end
-        elseif x~=entity.x or y~=entity.y then
-            changes[#changes+1]={kind="move",entity_id=id,from={x=entity.x,y=entity.y,direction=entity.direction},to={x=x,y=y,direction=d}}
-        elseif d~=entity.direction then
-            changes[#changes+1]={kind="direction",entity_id=id,from=entity.direction,to=d}
+        else
+            for _,row in ipairs(path) do history[#history+1]=row end
+            if x~=entity.x or y~=entity.y then
+                changes[#changes+1]={kind="move",entity_id=id,from={x=entity.x,y=entity.y,direction=entity.direction},to={x=x,y=y,direction=d}}
+            elseif d~=entity.direction then
+                changes[#changes+1]={kind="direction",entity_id=id,from=entity.direction,to=d}
+            end
         end
     end
     local sequence={}
     for _,op in ipairs(changes) do if op.kind=="back_restore" or op.kind=="create" or op.kind=="delete" then sequence[#sequence+1]=op.entity_id end end
-    local plan={consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back",unit_sequence=#sequence>0 and sequence or nil}
+    -- Native create/remove is immediate, while update/updatedir actions are
+    -- dispatched by doupdate only after every BACK selection has been processed.
+    for _,row in ipairs(history) do row.before_change=#changes+1 end
+    local plan={consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back",unit_sequence=#sequence>0 and sequence or nil,motion_history=#history>0 and history or nil}
     if next_id~=world.next_entity_id then plan.id_allocation={from=world.next_entity_id,to=next_id} end
     local after,why=api.preview(world,plan)
     if not after then return nil,why end

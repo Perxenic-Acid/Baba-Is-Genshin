@@ -1165,7 +1165,7 @@ function RW_PlanLevelAction(tree, action, services)
         if link.target == "parent" then next_tree, reason = return_to_parent(tree)
         else
             next_tree, reason = services.enter(tree,tostring(entity_id),link.definition_id)
-            if next_tree then next_tree, reason = services.bind_entry(next_tree,entity_id) end
+            if next_tree then next_tree, reason = services.bind_entry(next_tree,entity_id,session.world) end
             if next_tree then next_tree,reason=RW_InitializeLevelBoundary(next_tree,{tree.active_id,next_tree.active_id},services) end
         end
         if not next_tree then return fail(reason) end
@@ -2134,7 +2134,7 @@ local function start(run_self_tests)
     level_services.initialize = function(world) return RW_InitializeLevelWorld(world,turn_services) end
     level_services.enter = function(tree,slot,id) return world_api:Invoke("RW_EnterLevel",tree,slot,id) end
     level_services.return_level = function(tree) return world_api:Invoke("RW_ReturnLevel",tree) end
-    level_services.bind_entry = function(tree,id) return world_api:Invoke("RW_BindLevelEntry",tree,id) end
+    level_services.bind_entry = function(tree,id,source_world) return world_api:Invoke("RW_BindLevelEntry",tree,id,source_world) end
     level_services.commit_session = function(value,plan) return world_api:Invoke("RW_Commit",value,plan) end
     level_services.outcome = function(tree,kind,target) return world_api:Invoke("RW_RecordLevelOutcome",tree,kind,target) end
     level_services.selectors = function(world) return movement_api:Invoke("RW_LevelSelectorIDs",world) end
@@ -2424,7 +2424,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7P initialized")
+    print("[RuleWorld] M9.7Q initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

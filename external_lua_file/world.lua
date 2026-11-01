@@ -768,7 +768,7 @@ end
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
 local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, unit_order=true, infinite_loop=true, too_complex=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
-    behavior_registry=true,board_offset=true,random_state=true,last_input=true,chance_seed=true,bonus_count=true}
+    behavior_registry=true,level_surrounds=true,board_offset=true,random_state=true,last_input=true,chance_seed=true,bonus_count=true}
 
 local function plain_data(value, visiting)
     local kind = type(value)
@@ -786,6 +786,40 @@ local function plain_data(value, visiting)
     return true
 end
 
+local SURROUND_OFFSETS={{"r",1,0},{"u",0,-1},{"l",-1,0},{"d",0,1},
+    {"dr",1,1},{"ur",1,-1},{"ul",-1,-1},{"dl",-1,1},{"o",0,0}}
+local function valid_level_surrounds(value)
+    if type(value)~="table" or not is_integer(value.dir) or value.dir<0 or value.dir>4 then return false end
+    local allowed={dir=true}
+    for _,offset in ipairs(SURROUND_OFFSETS) do
+        local names=value[offset[1]];allowed[offset[1]]=true
+        if not is_list(names) then return false end
+        for _,name in ipairs(names) do if type(name)~="string" or name=="" then return false end end
+    end
+    for key in pairs(value) do if not allowed[key] then return false end end
+    return true
+end
+local function capture_level_surrounds(world,entity_id)
+    local entry=world.entities[entity_id]
+    if not entry then return nil,"level_entry_missing" end
+    local result={dir=({Right=0,Up=1,Left=2,Down=3})[entry.direction] or 4}
+    local order={};for id in pairs(world.entities) do order[#order+1]=id end;table.sort(order)
+    if world.unit_order then order=world.unit_order end
+    for _,offset in ipairs(SURROUND_OFFSETS) do
+        local names,occupied={},false
+        for _,id in ipairs(order) do local e=world.entities[id]
+            if e.x==entry.x+offset[2] and e.y==entry.y+offset[3] then
+                occupied=true
+                if id~=entity_id then names[#names+1]=e.class=="text" and "text"
+                    or e.archetype=="level_block" and "level" or e.archetype end
+            end
+        end
+        if not occupied then names[1]="-" end
+        result[offset[1]]=names
+    end
+    return result
+end
+
 local function validate_definition(definition)
     if type(definition) ~= "table" or not plain_data(definition)
         or type(definition.id) ~= "string" or definition.id == ""
@@ -798,6 +832,7 @@ local function validate_definition(definition)
     if not is_integer(world.width) or world.width < 1
         or not is_integer(world.height) or world.height < 1
         or type(world.entities) ~= "table" or not valid_frontier(world) or not valid_unit_order(world) then return false end
+    if world.level_surrounds~=nil and not valid_level_surrounds(world.level_surrounds) then return false end
     if world.bonus_count~=nil and (not is_integer(world.bonus_count) or world.bonus_count<0 or world.bonus_count>MAX_ID) then return false end
     if world.random_state~=nil and not valid_random_state(world.random_state) then return false end
     if world.chance_seed~=nil and not valid_random_state(world.chance_seed) then return false end
@@ -1477,6 +1512,7 @@ function RW_ReloadLevel(tree,id)
     local old = tree.instances[id]
     if not old then return nil,"unknown_instance" end
     local session = RW_InstantiateLevel(tree.definitions[old.definition_id],id)
+    session.world.level_surrounds=clone(old.world.level_surrounds)
     for entity_id, archetype in pairs(tree.level_transforms[id] or {}) do
         if type(archetype) == "table" then
             session.world.entities[entity_id]=archetype.deleted and nil or clone(archetype.entity)
@@ -1575,9 +1611,15 @@ function RW_LevelTreeSelfTest()
     return true,"Level boundary reload, stable identity and snapshot isolation passed"
 end
 
-function RW_BindLevelEntry(tree, entity_id)
+function RW_BindLevelEntry(tree, entity_id, source_world)
     if #tree.stack == 0 then return nil, "at_root" end
+    local parent=tree.instances[tree.stack[#tree.stack]]
+    local surrounds,why=capture_level_surrounds(source_world or parent.world,entity_id)
+    if not surrounds then return nil,why end
     local result = copy_map(tree)
+    result.instances=copy_map(tree.instances)
+    local active=copy_map(tree.instances[tree.active_id]);active.world=copy_map(active.world)
+    active.world.level_surrounds=surrounds;result.instances[tree.active_id]=active
     result.entry_links = copy_map(tree.entry_links)
     result.entry_links[tree.active_id] = {parent_id=tree.stack[#tree.stack], entity_id=entity_id}
     return result

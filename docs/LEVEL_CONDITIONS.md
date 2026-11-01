@@ -75,3 +75,26 @@ repeated quotas and complement parameters. It needs no parent coordinates.
 Physical level_block counts map to LEVEL while the synthetic observer stays
 unallocated. See WITHOUT.md for the normalized 20,736-case installed oracle and
 its documented native complement-order difference.
+
+## M9.7Q entry surroundings transport
+
+Installed tools.lua getlevelsurrounds() saves the entrance direction and nine
+one-cell regions r/u/l/d/dr/ur/ul/dl/o. It excludes the entrance itself, retains
+other names in unitmap order, writes '-' for an unoccupied cell, and writes no
+name for a cell occupied only by the entrance. Physical Text is named 'text';
+physical level shapes are named 'level', regardless of destination metadata.
+parsesurrounds() supplies these saved names to synthetic LEVEL condition queries.
+
+The tree confirm path now passes the pre-reset source world to BindLevelEntry.
+Capture into the child runtime's validated level_surrounds record; retain it when
+reloading that instance and replace it on fresh entry. Do not derive it from the
+already-reset authored parent or from the child board. This snapshot is semantic
+boundary data, never UI state. Root instances have no inherited surroundings.
+Whole-tree Undo restores the exact prior runtime; queries must not mutate arrays.
+
+The nine-region transport is in place, but parent-spatial consumers remain
+explicitly deferred until their original branch semantics are integrated. Tests
+execute installed getlevelsurrounds across six intrinsic directions and sparse/
+stacked neighborhoods, including transformed Text entrances and explicit unit
+order. They also cover pre-reset movement, reload isolation, schema rejection and
+whole-tree Undo. Startup remains 1,980,000 instructions; native success is unclaimed.

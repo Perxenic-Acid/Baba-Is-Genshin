@@ -986,3 +986,13 @@ witness order instead of native table hash ordering. Parent spatial conditions
 remain deferred; no frontend or authored layout changes.
 Full regressions, catalog/layout audits and diff checks pass; startup remains
 1,980,000 instructions. Native acceptance is not inferred from offline checks.
+
+## M9.7Q — entry-time LEVEL surroundings snapshot
+
+Capture the original nine-region name/direction record before parent reset, then
+store validated semantic boundary metadata on the child runtime. Reload preserves
+it; fresh entry replaces it; whole-tree Undo restores the pre-entry runtime.
+Respect custom unit order, stacked names, Text/Level naming and native empty-cell
+sentinels. Installed getlevelsurrounds oracle, malformed-data checks, reload and
+Undo tests pass with full regressions; startup stays 1,980,000. This is transport
+infrastructure: scoped parent-spatial consumers are the next integration step.

@@ -1505,9 +1505,14 @@ function RW_ResolveFollow(world,targets)
 end
 
 -- TELE bypasses collision, preserves facing and moves each rider at most once.
-function RW_ResolveTele(world)
-    local ids,sources={},{}
-    for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+function RW_ResolveTele(world,suppressed)
+    if suppressed~=nil then
+        if type(suppressed)~="table" then return nil,"invalid_tele_suppression" end
+        for id,value in pairs(suppressed) do
+            if value~=true or not world.entities[id] then return nil,"invalid_tele_suppression" end
+        end
+    end
+    local ids,sources=unit_ids(world),{}
     local positions={}
     for _,id in ipairs(ids) do local e=world.entities[id]
         positions[id]={x=e.x,y=e.y}
@@ -1524,7 +1529,7 @@ function RW_ResolveTele(world)
             if p.x==at.x and p.y==at.y then targets[#targets+1]=id end
         end
         for _,id in ipairs(targets) do local target=world.entities[id]
-            if id~=source_id and not moved[id] and name(target)~=name(source)
+            if id~=source_id and not moved[id] and not (suppressed and suppressed[id]) and name(target)~=name(source)
                 and not has_capability(world,target,"still") and same_layer(source,target) then
                 local destinations={}
                 for _,other_id in ipairs(sources) do

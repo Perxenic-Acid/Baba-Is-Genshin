@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6U)
+# BACK infrastructure progress (M9.6V)
 
 ## Installed primary references
 
@@ -233,11 +233,26 @@ malformed data, late failure and tree/boundary Undo tests. Native delunit() also
 explicitly marks queued actions DELETED, confirming restored handles must not
 inherit the retired unit's queued motion.
 
+## TELE handoff
+
+RW_ResolveTele(world, suppressed) consumes the physical-ID marks returned by
+BACK playback. The optional set is validated and remains transient. Direction-only
+and unchanged BACK update rows suppress transport without consuming RNG; paradox
+guards do not mark the rider. Restored products do not inherit a retired handle's
+mark, even when the implementation reuses its physical slot. Aliases sharing a
+logical identity remain independent riders. Marked TELE sources may carry others.
+TELE now follows runtime unit-list order for sources, riders and destination choices.
+
+The installed TELE loop passes 6,144 cases across suppression/order/network variants.
+Sequential BACK then TELE Commit/Undo tests cover the handoff, replacement and
+failure purity. This closes the solver handoff; production BACK scheduler placement
+and transient-set routing remain pending, rather than exposing a partial public word.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
 word yet. Automatic activation/status timing, scheduler retain decisions and
-production status/birth timing, TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
+production status/birth timing, TELE-suppression routing, status/reading barriers and synthetic LEVEL/EMPTY semantics
 still need implementation and source-oracle verification. Exact production
 updateundo/pruning decisions and history beyond this engine's existing 128-turn
 window remain explicit integration limits. Do not treat the journal infrastructure as completed BACK.

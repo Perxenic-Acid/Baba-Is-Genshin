@@ -764,3 +764,12 @@ Undo or authored boundary reload. Added 80 installed append/remove/lookup struct
 turns, 750 noncanonical FOLLOW and 128 HOLD cases, plus ordering/validation/boundary
 tests. Existing BROKEN and other solver scheduling contracts stay unchanged;
 production BACK status/scheduling/TELE/reading barriers remain pending.
+
+## M9.6V — BACK-to-TELE solver handoff
+
+TELE consumes validated transient physical-ID suppression from BACK, respects
+runtime unit-list order and skips RNG for suppressed riders. Keep alias/retired
+handle semantics and source transport independent from rider suppression. Expanded
+the installed TELE oracle to 6,144 cases and added sequential BACK/TELE atomic
+Commit/Undo tests. Production BACK activation/scheduling and transient routing
+remain pending; no public BACK registration yet.

@@ -468,10 +468,12 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             back_context.retain=playback.back_retain
             tele_suppressed=playback.tele_suppressed
             complete=next_world;trace[#trace+1]="back"
-            if #playback.changes>0 then
+            local motion=playback.motion_history or {}
+            if #playback.changes>0 or reading_changed(prior,motion,rules) then
                 effects,why,relations,rules,code_status=services.evaluate(complete)
                 if not effects then return after_failure(plan,"back_rules",why) end
-                if code_status and #code_status.changes>0 and reading_changed(prior,playback.changes,rules) then
+                if code_status and #code_status.changes>0 and
+                    (reading_changed(prior,playback.changes,rules) or reading_changed(prior,motion,rules)) then
                     local updated,why=services.preview(complete,code_status)
                     if not updated then return fail("code_status_after_back",why) end
                     plan.stages[#plan.stages+1]={name="code_status_after_back",plan=code_status}
@@ -2369,7 +2371,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7D initialized")
+    print("[RuleWorld] M9.7E initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

@@ -1,4 +1,4 @@
-# BACK integration progress (M9.7D)
+# BACK integration progress (M9.7E)
 
 BACK is now available in the default property vocabulary and behavior registry.
 The official catalog explicitly marks its public real-unit history execution as
@@ -524,6 +524,31 @@ The installed queue/update/updatedir emitted-history oracle expands from 144 to
 432 cases (one/two/three occurrences). Real physical duplicate BACK sentences,
 declaration-before-unit ordering, shared logical identities, malformed/sparse/
 incomplete instance lists, isolated Invoke routing and Undo have regressions.
+
+## M9.7E: code invalidation from effective zero-net Text dispatch
+
+Installed tools.lua update() ~339 and updatedir() ~370 set updatecode for an
+effective physical Text change. The flag survives multiple dispatched actions
+whose final position/facing returns to the initial state. rules.lua code() ~164
+then runs brokenblock(checkthese). Looking only at BACK's final changes summary
+missed this trigger even after the ordered history itself had been preserved.
+
+The BACK barrier now considers effective motion_history reading events as well
+as its final summary. A physical Text path with no net change can therefore
+trigger the existing compile/code-status/recompile sequence before contacts.
+Apply the compiler's status plan only once; do not parse intermediate geometries
+or rerun BACK/contacts. Pure dispatched no-ops have no new motion rows and do not
+fabricate invalidation. Ordinary zero-net non-reading motion need not add a
+compile. WORD detection keeps the engine's previously documented conservative
+rule-frame behavior; exact native dependency invalidation is still a separate gap.
+
+Real compiler/session regressions use TEXT ON AVATAR IS BROKEN: ordinary Avatar
+movement changes the pending Text status without itself invalidating reading,
+then a zero-net Text BACK displacement or turn must apply the status. A historical
+update that dispatches as a true no-op must leave it latched. Tests also cover
+both compile-limit terminal flags, pre-contact phase ordering, late status-preview
+rejection with input/chance/history purity, and Undo. The 432 installed dispatch
+oracle cases now assert the actual native updatecode flag for Object/Text paths.
 
 ## Still pending
 

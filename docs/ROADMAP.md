@@ -868,3 +868,13 @@ coverage and filter inactive/absent-frame selections without fabricating history
 The installed dispatch-history oracle expands to 432 cases. Physical duplicate
 sentences, ordering, aliases, malformed instances and Undo are covered. Repeated
 retired MF_* handle behavior/native phase gaps remain; BACK stays catalog-partial.
+
+## M9.7E — BACK zero-net Text code-status barrier
+
+Use effective BACK motion history to detect physical Text reading invalidation
+even when the final movement/facing summary is empty. Preserve the one-pass
+compiler status barrier before contacts and exclude pure dispatched no-ops.
+Real TEXT ON AVATAR IS BROKEN tests cover displacement/turn cancellation,
+no-op latching, both terminal compile limits, atomic failure and Undo. The 432
+installed dispatch oracles additionally verify native updatecode behavior.
+Exact WORD dependency invalidation and other recorded native gaps remain.

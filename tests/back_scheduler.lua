@@ -233,3 +233,62 @@ for _,invalid in ipairs({false,{1},{1,2,3,999},{[2]=1,[3]=2}}) do
  assert(not p and e=="invalid_back_instances")
 end
 print("PASS: scheduled repeated BACK declarations, declaration-before-unit-list queue order, instance validation and Undo")
+
+-- Native update/updatedir sets updatecode for effective Text writes, even when
+-- the queued path returns to its starting geometry/facing before code() runs.
+s=fixture({{"TEXT","ON","AVATAR","IS","BROKEN"}})
+local id=s.world.next_entity_id;s.world.next_entity_id=id+1
+s.world.entities[id]={id=id,kind="object",class="text",text={name="FLAG"},x=3,y=2,direction="Right",back_init=2}
+s.world.rule_sources[#s.world.rule_sources+1]={when={op="always"},effects={
+ {op="grant_trait",target={kind="class",value="text"},trait="back"},
+ {op="deny_trait",target={kind="class",value="text"},trait="pushable"}}}
+local function text_cycle(unit)
+ local e=s.world.entities[unit]
+ local plan=assert(RW_PlanStages(s.world,{
+  {name="out",plan={consumes_turn=true,changes={{kind="move",entity_id=unit,from={x=e.x,y=e.y,direction="Right"},to={x=e.x+1,y=e.y,direction="Right"}}}}},
+  {name="home",plan={consumes_turn=true,changes={{kind="move",entity_id=unit,from={x=e.x+1,y=e.y,direction="Right"},to={x=e.x,y=e.y,direction="Right"}}}}}}))
+ plan.back_frame={from=1,retain=true};return plan
+end
+s,r=RW_Commit(s,text_cycle(id));assert(r.accepted,r.reason)
+s,r=RW_Commit(s,{consumes_turn=true,changes={},back_frame={from=2,retain=true}});assert(r.accepted,r.reason)
+one,plan=step(s,right);local order=stages(plan);local back=plan.stages[order.back].plan
+assert(#back.changes==0 and #back.motion_history==2)
+assert(not order.code_status_after_move and order.back<order.code_status_after_back and order.code_status_after_back<order.sink)
+assert(one.world.entities[id].broken==1 and one.world.entities[id].x==3 and one.world.entities[1].x==3)
+assert(RW_Undo(one).world==s.world and not s.world.entities[id].broken)
+for _,reason in ipairs({"word_rule_limit","rule_complexity_limit"}) do
+ local limited=copy(services)
+ limited.evaluate=function(w) if w.entities[id].broken==1 then return nil,reason end;return services.evaluate(w) end
+ local terminal,p=step(s,right,limited);local terminal_order=stages(p)
+ assert(terminal.world[reason=="rule_complexity_limit" and "too_complex" or "infinite_loop"] and terminal.world.entities[id].broken==1 and not terminal_order.sink)
+ assert(terminal_order.back<terminal_order.code_status_after_back and RW_Undo(terminal).world==s.world)
+end
+local failing=copy(services)
+failing.preview=function(w,p)
+ if p.reason=="broken_status" then for _,op in ipairs(p.changes) do if op.entity_id==id and op.to==1 then return nil,"injected_reading_barrier_failure" end end end
+ return RW_PreviewPlan(w,p)
+end
+local rejected,e=RW_PlanTurn(s.world,right,failing,s)
+assert(not rejected and e.stage=="code_status_after_back" and e.reason=="injected_reading_barrier_failure")
+assert(s.world.entities[1].x==2 and not s.world.entities[id].broken and s.back_frame_count==3 and #s.history==2)
+assert(not s.world.chance_seed and not s.world.last_input)
+
+local turning=RW_Undo(RW_Undo(s))
+local direction_cycle=assert(RW_PlanStages(turning.world,{
+ {name="turn",plan={consumes_turn=true,changes={{kind="direction",entity_id=id,from="Right",to="Up"}}}},
+ {name="home",plan={consumes_turn=true,changes={{kind="direction",entity_id=id,from="Up",to="Right"}}}}}))
+direction_cycle.back_frame={from=1,retain=true};turning,r=RW_Commit(turning,direction_cycle);assert(r.accepted,r.reason)
+turning,r=RW_Commit(turning,{consumes_turn=true,changes={},back_frame={from=2,retain=true}});assert(r.accepted,r.reason)
+local turned,p=step(turning,right);local turn_order=stages(p)
+assert(#p.stages[turn_order.back].plan.changes==0 and turned.world.entities[id].broken==1 and turned.world.entities[id].direction=="Right")
+assert(turn_order.back<turn_order.code_status_after_back and RW_Undo(turned).world==turning.world)
+
+-- A matched historical update whose dispatch is already a no-op suppresses
+-- TELE, but must not invent updatecode/BROKEN refresh at this barrier.
+local noop=RW_Undo(RW_Undo(s))
+noop,r=RW_Commit(noop,{consumes_turn=true,changes={{kind="move",entity_id=id,from={x=3,y=2,direction="Right"},to={x=4,y=2,direction="Right"}}},back_frame={from=1,retain=true}});assert(r.accepted,r.reason)
+noop,r=RW_Commit(noop,{consumes_turn=true,changes={{kind="move",entity_id=id,from={x=4,y=2,direction="Right"},to={x=3,y=2,direction="Right"}}},back_frame={from=2,retain=true}});assert(r.accepted,r.reason)
+local unchanged,p=step(noop,right);local no_order=stages(p);local back=p.stages[no_order.back].plan
+assert(#back.changes==0 and not back.motion_history and back.tele_suppressed[id])
+assert(not no_order.code_status_after_back and not unchanged.world.entities[id].broken)
+print("PASS: zero-net BACK Text dispatch triggers one code-status barrier before frozen contacts and Undo")

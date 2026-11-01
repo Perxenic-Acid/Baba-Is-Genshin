@@ -43,6 +43,7 @@ for _,facing in ipairs({"Right","Up","Down","None"}) do for guard=0,1 do for _,c
   assert(row.moved==(golden[3]~=golden[6] or golden[4]~=golden[7]))
  end
  local e=after.world.entities[1];assert(e.x==unit.values.XPOS and e.y==unit.values.YPOS and e.direction==unit.values.DIR)
+ assert(env.updatecode==((class=="text" and #logged>0) and 1 or 0),"native updatecode must follow effective Text dispatch, including zero-net paths")
  assert((plan.tele_suppressed[1]==true)==(env.objectdata[101]~=nil));assert(RW_Undo(after).world==s.world)
  cases=cases+1
 end end end end end end

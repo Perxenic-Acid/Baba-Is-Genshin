@@ -333,3 +333,15 @@ YOU/WIN contact, boundary initialization and whole-tree Undo. No native acceptan
 is inferred. Full regression startup with the new vocabulary costs 1,926,000 Lua
 instructions, below the 2,000,000 production ceiling. Fifteen catalog properties
 remain pending (3D separately excluded); frontend/level design stay deferred.
+
+## Zero-net BACK Text invalidation (M9.7E)
+
+Installed update()/updatedir() sets updatecode for each effective Text dispatch,
+even when a later queued action restores its initial geometry/facing. BACK now
+uses its effective motion_history at the existing code-status barrier rather
+than relying only on a nonempty final summary. The compiler's one status pass
+still runs after dispatch and before contacts; intermediate positions are never
+compiled and contacts/BACK are not repeated. Pure no-op dispatch does not trigger
+this refresh. Tests cover real spatial BROKEN rules, zero-net displacement and
+turning, no-op latching, both compile-limit terminal states, atomic rejection and
+Undo. Existing conservative WORD dependency detection remains a documented gap.

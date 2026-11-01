@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6Z)
+# BACK infrastructure progress (M9.7A)
 
 ## Installed primary references
 
@@ -388,15 +388,47 @@ verify both reused and allocated identities survive restoration, then verify
 destruction on the next input and Undo in both directions. Public BACK remains
 pending; offline checks do not assert native acceptance.
 
+## M9.7A: ordered SHIFT motion history
+
+Installed moveblock() final SHIFT alignment (blocks.lua ~818–845) unconditionally
+adds an update row for every surviving same-layer co-occupant of an awake source.
+The old final-state summary discarded equal-direction writes. It also could not
+retain the intermediate directions of multiple stacked sources.
+
+SHIFT now emits an owned ordered motion_history alongside its unchanged atomic
+changes summary. Rows carry physical entity IDs, full from/to positions/facing
+and an optional retain flag (default true for actual motion).
+Impulse applications and final alignment share that path; every alignment writes
+a row, even when equal. Sources/riders follow the authoritative unit-list order.
+Validation checks each row against its predecessor and the complete path against
+the ordinary final changes, rejecting structural/status mixtures, stale rows and
+out-of-bounds positions. A nontrivial net-zero motion path retains a BACK frame;
+final alignment uses retain=false even when facing changes, because that direct
+assignment does not set updateundo (addundo only stores the row). The final
+changes summary must not independently override those explicit retention flags.
+An independently retained/current BACK frame can still contain such equal rows.
+
+The phase journal clones this metadata. BACK's newest-first row translation uses
+the ordered path instead of duplicating the final move/direction summary. Replaying
+an equal update marks that physical rider for TELE suppression without moving it
+or drawing destination RNG. The world-only diagnostic motion path supports the
+same metadata. No new entity/world facts or stage nesting are introduced.
+
+384 unchanged installed SHIFT alignment oracle cases cover directions, multiple
+sources, unit-list order, SLEEP, FLOAT and non-retaining changed/unchanged alignment.
+Another 32 impulse/PUSH/WEAK scenarios
+validate the full path and its inverse. Complete and isolated mapped schedulers
+verify current-frame BACK/TELE routing; validation, ownership, retention, late
+failure and Undo tests cover history-only and net-zero phases. Native impulse
+batching and intra-impulse HAS/conditional cache differences remain documented
+separately; this does not claim complete phase-graph parity or native acceptance.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
 word yet. Native paradox routing and synthetic
 LEVEL/EMPTY semantics remain
 explicit gaps, as do broader native phase-graph/conditional intra-phase differences.
-In particular, native moveblock() SHIFT alignment writes an update history row even
-when facing is unchanged; the current effective-change journal omits such no-op
-rows. Their BACK/TELE consequences still need explicit history metadata.
 Opaque host lifetime updateundo behavior and history beyond this engine's existing
 128-turn window remain integration limits. Do not treat the current session
 scheduler as completed public BACK.

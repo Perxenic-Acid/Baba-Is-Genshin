@@ -68,3 +68,17 @@ fully reproduced. Death HAS is batched after SHIFT, as documented in the pipelin
 Normal startup still skips regressions and stays under the existing 2M offline
 instruction budget. The more complex official puzzle has traversal coverage;
 complete solution parity and real-device acceptance remain to be checked.
+
+## M9.7A history update
+
+The earlier milestone boundary above is historical; subsequent motion words are
+tracked in MOTION_WORDS.md. SHIFT now follows authoritative unit-list order and
+emits ordered phase-owned motion_history in addition to its atomic final changes.
+Final alignment records every awake same-layer surviving co-occupant, including
+equal facing and intermediate stacked-source facing. These direct native
+addundo/assignment rows use retain=false: even changed alignment does not alone
+set updateundo. Ordinary impulse updates retain their motion history semantics.
+BACK replays the path once, including equal-update TELE suppression; no transient
+marks/history are stored on entities. See BACK.md M9.7A and shift_history.lua for
+384 installed alignment oracle cases, 32 inverse-path cases and scheduler/Undo
+coverage. Native intra-impulse death/HAS and conditional-cache differences remain.

@@ -868,12 +868,11 @@ end
 function RW_ResolveShift(world)
     local working={};for k,v in pairs(world) do working[k]=v end
     working.entities={}
-    local ids={}
+    local ids=unit_ids(world)
     for id,e in pairs(world.entities) do
         local copy={};for k,v in pairs(e) do copy[k]=v end
-        working.entities[id]=copy;ids[#ids+1]=id
+        working.entities[id]=copy
     end
-    table.sort(ids)
     local vectors={Left={-1,0},Up={0,-1},Right={1,0},Down={0,1}}
     local tasks,order={},{}
     for _,id in ipairs(ids) do
@@ -891,6 +890,18 @@ function RW_ResolveShift(world)
             end
         end
     end
+    -- Ordered history is separate from the final atomic displacement summary.
+    -- In particular, native alignment emits an update even for identical facing.
+    local history,history_state={},{}
+    local function remember(id,entity,force)
+        local old=history_state[id] or world.entities[id]
+        local from={x=old.x,y=old.y,direction=old.direction or "None"}
+        local to={x=entity.x,y=entity.y,direction=entity.direction or "None"}
+        if force or from.x~=to.x or from.y~=to.y or from.direction~=to.direction then
+            history[#history+1]={kind="move",entity_id=id,from=from,to=to,retain=not force}
+            history_state[id]=to
+        end
+    end
     local deaths,records={},{}
     local rounds=0;for _,task in pairs(tasks) do rounds=math.max(rounds,task.count) end
     for impulse=1,rounds do
@@ -903,6 +914,7 @@ function RW_ResolveShift(world)
                 local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
                 if not part.consumes_turn then return nil,part.reason end
                 working.entities[id].direction=task.direction
+                remember(id,working.entities[id])
                 for _,change in ipairs(part.changes) do queued[#queued+1]=change end
                 for _,death in ipairs(part.destructions or {}) do
                     deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
@@ -914,6 +926,7 @@ function RW_ResolveShift(world)
             if e then
                 if change.kind=="move" then e.x=change.to.x;e.y=change.to.y;e.direction=change.to.direction
                 elseif change.kind=="direction" then e.direction=change.to end
+                remember(change.entity_id,e)
             end
         end
     end
@@ -926,6 +939,7 @@ function RW_ResolveShift(world)
                 local rider=working.entities[other_id]
                 if rider and other_id~=id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider) then
                     rider.direction=belt.direction
+                    remember(other_id,rider,true)
                 end
             end
         end
@@ -933,6 +947,7 @@ function RW_ResolveShift(world)
     local changes={}
     for _,id in ipairs(ids) do
         local before=world.entities[id];local after=working.entities[id] or records[id]
+        remember(id,after)
         if before.x~=after.x or before.y~=after.y then
             changes[#changes+1]={kind="move",entity_id=id,
                 from={x=before.x,y=before.y,direction=before.direction or "None"},
@@ -941,7 +956,7 @@ function RW_ResolveShift(world)
             changes[#changes+1]={kind="direction",entity_id=id,from=before.direction or "None",to=after.direction or "None"}
         end
     end
-    return {consumes_turn=true,changes=changes,destructions=deaths,reason="shift"}
+    return {consumes_turn=true,changes=changes,destructions=deaths,reason="shift",motion_history=#history>0 and history or nil}
 end
 
 -- Direction grants use physical rule multiplicity (statusblock in blocks.lua).
@@ -1642,7 +1657,8 @@ function RW_PlanBackMotion(world,selections,paradox)
         local rows={}
         for _,phase in ipairs(record.phases) do
             if type(phase)~="table" or not list(phase.changes) then return nil,"invalid_back_history" end
-            for _,op in ipairs(phase.changes) do
+            if phase.motion_history~=nil and not list(phase.motion_history) then return nil,"invalid_back_history" end
+            for _,op in ipairs(phase.motion_history or phase.changes) do
                 if type(op)~="table" then return nil,"invalid_back_history" end
                 if op.entity_id==id then
                     if op.kind=="move" then

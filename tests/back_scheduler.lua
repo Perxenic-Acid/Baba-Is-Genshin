@@ -170,3 +170,16 @@ for _,scenario in ipairs({{copies=1},{copies=2},{copies=1,repeated=true}}) do
  assert(RW_Undo(expired).world==restored.world and RW_Undo(restored).world==s.world)
 end
 print("PASS: BACK primary/duplicate restored WEAK contact grace, transient expiry and atomic Undo")
+
+-- The real scheduler must preserve SHIFT history metadata through its phase
+-- adapter. A locked rider stays put but still gets native final alignment.
+s=fixture({{"AVATAR","IS","BACK"},{"ROCK","IS","SHIFT"},{"ROCK","IS","TELE"}})
+s.world.entities[1].back_init=1;s.world.entities[2].x=2
+s.world.rule_sources[#s.world.rule_sources+1]={when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="avatar"},trait="lockedright"}}}
+local shifted=copy(services);shifted.shift=RW_ResolveShift
+one,plan=step(s,wait,shifted)
+local order=stages(plan)
+assert(#plan.stages[order.shift].plan.motion_history==1 and #plan.stages[order.shift].plan.changes==0)
+assert(plan.stages[order.back].plan.tele_suppressed[1] and one.world.entities[1].x==2 and not one.world.random_state)
+assert(order.shift<order.back and order.back<order.tele and one.back_frame_count==2)
+print("PASS: scheduled SHIFT no-op current-frame BACK playback and transient TELE suppression without RNG")

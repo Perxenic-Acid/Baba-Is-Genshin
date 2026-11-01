@@ -818,3 +818,16 @@ Keep grace transient and preserve ordinary conversion behavior. Real-journal
 tests cover primary/duplicate/repeated conversions, allocated cartesian products,
 expiry on next input and Undo. Native SHIFT no-op history, paradox and synthetic
 scope remain; public BACK is still pending.
+
+## M9.7A — ordered SHIFT history for BACK
+
+Keep an explicit phase-owned motion_history path, including every unchanged
+SHIFT alignment and intermediate stacked-source facing. Validate its stale
+preconditions and agreement with the atomic final summary; journal owned rows
+without persisting them in world state. Honor unit-list source/rider order.
+BACK consumes those rows once, preserving no-op TELE suppression and net-zero
+motion retention. Direct alignment rows never independently set updateundo,
+including changed facing. Added 384 installed alignment oracles, 32 inverse-path scenarios,
+complete/isolated scheduler routing, ownership, rejection and Undo coverage.
+Native phase-graph/conditional differences, paradox and synthetic scope remain;
+public BACK is still pending.

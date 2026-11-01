@@ -146,3 +146,31 @@ plan,e=bootstrap:Invoke("RW_PlanTurn",s.world,{type="wait"},scheduled,s);assert(
 n=commit(s,plan);assert(n.world.entities[1].archetype=="rock" and n.world.entities[1].back_init==2)
 assert(world:Invoke("RW_Undo",n).world==s.world)
 print("PASS: isolated session-to-conversion native clock propagation, fresh BACK status and Undo")
+
+-- SHIFT's history-only metadata must cross both movement and world Invoke.
+s=fixture();s.world.entities[1].back_init=1
+s.world.rule_sources[#s.world.rule_sources+1]={when={op="always"},effects={
+ {op="grant_trait",target={kind="archetype",value="avatar"},trait="back"},
+ {op="grant_trait",target={kind="archetype",value="avatar"},trait="lockedright"},
+ {op="grant_trait",target={kind="archetype",value="rock"},trait="shift"},
+ {op="grant_trait",target={kind="archetype",value="rock"},trait="tele"}}}
+scheduled.shift=function(...) return movement:Invoke("RW_ResolveShift",...) end
+scheduled.refresh=compile.evaluate
+scheduled.contact=function(w,p,k,c,r,count)
+ return bootstrap:Invoke("RW_PlanContactPhase",w,p,k,c,{
+  victims=function(...) return properties:Invoke("RW_ResolveContactVictims",...) end,
+  births=function(w,ids,c,r,count)
+   local specs,why=rules:Invoke("RW_PlanHasBirths",w,ids,c);if not specs then return nil,why end
+   return rules:Invoke("RW_InitializeBirthSpecifications",w,specs,r,count)
+  end,
+  create=function(...) return world:Invoke("RW_PlanCreate",...) end,
+  delete=function(...) return world:Invoke("RW_PlanDelete",...) end},r,count)
+end
+plan,e=bootstrap:Invoke("RW_PlanTurn",s.world,{type="wait"},scheduled,s);assert(plan,e and e.reason)
+n=commit(s,plan);local found=false
+for _,stage in ipairs(plan.stages) do if stage.name=="shift" then
+ assert(#stage.plan.changes==0 and #stage.plan.motion_history==1);found=true
+end end
+assert(found and n.world.entities[1].x==2 and not n.world.random_state)
+assert(world:Invoke("RW_Undo",n).world==s.world)
+print("PASS: isolated SHIFT history-only phase, current BACK frame, TELE suppression and Undo")

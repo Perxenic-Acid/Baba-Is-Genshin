@@ -346,6 +346,40 @@ local function validate_plan(world, plan)
         end
     end
 
+    if plan.motion_history~=nil then
+        if not is_list(plan.motion_history) then return false,"invalid_motion_history" end
+        local expected,actual={},{}
+        local function position(entity)
+            return {x=entity.x,y=entity.y,direction=entity.direction or "None"}
+        end
+        for _,op in ipairs(plan.changes) do
+            if op.kind~="move" and op.kind~="direction" then return false,"invalid_motion_history_phase" end
+            local point=expected[op.entity_id] or position(world.entities[op.entity_id])
+            if op.kind=="move" then point.x,point.y=op.to.x,op.to.y;point.direction=op.to.direction or point.direction
+            else point.direction=op.to end
+            expected[op.entity_id]=point
+        end
+        for _,row in ipairs(plan.motion_history) do
+            if type(row)~="table" or row.kind~="move" or not valid_id(row.entity_id)
+                or not world.entities[row.entity_id] or type(row.from)~="table" or type(row.to)~="table"
+                or (row.retain~=nil and type(row.retain)~="boolean") then return false,"invalid_motion_history" end
+            for _,point in ipairs({row.from,row.to}) do
+                if type(point)~="table" or not is_integer(point.x) or not is_integer(point.y)
+                    or point.x<1 or point.x>world.width or point.y<1 or point.y>world.height
+                    or not valid_direction(point.direction) then return false,"invalid_motion_history" end
+            end
+            local old=actual[row.entity_id] or position(world.entities[row.entity_id])
+            if not same_state(old,row.from) then return false,"stale_motion_history" end
+            actual[row.entity_id]=clone(row.to)
+        end
+        for id,point in pairs(expected) do
+            if not same_state(point,actual[id] or position(world.entities[id])) then return false,"motion_history_mismatch" end
+        end
+        for id,point in pairs(actual) do
+            if not same_state(point,expected[id] or position(world.entities[id])) then return false,"motion_history_mismatch" end
+        end
+    end
+
     if plan.back_conversions~=nil then
         if not is_list(plan.back_conversions) then return false,"invalid_back_conversions" end
         local products,sources={},{}
@@ -844,7 +878,7 @@ local function preview_transaction(world, plan)
         return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.infinite_loop == true or plan.too_complex == true or not same_state(world.unit_order,result.unit_order)
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
-        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.back_conversions~=nil or plan.unit_sequence~=nil
+        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.back_conversions~=nil or plan.unit_sequence~=nil or plan.motion_history~=nil
         or not is_list(plan.stages) or #plan.stages == 0 or #plan.stages > 32 then
         return nil,"invalid_stage_sequence"
     end
@@ -902,13 +936,16 @@ function RW_BackRetainDecision(world,plan,active)
     local phases=plan.stages or {{plan=plan}}
     for _,stage in ipairs(phases) do local phase=stage.plan
         if phase.board_shift or (phase.bonus_state and phase.bonus_state.to~=phase.bonus_state.from) then return decision(true) end
+        for _,row in ipairs(phase.motion_history or {}) do
+            if row.retain~=false and not same_state(row.from,row.to) then return decision(true) end
+        end
         for _,event in ipairs(phase.back_conversions or {}) do
             if event.removed or #event.product_ids>0 then return decision(true) end
         end
         for _,op in ipairs(phase.changes) do
             if op.kind=="create" or op.kind=="delete" or op.kind=="transform" or op.kind=="retype" or op.kind=="back_restore" then return decision(true)
-            elseif op.kind=="direction" and op.from~=op.to then return decision(true)
-            elseif op.kind=="move" then
+            elseif op.kind=="direction" and not phase.motion_history and op.from~=op.to then return decision(true)
+            elseif op.kind=="move" and not phase.motion_history then
                 local direction=op.from.direction or (world.entities[op.entity_id] or {}).direction or "None"
                 if op.from.x~=op.to.x or op.from.y~=op.to.y or (op.to.direction and op.to.direction~=direction) then return decision(true) end
             end
@@ -929,6 +966,7 @@ local function valid_turn_records(records,count)
             for _,phase in ipairs(record.phases) do
                 if type(phase)~="table" or not is_list(phase.changes)
                     or (phase.name~=nil and type(phase.name)~="string")
+                    or (phase.motion_history~=nil and not is_list(phase.motion_history))
                     or (phase.back_format~=nil and phase.back_format~=1) then return false end
             end
         end
@@ -937,7 +975,7 @@ local function valid_turn_records(records,count)
 end
 local function journal_phase(plan,name)
     local phase={name=type(name)=="string" and name or nil,changes=clone(plan.changes),back_format=1}
-    for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","infinite_loop","too_complex","back_conversions","unit_sequence"}) do
+    for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","infinite_loop","too_complex","back_conversions","unit_sequence","motion_history"}) do
         if plan[key]~=nil then phase[key]=clone(plan[key]) end
     end
     return phase
@@ -2642,7 +2680,7 @@ function RW_BackHistoryRows(before,record)
     for _,phase in ipairs(record.phases) do
         if type(phase)~="table" or not is_list(phase.changes) then return nil,"invalid_back_history" end
         local plan={consumes_turn=true,changes=phase.changes}
-        for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","back_conversions","unit_sequence"}) do plan[key]=phase[key] end
+        for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","back_conversions","unit_sequence","motion_history"}) do plan[key]=phase[key] end
         local after,reason=RW_PreviewPlan(current,plan)
         if not after then return nil,reason end
         local covered={}
@@ -2661,7 +2699,7 @@ function RW_BackHistoryRows(before,record)
         local cursor=clone(current.entities)
         for _,op in ipairs(phase.changes) do
             local id=op.entity_id;local entity=cursor[id]
-            if op.kind=="move" or op.kind=="direction" then
+            if (op.kind=="move" or op.kind=="direction") and not phase.motion_history then
                 add({kind="update",identity=back_identity(entity),x=entity.x,y=entity.y,direction=entity.direction,
                     moved=op.kind=="move" and (entity.x~=op.to.x or entity.y~=op.to.y) or false})
                 if op.kind=="move" then entity.x,entity.y=op.to.x,op.to.y;entity.direction=op.to.direction or entity.direction
@@ -2688,6 +2726,10 @@ function RW_BackHistoryRows(before,record)
                 elseif op.kind=="holder" then entity.holder=op.to
                 elseif op.kind=="followed" then entity.followed=op.to end
             end
+        end
+        for _,row in ipairs(phase.motion_history or {}) do
+            add({kind="update",identity=back_identity(current.entities[row.entity_id]),x=row.from.x,y=row.from.y,
+                direction=row.from.direction,moved=row.from.x~=row.to.x or row.from.y~=row.to.y})
         end
         current=after
     end

@@ -312,7 +312,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if not shift then return fail(motion_phase,shift_error) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,
             changes=movement.changes,board_shift=movement.board_shift}}}
-        stages[#stages+1]={name=motion_phase,plan={consumes_turn=true,changes=shift.changes,random_state=shift.random_state}}
+        stages[#stages+1]={name=motion_phase,plan={consumes_turn=true,changes=shift.changes,random_state=shift.random_state,motion_history=shift.motion_history}}
         local after,problem=services.preview(preview,stages[#stages].plan)
         if not after then return fail("preview_"..motion_phase,problem) end
         local destruction_terminal
@@ -2361,7 +2361,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6Z initialized")
+    print("[RuleWorld] M9.7A initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

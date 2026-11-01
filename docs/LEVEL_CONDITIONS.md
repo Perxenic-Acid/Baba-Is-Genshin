@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7V)
+# Scoped LEVEL conditions (M9.7W)
 
 Current status: all condition/prefix syntax currently registered by this engine
 can lower for scoped LEVEL consumers that already have typed scoped semantics.
@@ -205,3 +205,25 @@ parameters/NOT, LEVEL quota and parent independence, alongside 36,288 physical c
 Compiler/tree conversion and whole-tree Undo cover positive/negative special cases.
 All existing scoped spatial syntax is now admitted; unsupported scoped consumers
 and documented query/postrules limits still remain.
+
+## M9.7W frozen-contact scoped property refresh
+
+Installed blocks.lua levelblock() re-tests each LEVEL IS declaration's conditions
+at its current evaluation point (e.g. around line 2553); a previously true result
+is not a persistent property fact. RW_QueryLevelTraits projects ordered raw scoped
+property declarations against current entities in the supplied frozen rule frame,
+retaining conditional denial/BROKEN gating, duplicate grants and terminal ordering.
+It neither recompiles physical Text nor changes saved surroundings.
+
+The scheduler refreshes scoped properties after each contact/EAT/MAKE/BONUS mutation
+and before the first contact projection. Final tree outcome projection refreshes
+again against the surviving runtime, covering later code-status/orientation work.
+Skip terminal-board queries; only Undo restrictions remain unchanged. A refresh
+error rejects the same transaction (or commits the existing compile-limit terminal
+policy), with no host/global side effects. The optional service follows existing
+injected-service compatibility; production always binds the real query function.
+
+Tree tests cover LEVEL ON ROCK IS WIN and NOT ON activation/retraction after SINK,
+whole-tree Undo and atomic injected late failure. Scoped conversions still retain
+their pre-contact selection and existing conversion-before-terminal priority;
+this change does not rerun earlier conversion phases.

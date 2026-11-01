@@ -1049,3 +1049,14 @@ condition syntax is now admitted for supported scoped consumers; lifecycle/verb
 and documented native query gaps remain. Frontend/layout work stays deferred.
 Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
 instructions. No native success claim follows from offline checks.
+
+## M9.7W — re-evaluate frozen scoped LEVEL properties across contacts
+
+Add pure ordered RW_QueryLevelTraits and bind it in native services. Refresh after
+contact/EAT/MAKE/BONUS changes and before final tree outcomes, preserving frozen
+declarations, dynamic denial/BROKEN, duplicates and terminal ordering. Tests prove
+SINK witness deletion retracts positive LEVEL WIN and activates NOT ON WIN; whole-
+tree Undo and injected late query failure preserve atomicity. No conversion replay,
+Text recompile or query cache persistence is introduced.
+Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
+instructions. Tests also preserve ordered WIN/DEFEAT and duplicate grants.

@@ -1,6 +1,6 @@
 local cs={read=RW_ReadLines,parse=RW_ParseRuleAST,lower=RW_LowerRuleAST,evaluate=RW_EvaluateRules,
  project=RW_ProjectWorld,words=RW_WordTokenMap,code_status=RW_PlanCodeStatus}
-local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,convert=RW_PlanConversions,refresh=RW_EvaluateRules,
+local services={level_traits=RW_QueryLevelTraits,project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,convert=RW_PlanConversions,refresh=RW_EvaluateRules,
  status=RW_PlanRuleStatus,
  contact=function(w,p,k,c,rules) return RW_PlanContactPhase(w,p,k,c,{victims=RW_ResolveContactVictims,births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},rules) end,
  evaluate=function(w) local f,e=RW_CompileWorld(w,cs);if not f then return nil,e.reason end;return f.effects,nil,f.relations,f.rules,f.code_status end,
@@ -286,3 +286,38 @@ for _,case in ipairs({
  local n=act(tree,wait);assert((n.active_id==parent)==case.fires,table.concat(row,' '))
 end
 print('PASS: scoped LEVEL FACEDBY fixed child origin, parent independence, single LEVEL witness, default EMPTY/NOT and tree conversion/Undo')
+
+for _,destroy in ipairs({false,true}) do for _,negative in ipairs({false,true}) do
+ local row=negative and {'LEVEL','NOT','ON','ROCK','IS','WIN'} or {'LEVEL','ON','ROCK','IS','WIN'}
+ local tree,parent=fixture({row});local w=RW_GetActiveLevel(tree).world
+ w.entities[3]={id=3,kind='object',class='object',archetype='rock',x=25,y=25,direction='Right'}
+ if destroy then
+  w.entities[4]={id=4,kind='object',class='object',archetype='flag',x=25,y=25,direction='Right'}
+  w.rule_sources[#w.rule_sources+1]={when={op='always'},effects={{op='grant_trait',trait='sink',target={kind='id',value=4}}}}
+ end
+ local n=act(tree,wait);local expected=negative==destroy
+ assert((n.active_id==parent)==expected,'post-SINK scoped WIN:'..tostring(destroy)..':'..tostring(negative))
+end end
+print('PASS: frozen scoped LEVEL WIN retracts/activates after SINK deletes child witnesses, with tree outcome priority and Undo')
+
+local tree=fixture({{'LEVEL','ON','ROCK','IS','WIN'}});local w=RW_GetActiveLevel(tree).world
+w.entities[3]={id=3,kind='object',class='object',archetype='rock',x=25,y=25,direction='Right'}
+w.entities[4]={id=4,kind='object',class='object',archetype='flag',x=25,y=25,direction='Right'}
+w.rule_sources[#w.rule_sources+1]={when={op='always'},effects={{op='grant_trait',trait='sink',target={kind='id',value=4}}}}
+local broken_services={};for k,v in pairs(services) do broken_services[k]=v end
+broken_services.level_traits=function(current,rules)
+ if not current.entities[3] then return nil,'injected_scoped_refresh_failure' end
+ return RW_QueryLevelTraits(current,rules)
+end
+local p,e=RW_PlanLevelAction(tree,wait,broken_services)
+assert(not p and e.reason=='injected_scoped_refresh_failure')
+assert(w.entities[3] and w.entities[4] and RW_GetActiveLevel(tree).world==w and not w._condition_rules)
+print('PASS: late scoped property refresh failure rejects atomically without deleting source entities or leaking query state')
+
+for _,traits in ipairs({{'WIN','DEFEAT'},{'DEFEAT','WIN'},{'WIN','WIN'}}) do
+ local tree=fixture({{'LEVEL','IS',traits[1],'AND',traits[2]}})
+ local w=RW_GetActiveLevel(tree).world;local f=assert(RW_CompileWorld(w,cs))
+ local projected=assert(RW_QueryLevelTraits(w,f.rules))
+ assert(#projected==2 and projected[1]==traits[1]:lower() and projected[2]==traits[2]:lower())
+end
+print('PASS: frozen scoped projection preserves WIN/DEFEAT declaration order and duplicate property instances')

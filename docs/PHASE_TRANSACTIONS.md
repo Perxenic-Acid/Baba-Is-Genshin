@@ -72,3 +72,7 @@ Commit 日志复制路径；BACK 优先读取路径而非重复读取摘要。�
 操作语义。BACK 使用尾部锚点，反映先立即创建/删除、再统一派发运动。
 SHIFT 的无条件对齐与 BACK 的过滤空派发保持不同规则。中间变化抵消后
 摘要可以为空，日志仍可保留路径，供后续 BACK 与整树 Undo 使用。
+
+M9.7W: raw frozen scoped LEVEL properties now re-evaluate after contact/EAT/MAKE/
+BONUS mutations and at final tree outcome projection, like ordinary property
+conditions. No Text recompile occurs during frozen contacts. See LEVEL_CONDITIONS.md.

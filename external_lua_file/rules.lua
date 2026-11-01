@@ -214,6 +214,25 @@ query_level_trait=function(world,trait)
     end
     guard[key]=nil;return granted and not denied
 end
+-- Ordered scoped property projection from one frozen declaration frame.
+function RW_QueryLevelTraits(world,rules)
+    local context=condition_context(world,rules)
+    local traits={}
+    for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+        for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
+            if d.op=="level_trait" then
+                local enabled,why=query_level_trait(context,d.trait)
+                if enabled==nil then return nil,why end
+                if enabled then
+                    local active,why=RW_TestEntityCondition(context,d.when,{id=0,class="level",x=0,y=0,direction="None"})
+                    if active==nil then return nil,why end
+                    if active then traits[#traits+1]=d.trait end
+                end
+            end
+        end end
+    end
+    return traits
+end
 virtual_broken=function(world,entity)
     if entity.class=="level" then
         if world._ignore_level_broken then return false end

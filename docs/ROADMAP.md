@@ -1038,3 +1038,14 @@ conversion and Undo tests run both conditions. FACEDBY remains the next scoped
 spatial gap; frontend and authored layouts remain deferred.
 Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
 instructions. No native acceptance claim follows from offline checks.
+
+## M9.7V — scoped LEVEL FACEDBY
+
+Admit FACEDBY and enforce the native synthetic (0,0) child-grid observer, without
+substituting parent surroundings or caller-supplied coordinates. Keep single LEVEL
+witness and default EMPTY semantics. Compiler/tree/Undo tests and 432 installed
+scoped cases pass alongside the 36,288-case physical oracle. All existing spatial
+condition syntax is now admitted for supported scoped consumers; lifecycle/verb
+and documented native query gaps remain. Frontend/layout work stays deferred.
+Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
+instructions. No native success claim follows from offline checks.

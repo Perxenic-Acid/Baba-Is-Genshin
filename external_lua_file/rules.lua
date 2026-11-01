@@ -550,6 +550,8 @@ local function level_facing_condition(world,parameters,negated)
 end
 -- FACEDBY visits neighbors first, then parameters (unlike forward FACING).
 local function facedby_condition(world,parameters,entity,negated)
+    -- testcond(unitid=1) retains its fixed child-grid origin, not the entrance.
+    if entity.class=="level" then entity={id=0,class="level",x=0,y=0,direction="None"} end
     local vectors={{1,0},{0,-1},{-1,0},{0,1}}
     local dirs={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
     local used,matched,allfound={},{},0
@@ -2188,13 +2190,13 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         bans[key][target][#bans[key][target]+1]=query_clone(condition)
     end
     local function append(list,items) for _,item in ipairs(items) do list[#list+1]=item end end
-    local function input_prefixes(node)
+    local function level_conditions(node)
         if type(node)~="table" then return false end
         if node.op=="always" then return true end
-        if node.op=="not" then return input_prefixes(node.condition) end
+        if node.op=="not" then return level_conditions(node.condition) end
         if node.op=="all" then
             if not dense_list(node.terms) then return false end
-            for _,term in ipairs(node.terms) do if not input_prefixes(term) then return false end end
+            for _,term in ipairs(node.terms) do if not level_conditions(term) then return false end end
             return true
         end
         if node.op~="spatial" or not dense_list(node.clauses) then return false end
@@ -2206,9 +2208,10 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 and clause.relation~="near" and clause.relation~="nextto"
                 and clause.relation~="above" and clause.relation~="below"
                 and clause.relation~="besideleft" and clause.relation~="besideright"
-                and clause.relation~="facing" and clause.relation~="seeing" then return false end
+                and clause.relation~="facing" and clause.relation~="seeing"
+                and clause.relation~="facedby" then return false end
         end
-        for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
+        for _,term in ipairs(node.requirements or {}) do if not level_conditions(term) then return false end end
         return true
     end
     for _,ast in ipairs(ast_rules) do
@@ -2245,7 +2248,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
             if subject.tag=="noun" and subject.type and subject.type.tag=="level"
-                and ast.when.op~="always" and input_prefixes(ast.when) then
+                and ast.when.op~="always" and level_conditions(ast.when) then
                 local unconditional=query_clone(rule);unconditional.when={op="always"}
                 local g,d,r=lower_simple({unconditional},registry,world)
                 if not g then return nil,d end

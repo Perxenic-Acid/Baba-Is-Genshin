@@ -37,3 +37,26 @@ for _,name in ipairs({'rock','flag','text'}) do for _,stack in ipairs({false,tru
     end end
 end end end end end
 print('PASS: installed FACEDBY cardinal/stack/negative/Text/LEVEL/default EMPTY/AND matrix ('..count..' cases)')
+
+local scoped=0
+for _,source_dir in ipairs(dirs) do for population=0,2 do
+ local w=RW_CreateSession().world;w.width=9;w.height=9;w.entities={};w.rule_sources={}
+ w.level_surrounds={dir=0,r={'rock'},u={'rock'},l={'rock'},d={'rock'}}
+ units={};env.unitmap={}
+ for id=100,99+population do
+  local x,y=id-99,1
+  w.entities[id]={id=id,class='object',archetype='rock',x=x,y=y,direction='Left'}
+  units[id]={name='rock',values={2,x,y}}
+  env.unitmap[x+y*9]={id}
+ end
+ for _,params in ipairs(paramslist) do for _,negative in ipairs({false,true}) do
+  local ordered,terms={},{}
+  for _,p in ipairs(params) do terms[#terms+1]=term(p);if p:sub(1,4)=='not ' then ordered[#ordered+1]=p else table.insert(ordered,1,p) end end
+  local expected=original(ordered,{},{},{unitid=1,x=0,y=0,dir=0,conds={},surrounds=w.level_surrounds})
+  if negative then expected=not expected end
+  local actual=RW_TestEntityCondition(w,{op='spatial',clauses={{relation='facedby',negated=negative,parameters=terms}}},
+   {id=0,class='level',x=4,y=4,direction=source_dir})
+  assert(actual==expected,'scoped facedby:'..table.concat(params,','));scoped=scoped+1
+ end end
+end end
+print('PASS: installed scoped FACEDBY fixed origin, entrance/facing independence, LEVEL quota and default EMPTY ('..scoped..' cases)')

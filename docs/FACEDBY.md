@@ -38,3 +38,7 @@ native acceptance remains waived and offline checks do not establish native pari
 A loose FACEDBY replaces one redundant IS in MOTION; dimensions and sparse spacing
 remain unchanged. SEEING is next; its occlusion uses original simplecheck() and
 requires careful rule-derived STOP/PUSH/PULL/HIDE/PHANTOM queries.
+
+M9.7V admits scoped LEVEL FACEDBY using the original fixed child-grid origin,
+independent of saved entrance surroundings. See LEVEL_CONDITIONS.md for the
+432-case synthetic source oracle, scope and remaining virtual Empty limits.

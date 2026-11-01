@@ -1,4 +1,15 @@
-# Scoped LEVEL conditions (M9.7U)
+# Scoped LEVEL conditions (M9.7V)
+
+Current status: all condition/prefix syntax currently registered by this engine
+can lower for scoped LEVEL consumers that already have typed scoped semantics.
+This includes ON/NEAR/NEXTTO, the four directional relations, FACING/FACEDBY/SEEING,
+WITHOUT/FEELING and input/chance/power/lonely prefixes. It does not implement
+unsupported scoped verbs or lifecycle phases. Earlier milestone gap statements
+below describe their historical scope, superseded by the later integrations.
+Remaining limitations include documented native fault/order normalizations,
+pathological recursive/postrules parity, virtual EMPTY direction/lifecycle, and
+scoped consumers outside the existing typed command set.
+
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -177,3 +188,20 @@ seeing() with normal interior bounds and fresh checked conditions. Tree tests
 cover both clauses across six directions, repeated/literal names, complements and
 conversion/Undo. Native checked-condition/postrules edge cases retain the existing
 SEEING query scope; FACEDBY is the remaining scoped spatial syntax gap.
+
+## M9.7V FACEDBY
+
+Installed testcond() leaves synthetic LEVEL at child-grid (0,0). Unlike FACING and
+SEEING, facedby() has no unitid=1 surroundings branch: it visits the cardinal
+neighbors of that fixed origin, regardless of saved entrance position/direction.
+Enforce the fixed origin even when a query caller supplies other synthetic
+coordinates. Ordinary physical observers retain their own coordinates.
+
+Keep the shared single enclosing-LEVEL witness, distinct identity consumption and
+existing default None-facing EMPTY behavior. Parent names cannot supply incoming
+watchers. Empty directional rules remain part of the deferred virtual subsystem.
+The installed scoped oracle covers 432 cases across input facing, child populations,
+parameters/NOT, LEVEL quota and parent independence, alongside 36,288 physical cases.
+Compiler/tree conversion and whole-tree Undo cover positive/negative special cases.
+All existing scoped spatial syntax is now admitted; unsupported scoped consumers
+and documented query/postrules limits still remain.

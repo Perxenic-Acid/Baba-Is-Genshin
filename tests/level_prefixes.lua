@@ -90,11 +90,11 @@ for _,prefix in ipairs({'OFTEN','SELDOM'}) do
  end
 end
 assert(differed.often and differed.seldom and checked==64)
--- Parent-dependent spatial tests remain deferred, including mixtures with IDLE.
+-- All existing spatial condition syntax now lowers for scoped LEVEL.
 for _,words in ipairs({{'LEVEL','FACEDBY','ROCK','IS','SAFE'},{'IDLE','LEVEL','FACEDBY','ROCK','IS','SAFE'}}) do
- local tree=fixture({words});local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#frame.deferred>0)
+ local tree=fixture({words});local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#frame.deferred==0)
 end
-print('PASS: scoped input-prefix BROKEN/protection/destruction, 64 pure chance plans with independent map/physical identities, and explicit spatial deferral')
+print('PASS: scoped input-prefix BROKEN/protection/destruction, 64 pure chance plans with independent map/physical identities, and scoped spatial lowering')
 
 for _,case in ipairs({
  {prefix='POWERED',source={'AVATAR','IS','POWER'},fires=true},
@@ -272,3 +272,17 @@ for _,direction in ipairs({'Right','Up','Left','Down','Mid','None'}) do
 end
 end
 print('PASS: scoped LEVEL FACING/SEEING uses saved entrance direction/region, repeatable names, literal direction arguments, none-facing and whole-tree Undo')
+
+for _,case in ipairs({
+ {params={'LEVEL'},fires=true}, {params={'LEVEL','AND','LEVEL'},fires=false},
+ {params={'EMPTY'},fires=false}, {params={'NOT','EMPTY'},fires=true},
+ {params={'ROCK'},fires=false}, {params={'ROCK'},negative=true,fires=true}
+}) do
+ local row={'LEVEL'};if case.negative then row[#row+1]='NOT' end
+ row[#row+1]='FACEDBY';for _,word in ipairs(case.params) do row[#row+1]=word end
+ row[#row+1]='BECOME';row[#row+1]='FLAG'
+ local tree,parent=fixture({row},{{'rock',-1,0},{'rock',1,0},{'rock',0,1},{'rock',0,-1}})
+ local f=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#f.deferred==0)
+ local n=act(tree,wait);assert((n.active_id==parent)==case.fires,table.concat(row,' '))
+end
+print('PASS: scoped LEVEL FACEDBY fixed child origin, parent independence, single LEVEL witness, default EMPTY/NOT and tree conversion/Undo')

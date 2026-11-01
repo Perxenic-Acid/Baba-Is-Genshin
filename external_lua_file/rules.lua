@@ -499,7 +499,8 @@ local function level_spatial_condition(world,parameters,relation,negated)
     ids=world.unit_order or ids
     local used,allfound={},0
     local surrounds=world.level_surrounds or {}
-    local regions=relation=="on" and {"o"} or relation=="nextto"
+    local side=({above="d",below="u",besideright="l",besideleft="r"})[relation]
+    local regions=side and {side} or relation=="on" and {"o"} or relation=="nextto"
         and {"r","u","l","d","dr","ur","ul","dl"}
         or {"r","u","l","d","dr","ur","ul","dl","o"}
     for _,p in ipairs(parameters) do
@@ -513,7 +514,7 @@ local function level_spatial_condition(world,parameters,relation,negated)
                     used[id]=true;matched=true;break
                 end
             end
-        elseif wanted=="empty" then
+        elseif wanted=="empty" and relation~="above" and relation~="besideleft" then
             local occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
             for y=1,world.height do for x=1,world.width do
                 local cell=x+y*world.width
@@ -662,7 +663,8 @@ function RW_TestEntityCondition(world,node,entity)
             end
         end
         for _,index in ipairs(remove) do table.remove(parameters,index-offset);offset=offset+1 end
-        if entity.class=="level" and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto") then
+        if entity.class=="level" and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto"
+            or clause.relation=="above" or clause.relation=="below" or clause.relation=="besideleft" or clause.relation=="besideright") then
             result=result and level_spatial_condition(world,parameters,clause.relation,clause.negated)
         elseif clause.relation=="often" or clause.relation=="seldom" then
             if #parameters~=0 or (clause.chance_key~=nil and type(clause.chance_key)~="string") then return nil,"invalid_chance_clause" end
@@ -2184,7 +2186,9 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3"
                 and clause.relation~="lonely" and clause.relation~="feeling"
                 and clause.relation~="without" and clause.relation~="on"
-                and clause.relation~="near" and clause.relation~="nextto" then return false end
+                and clause.relation~="near" and clause.relation~="nextto"
+                and clause.relation~="above" and clause.relation~="below"
+                and clause.relation~="besideleft" and clause.relation~="besideright" then return false end
         end
         for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
         return true

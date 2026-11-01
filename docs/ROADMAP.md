@@ -1007,3 +1007,14 @@ checks and 9,216 installed normalized source cases pass. Remaining scoped spatia
 branches are documented in LEVEL_CONDITIONS.md; frontend/layouts remain deferred.
 Full regressions, catalog/layout audits and diff checks pass; startup remains
 1,980,000 instructions. Frozen-frame child deletion is covered independently.
+
+## M9.7S — scoped LEVEL directional spatial conditions
+
+Add ABOVE/BELOW/BESIDELEFT/BESIDERIGHT using native global-child then single-parent-
+side branches. Preserve ordinary physical rays separately, repeatable parent
+names and Text/Level special cases. Record native ABOVE/BESIDELEFT EMPTY's missing
+unitlists lookup; normalize absence to an empty list without startup errors.
+Expanded installed comparisons cover 43,008 cases; tree conversions/Undo cover
+all directions, wrong sides/diagonals, child witnesses and EMPTY asymmetry.
+Full regressions and catalog/layout/diff audits pass; startup stays at 1,980,000
+instructions. No native success claim is inferred from offline checks.

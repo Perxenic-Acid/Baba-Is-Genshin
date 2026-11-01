@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7R)
+# Scoped LEVEL conditions (M9.7S)
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -122,3 +122,24 @@ Text/Level special behavior, mixed IDLE and conversion/Undo. The installed branc
 oracle covers 9,216 normalized cases, full/empty child rooms, parent patterns and
 positive/negative parameters. ABOVE/BELOW/side rays, FACING/FACEDBY/SEEING remain
 explicit scoped gaps; ordinary implementations are unchanged.
+
+## M9.7S ABOVE / BELOW / BESIDELEFT / BESIDERIGHT
+
+Installed conditions.lua uses global child witnesses first, then exactly one saved
+entrance side: ABOVE reads d, BELOW u, BESIDELEFT r, BESIDERIGHT l. These synthetic
+branches do not scan distant parent rays or diagonal cells. Reuse parent names,
+consume child identities, and retain Text/LEVEL/complement behavior from the
+shared spatial query. Ordinary physical blocks keep their existing ray semantics.
+
+Deliberate fault handling: original ABOVE/BESIDELEFT EMPTY queries findempty(),
+but then iterate unitlists.empty rather than those vacancies. A missing list can
+raise a native Lua error. The backend treats this unpopulated list as empty, not
+as a global vacancy list, and never crashes normal startup for that native fault.
+BELOW/BESIDERIGHT still use actual vacancy witnesses. The installed oracle
+normalizes only the missing list to {}; this asymmetry has explicit tree tests.
+No persistent Empty identities or Empty lifecycle are introduced.
+
+The seven-branch source oracle now covers 43,008 normalized cases, including all
+four cardinal parent regions, wrong sides, full rooms and repeated/NOT parameters.
+Compiler/tree tests verify correct/opposite/diagonal/child-only witnesses and Undo.
+FACING/FACEDBY/SEEING remain scoped gaps. No frontend or authored layout changes.

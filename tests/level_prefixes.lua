@@ -91,7 +91,7 @@ for _,prefix in ipairs({'OFTEN','SELDOM'}) do
 end
 assert(differed.often and differed.seldom and checked==64)
 -- Parent-dependent spatial tests remain deferred, including mixtures with IDLE.
-for _,words in ipairs({{'LEVEL','ABOVE','ROCK','IS','SAFE'},{'IDLE','LEVEL','ABOVE','ROCK','IS','SAFE'}}) do
+for _,words in ipairs({{'LEVEL','FACING','ROCK','IS','SAFE'},{'IDLE','LEVEL','FACING','ROCK','IS','SAFE'}}) do
  local tree=fixture({words});local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#frame.deferred>0)
 end
 print('PASS: scoped input-prefix BROKEN/protection/destruction, 64 pure chance plans with independent map/physical identities, and explicit spatial deferral')
@@ -235,3 +235,23 @@ context.entities={};for id,e in pairs(w.entities) do if id~=3 then context.entit
 assert(RW_TestEntityCondition(context,condition,map)==false)
 assert(w.entities[3] and not w._condition_rules and #w.level_surrounds.o==0)
 print('PASS: scoped spatial frozen declarations observe child deletion without changing saved surroundings or source runtime')
+
+for _,case in ipairs({{'ABOVE',0,1},{'BELOW',0,-1},{'BESIDELEFT',1,0},{'BESIDERIGHT',-1,0}}) do
+ for _,location in ipairs({'correct','opposite','diagonal','child'}) do
+  local x,y=case[2],case[3]
+  if location=='opposite' then x,y=-x,-y elseif location=='diagonal' then x,y=1,1 end
+  local row={'LEVEL',case[1],'ROCK','BECOME','FLAG'}
+  local tree,parent=fixture({row},location~='child' and {{'rock',x,y}} or {})
+  local w=RW_GetActiveLevel(tree).world
+  if location=='child' then w.entities[3]={id=3,kind='object',class='object',archetype='rock',x=25,y=25,direction='None'} end
+  local f=assert(RW_CompileWorld(w,cs));assert(#f.deferred==0)
+  local n=act(tree,wait);assert((n.active_id==parent)==(location=='correct' or location=='child'),case[1]..':'..location)
+ end
+end
+print('PASS: scoped LEVEL directional conditions use the correct one-cell parent side or global child witnesses, preserve diagonal exclusion and Undo')
+
+for _,side in ipairs({'ABOVE','BELOW','BESIDELEFT','BESIDERIGHT'}) do
+ local tree,parent=fixture({{'LEVEL',side,'EMPTY','BECOME','FLAG'}})
+ local n=act(tree,wait);assert((n.active_id==parent)==(side=='BELOW' or side=='BESIDERIGHT'))
+end
+print('PASS: scoped directional EMPTY retains native lookup asymmetry without crashing on a missing unitlists.empty')

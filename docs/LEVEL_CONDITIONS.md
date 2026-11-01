@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7N)
+# Scoped LEVEL conditions (M9.7O)
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -36,8 +36,7 @@ physical decisions. Installed prefix oracles now include LEVEL: 24 IDLE cases an
 1,920 normalized OFTEN/SELDOM cases with repeated-query caching.
 
 Parent-dependent spatial conditions (including mixes with the supported prefixes)
-remain explicitly deferred. FEELING needs scoped property-instance counting;
-other parent-dependent queries need actual surroundings.
+remain explicitly deferred; parent-dependent queries need actual surroundings.
 LONELY is supported: installed lonely() explicitly returns false for unitid=1,
 regardless of surroundings; NOT LONELY returns true. Physical blocks keep their
 ordinary identity-based occupancy query. Scoped HAS lifecycle and other unrelated
@@ -59,8 +58,14 @@ level_prefixes.lua covers conditional map power, channels, ungrounded recursion,
 BROKEN suppression/release, conversion/Undo and frozen-frame source deletion.
 reference_powered.lua now uses raw conditional scoped declarations in its 1,080
 installed-source comparisons. Startup remains 1,979,000 instructions. Parent
-spatial conditions, FEELING instance accounting and native acceptance remain open.
+spatial conditions and native acceptance remain open.
 
 M9.7N adds scoped LONELY/NOT LONELY to the shared condition path. Compiler/tree
 conversion and Undo tests keep physical Level behavior separate; the installed
 LONELY oracle includes synthetic LEVEL with zero through four co-occupants.
+
+M9.7O supports FEELING with property/direction arguments, NOT arguments and repeated
+parameters through raw scoped condition instances. Mixes with other supported
+input/chance/POWERED/LONELY clauses use the shared path. Frozen queries re-evaluate
+conditions and BROKEN dynamically; they do not read old projections. See FEELING.md
+for the 5,760-case normalized source oracle and remaining recursive/postrules gaps.

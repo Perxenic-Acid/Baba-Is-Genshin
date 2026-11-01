@@ -47,3 +47,16 @@ Native acceptance is waived; offline checks do not establish native runtime pari
 A loose FEELING replaces one redundant NOT in MOTION, retaining spacing/dimensions.
 Next: prefix infrastructure and POWERED/POWERED2/POWERED3 with their POWER properties,
 then remaining prefixes, GROUP and properties. Letter composition remains deferred.
+
+## M9.7O scoped LEVEL
+
+Synthetic LEVEL now reads raw scoped property declarations through the same
+condition-instance consumer as real units. The adapter retains each raw condition
+table identity, including shared/failing instances, without treating the map as
+a physical level_block or reading projected traits. Dynamic BROKEN gating and
+conditional denials apply; recursive ungrounded FEELING cannot supply a property.
+Queries remain transient and can re-evaluate frozen declarations against current
+input. The installed normalized oracle now includes unitid=1 (5,760 total cases).
+Compiler/tree tests cover duplicates, complements, conditional properties, own
+negation, BROKEN, recursion, conversion and Undo. Existing pathological recursion
+and native postrules/condition-sharing edge cases remain outside the source matrix.

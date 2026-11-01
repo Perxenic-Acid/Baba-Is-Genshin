@@ -964,3 +964,13 @@ ordinary physical Level per-identity queries. Compiler/tree/Undo tests and the
 expanded 30-case installed oracle cover both paths. Parent-dependent spatial
 conditions and FEELING instance counting remain deferred.
 Full regressions and catalog/layout audits pass; startup is 1,980,000 instructions.
+
+## M9.7O — scoped LEVEL FEELING
+
+Adapt raw scoped properties to the existing condition-instance query, preserving
+condition identities, failed consumption, duplicates/complements and denial/BROKEN
+gating. Admit FEELING in scoped conditions without physical-block substitution.
+Tree conversion/Undo and frozen-input queries pass; installed normalized FEELING
+comparisons now include the map (5,760 cases). Full regressions and catalog/layout
+audits pass; startup remains 1,980,000. Parent-dependent spatial conditions and
+pathological recursion/postrules equivalence remain documented gaps.

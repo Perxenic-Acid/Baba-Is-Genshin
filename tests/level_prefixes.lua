@@ -138,3 +138,35 @@ for _,negative in ipairs({false,true}) do
  if not negative then assert(RW_GetActiveLevel(n).world.entities[2].archetype=='flag') end
 end
 print('PASS: scoped LEVEL LONELY is always false, NOT LONELY is true, physical Level stays per-identity and Undo restores both')
+
+for _,case in ipairs({
+ {condition={'FEELING','SAFE'},sources={{'LEVEL','IS','SAFE'}},fires=true},
+ {condition={'FEELING','SAFE'},sources={{'IDLE','LEVEL','IS','SAFE'}},fires=true},
+ {condition={'FEELING','SAFE'},sources={{'LEVEL','IS','SAFE'},{'LEVEL','IS','NOT','SAFE'}},fires=false},
+ {condition={'FEELING','NOT','SAFE'},sources={{'LEVEL','IS','FLOAT'}},fires=true},
+ {condition={'FEELING','NOT','SAFE'},sources={},fires=false},
+ {condition={'FEELING','SAFE','AND','SAFE'},sources={{'LEVEL','IS','SAFE'}},fires=false},
+ {condition={'FEELING','SAFE','AND','SAFE'},sources={{'LEVEL','IS','SAFE'},{'LEVEL','IS','SAFE'}},fires=true},
+ {condition={'FEELING','SAFE'},sources={{'LEVEL','FEELING','SAFE','IS','SAFE'}},fires=false},
+ {condition={'FEELING','SAFE'},sources={{'LEVEL','IS','SAFE'},{'LEVEL','IS','BROKEN'}},fires=false}
+}) do
+ local words={'LEVEL'};for _,word in ipairs(case.condition) do words[#words+1]=word end
+ words[#words+1]='BECOME';words[#words+1]='FLAG'
+ local rows={words};for _,row in ipairs(case.sources) do rows[#rows+1]=row end
+ local tree,parent=fixture(rows);RW_GetActiveLevel(tree).world.entities[2]=nil
+ local f=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#f.deferred==0)
+ local n=act(tree,wait);assert((n.active_id==parent)==case.fires,table.concat(case.condition,' '))
+end
+print('PASS: scoped LEVEL FEELING current/conditional properties, complements, duplicate quotas, denials, ungrounded recursion, BROKEN and whole-tree Undo')
+
+local tree=fixture({{'IDLE','LEVEL','IS','SAFE'},{'LEVEL','FEELING','SAFE','IS','POWER'}})
+local w=RW_GetActiveLevel(tree).world;w.last_input='wait'
+local frame=assert(RW_CompileWorld(w,cs))
+local condition={op='spatial',clauses={{relation='feeling',negated=false,parameters={{tag='property',name='safe'}}}}}
+local context={};for k,v in pairs(w) do context[k]=v end
+context._condition_rules=frame.rules
+local map={id=0,class='level',x=0,y=0,direction='None'}
+assert(RW_TestEntityCondition(context,condition,map)==true)
+context.last_input='move';assert(RW_TestEntityCondition(context,condition,map)==false)
+assert(not w._feeling_checked and not w._condition_guard and not w._condition_rules)
+print('PASS: scoped FEELING frozen declarations re-evaluate current input without persisting query caches')

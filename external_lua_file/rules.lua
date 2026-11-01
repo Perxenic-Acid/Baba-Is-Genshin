@@ -225,6 +225,7 @@ virtual_broken=function(world,entity)
     return query_trait(context,entity,"broken")
 end
 local function condition_matches(world,entity,target)
+    if entity.class=="level" then return target.kind=="scoped_level" end
     if entity.class=="empty" then return target.kind=="empty" end
     return valid_selector(target,world) and matches(entity,target,world)
 end
@@ -247,6 +248,17 @@ local function feeling_condition(world,parameters,entity,negated,node)
     local properties={}
     for _,trait in pairs((world.language or {}).properties or {}) do properties[trait]=true end
     local frames={world.rule_sources or {},world._condition_rules or {}}
+    if entity.class=="level" then
+        local scoped={}
+        for _,rules in ipairs(frames) do for _,rule in ipairs(rules) do
+            for _,declaration in ipairs(rule.scoped_conditions or {}) do
+                scoped[#scoped+1]={when=declaration.when,effects={{
+                    op=declaration.op=="level_trait" and "grant_trait" or "deny_trait",
+                    trait=declaration.trait,target={kind="scoped_level"}}}}
+            end
+        end end
+        frames={scoped}
+    end
     local found=0
     for _,parameter in ipairs(parameters) do
         local wanted=parameter.name:match("^@trait:(.+)$") or parameter.name:match("^@direction:(.+)$")
@@ -2128,7 +2140,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         for _,clause in ipairs(node.clauses) do
             if clause.relation~="idle" and clause.relation~="often" and clause.relation~="seldom"
                 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3"
-                and clause.relation~="lonely" then return false end
+                and clause.relation~="lonely" and clause.relation~="feeling" then return false end
         end
         for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
         return true

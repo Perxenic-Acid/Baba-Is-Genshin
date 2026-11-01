@@ -135,3 +135,38 @@ assert(RW_GetActiveLevel(reload).back_frame_count==nil and not RW_GetActiveLevel
 local boundary,result=RW_CommitLevelTree(completed,{before=completed,after=reload});assert(result.accepted)
 assert(RW_UndoLevelTree(boundary).instances[tree.active_id]==one)
 print("PASS: session BACK scheduler activation/retraction/conditions/NOT/BROKEN/IDLE, current/past frames, FOLLOW, TELE/RNG, Text code-status barrier, retention, replay/Undo and atomic failures")
+
+-- Native BACK restoration calls addunit(...,true), retaining unit.new=true.
+-- Conversion products instead explicitly clear that flag. Only the former
+-- receive current-turn WEAK contact grace, including allocated duplicate slots.
+for _,scenario in ipairs({{copies=1},{copies=2},{copies=1,repeated=true}}) do
+ local copies=scenario.copies
+ s=fixture();s.world.entities[1].back_init=2
+ s.world.entities[2].archetype="flag";s.world.entities[2].x=2
+ s.world.entities[3]=nil
+ for _,pair in ipairs({{"rock","back"},{"flag","back"},{"avatar","weak"}}) do
+  s.world.rule_sources[#s.world.rule_sources+1]={when={op="always"},effects={{op="grant_trait",target={kind="archetype",value=pair[1]},trait=pair[2]}}}
+ end
+ local relations={};for i=1,copies do relations[i]={op="transform",source_type="avatar",target_type="rock"} end
+ local ops,e,a,_,_,events=RW_PlanConversions(s.world,relations);assert(ops,e)
+ local history={consumes_turn=true,changes=ops,id_allocation=a,back_conversions=events}
+ if scenario.repeated then
+  local mid=assert(RW_PreviewPlan(s.world,history))
+  local changes,why,allocation,_,_,conversions=RW_PlanConversions(mid,{{op="transform",source_type="rock",target_type="flag"}});assert(changes,why)
+  history=assert(RW_PlanStages(s.world,{{name="first",plan=history},{name="second",plan={consumes_turn=true,changes=changes,id_allocation=allocation,back_conversions=conversions}}}))
+ end
+ history.back_frame={from=1,retain=true}
+ s,r=RW_Commit(s,history);assert(r.accepted,r.reason)
+ s,r=RW_Commit(s,{consumes_turn=true,changes={},back_frame={from=2,retain=true}});assert(r.accepted,r.reason)
+ local restored,p=step(s);local count=0
+ for _,u in pairs(restored.world.entities) do if u.archetype=="avatar" then count=count+1;assert(u.x==2 and u.y==2 and not u.weak_new) end end
+ assert(count==(scenario.repeated and 2 or copies) and stages(p).back<stages(p).weak,"restored WEAK must survive its birth turn")
+ if scenario.repeated then local allocated=false
+  for _,op in ipairs(p.stages[stages(p).back].plan.changes) do if op.kind=="create" and op.to.archetype=="avatar" then allocated=true end end
+  assert(allocated,"repeated restoration must exercise allocated birth grace")
+ end
+ local expired=step(restored)
+ for _,u in pairs(expired.world.entities) do assert(u.archetype~="avatar","WEAK birth grace must expire on next input") end
+ assert(RW_Undo(expired).world==restored.world and RW_Undo(restored).world==s.world)
+end
+print("PASS: BACK primary/duplicate restored WEAK contact grace, transient expiry and atomic Undo")

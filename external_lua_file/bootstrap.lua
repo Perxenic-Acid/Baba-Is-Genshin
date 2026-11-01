@@ -662,6 +662,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         for _,stage in ipairs(plan.stages) do
             for _,change in ipairs(stage.plan.changes) do
                 if (stage.name == "movement_destruction" or stage.name == "shift_destruction" or stage.name == "automatic_destruction" or stage.name == "fear_destruction" or stage.name == "fall_destruction" or stage.name == "more") and change.kind == "create" then weak_new[change.entity_id]=true
+                elseif stage.name == "back" and (change.kind=="back_restore" or change.kind=="create") then weak_new[change.entity_id]=true
                 elseif stage.name == "conversion" then weak_new[change.entity_id]=nil end
             end
         end
@@ -2360,7 +2361,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6Y initialized")
+    print("[RuleWorld] M9.6Z initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

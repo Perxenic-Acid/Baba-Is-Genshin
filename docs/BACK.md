@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6Y)
+# BACK infrastructure progress (M9.6Z)
 
 ## Installed primary references
 
@@ -371,10 +371,27 @@ conversions, ON source witnesses, WRITE/BECOME, recursive-query terminal prefixe
 saved clock reset and local/tree Undo. Separate-global tests verify the session
 count crosses Invoke into conversion initialization. Startup still runs no tests.
 
+## M9.6Z: restored WEAK birth grace
+
+Installed blocks.lua BACK restoration calls addunit(newunitid,true) around line
+685. syntax.lua addunit leaves unit.new=true, while convert.lua explicitly clears
+it for ordinary conversion products. blocks.lua's WEAK contact branch around
+1473 requires unit.new=false. Accordingly, BACK back_restore operations and
+allocated restoration create operations now enter the turn-local WEAK newborn
+set. This includes primary-ID reuse, separately restored duplicate branches and
+the cartesian allocated products of repeated conversions. This set is never
+saved on entities; next input removes the grace and Undo restores the complete
+pre-turn state. Other contact phases retain their ordinary behavior.
+
+Scheduler tests replay real conversion journals into overlapping WEAK sources,
+verify both reused and allocated identities survive restoration, then verify
+destruction on the next input and Undo in both directions. Public BACK remains
+pending; offline checks do not assert native acceptance.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
-word yet. Restored newborn WEAK grace, native paradox routing and synthetic
+word yet. Native paradox routing and synthetic
 LEVEL/EMPTY semantics remain
 explicit gaps, as do broader native phase-graph/conditional intra-phase differences.
 In particular, native moveblock() SHIFT alignment writes an update history row even

@@ -809,3 +809,12 @@ clear saved runtime clocks without creating an activation/history/input/RNG pass
 Added 648 installed reset/status oracle cases, scheduled lifecycle/terminal/Undo
 tests and isolated Invoke count propagation. Native SHIFT no-op history rows,
 restored WEAK grace, paradox and synthetic scope remain; BACK is still pending.
+
+## M9.6Z — BACK restoration WEAK grace
+
+Follow installed addunit(...,true) newborn handling: both back_restore and
+allocated restoration products skip WEAK contact for their restoration turn.
+Keep grace transient and preserve ordinary conversion behavior. Real-journal
+tests cover primary/duplicate/repeated conversions, allocated cartesian products,
+expiry on next input and Undo. Native SHIFT no-op history, paradox and synthetic
+scope remain; public BACK is still pending.

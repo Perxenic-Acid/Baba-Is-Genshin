@@ -655,3 +655,15 @@ earlier CRASH/terminal states remain authoritative. Preserved the project's
 conversion-before-WIN order. Added 49/50/51 pipeline and AUTO prefix/queue tests,
 plus six unchanged original dispatch branch cases. Native callback/WINTIMER timing
 remains deferred with the previously recorded integration gaps.
+
+
+## M9.6M — BACK operation-history prerequisite
+
+RW_Commit now records owned phase operation journals beside local world snapshots,
+including intra-turn net-zero motion, direction-only changes and lifecycle metadata.
+RW_GetTurnRecord exposes cloned age-indexed data. Commit/Undo/tree checks preserve
+alignment; rejection writes nothing, legacy frames stay unavailable, and the
+128-turn cap/boundary reload/whole-tree Undo keep both histories synchronized.
+An unchanged installed addundo() oracle verifies newest-first motion-row ordering.
+BACK itself remains pending: activation clocks, playback and native index mapping
+are not claimed by this prerequisite. See BACK.md for source details and limits.

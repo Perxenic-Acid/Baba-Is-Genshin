@@ -746,8 +746,50 @@ function RW_PreviewPlan(world, plan)
     return preview,reason,phase
 end
 
+-- Session-owned operation journals accompany world snapshots. Keep phase order:
+-- BACK consumes update/create/remove history, not just a final-state difference.
+local function valid_turn_records(records,count)
+    if records==nil then return true end
+    if not is_list(records) or #records~=count then return false end
+    for _,record in ipairs(records) do
+        if record~=false then
+            if type(record)~="table" or not is_list(record.phases) or #record.phases<1
+                or (record.reason~=nil and type(record.reason)~="string") then return false end
+            for _,phase in ipairs(record.phases) do
+                if type(phase)~="table" or not is_list(phase.changes)
+                    or (phase.name~=nil and type(phase.name)~="string") then return false end
+            end
+        end
+    end
+    return true
+end
+local function journal_phase(plan,name)
+    local phase={name=type(name)=="string" and name or nil,changes=clone(plan.changes)}
+    for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","infinite_loop","too_complex"}) do
+        if plan[key]~=nil then phase[key]=clone(plan[key]) end
+    end
+    return phase
+end
+local function journal_turn(plan)
+    local record={reason=type(plan.reason)=="string" and plan.reason or nil,phases={}}
+    if plan.stages then
+        for _,stage in ipairs(plan.stages) do record.phases[#record.phases+1]=journal_phase(stage.plan,stage.name) end
+    else record.phases[1]=journal_phase(plan) end
+    record.infinite_loop,record.too_complex=plan.infinite_loop,plan.too_complex
+    return record
+end
+function RW_GetTurnRecord(session,age)
+    if type(session)~="table" or not is_list(session.history)
+        or not valid_turn_records(session.turn_records,#session.history) then return nil,"invalid_turn_records" end
+    if not is_integer(age) or age<1 then return nil,"invalid_history_age" end
+    local record=session.turn_records and session.turn_records[#session.history-age+1]
+    if not record then return nil,"history_unavailable" end
+    return clone(record)
+end
+
 -- One final world, one history frame, even across multiple sequential phases.
 function RW_Commit(session, plan)
+    if not valid_turn_records(session.turn_records,#session.history) then return session,rejected("invalid_turn_records") end
     local preview, reason, changed, phase = preview_transaction(session.world,plan)
     if not preview then
         local result = rejected(reason)
@@ -756,24 +798,21 @@ function RW_Commit(session, plan)
     end
     local next_world = changed and preview or session.world
 
-    local history = {}
-
+    local history,records = {},{}
     for i = 1, #session.history do
         history[i] = session.history[i]
+        records[i]=session.turn_records and session.turn_records[i] or false
     end
-
-    if #history >= HISTORY_LIMIT then
-        table.remove(history, 1)
-    end
-
+    if #history >= HISTORY_LIMIT then table.remove(history,1);table.remove(records,1) end
     history[#history + 1] = session.world
+    records[#records+1]=journal_turn(plan)
 
     return {
         world = next_world,
         definition_id = session.definition_id,
         instance_id = session.instance_id,
         defeated = session.defeated,
-        history = history
+        history = history,turn_records=records
     }, {
         accepted = true,
         changed = changed,
@@ -802,6 +841,7 @@ function RW_StageTransactionSelfTest()
 end
 
 function RW_Undo(session)
+    if not valid_turn_records(session.turn_records,#session.history) then return session,rejected("invalid_turn_records") end
     local n = #session.history
 
     if n == 0 then
@@ -809,18 +849,20 @@ function RW_Undo(session)
     end
 
     local previous_world = session.history[n]
-    local history = {}
-
+    local history,records,known = {},{},false
     for i = 1, n - 1 do
         history[i] = session.history[i]
+        records[i]=session.turn_records and session.turn_records[i] or false
+        known=known or records[i]~=false
     end
+    if not known then records=nil end
 
     return {
         world = previous_world,
         definition_id = session.definition_id,
         instance_id = session.instance_id,
         defeated = session.defeated,
-        history = history
+        history = history,turn_records=records
     }, {
         accepted = true,
         changed = previous_world ~= session.world,
@@ -1398,6 +1440,7 @@ local function valid_tree_candidate(tree)
         if not sequence or not valid_id(sequence) or sequence >= tree.next_instance_id
             or type(session) ~= "table" or session.instance_id ~= id
             or not tree.definitions[session.definition_id] or not is_list(session.history)
+            or not valid_turn_records(session.turn_records,#session.history)
             or not validate_definition({id=session.definition_id,initial_world=session.world}) then return false end
     end
     local seen = {[tree.active_id]=true}

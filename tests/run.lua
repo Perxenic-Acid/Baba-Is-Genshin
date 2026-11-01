@@ -525,3 +525,5 @@ dofile("tests/revert.lua")
 dofile("tests/revert_level.lua")
 
 dofile("tests/level_conversion_limits.lua")
+
+dofile("tests/turn_records.lua")

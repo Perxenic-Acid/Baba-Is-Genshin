@@ -793,9 +793,69 @@ function RW_GetTurnRecord(session,age)
     return clone(record)
 end
 
+-- BACK has a native open-frame clock distinct from user-facing Undo turns.
+-- Explicit retain decisions come from the scheduler's native updateundo decision;
+-- metadata-only commands must not be guessed from world snapshot equality.
+local function valid_back_frames(session)
+    local count=session.back_frame_count
+    if count==nil then
+        for _,record in ipairs(session.turn_records or {}) do
+            if record and record.back_frame then return false end
+        end
+        return true
+    end
+    if not is_integer(count) or count<1 then return false end
+    local records=session.turn_records
+    if not records or #records==0 then return #session.history==0 end
+    local expected=count
+    for i=#records,1,-1 do
+        local frame=records[i] and records[i].back_frame
+        if not frame or not is_integer(frame.from) or frame.from<1
+            or type(frame.retain)~="boolean" or (frame.initial~=nil and frame.initial~=true)
+            or frame.from+(frame.retain and 1 or 0)~=expected then return false end
+        expected=frame.from
+        if frame.initial then return i==1 and expected==1 end
+    end
+    -- The beginning of this clock may have been evicted by the local history cap.
+    return true
+end
+
+function RW_GetBackFrame(session,index,current_plan)
+    if type(session)~="table" or not is_list(session.history)
+        or not valid_turn_records(session.turn_records,#session.history)
+        or not valid_back_frames(session) then return nil,"invalid_back_frames" end
+    if not is_integer(index) then return nil,"invalid_back_index" end
+    local count=session.back_frame_count
+    if count==nil then return nil,"back_history_unavailable" end
+    if index<1 or index>count then return nil,"back_frame_absent" end
+    if index==1 then
+        if type(current_plan)~="table" then return nil,"back_current_frame_unavailable" end
+        local preview,reason=preview_transaction(session.world,current_plan)
+        if not preview then return nil,reason end
+        return journal_turn(current_plan),clone(session.world)
+    end
+    local target=count-index+1
+    for i=#session.history,1,-1 do
+        local record=session.turn_records[i]
+        local frame=record and record.back_frame
+        if frame and frame.retain and frame.from==target then
+            return clone(record),clone(session.history[i])
+        end
+    end
+    return nil,"back_history_unavailable"
+end
+
 -- One final world, one history frame, even across multiple sequential phases.
 function RW_Commit(session, plan)
     if not valid_turn_records(session.turn_records,#session.history) then return session,rejected("invalid_turn_records") end
+    if not valid_back_frames(session) then return session,rejected("invalid_back_frames") end
+    local frame
+    if type(plan)=="table" then frame=plan.back_frame end
+    if frame~=nil then
+        if type(frame)~="table" or frame.from~=(session.back_frame_count or 1)
+            or type(frame.retain)~="boolean" or frame.initial~=nil
+            or (session.back_frame_count==nil and #session.history>0) then return session,rejected("invalid_back_frame") end
+    elseif session.back_frame_count~=nil then return session,rejected("missing_back_frame") end
     local preview, reason, changed, phase = preview_transaction(session.world,plan)
     if not preview then
         local result = rejected(reason)
@@ -812,13 +872,18 @@ function RW_Commit(session, plan)
     if #history >= HISTORY_LIMIT then table.remove(history,1);table.remove(records,1) end
     history[#history + 1] = session.world
     records[#records+1]=journal_turn(plan)
+    local back_count=session.back_frame_count
+    if frame then
+        records[#records].back_frame={from=frame.from,retain=frame.retain,initial=back_count==nil and true or nil}
+        back_count=frame.from+(frame.retain and 1 or 0)
+    end
 
     return {
         world = next_world,
         definition_id = session.definition_id,
         instance_id = session.instance_id,
         defeated = session.defeated,
-        history = history,turn_records=records
+        history = history,turn_records=records,back_frame_count=back_count
     }, {
         accepted = true,
         changed = changed,
@@ -848,6 +913,7 @@ end
 
 function RW_Undo(session)
     if not valid_turn_records(session.turn_records,#session.history) then return session,rejected("invalid_turn_records") end
+    if not valid_back_frames(session) then return session,rejected("invalid_back_frames") end
     local n = #session.history
 
     if n == 0 then
@@ -855,6 +921,11 @@ function RW_Undo(session)
     end
 
     local previous_world = session.history[n]
+    local back_count=session.back_frame_count
+    if back_count~=nil then
+        local frame=session.turn_records[n].back_frame
+        if frame.initial then back_count=nil else back_count=frame.from end
+    end
     local history,records,known = {},{},false
     for i = 1, n - 1 do
         history[i] = session.history[i]
@@ -868,7 +939,7 @@ function RW_Undo(session)
         definition_id = session.definition_id,
         instance_id = session.instance_id,
         defeated = session.defeated,
-        history = history,turn_records=records
+        history = history,turn_records=records,back_frame_count=back_count
     }, {
         accepted = true,
         changed = previous_world ~= session.world,
@@ -1447,6 +1518,7 @@ local function valid_tree_candidate(tree)
             or type(session) ~= "table" or session.instance_id ~= id
             or not tree.definitions[session.definition_id] or not is_list(session.history)
             or not valid_turn_records(session.turn_records,#session.history)
+            or not valid_back_frames(session)
             or not validate_definition({id=session.definition_id,initial_world=session.world}) then return false end
     end
     local seen = {[tree.active_id]=true}

@@ -688,3 +688,15 @@ installed status/index branch cases cover activation, loss, failed conditions,
 retained clocks and dead units. Preserve the absent nonpositive-frame case.
 Scheduler eligibility, native-count/journal mapping, pruning and lifecycle clock
 inheritance remain pending; public BACK remains unregistered. See BACK.md.
+
+
+## M9.6P — BACK native-frame mapping and historical motion selection
+
+Added opt-in atomic native open-frame counts and explicit retain/prune decisions
+beside user-facing command history. Native frame queries map current prefixes or
+retained operation journals and paired snapshots; capped/legacy history is explicitly
+unavailable, never silently retargeted. Added per-identity clock-driven motion
+selection, absent-frame retention and transient scheduler hints. 1,260 unchanged
+installed newundo() oracle queries plus staged playback, rejection, cap, local/tree
+Undo and boundary tests pass. Public registration, production retain decisions,
+status timing and lifecycle playback remain pending; see BACK.md.

@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6O)
+# BACK infrastructure progress (M9.6P)
 
 ## Installed primary references
 
@@ -78,13 +78,40 @@ These primitives do not infer native counts from capped history, prune waits,
 query BACK rules, or register/schedule BACK. Lifecycle clock inheritance remains
 part of conversion playback work. No normal-startup pass has been added.
 
+## Native-frame ledger and motion selection
+
+Opt-in top-level plan.back_frame={from=count,retain=boolean} separates the native
+open-frame clock from user-facing Undo commands. Each journal records its decision;
+session.back_frame_count advances only for retained frames. The explicit decision
+must come from scheduler updateundo semantics, not snapshot equality: an empty
+retained frame occupies a slot, while a pruned accepted command remains user-undoable.
+Missing/stale decisions reject atomically once this ledger is enabled. It can start
+only on a fresh local history, never silently reinterpret legacy snapshots.
+
+RW_GetBackFrame maps native index 1 to a validated current phase prefix, and older
+indices to retained journal/snapshot pairs. It returns owned data and distinguishes
+absent indices from evicted/unavailable history. Absolute counts survive the 128-turn
+cap; eviction does not retarget a clock. Local Undo restores each preceding command's
+count/decision; whole-tree Undo and boundaries restore/reset the complete session.
+A capped empty session keeps its absolute clock without inventing missing frames.
+
+RW_PlanBackHistoryMotion selects frames independently for eligible identities using
+their intrinsic clocks, then invokes the motion primitive. It handles current/past
+updates, absent-frame retention and paradox marks, returning transient back_retain
+for the future scheduler. Unavailable or lifecycle history fails explicitly.
+
+An unchanged installed newundo() oracle checks 1,260 queries through 180 retained/
+pruned commands, including cap eviction. Tests also cover current/past atomic phase
+playback, ownership, stale/late rejection, local/tree Undo, sibling isolation and
+boundary reset. Native retain decisions/rule eligibility are supplied explicitly;
+production turns do not enable this ledger or schedule BACK yet.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
-word yet. Automatic activation/status timing and native current/open-frame mapping
-to this engine's retained journals,
-automatic per-unit history selection and conversion playback, born/dead handling,
+word yet. Automatic activation/status timing, scheduler retain decisions and
+conversion playback, born/dead handling,
 TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
-still need implementation and source-oracle verification. Native unchanged-turn
-pruning and history beyond this engine's existing 128-turn window remain explicit
-integration limits. Do not treat the journal infrastructure as completed BACK.
+still need implementation and source-oracle verification. Exact production
+updateundo/pruning decisions and history beyond this engine's existing 128-turn
+window remain explicit integration limits. Do not treat the journal infrastructure as completed BACK.

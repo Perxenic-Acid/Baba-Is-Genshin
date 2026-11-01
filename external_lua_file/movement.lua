@@ -1690,3 +1690,36 @@ function RW_PlanBackStatus(world,eligible,frame_count)
     end
     return {consumes_turn=true,changes=changes,reason="back_status"}
 end
+
+
+-- Select per-unit BACK frames from the native-clock ledger and the current
+-- pre-BACK phase prefix. Eligibility and status refresh are supplied by the caller.
+function RW_PlanBackHistoryMotion(session,current_plan,eligible,paradox)
+    if type(session)~="table" or type(eligible)~="table" then return nil,"invalid_back_selection" end
+    local count=session.back_frame_count
+    if count==nil then return nil,"back_history_unavailable" end
+    local world,reason=RW_PreviewPlan(session.world,current_plan)
+    if not world then return nil,reason end
+    local ids={}
+    for id,value in pairs(eligible) do
+        if value~=true or not world.entities[id] then return nil,"invalid_back_identity" end
+        ids[#ids+1]=id
+    end
+    table.sort(ids)
+    local selections,retain={},false
+    for _,id in ipairs(ids) do
+        local index,why=RW_BackFrameIndex(world.entities[id].back_init or 0,count,false)
+        if index~=nil then
+            retain=true
+            local record,before=RW_GetBackFrame(session,index,current_plan)
+            if record then
+                if not before.entities[id] then return nil,"back_conversion_history_pending" end
+                selections[#selections+1]={entity_id=id,before=before.entities[id],record=record}
+            elseif before~="back_frame_absent" then return nil,before end
+        elseif why~="back_inactive" then return nil,why end
+    end
+    local plan,why=RW_PlanBackMotion(world,selections,paradox)
+    if not plan then return nil,why end
+    plan.back_retain=retain
+    return plan
+end

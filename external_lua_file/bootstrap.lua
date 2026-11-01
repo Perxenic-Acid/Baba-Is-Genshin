@@ -193,8 +193,33 @@ local function valid_turn_action(action)
     return action.type=="move" and ((action.dx==1 or action.dx==-1) and action.dy==0
         or (action.dy==1 or action.dy==-1) and action.dx==0)
 end
-local function plan_turn(world, action, services, initial_frame)
+local function back_eligible(world,effects)
+    local eligible,denied={},{}
+    for _,effect in ipairs(effects or {}) do if effect.trait=="back" then
+        for _,id in ipairs(effect.entity_ids or {}) do if world.entities[id] then
+            if effect.op=="grant_trait" then eligible[id]=true
+            elseif effect.op=="deny_trait" then denied[id]=true end
+        end end
+    end end
+    for id in pairs(denied) do eligible[id]=nil end
+    return eligible
+end
+
+-- Keep before-input status/input metadata in current-frame BACK history without
+-- flattening the core planner's sequential phase preconditions.
+local function prepend_turn(plan,before)
+    local result={};for key,value in pairs(plan) do result[key]=value end
+    result.stages={};result.changes={}
+    for _,stage in ipairs(before) do result.stages[#result.stages+1]=stage end
+    if plan.stages then for _,stage in ipairs(plan.stages) do result.stages[#result.stages+1]=stage end
+    else result.stages[#result.stages+1]={name="movement",plan=plan} end
+    for _,stage in ipairs(result.stages) do for _,op in ipairs(stage.plan.changes) do result.changes[#result.changes+1]=op end end
+    return result
+end
+
+local function plan_turn(world, action, services, initial_frame,back_context)
     local trace = {}
+    local tele_suppressed
     if type(world) == "table" and world.infinite_loop then return nil,{stage="input",reason="infinite_loop_undo_only"} end
     if type(world) == "table" and world.too_complex then return nil,{stage="input",reason="too_complex_undo_only"} end
     local function fail(stage, reason, phase)
@@ -378,7 +403,7 @@ local function plan_turn(world, action, services, initial_frame)
         lock_compile_failure(plan,conversion_terminal);return plan,nil,trace
     end
     local more_frame
-    if services.more or services.fall or services.follow or services.done or (services.status and reading_changed(preview,operations,post_rules)) then
+    if back_context or services.more or services.fall or services.follow or services.done or (services.status and reading_changed(preview,operations,post_rules)) then
         local effects,why,relations,rules,code_status=services.evaluate(complete)
         if not effects then
             if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
@@ -419,6 +444,35 @@ local function plan_turn(world, action, services, initial_frame)
                 end
             end
         end
+        end
+        if back_context then
+            local eligible=back_eligible(complete,effects)
+            if next(eligible)~=nil then
+            local prefix=prepend_turn(plan,back_context.before)
+            local playback,why=services.back_history(back_context.session,prefix,eligible)
+            if not playback then return fail("back",why) end
+            local prior=complete
+            local next_world,why=services.preview(complete,playback)
+            if not next_world then return fail("back_preview",why) end
+            plan.stages[#plan.stages+1]={name="back",plan=playback}
+            for _,change in ipairs(playback.changes) do plan.changes[#plan.changes+1]=change end
+            back_context.retain=playback.back_retain
+            tele_suppressed=playback.tele_suppressed
+            complete=next_world;trace[#trace+1]="back"
+            if #playback.changes>0 then
+                effects,why,relations,rules,code_status=services.evaluate(complete)
+                if not effects then return after_failure(plan,"back_rules",why) end
+                if code_status and #code_status.changes>0 and reading_changed(prior,playback.changes,rules) then
+                    local updated,why=services.preview(complete,code_status)
+                    if not updated then return fail("code_status_after_back",why) end
+                    plan.stages[#plan.stages+1]={name="code_status_after_back",plan=code_status}
+                    for _,change in ipairs(code_status.changes) do plan.changes[#plan.changes+1]=change end
+                    complete=updated;trace[#trace+1]="code_status_after_back"
+                    effects,why,relations,rules=services.evaluate(complete)
+                    if not effects then return after_failure(plan,"back_status_rules",why) end
+                end
+            end
+            end
         end
         local has_fall=false
         if services.fall then for _,effect in ipairs(effects) do
@@ -530,7 +584,12 @@ local function plan_turn(world, action, services, initial_frame)
         if active then
             local projected,why=services.project(complete,frame.effects,level_traits_from(frame.relations))
             if not projected then return fail("tele_project",why) end
-            local tele,why=services.tele(projected);if not tele then return fail("tele",why) end
+            local surviving_marks
+            if tele_suppressed then
+                surviving_marks={}
+                for id in pairs(tele_suppressed) do if complete.entities[id] then surviving_marks[id]=true end end
+            end
+            local tele,why=services.tele(projected,surviving_marks);if not tele then return fail("tele",why) end
             local after,why=services.preview(complete,tele);if not after then return fail("tele_preview",why) end
             plan.stages[#plan.stages+1]={name="tele",plan=tele}
             for _,change in ipairs(tele.changes) do plan.changes[#plan.changes+1]=change end
@@ -656,7 +715,7 @@ local function plan_turn(world, action, services, initial_frame)
                 local converted={}
                 for id in pairs(converted_ids or {}) do converted[id]=true end
                 for _,stage in ipairs(plan.stages) do for _,change in ipairs(stage.plan.changes) do
-                    if change.kind=="create" or change.kind=="transform" or change.kind=="retype" then converted[change.entity_id]=true end
+                    if change.kind=="create" or change.kind=="transform" or change.kind=="retype" or change.kind=="back_restore" then converted[change.entity_id]=true end
                 end end
                 local creation,why=services.make(complete,frozen_relations,converted,frozen_rules)
                 if not creation then return fail("make",why) end
@@ -820,14 +879,30 @@ end
 -- Whole-tree transaction planner: navigation, outcomes and movement share one Undo.
 -- Input conditions see this command before movement. Persist it only through
 -- the first atomic phase, so rejection and whole-tree Undo restore prior input.
-function RW_PlanTurn(world,action,services)
+function RW_PlanTurn(world,action,services,session)
     if type(world)~="table" or not valid_turn_action(action) then
         return plan_turn(world,action,services)
     end
     local context={};for k,v in pairs(world) do context[k]=v end
     context.last_input=turn_input_type(action)
     context.chance_seed=((world.chance_seed or 1)*48271)%2147483647
-    local status,initial_frame
+    local status,initial_frame,back_context
+    if session and type(services)=="table" and services.back_history and not world.infinite_loop and not world.too_complex then
+        if type(session)~="table" or session.world~=world or type(session.history)~="table" then return nil,{stage="back_session",reason="invalid_back_session"} end
+        if type(services.back_history)~="function" or type(services.back_status)~="function" or type(services.back_retain)~="function" then
+            return nil,{stage="back_session",reason="missing_back_services"}
+        end
+        for _,name in ipairs({"evaluate","project","resolve","preview","convert"}) do
+            if type(services[name])~="function" then return nil,{stage="input",reason="missing_service_"..name} end
+        end
+        if session.back_frame_count==nil and #session.history>0 then return nil,{stage="back_session",reason="back_history_unavailable"} end
+        if session.back_frame_count~=nil and (type(session.back_frame_count)~="number" or session.back_frame_count%1~=0 or session.back_frame_count<1) then
+            return nil,{stage="back_session",reason="invalid_back_clock"}
+        end
+        local owned={};for k,v in pairs(session) do owned[k]=v end
+        owned.back_frame_count=session.back_frame_count or 1
+        back_context={session=owned,before={}}
+    end
     if not world.infinite_loop and not world.too_complex and type(services)=="table"
         and type(services.status)=="function" and type(services.evaluate)=="function" and type(services.preview)=="function" then
         initial_frame={services.evaluate(context)}
@@ -842,9 +917,37 @@ function RW_PlanTurn(world,action,services)
             else status=nil end
         end
     end
-    local plan,err,trace=plan_turn(context,action,services,initial_frame)
+    if back_context then
+        if status then back_context.before[#back_context.before+1]={name="status_before",plan=status} end
+        if not initial_frame then initial_frame={services.evaluate(context)} end
+        local clock={consumes_turn=true,changes={}}
+        if initial_frame[1] then
+            local why;clock,why=services.back_status(context,back_eligible(context,initial_frame[1]),back_context.session.back_frame_count)
+            if not clock then return nil,{stage="back_status_before",reason=why} end
+            if #clock.changes>0 then
+                local updated,why=services.preview(context,clock)
+                if not updated then return nil,{stage="back_status_before_preview",reason=why} end
+                context=updated
+            end
+        end
+        back_context.before[#back_context.before+1]={name="back_status_before",plan=clock}
+        local first=back_context.before[1].plan
+        if world.last_input~=turn_input_type(action) then first.input_state={from=world.last_input or "none",to=turn_input_type(action)} end
+        first.chance_state={from=world.chance_seed or 1,to=context.chance_seed}
+    end
+    local plan,err,trace=plan_turn(context,action,services,initial_frame,back_context)
     if plan and plan.consumes_turn then
-        if status then
+        if back_context then
+            plan=prepend_turn(plan,back_context.before)
+            local retain,why,verified=services.back_retain(world,plan,back_context.retain or false)
+            if retain==nil then return nil,{stage="back_retain",reason=why} end
+            plan.back_frame={from=back_context.session.back_frame_count,retain=retain}
+            if not verified then
+                local phase;verified,why,phase=services.preview(world,plan)
+                if not verified then return nil,{stage="back_complete",reason=why,phase=phase} end
+            end
+            return plan,nil,trace
+        elseif status then
             local stages={{name="status_before",plan=status}}
             if plan.stages then for _,stage in ipairs(plan.stages) do stages[#stages+1]=stage end
             else
@@ -933,7 +1036,7 @@ function RW_PlanLevelAction(tree, action, services)
     local effects, err, initial_conversions = services.evaluate(input_world)
     if not effects then
         if valid_turn_action(action) and (err=="word_rule_limit" or err=="word_rule_cycle" or err=="rule_complexity_limit") then
-            local turn,why=RW_PlanTurn(session.world,action,services)
+            local turn,why=RW_PlanTurn(session.world,action,services,session)
             if not turn then return nil,why end
             if turn.infinite_loop or turn.too_complex then
                 local completed,accepted=services.commit_session(session,turn)
@@ -1006,7 +1109,7 @@ function RW_PlanLevelAction(tree, action, services)
         if not next_tree then return fail(reason) end
         return {before=tree,after=next_tree,reason="confirm_level",changes={},select_after_defeat=select_after_defeat}
     end
-    local turn, planning_error = RW_PlanTurn(session.world,action,services)
+    local turn, planning_error = RW_PlanTurn(session.world,action,services,session)
     if not turn then return nil, planning_error end
     if not turn.consumes_turn then return fail(turn.reason) end
     -- dolevelconversions() rejects 50 or more selected ordinary products.
@@ -1645,6 +1748,7 @@ local function start(run_self_tests)
     turn_services.back_history=function(session,prefix,eligible,paradox)
         return movement_api:Invoke("RW_PlanBackHistoryMotion",session,prefix,eligible,paradox,back_services)
     end
+    turn_services.back_retain=function(world,plan,active) return world_api:Invoke("RW_BackRetainDecision",world,plan,active) end
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
     turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
@@ -2251,7 +2355,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6W initialized")
+    print("[RuleWorld] M9.6X initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

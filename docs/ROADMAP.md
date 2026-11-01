@@ -783,3 +783,16 @@ Lua environments verify status, native clocks, historical/current playback,
 branches/repeated conversions, aliases, TELE handoff, diagnostics and Commit/Undo.
 This fixes the host boundary before production scheduling; public BACK activation,
 retain decisions, birth clocks and reading barriers remain pending.
+
+## M9.6X — session-aware BACK production scheduler
+
+Production level actions now supply the active session to RW_PlanTurn. Keep a
+native retained-frame ledger separate from user Undo commands; refresh BACK clocks
+after before-input BROKEN status and replay after FOLLOW. Include status/input/RNG
+prefixes in current-frame history without flattening phases. Route transient tags
+to TELE, discard tags of retired riders, and apply the post-BACK Text/WORD code-status
+barrier. Compile limits commit the triggering board; errors reject atomically.
+Added 392 installed retention/pruning oracle cases plus compiler/session tests for
+conditions, current/past frames, FOLLOW/TELE, reading barriers, terminal states,
+replay and local/tree/boundary Undo. Boot/birth/conversion clocks, restored newborn
+status/grace, paradox and synthetic scope remain; public BACK stays pending.

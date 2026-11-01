@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6W)
+# BACK infrastructure progress (M9.6X)
 
 ## Installed primary references
 
@@ -104,7 +104,8 @@ An unchanged installed newundo() oracle checks 1,260 queries through 180 retaine
 pruned commands, including cap eviction. Tests also cover current/past atomic phase
 playback, ownership, stale/late rejection, local/tree Undo, sibling isolation and
 boundary reset. Native retain decisions/rule eligibility are supplied explicitly;
-production turns do not enable this ledger or schedule BACK yet.
+M9.6X's session-aware scheduler below now supplies these decisions for production
+turns; direct world-only diagnostic calls still leave the ledger opt-in.
 
 ## Primary conversion restoration
 
@@ -129,8 +130,8 @@ The older selected-entity RW_PlanBackPlayback helper still reports allocated
 branches/repeated rows as pending; full-frame playback below supersedes that limit. The native source can be restored more than once with the same logical ID from
 multiple branches. Full-frame playback below now tracks those identities explicitly;
 do not guess provenance from noun or original_name.
-Native host disposal details and mixed queued-update disposal are not covered by
-the isolated branch oracle; current behavior preserves distinct old/new handles.
+Native host disposal details are not covered by the isolated branch oracle itself;
+M9.6U separately checked delunit() invalidating queued actions on retired handles.
 No public BACK registration or production scheduling is enabled.
 
 ## Ordered conversion source journals
@@ -246,7 +247,8 @@ TELE now follows runtime unit-list order for sources, riders and destination cho
 The installed TELE loop passes 6,144 cases across suppression/order/network variants.
 Sequential BACK then TELE Commit/Undo tests cover the handoff, replacement and
 failure purity. This closes the solver handoff; production BACK scheduler placement
-and transient-set routing remain pending, rather than exposing a partial public word.
+and transient-set routing are integrated by the session scheduler below. Public
+BACK registration still waits for initialization/lifecycle timing.
 
 ## Isolated mapped-script services
 
@@ -258,8 +260,8 @@ omission retains combined-module compatibility for offline callers. Missing or
 invalid services fail with a diagnostic instead of a nil global call.
 
 Bootstrap supplies Invoke adapters in turn_services.back_history/back_status;
-its TELE adapter also forwards the transient suppression set. These are service
-bindings only: they do not schedule BACK or enable the public word yet.
+its TELE adapter also forwards the transient suppression set. The session scheduler
+below consumes these bindings; they do not enable the public word yet.
 
 An isolated-host test loads world, movement and properties into separate global
 tables with only standard Lua libraries. It exercises activation clocks, current
@@ -268,11 +270,66 @@ playback, shared identities, TELE handoff, Commit/Undo and missing/failing servi
 diagnostics. It explicitly verifies movement has no world globals and compares
 results with the combined-module reference path. No native success is inferred.
 
+## Session-aware production scheduling
+
+RW_PlanTurn(world, action, services, session) uses session-owned BACK history when
+the BACK services are supplied. Production RW_PlanLevelAction passes the active
+session, including its initial compile-limit path. Ordinary world-only diagnostic
+calls keep their existing contract. A fresh session starts an open native count of
+one. Legacy local history without a ledger is explicitly unavailable; it is never
+silently reinterpreted. Confirm/navigation stays separate and boundary reload resets
+the ledger; whole-tree Undo restores it.
+
+Before input movement, BROKEN refresh runs first. BACK eligibility then comes from
+current rule effects, including per-identity conditions, NOT denial and the command's
+IDLE/chance state. Apply clock changes atomically with input/RNG metadata. The current
+BACK frame includes this prefix plus movement/conversion/FOLLOW phases, retaining
+their previous-phase preconditions. Clock changes do not require recompilation.
+
+After FOLLOW and before the existing FALL/DONE/MORE/TELE phases, surviving real
+eligible identities select historical frames and replay them. An empty eligibility
+set skips playback. This preserves the project's existing broader phase boundaries;
+it does not claim complete native phase-graph parity. BACK's temporary retain/tag
+results feed the session ledger and TELE only. Filter tags of riders deleted before
+TELE (for example DONE), without inheriting tags on new products. Restored instances
+also count as current-turn conversions for late MAKE occupancy.
+
+Recompile after BACK changes. If physical/WORD reading changed, apply compiler
+code_status once at that barrier before later phases, then re-evaluate. Compile
+limits retain the triggering BACK board/clock phases and enter only-Undo lockout.
+Ordinary failures reject clocks, input, RNG, movement and history together.
+
+RW_BackRetainDecision validates the complete staged plan and classifies native-style
+updateundo effects. Real displacement/direction changes, lifetime actions, conversion
+events and explicit map updates retain frames, including net-zero movement cycles.
+BACK eligibility can retain an otherwise empty frame, even for an absent negative
+target index. Memory/status/input/RNG-only changes do not retain a native frame,
+but remain user-undoable commands. The helper returns its validated preview as a
+third result so the scheduler need not repeat a full preview. Terminal/bonus actions
+also retain. Structural host actions are mapped to retaining gameplay actions;
+their opaque MF_* implementation is not claimed as an unchanged-source oracle.
+
+392 installed update/updatedir/BACK/newundo cases check changed/no-op motion and
+facing, eligibility/absence/dead gates and frame pruning. Further tests cover metadata
+pruning, net-zero phases and late validation. Real compiler/session tests cover
+activation/retraction, current/old frame selection, expiry, NOT/ON/BROKEN/IDLE,
+FOLLOW memory, TELE/RNG and retired tags, Text status barriers, terminal triggering,
+legacy/error purity, replay, local/tree Undo and boundary reset. Routine real-device
+acceptance remains waived; offline success is not native acceptance.
+
+The separate-global host test now also runs the complete compiler/status/session
+planner across Invoke adapters, including BACK/TELE, native counts, RNG and Undo.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
-word yet. Automatic activation/status timing, scheduler retain decisions and
-production status/birth timing, TELE-suppression routing, status/reading barriers and synthetic LEVEL/EMPTY semantics
-still need implementation and source-oracle verification. Exact production
-updateundo/pruning decisions and history beyond this engine's existing 128-turn
-window remain explicit integration limits. Do not treat the journal infrastructure as completed BACK.
+word yet. Boot/boundary initialization and native addunit birth/conversion clock
+timing still need implementation and source-oracle verification. Restored newborn
+status/grace, native paradox routing and synthetic LEVEL/EMPTY semantics remain
+explicit gaps, as do broader native phase-graph/conditional intra-phase differences.
+In particular, native moveblock() SHIFT alignment writes an update history row even
+when facing is unchanged; the current effective-change journal omits such no-op
+rows. Their BACK/TELE consequences still need explicit history metadata.
+Opaque host lifetime updateundo behavior and history beyond this engine's existing
+128-turn window remain integration limits. Do not treat the current session
+scheduler as completed public BACK.

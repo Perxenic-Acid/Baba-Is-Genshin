@@ -101,3 +101,39 @@ local failed=copy(api);failed.rows=function() return nil,"isolated_row_failure" 
 p,why=movement:Invoke("RW_PlanBackHistoryMotion",s,prefix,{[1]=true},nil,failed)
 assert(not p and why=="isolated_row_failure" and s.world.entities[1].x==2 and s.back_frame_count==2)
 print("PASS: isolated mapped BACK clock/history/current-frame/branch/repeated/legacy playback, explicit world services, TELE handoff, failure propagation and Undo")
+
+-- Run the complete session-aware planner with the same script isolation and
+-- Invoke boundaries, rather than only composing individual solver calls.
+local bootstrap,reader,grammar,rules=isolated("bootstrap"),isolated("reader"),isolated("grammar"),isolated("rules")
+local compile={read=function(...) return reader:Invoke("RW_ReadLines",...) end,
+ parse=function(...) return grammar:Invoke("RW_ParseRuleAST",...) end,
+ lower=function(...) return rules:Invoke("RW_LowerRuleAST",...) end,
+ evaluate=function(...) return rules:Invoke("RW_EvaluateRules",...) end,
+ project=function(...) return properties:Invoke("RW_ProjectWorld",...) end,
+ words=function(...) return rules:Invoke("RW_WordTokenMap",...) end,
+ code_status=function(...) return rules:Invoke("RW_PlanCodeStatus",...) end}
+local scheduled={project=compile.project,preview=api.preview,
+ status=function(...) return rules:Invoke("RW_PlanRuleStatus",...) end,
+ resolve=function(...) return movement:Invoke("RW_ResolveTurn",...) end,
+ convert=function(...) return rules:Invoke("RW_PlanConversions",...) end,
+ tele=function(...) return movement:Invoke("RW_ResolveTele",...) end,
+ back_status=function(...) return movement:Invoke("RW_PlanBackStatus",...) end,
+ back_history=function(s,p,e,guard) return movement:Invoke("RW_PlanBackHistoryMotion",s,p,e,guard,api) end,
+ back_retain=function(...) return world:Invoke("RW_BackRetainDecision",...) end,
+ evaluate=function(w)
+  local f,e=bootstrap:Invoke("RW_CompileWorld",w,compile);if not f then return nil,e.reason end
+  return f.effects,nil,f.relations,f.rules,f.code_status
+ end}
+s=fixture();s.world.entities[1].back_init=1
+s.world.rule_sources[#s.world.rule_sources+1]={when={op="always"},effects={
+ {op="grant_trait",target={kind="archetype",value="avatar"},trait="you"},
+ {op="grant_trait",target={kind="archetype",value="avatar"},trait="back"},
+ {op="grant_trait",target={kind="archetype",value="rock"},trait="tele"}}}
+local plan,e=bootstrap:Invoke("RW_PlanTurn",s.world,{type="move",dx=1,dy=0},scheduled,s);assert(plan,e and e.reason)
+local n=commit(s,plan)
+assert(n.world.entities[1].x==2 and not n.world.random_state and n.back_frame_count==2)
+plan,e=bootstrap:Invoke("RW_PlanTurn",n.world,{type="wait"},scheduled,n);assert(plan,e and e.reason)
+local transported=commit(n,plan)
+assert(transported.world.entities[1].x==8 and transported.world.random_state and transported.back_frame_count==3)
+assert(world:Invoke("RW_Undo",transported).world==n.world and world:Invoke("RW_Undo",n).world==s.world)
+print("PASS: fully isolated compiler/status/session scheduler, current-frame BACK, transient TELE routing, retained-frame clock, RNG and atomic Undo")

@@ -547,3 +547,7 @@ dofile("tests/unit_order.lua")
 dofile("tests/back_tele.lua")
 
 dofile("tests/back_isolation.lua")
+
+dofile("tests/back_scheduler.lua")
+
+dofile("tests/back_retention.lua")

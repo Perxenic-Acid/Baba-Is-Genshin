@@ -890,6 +890,33 @@ function RW_PreviewPlan(world, plan)
     return preview,reason,phase
 end
 
+-- Native newundo() retains updateundo frames, not merely different snapshots.
+-- Status/memory/input/RNG rows alone do not set that flag. Physical replacement,
+-- destruction/creation and LEVEL/cursor updates are gameplay lifetime actions.
+function RW_BackRetainDecision(world,plan,active)
+    if active~=nil and type(active)~="boolean" then return nil,"invalid_back_retain" end
+    local valid,why=preview_transaction(world,plan)
+    if not valid then return nil,why end
+    local function decision(value) return value,nil,valid end
+    if active or plan.infinite_loop or plan.too_complex then return decision(true) end
+    local phases=plan.stages or {{plan=plan}}
+    for _,stage in ipairs(phases) do local phase=stage.plan
+        if phase.board_shift or (phase.bonus_state and phase.bonus_state.to~=phase.bonus_state.from) then return decision(true) end
+        for _,event in ipairs(phase.back_conversions or {}) do
+            if event.removed or #event.product_ids>0 then return decision(true) end
+        end
+        for _,op in ipairs(phase.changes) do
+            if op.kind=="create" or op.kind=="delete" or op.kind=="transform" or op.kind=="retype" or op.kind=="back_restore" then return decision(true)
+            elseif op.kind=="direction" and op.from~=op.to then return decision(true)
+            elseif op.kind=="move" then
+                local direction=op.from.direction or (world.entities[op.entity_id] or {}).direction or "None"
+                if op.from.x~=op.to.x or op.from.y~=op.to.y or (op.to.direction and op.to.direction~=direction) then return decision(true) end
+            end
+        end
+    end
+    return decision(false)
+end
+
 -- Session-owned operation journals accompany world snapshots. Keep phase order:
 -- BACK consumes update/create/remove history, not just a final-state difference.
 local function valid_turn_records(records,count)

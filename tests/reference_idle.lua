@@ -6,7 +6,7 @@ local env=setmetatable({},{__index=_G})
 local original=assert(load('return {'..source:sub(a,b-1)..'}','@original_idle','t',env))().idle
 local count=0
 for _,input in ipairs({'none','move','wait'}) do for _,negated in ipairs({false,true}) do
- for _,class in ipairs({'object','text','empty'}) do
+ for _,class in ipairs({'object','text','empty','level'}) do
   local w=RW_CreateSession().world;w.last_input=input
   env.last_key=input=='wait' and 4 or 0
   local expected=original({},{});if negated then expected=not expected end
@@ -15,4 +15,4 @@ for _,input in ipairs({'none','move','wait'}) do for _,negated in ipairs({false,
   assert(actual==expected);count=count+1
  end
 end end
-print('PASS: installed IDLE input/NOT/Object/Text/EMPTY ('..count..' cases)')
+print('PASS: installed IDLE input/NOT/Object/Text/EMPTY/LEVEL ('..count..' cases)')

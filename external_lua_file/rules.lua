@@ -2078,6 +2078,22 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         bans[key][target][#bans[key][target]+1]=query_clone(condition)
     end
     local function append(list,items) for _,item in ipairs(items) do list[#list+1]=item end end
+    local function input_prefixes(node)
+        if type(node)~="table" then return false end
+        if node.op=="always" then return true end
+        if node.op=="not" then return input_prefixes(node.condition) end
+        if node.op=="all" then
+            if not dense_list(node.terms) then return false end
+            for _,term in ipairs(node.terms) do if not input_prefixes(term) then return false end end
+            return true
+        end
+        if node.op~="spatial" or not dense_list(node.clauses) then return false end
+        for _,clause in ipairs(node.clauses) do
+            if clause.relation~="idle" and clause.relation~="often" and clause.relation~="seldom" then return false end
+        end
+        for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
+        return true
+    end
     for _,ast in ipairs(ast_rules) do
         if type(ast) ~= "table" or type(ast.when) ~= "table" then return nil,"invalid_ast_rule" end
         local subj,subnot=unwrap(ast.subject)
@@ -2111,7 +2127,26 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local key=subject_key(subject)
             local special=key == "@text" or key == "@empty"
             local has_start=#relations+1
-            if sem and key and sem.noun=="play" and obj.tag=="note" and type(obj.name)=="string"
+            if subject.tag=="noun" and subject.type and subject.type.tag=="level"
+                and ast.when.op~="always" and input_prefixes(ast.when) then
+                local enabled,why=RW_TestEntityCondition(world,ast.when,
+                    {id=0,class="level",archetype=subject.type.block_type or "level_block",x=0,y=0,direction="None"})
+                if enabled==nil then return nil,why end
+                local unconditional=query_clone(rule);unconditional.when={op="always"}
+                local g,d,r=lower_simple({unconditional},registry,world)
+                if not g then return nil,d end
+                for _,generated_rule in ipairs(g) do generated_rule.when=query_clone(ast.when) end
+                append(generated,g)
+                for _,relation in ipairs(r) do
+                    local scoped=relation.op=="level_trait" or relation.op=="deny_level_trait"
+                        or relation.op=="transform_level" or relation.op=="protect_level"
+                        or relation.op=="become_level" or relation.op=="forbid_become_level" or relation.op=="destroy_level"
+                    if scoped then
+                        if enabled then relations[#relations+1]=relation end
+                    else relation.when=query_clone(ast.when);relations[#relations+1]=relation end
+                end
+                supported=supported or #d==0
+            elseif sem and key and sem.noun=="play" and obj.tag=="note" and type(obj.name)=="string"
                 and (ast.when.op=="always" or ast.when.op=="spatial") then
                 if objnot then add_ban(play_bans,ast.verb,key,obj.name,ast.when)
                 else relations[#relations+1]={op="play",source_type=key,note=obj.name,when=query_clone(ast.when),verb=ast.verb} end

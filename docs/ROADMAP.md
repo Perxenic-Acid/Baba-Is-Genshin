@@ -935,3 +935,13 @@ conversion/revert requests and the existing boundary reset. Scope BROKEN and
 prior-DEFEAT SELECT authorization remain effective. Compiler/tree/rollback tests
 and installed total-delete/error-selection oracles cover the change; exact native
 callback timing and conditional scoped surroundings stay documented gaps.
+
+## M9.7L — scoped LEVEL input/chance prefixes
+
+Introduce a shared scoped condition path for IDLE/OFTEN/SELDOM and their logical
+combinations. Keep the synthetic map identity separate from physical level blocks
+and preserve their original per-identity conditions, activation and pure chance
+state. Existing scoped BROKEN, conversion/protection/outcome/destroy transactions
+consume the selected commands unchanged. Tests cover real compiler/tree actions,
+64 pure chance plans and expanded installed prefix oracles. Parent spatial/query
+conditions remain explicitly deferred; see LEVEL_CONDITIONS.md.

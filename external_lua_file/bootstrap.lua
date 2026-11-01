@@ -346,7 +346,9 @@ local function plan_turn(world, action, services, initial_frame)
     level_traits=level_traits_from(conversions)
     local target_type
     if not protected then
-        if #level_targets == 1 then target_type=level_targets[1]
+        local reverting=false;for _,trait in ipairs(level_traits) do if trait=="revert" then reverting=true;break end end
+        if reverting then target_type="@revert"
+        elseif #level_targets == 1 then target_type=level_targets[1]
         elseif #level_targets > 1 then target_type=level_targets end
     end
     local operations, conversion_error, allocation, converted_ids, conversion_terminal = services.convert(preview, entity_conversions, post_rules)
@@ -1039,7 +1041,7 @@ function RW_PlanLevelAction(tree, action, services)
         local contact=turn.end_contact
         if contact.source.kind=="level" or contact.target.kind=="level" then turn.end_contact=nil end
     end
-    local outcome = turn.level_transform and "transform" or level_outcome
+    local outcome = turn.level_transform and (turn.level_transform=="@revert" and "revert" or "transform") or level_outcome
         or ((turn.end_contact or turn.done_win or turn.bonus_win_contact or services.win(post)) and "win" or nil)
     if select_after_defeat and outcome == "defeat" then outcome = nil end
     local outcome_diagnostic
@@ -2230,7 +2232,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6J initialized")
+    print("[RuleWorld] M9.6K initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

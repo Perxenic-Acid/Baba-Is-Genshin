@@ -631,3 +631,16 @@ WRITE supports the REVERT literal; BECOME remains noun-only per original editor
 argument typing. Installed convert() collection oracle covers 96 combinations;
 public tests cover compiler, conversion, conditions, metadata and atomic Undo.
 Scoped LEVEL reversion remains pending, explicitly partial in the official audit.
+
+
+## M9.6K — scoped LEVEL REVERT
+
+Unconditional scoped REVERT now restores the authored source entrance by removing
+its saved conversion, rather than retyping a synthetic LEVEL unit. Retires the
+whole previous product group (including copy entry), retains allocator tombstones,
+rebases the child entry and returns via the existing parent boundary initializer.
+Sibling persistence and scoped denial/identity/BROKEN survive; whole-tree Undo
+restores the full pre-return transaction. Missing authored provenance rejects.
+48 installed scoped selection-loop cases plus tree tests verify priority, shapes,
+links, copy groups, reload/reset and Undo. Conditional/root scope and native save/
+AUTO dispatch/general scoped >=50-product limits remain documented shared gaps.

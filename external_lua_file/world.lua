@@ -1247,7 +1247,35 @@ function RW_BindLevelEntry(tree, entity_id)
     return result
 end
 
+-- Scoped REVERT removes a saved entrance conversion, so the authored map
+-- supplies the original shape. It is not ordinary unit original_name retyping.
+local function revert_level_entrance(tree)
+    local entry=tree.entry_links[tree.active_id]
+    if not entry then return nil,"no_parent_level_block" end
+    local parent=tree.instances[entry.parent_id]
+    if not parent or not parent.world.entities[entry.entity_id] then return nil,"missing_parent_level_block" end
+    local previous=tree.level_transforms[entry.parent_id] or {}
+    local record=previous[entry.entity_id]
+    local source_id=type(record)=="table" and record.source_id or entry.entity_id
+    local definition=tree.definitions[parent.definition_id]
+    if not definition or not definition.initial_world.entities[source_id] then return nil,"missing_authored_level_origin" end
+    local result=copy_map(tree)
+    result.level_transforms=copy_map(tree.level_transforms)
+    local persisted=copy_map(previous);persisted[source_id]=nil
+    for id,item in pairs(previous) do
+        if id~=source_id and type(item)=="table" and item.source_id==source_id then
+            persisted[id]={deleted=true,source_id=source_id}
+        end
+    end
+    result.level_transforms[entry.parent_id]=persisted
+    result.entry_links=copy_map(tree.entry_links)
+    result.entry_links[tree.active_id]={parent_id=entry.parent_id,entity_id=source_id}
+    result.outcomes=copy_map(tree.outcomes);result.outcomes[tree.active_id]={kind="revert"}
+    return RW_ReloadLevel(result,entry.parent_id)
+end
+
 function RW_RecordLevelOutcome(tree, kind, target_type)
+    if kind=="revert" then return revert_level_entrance(tree) end
     if kind ~= "win" and kind ~= "transform" and kind ~= "defeat" then return nil, "invalid_level_outcome" end
     local targets=type(target_type) == "table" and target_type or {target_type}
     if kind == "transform" then

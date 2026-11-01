@@ -1,4 +1,4 @@
-# REVERT progress (M9.6J)
+# REVERT progress (M9.6K)
 
 ## Primary references
 
@@ -66,14 +66,42 @@ WRITE literals, source purity and Undo. The oracle covers product collection,
 not the native MF_emptycreate/remove host implementation. Native success is not
 inferred.
 
+## Scoped entrance reversion (M9.6K)
+
+Installed dolevelconversions() selects the first eligible REVERT, discards other
+LEVEL products, removes the corresponding saved conversion record, then returns
+to the upper level. It restores authored map data; it does not look up an
+individual transformed unit's originalname. This backend follows that distinction.
+
+Unconditional scoped REVERT is selected from the resolved LEVEL trait frame, so
+NOT REVERT, identity protection and scoped BROKEN retain their existing gating.
+It takes conversion precedence over other scoped targets and terminal outcomes.
+`RW_RecordLevelOutcome(..., "revert")` resolves the entered product's tracked source,
+removes its saved source conversion, retires the entire duplicate product group,
+and reloads authored parent runtime plus other persistent conversions/results.
+Retired IDs retain tombstones/allocator reservation. The child entry is rebound to
+the surviving authored source, including entry through an allocated copy. Even
+an unconverted entrance returns to its parent, matching the original save-removal
+branch. Ordinary contact destruction/HAS is not involved.
+
+One outer Commit and whole-tree Undo include the completed child turn, result,
+parent reload, product retirements, entry identity and allocators. Tests cover
+multiple products, non-Level authored entrance shapes/links, copy entry, sibling
+persistence, runtime reset, tombstone reload, NOT/identity/BROKEN, conversion versus
+terminal precedence and rejected missing provenance. The installed scoped selection
+loop executes unchanged for 48 count/order/condition combinations; its native save
+I/O and general 50-product terminal limit are outside this selection oracle.
+
 ## Remaining scope
 
-Synthetic scoped LEVEL reversion (restore the current room's tracked entrance
-products) is still pending; the catalog therefore marks REVERT partial. Conditional
-scoped LEVEL evaluation retains its existing subsystem gap. Arbitrary metadata
-must not be used to invent missing historical entrance origins. Exact self-negated
-conversion and native host failure interactions outside the existing conversion
-model remain shared parity limits.
+Conditional scoped LEVEL evaluation retains its existing subsystem gap. Root
+rooms without a parent entrance use the existing no_parent_level_block rejection;
+runtime-only entrances lacking an authored origin reject missing_authored_level_origin
+without changing progress. Arbitrary metadata must not invent missing history.
+The native dolevelconversions() >=50 ordinary-product TOO COMPLEX boundary remains
+a shared scoped-conversion gap; an effective REVERT preempts such product lists.
+Exact self-negated conversion/native host failure interactions and AUTO boundary
+dispatch retain the documented shared engine limits. Native success is not inferred.
 
 BACK remains a separate pending subsystem: it indexes historical per-unit changes
 and conversion creation/removal pairs, rather than restoring original type.

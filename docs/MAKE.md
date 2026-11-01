@@ -62,9 +62,35 @@ Startup measured 1,914,000 offline instructions (unchanged 2M limit).
 
 ## Remaining scope
 
-Scoped LEVEL and virtual EMPTY sources remain deferred. GROUP behavior is deferred
+Scoped LEVEL sources remain deferred. Virtual EMPTY sources are supported as of
+M9.8B below. GROUP behavior is deferred
 until the requested GROUP batch. Finite board boundaries and authored noun vocabulary
 remain current engine scope. Converted-flag lifetime across repeated original engine
 block() subpasses and original mutable unit-list/group traversal order are not fully
 replicated; this engine has explicit scheduled phases and stable ID ordering. Tests
 establish the listed matrices, not whole-game or native-renderer parity.
+
+## M9.8B virtual EMPTY creation
+
+The installed features.lua getunitswithverb collects matching vacancy lists before
+the MAKE loop. blocks.lua:1660 then creates at each EMPTY source, using emptydir
+and drawing a direction when unset. EMPTY bypasses the old-occupant MAKE blocker;
+Text products use text_empty. The compiler now admits EMPTY MAKE (including ALL,
+conditional rules and negative target exclusions). The planner enumerates the
+current vacancy snapshot once per phase and reuses it for duplicate declarations,
+without IDs or persisted EMPTY entities. Earlier MAKE births cannot consume those
+snapshot sources. Vacancies refresh on the next accepted turn.
+
+Conditions use the current frozen relation frame, including dynamic EMPTY BROKEN;
+query errors propagate before Commit. Existing creation initialization, allocator,
+random-state, terminal checks and whole-tree Undo remain in the normal MAKE stage.
+Tests cover duplicate overlap, Text, spatial/negative rules, BROKEN, ALL, replay,
+late CRASH and Undo. Fifteen cases execute the installed EMPTY branch including
+random draws for a non-producing EMPTY target.
+
+EMPTY direction remains the current virtual None convention: MAKE draws a pure
+planned direction. Original emptydir's directional/FOLLOW declarations and its
+FACING/SEEING condition suppression still need the shared virtual orientation
+subsystem; this milestone does not claim that parity. Scoped LEVEL sources and
+EMPTY destruction/HAS are separate remaining lifecycle work. No native acceptance
+is inferred from offline tests.

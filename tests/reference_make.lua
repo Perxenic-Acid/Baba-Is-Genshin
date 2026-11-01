@@ -64,3 +64,31 @@ for occupant=0,3 do for duplicate=1,3 do for _,converted_source in ipairs({false
     checked=checked+1
 end end end end end end
 print('PASS: installed MAKE duplicate/converted/old-occupant/TEXT/direction-draw matrix ('..checked..' cases)')
+
+-- Run the installed EMPTY MAKE branch, including emptydir's unset direction
+-- and random draws even for the non-producing EMPTY target.
+env.roomsizex=9;env.emptydir=function() return 4 end
+local empty_cases=0
+for _,target in ipairs({'rock','avatar','flag','text','empty'}) do for duplicate=1,3 do
+    units={};groups={};births={};state=1
+    local w={width=8,height=8,entities={},language={nouns={ROCK='rock',AVATAR='avatar',FLAG='flag'}}}
+    local id=1
+    for y=1,8 do for x=1,8 do if x~=4 or y~=4 then
+        w.entities[id]={id=id,kind='object',class='object',archetype='wall',x=x,y=y,direction='None'};id=id+1
+    end end end
+    local relations={}
+    for i=1,duplicate do
+        groups[i]={target,{40},'empty'}
+        relations[i]={op='make',source_type='@empty',target_type=target=='text' and '@text' or target=='empty' and '@empty' or target}
+    end
+    original()
+    local products,rng=RW_PlanMakeProducts(w,relations)
+    assert(#products==#births)
+    for i,p in ipairs(products) do
+        local name=p.class=='text' and 'text_'..p.text.name:lower() or p.archetype
+        assert(name==births[i].name and p.direction==births[i].direction and p.x==4 and p.y==4)
+    end
+    assert(rng and rng.to==state)
+    empty_cases=empty_cases+1
+end end
+print('PASS: installed EMPTY MAKE unset-facing/Text/duplicates/non-product RNG oracle ('..empty_cases..' cases)')

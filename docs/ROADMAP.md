@@ -1091,3 +1091,12 @@ blocks ordinary scoped IS TEXT. Tests cover real tree and physical conversions;
 16 installed selection cases compare mixed conditional/duplicate WRITE/IS order.
 Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
 instructions. Conditional own/IS NOT TEXT bans also pass move/wait tests.
+
+## M9.8B — virtual EMPTY MAKE sources
+
+Admit EMPTY MAKE with conditional/negative/ALL targets. Reuse phase-snapshot vacancy
+sources for duplicate products; create text_EMPTY for TEXT, without allocating EMPTY
+identities. Preserve planned RNG, error propagation, late terminal checks and Undo.
+Tests cover vacancy changes, BROKEN, exclusions, ALL, replay and CRASH; 15 installed
+MAKE branch cases compare unset-facing products/draws. The shared virtual emptydir
+directional/FOLLOW subsystem remains pending, as documented in MAKE.md.

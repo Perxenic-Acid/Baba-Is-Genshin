@@ -120,3 +120,53 @@ assert(not RW_InstantiateLevel(definition,'invalid-rng'))
 local _,r=RW_Commit(s,{consumes_turn=false,changes={},random_state={from=1,to=2}})
 assert(not r.accepted and r.reason=='invalid_no_turn_plan')
 print('PASS: MAKE duplicates/old blockers/conversions/TEXT/ALL/links, conditions/NOT, late contacts/CRASH, random-state Undo/replay and atomic failure')
+
+-- EMPTY sources are snapshot cells, not allocated proxy entities. Duplicate
+-- declarations share vacancies and do not see earlier MAKE products as blockers.
+local function empty_fixture(rows)
+    local s=fixture(rows);s.world.width,s.world.height=8,16;return s
+end
+local function vacancies(w)
+    local occupied={};for _,e in pairs(w.entities) do occupied[e.x..':'..e.y]=true end
+    local cells={};for y=1,w.height do for x=1,w.width do
+        if not occupied[x..':'..y] then cells[x..':'..y]=true end
+    end end;return cells
+end
+s=empty_fixture({{'EMPTY','MAKE','FLAG'},{'EMPTY','MAKE','FLAG'}})
+local cells=vacancies(s.world);local count=0;for _ in pairs(cells) do count=count+1 end
+local before_rng=s.world.random_state or 1
+n,p=step(s);local seen={};local births=0
+for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id then
+    assert(id>0 and e.archetype=='flag' and cells[e.x..':'..e.y] and not e.level_link)
+    seen[e.x..':'..e.y]=(seen[e.x..':'..e.y] or 0)+1;births=births+1
+end end
+assert(births==count*2 and n.world.next_entity_id==s.world.next_entity_id+births)
+for key in pairs(cells) do assert(seen[key]==2) end
+local restored_empty=RW_Undo(n);local replay=step(restored_empty);assert(replay.world.random_state==n.world.random_state)
+assert(s.world.random_state==nil and before_rng==1)
+-- Once occupied, those cells stop being EMPTY on the following turn.
+local next_turn=step(n);assert(next_turn.world.next_entity_id==n.world.next_entity_id)
+s=empty_fixture({{'EMPTY','NEAR','ROCK','MAKE','TEXT'}})
+n=step(s);births=0
+for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id then
+    assert(e.class=='text' and e.text.name=='EMPTY' and math.abs(e.x-6)<=1 and math.abs(e.y-3)<=1)
+    births=births+1
+end end
+assert(births==8)
+s=empty_fixture({{'EMPTY','MAKE','FLAG'},{'EMPTY','NEAR','ROCK','MAKE','NOT','FLAG'}})
+cells=vacancies(s.world);n=step(s)
+for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id then
+    assert(math.abs(e.x-6)>1 or math.abs(e.y-3)>1)
+end end
+s=empty_fixture({{'EMPTY','IS','BROKEN'},{'EMPTY','MAKE','FLAG'}})
+n=step(s);assert(n.world.next_entity_id==s.world.next_entity_id and n.world.random_state==nil)
+s=empty_fixture({{'EMPTY','MAKE','FLAG'},{'FLAG','IS','CRASH'}})
+n=step(s);assert(n.world.infinite_loop and RW_Undo(n).world==s.world)
+print('PASS: EMPTY MAKE snapshot vacancies/duplicates/TEXT/spatial NOT/BROKEN, allocator/RNG replay, late CRASH and Undo')
+s=empty_fixture({{'EMPTY','MAKE','ALL'}})
+cells=vacancies(s.world);count=0;for _ in pairs(cells) do count=count+1 end
+n=step(s);assert(n.world.next_entity_id==s.world.next_entity_id+count*#RW_NounPalette(s.world))
+s=empty_fixture({{'EMPTY','MAKE','FLAG'},{'EMPTY','MAKE','NOT','FLAG'}})
+n=step(s);assert(n.world.next_entity_id==s.world.next_entity_id and n.world.random_state==nil)
+local bad,why=RW_PlanMakeProducts(s.world,{{op='make',source_type='@empty',target_type='flag',when={op='invalid'}}})
+assert(not bad and why=='invalid_spatial_condition' and s.world.random_state==nil,tostring(why))

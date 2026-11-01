@@ -2294,7 +2294,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 if objnot then add_ban(play_bans,ast.verb,key,obj.name,ast.when)
                 else relations[#relations+1]={op="play",source_type=key,note=obj.name,when=query_clone(ast.when),verb=ast.verb} end
                 supported=true
-            elseif sem and key and key~="@empty" and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
+            elseif sem and key and (key~="@empty" or sem.noun=="make") and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
                 and (not objnot or sem.negative_noun=="forbid_"..sem.noun) then
                 local target=subject_key(obj)
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
@@ -2898,6 +2898,7 @@ function RW_PlanMakeProducts(world,relations,converted)
     local state=world.random_state or 1
     local original_state=state
     local directions={"Right","Up","Left","Down"}
+    local empty_sources
     local function random_direction()
         state=(state*48271)%2147483647
         return directions[state%4+1]
@@ -2906,23 +2907,37 @@ function RW_PlanMakeProducts(world,relations,converted)
         if relation.op=="make" then
             local selector=relation.source_type=="@text" and {kind="class",value="text"}
                 or {kind="archetype",value=relation.source_type}
-            for _,id in ipairs(RW_SelectEntities(world,selector)) do
-                local source=world.entities[id]
-                if RW_RelationApplies(world,relation,source) then
+            local sources={}
+            if relation.source_type=="@empty" then
+                if not empty_sources then
+                    empty_sources={}
+                    local occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
+                    for y=1,world.height do for x=1,world.width do
+                        if not occupied[x..":"..y] then empty_sources[#empty_sources+1]={class="empty",x=x,y=y,direction="None"} end
+                    end end
+                end
+                sources=empty_sources
+            else
+                for _,id in ipairs(RW_SelectEntities(world,selector)) do sources[#sources+1]=world.entities[id] end
+            end
+            for _,source in ipairs(sources) do
+                local enabled,why=RW_RelationApplies(world,relation,source)
+                if enabled==nil then return nil,why end
+                if enabled then
                     local direction=source.direction
                     if direction=="None" or direction=="Mid" then direction=random_direction() end
                     local target=relation.target_type
                     local blocked=false
-                    for other_id,other in pairs(world.entities) do
+                    if source.class~="empty" then for other_id,other in pairs(world.entities) do
                         if not (converted and converted[other_id]) and other.x==source.x and other.y==source.y then
                             if (target=="@text" and other.class=="text")
                                 or (target~="@text" and other.class~="text" and other.archetype==target) then blocked=true;break end
                         end
-                    end
+                    end end
                     if not blocked and target~="@empty" and not (target=="@text" and source.class=="text") then
                         local product={kind="object",class=target=="@text" and "text" or "object",
                             x=source.x,y=source.y,direction=direction,level_link=query_clone(source.level_link)}
-                        if target=="@text" then product.text={name=RW_NounTextName(world,source)}
+                        if target=="@text" then product.text={name=source.class=="empty" and "EMPTY" or RW_NounTextName(world,source)}
                         else product.archetype=target end
                         products[#products+1]=product
                     end

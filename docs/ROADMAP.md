@@ -886,3 +886,12 @@ code-status barrier, so blocked Text turns cancelled by final alignment still
 refresh reading status before conversion. Direct alignment-only rows do not
 independently invalidate reading. Real solver/compiler tests cover the zero-net
 path, one status pass, no-op alignment and Undo. No frontend/level changes.
+
+## M9.7G — phase-aware movement reading events
+
+Exclude direct SHIFT alignment from code-status invalidation even when its final
+facing differs. Accumulate reading events per phase snapshot, taking journaled
+dispatches instead of double-counting their final atomic summaries. Keep ordinary
+movement, destruction/birth and unjournaled service changes on their existing
+path. Real compiler/solver tests verify latching, direction/Undo and fallback;
+384 installed alignment oracle cases verify no native updatecode assignment.

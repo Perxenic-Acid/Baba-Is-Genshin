@@ -299,7 +299,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             return movement_prefix,nil,trace
         end
     end
-    local movement_reading_event=false
+    local movement_reading_event=reading_changed(world,movement_prefix.changes,before_rules)
     local automatic_active=false
     for _,effect in ipairs(effects) do
         local trait=effect.trait
@@ -324,10 +324,19 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if not after then return fail("preview_"..motion_phase,problem) end
         -- SHIFT alignment writes DIR directly and does not invalidate code.
         -- Effective solver dispatches do, including paths with no net change.
+        local recorded={}
         for _,row in ipairs(shift.motion_history or {}) do
+            recorded[row.entity_id]=true
             if row.retain~=false and (row.from.x~=row.to.x or row.from.y~=row.to.y or row.from.direction~=row.to.direction)
-                and reading_changed(preview,{row},before_rules) then movement_reading_event=true;break end
+                and reading_changed(preview,{row},before_rules) then movement_reading_event=true end
         end
+        -- A journaled identity's final summary is only a commit projection of
+        -- those rows; it must not independently invalidate direct alignment.
+        local unrecorded={}
+        for _,change in ipairs(shift.changes) do
+            if not recorded[change.entity_id] then unrecorded[#unrecorded+1]=change end
+        end
+        if reading_changed(preview,unrecorded,before_rules) then movement_reading_event=true end
         local destruction_terminal
         if #(shift.destructions or {})>0 then
             local ids,contents={},{}
@@ -338,6 +347,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             if not destruction then return fail(motion_phase.."_destruction",why) end
             local next_world,err=services.preview(after,destruction)
             if not next_world then return fail(motion_phase.."_destruction",err) end
+            if reading_changed(after,destruction.changes,before_rules) then movement_reading_event=true end
             stages[#stages+1]={name=motion_phase.."_destruction",plan=destruction};after=next_world
             if destruction.infinite_loop or destruction.too_complex then destruction_terminal=destruction end
         end
@@ -363,7 +373,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         return fail("rules_after", post_error)
     end
 
-    if code_status and #code_status.changes>0 and (movement_reading_event or reading_changed(world,movement_prefix.changes,before_rules)) then
+    if code_status and #code_status.changes>0 and movement_reading_event then
         local updated,why=services.preview(preview,code_status)
         if not updated then return fail("code_status_after_move",why) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,changes=movement.changes,board_shift=movement.board_shift}}}
@@ -2378,7 +2388,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7F initialized")
+    print("[RuleWorld] M9.7G initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

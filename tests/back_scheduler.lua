@@ -345,3 +345,19 @@ for _,row in ipairs(p.stages[stages(p).shift].plan.motion_history or {}) do
  if row.entity_id==id then assert(row.retain==false and row.from.direction==row.to.direction) end
 end
 print("PASS: zero-net blocked SHIFT Text facing refreshes code status before conversion and Undo")
+
+-- Direct SHIFT alignment alone never sets native updatecode, even when DIR
+-- changes. The final atomic summary must not turn that assignment into a dispatch.
+alignment.world.entities[id].direction="Up"
+local aligned,p=step(alignment,right,shift_services)
+assert(aligned.world.entities[id].direction=="Right" and not aligned.world.entities[id].broken)
+assert(not stages(p).code_status_after_move and RW_Undo(aligned).world==alignment.world)
+-- Services without an ordered journal retain the ordinary dispatch contract;
+-- do not silently suppress their real final Text direction update.
+local unjournaled=copy(shift_services)
+unjournaled.shift=function(w)
+ local p=assert(RW_ResolveShift(w));p.motion_history=nil;return p
+end
+local dispatched,p=step(alignment,right,unjournaled)
+assert(dispatched.world.entities[id].broken==1 and stages(p).code_status_after_move)
+print("PASS: changed SHIFT alignment alone does not invent Text code invalidation")

@@ -31,7 +31,9 @@ for sleep=0,1 do for layer=0,1 do for reversed=0,1 do
  env.issleep=function(handle) return projected.entities[handle-100].behaviors.sleep==true end
  env.isgone=function() return false end
  env.addundo=function(row) golden[#golden+1]=copy(row) end
+ env.updatecode=0
  local handles={};for _,id in ipairs(belts) do handles[#handles+1]=id+100 end;native(handles)
+ assert(env.updatecode==0,"native direct SHIFT alignment never invalidates code, including changed facing")
  local plan=assert(RW_ResolveShift(projected));local rows=plan.motion_history or {}
  assert(#rows==#golden,table.concat({"SHIFT row mismatch",n,facing,heading,sleep,layer,reversed,#rows,#golden},":"))
  for i,row in ipairs(rows) do local expected=golden[i]

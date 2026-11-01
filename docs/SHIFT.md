@@ -103,3 +103,27 @@ pure equal-facing alignment, both compile-limit terminal prefixes, atomic late
 failure and malformed history rejection before inspection. Existing final-summary and conservative WORD
 invalidation behavior remains unchanged; this does not claim exact native
 intra-phase code timing or WORD dependency parity.
+
+## M9.7G: exclude direct alignment from final-summary invalidation
+
+M9.7F covered cancelled dispatch paths but still passed the flattened movement
+summary to reading_changed. A changed direct SHIFT alignment therefore acquired
+an unintended Text code-status refresh, although installed blocks.lua only
+records Undo and assigns DIR. Its updatecode flag stays unchanged.
+
+Movement invalidation now accumulates events against each phase's source snapshot.
+The initial movement/destruction prefix and later destruction products retain
+their ordinary detection. For journaled motion identities, effective dispatch
+rows decide invalidation; their final commit summary cannot count a second time.
+Unjournaled changes keep their existing dispatch contract. This is transient
+scheduler data and neither changes the stored history nor replays contacts.
+
+A real compiler/SHIFT regression begins with a STILL physical Text facing Up,
+an awake right-facing source and TEXT ON AVATAR IS BROKEN. Avatar moves onto
+Text; pure alignment turns it Right but leaves its saved BROKEN status latched.
+The previous implementation incorrectly refreshed it. Undo restores the original
+facing/status. A service without a motion journal retains its normal direction
+write/refresh behavior. All 384 installed alignment oracle cases additionally
+assert that original code leaves updatecode at zero. Earlier M9.7F effective
+blocked-dispatch tests remain active. Exact WORD dependency and native phase
+ordering gaps remain documented separately.

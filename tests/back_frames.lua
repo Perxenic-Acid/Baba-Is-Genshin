@@ -19,9 +19,7 @@ for turn=1,180 do
   if not native then assert(not record and before=="back_frame_absent")
   elseif index==1 then assert(record.reason==native.tag and before.entities[1].x==s.world.entities[1].x)
   else
-   local present=false;for _,v in ipairs(s.turn_records) do if v.reason==native.tag and v.back_frame.retain then present=true end end
-   if present then assert(record and record.reason==native.tag,"native frame tag mismatch");assert(before.entities[1])
-   else assert(not record and before=="back_history_unavailable") end
+   assert(record and record.reason==native.tag,"native frame tag mismatch");assert(before.entities[1])
   end
   checks=checks+1
  end
@@ -29,17 +27,27 @@ for turn=1,180 do
  -- including commands pruned only from BACK's operation history.
  local restored,ur=RW_Undo(s);assert(ur.accepted and restored.world==old.world and restored.back_frame_count==old.back_frame_count)
 end
-assert(checks==1260 and #s.history==128 and s.back_frame_count==121)
+assert(checks==1260 and #s.history==180 and s.back_frame_count==121)
 local record,before=RW_GetBackFrame(s,2);assert(record and before)
 record.reason="mutated";before.entities[1].x=99
 assert(RW_GetBackFrame(s,2).reason~="mutated")
 local _,again=RW_GetBackFrame(s,2);assert(again.entities[1].x~=99)
 local missing,why=RW_GetBackFrame(s,1);assert(not missing and why=="back_current_frame_unavailable")
 local original=s
-for i=1,128 do local n,r=RW_Undo(s);assert(r.accepted,r.reason);s=n end
-assert(#s.history==0 and s.back_frame_count>1)
+-- Select the first retained frame after 180 commands. Its snapshot was lost
+-- under the old cap; playback must now undo its actual update, not silently skip.
+original.world.entities[1].back_init=61
+local long_prefix={consumes_turn=true,changes={{kind="move",entity_id=1,
+ from={x=original.world.entities[1].x,y=2,direction="Right"},to={x=4,y=2,direction="Right"}}}}
+local replay=assert(RW_PlanBackHistoryMotion(original,long_prefix,{[1]=true}))
+local combined=assert(RW_PlanStages(original.world,{{name="move",plan=long_prefix},{name="back",plan=replay}}))
+combined.back_frame={from=121,retain=true}
+local replayed,res=RW_Commit(original,combined);assert(res.accepted,res.reason)
+assert(replayed.world.entities[1].x==2 and replay.tele_suppressed[1] and RW_Undo(replayed).world==original.world)
+for i=1,180 do local n,r=RW_Undo(s);assert(r.accepted,r.reason);s=n end
+assert(#s.history==0 and s.back_frame_count==nil)
 assert(not RW_GetBackFrame(s,2))
-local next_session,r=RW_Commit(s,{consumes_turn=true,changes={},back_frame={from=s.back_frame_count,retain=true}});assert(r.accepted,r.reason)
+local next_session,r=RW_Commit(s,{consumes_turn=true,changes={},back_frame={from=1,retain=true}});assert(r.accepted,r.reason)
 assert(RW_Undo(next_session).back_frame_count==s.back_frame_count)
 -- Empty retained frames still occupy a native slot; pruned frames never do.
 local a=fixture();local b,r=RW_Commit(a,{consumes_turn=true,changes={},back_frame={from=1,retain=false}});assert(r.accepted and b.back_frame_count==1)
@@ -55,7 +63,7 @@ local same,r=RW_Commit(c,late);assert(same==c and not r.accepted and c.back_fram
 local legacy=fixture();legacy=RW_Commit(legacy,{consumes_turn=true,changes={}})
 local same,r=RW_Commit(legacy,{consumes_turn=true,changes={},back_frame={from=1,retain=true}});assert(same==legacy and not r.accepted)
 local bad=fixture();bad.back_frame_count=0;local same,r=RW_Commit(bad,{consumes_turn=true,changes={}});assert(same==bad and not r.accepted)
-print("PASS: installed newundo frame mapping/pruning oracle (1260 queries), open/retained/evicted frames, absolute capped clock, ownership, rejection and Undo")
+print("PASS: installed newundo frame mapping/pruning oracle (1260 queries), open/retained frames beyond 128 commands, ownership, rejection and complete Undo")
 
 -- Current open-frame playback and past-frame playback share the same mapping.
 local selected=fixture();selected.world.entities[1].back_init=1
@@ -96,3 +104,24 @@ assert(RW_UndoLevelTree(boundary).instances[child_id]==moved)
 local corrupt={};for k,v in pairs(moved) do corrupt[k]=v end;corrupt.back_frame_count=3
 local candidate=assert(RW_UpdateActiveLevel(completed,corrupt));local same,r=RW_CommitLevelTree(completed,{before=completed,after=candidate});assert(same==completed and not r.accepted)
 print("PASS: BACK clock tree/sibling isolation, boundary reset/restoration and corrupted-ledger rejection")
+
+-- Whole-tree history must retain the same long lifetime, including a boundary
+-- that resets the active session's local journal and allocators.
+local initial=assert(RW_CreateLevelTree({root=assert(RW_CreateLevelDefinition("root",fixture().world))},"root"))
+local long_tree=initial
+for i=1,165 do
+ local active=RW_GetActiveLevel(long_tree);local e=active.world.entities[1]
+ local next_session,result=RW_Commit(active,{consumes_turn=true,changes={{kind="direction",entity_id=1,
+  from=e.direction,to=e.direction=="Right" and "Left" or "Right"}}});assert(result.accepted)
+ local candidate=assert(RW_UpdateActiveLevel(long_tree,next_session))
+ long_tree,result=RW_CommitLevelTree(long_tree,{before=long_tree,after=candidate});assert(result.accepted)
+end
+assert(#long_tree.history==165 and #RW_GetActiveLevel(long_tree).history==165)
+local candidate=assert(RW_ReloadLevel(long_tree,long_tree.active_id))
+local reloaded,result=RW_CommitLevelTree(long_tree,{before=long_tree,after=candidate});assert(result.accepted)
+assert(#RW_GetActiveLevel(reloaded).history==0 and #reloaded.history==166)
+local restored=RW_UndoLevelTree(reloaded)
+assert(RW_GetActiveLevel(restored)==RW_GetActiveLevel(long_tree))
+for i=1,165 do restored,result=RW_UndoLevelTree(restored);assert(result.accepted) end
+assert(#restored.history==0 and RW_GetActiveLevel(restored)==RW_GetActiveLevel(initial))
+print("PASS: BACK replay beyond 128 commands and complete long local/tree/boundary Undo")

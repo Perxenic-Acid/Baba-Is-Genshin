@@ -1,8 +1,6 @@
 -- world.lua
 -- RuleWorld M2: World state, atomic commit, history
 
-local HISTORY_LIMIT = 128
-
 -- Intrinsic Object/Text state, independent of rule-derived traits.
 local DIRECTIONS = {
     Left = true, Up = true, Right = true,
@@ -1029,7 +1027,7 @@ local function valid_back_frames(session)
         expected=frame.from
         if frame.initial then return i==1 and expected==1 end
     end
-    -- The beginning of this clock may have been evicted by the local history cap.
+    -- Legacy/imported sessions may begin after an already unavailable prefix.
     return true
 end
 
@@ -1082,7 +1080,6 @@ function RW_Commit(session, plan)
         history[i] = session.history[i]
         records[i]=session.turn_records and session.turn_records[i] or false
     end
-    if #history >= HISTORY_LIMIT then table.remove(history,1);table.remove(records,1) end
     history[#history + 1] = session.world
     records[#records+1]=journal_turn(plan)
     local back_count=session.back_frame_count
@@ -1771,7 +1768,6 @@ function RW_CommitLevelTree(tree, plan)
     local snapshot = copy_map(tree)
     snapshot.history = nil -- Avoid nested history chains; frames share immutable state.
     result.history = copy_map(tree.history)
-    if #result.history >= HISTORY_LIMIT then table.remove(result.history,1) end
     result.history[#result.history+1] = snapshot
     return result, {accepted=true,changed=true,reason=plan.reason,changes=plan.changes or {}}
 end

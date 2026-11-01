@@ -31,13 +31,13 @@ local legacy=fixture();legacy.history={legacy.world}
 local l,res=RW_Commit(legacy,{consumes_turn=true,changes={}});assert(res.accepted and l.turn_records[1]==false)
 local missing,why=RW_GetTurnRecord(l,2);assert(not missing and why=="history_unavailable")
 local back=RW_Undo(l);assert(back.turn_records==nil and #back.history==1)
--- Cap journals in lockstep with snapshots; Undo removes both aligned entries.
+-- Retain journals and snapshots beyond the old 128-command cutoff.
 local capped=fixture()
 for i=1,130 do local e=capped.world.entities[1];local plan={consumes_turn=true,changes={{kind="direction",entity_id=1,from=e.direction,to=e.direction=="Right" and "Left" or "Right"}}}
  capped,res=RW_Commit(capped,plan);assert(res.accepted) end
-assert(#capped.history==128 and #capped.turn_records==128 and RW_GetTurnRecord(capped,128))
-assert(not RW_GetTurnRecord(capped,129))
-for i=1,128 do capped,res=RW_Undo(capped);assert(res.accepted) end
+assert(#capped.history==130 and #capped.turn_records==130 and RW_GetTurnRecord(capped,130))
+assert(not RW_GetTurnRecord(capped,131))
+for i=1,130 do capped,res=RW_Undo(capped);assert(res.accepted) end
 assert(#capped.history==0 and capped.turn_records==nil)
 local malformed=fixture();malformed.turn_records={{phases={}}}
 local _,res=RW_Commit(malformed,{consumes_turn=true,changes={}});assert(not res.accepted and res.reason=="invalid_turn_records")
@@ -47,7 +47,7 @@ for _,flag in ipairs({"too_complex","infinite_loop"}) do
  local terminal,res=RW_Commit(base,plan);assert(res.accepted and RW_GetTurnRecord(terminal,1)[flag])
  local u,res=RW_Undo(terminal);assert(res.accepted and u.world==base.world and not u.turn_records)
 end
-print("PASS: turn journals preserve net-zero sequential motion, conversion/create/delete, metadata-only turns, ownership, rejection, cap/legacy alignment, terminal states and Undo")
+print("PASS: turn journals preserve net-zero sequential motion, conversion/create/delete, metadata-only turns, ownership, rejection, long/legacy alignment, terminal states and Undo")
 
 -- Installed addundo inserts newest operation rows first. Reversing our phase/
 -- operation traversal preserves the same update sequence without flattening it.

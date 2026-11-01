@@ -1,4 +1,4 @@
-# BACK integration progress (M9.7E)
+# BACK integration progress (M9.7H)
 
 BACK is now available in the default property vocabulary and behavior registry.
 The official catalog explicitly marks its public real-unit history execution as
@@ -557,6 +557,30 @@ motion declaration instances now execute, but exact duplicate processing against
 already retired native MF_* handles remains a declaration/lifetime gap.
 Future native host evidence of a nonempty paradox writer would require an
 explicit transaction-owned integration rather than guessing new persistent facts.
-Opaque host lifetime updateundo behavior and history beyond this engine's existing
-128-turn window remain integration limits. Do not treat the current session
+Opaque host lifetime updateundo behavior remains an integration limit. The old
+128-command eviction was removed in M9.7H; see below. Do not treat the current session
 scheduler as completed public BACK.
+
+## M9.7H: retain complete session and whole-tree history
+
+Installed undo.lua newundo() retains prior frames without a fixed command cap;
+only the nonretained open frame is removed. undo() consumes the preceding frame.
+load.lua and clears.lua reset history at boundaries. The old engine limit of 128
+commands could evict a retained BACK frame despite a valid absolute frame clock.
+It also truncated user-facing whole-tree Undo independently of local journals.
+
+Remove fixed eviction from both Commit surfaces. World snapshots and operation
+journals remain aligned; native retain/prune decisions, absolute clocks and
+boundary local resets are unchanged. Whole-tree history still stores snapshots
+without nesting its own history chain. Undo restores the full pre-boundary local
+journal. Legacy imported sessions may still have an unavailable historical prefix;
+never fabricate it or reinterpret their absolute clock.
+
+The installed newundo oracle's 1,260 frame queries now require every valid
+retained frame to exist after 180 commands. Actual BACK playback selects the
+first retained frame across that former cutoff, with TELE marking and Undo.
+Tests undo all 180 local commands to the original nil clock, retain/undo 130
+ordinary journals, and preserve 165 local/tree commands plus a reload boundary.
+History storage now grows with accepted play, as in the original; no claim of
+bounded memory or native acceptance follows. Startup does not construct history.
+Earlier entries describing the cap are historical and superseded here.

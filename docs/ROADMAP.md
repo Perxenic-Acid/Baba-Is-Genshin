@@ -895,3 +895,13 @@ dispatches instead of double-counting their final atomic summaries. Keep ordinar
 movement, destruction/birth and unjournaled service changes on their existing
 path. Real compiler/solver tests verify latching, direction/Undo and fallback;
 384 installed alignment oracle cases verify no native updatecode assignment.
+
+## M9.7H — remove history eviction from BACK and whole-tree Undo
+
+Remove the early 128-command cap from both Commit surfaces, matching installed
+undo.lua's uncapped retained-frame history. Preserve native pruning, absolute
+clocks, aligned journals, legacy unavailable prefixes and boundary resets.
+The 1,260 installed newundo frame queries now require all retained frames after
+180 commands; actual BACK replays the first frame across the former cutoff.
+Local full Undo and 165-turn whole-tree/reload restoration are covered. History
+memory grows with accepted play; frontend/design and other BACK gaps stay open.

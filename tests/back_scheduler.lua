@@ -14,7 +14,7 @@ local function fixture(rows)
  w.entities={[1]={id=1,kind="object",class="object",archetype="avatar",x=2,y=2,direction="Right"},
  [2]={id=2,kind="object",class="object",archetype="rock",x=5,y=2,direction="Right"},
  [3]={id=3,kind="object",class="object",archetype="rock",x=12,y=2,direction="Right"}}
- w.language.properties.BACK="back";w.language.nouns.ROCK="rock";w.language.nouns.FLAG="flag"
+ assert(w.language.properties.BACK=="back");w.language.nouns.ROCK="rock";w.language.nouns.FLAG="flag"
  w.rule_sources[#w.rule_sources+1]={when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="avatar"},trait="you"}}}
  for row,words in ipairs(rows or {}) do for x,word in ipairs(words) do
   local id=w.next_entity_id;w.next_entity_id=id+1

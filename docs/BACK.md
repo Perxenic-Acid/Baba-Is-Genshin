@@ -1,4 +1,10 @@
-# BACK infrastructure progress (M9.7A)
+# BACK integration progress (M9.7B)
+
+BACK is now available in the default property vocabulary and behavior registry.
+The official catalog explicitly marks its public real-unit history execution as
+partial: native phase/declaration/lifetime parity remains pending. Historical
+sections below saying "not registered" describe earlier milestones and are
+superseded by M9.7B. This is not a complete original-engine compatibility claim.
 
 ## Installed primary references
 
@@ -423,12 +429,43 @@ failure and Undo tests cover history-only and net-zero phases. Native impulse
 batching and intra-impulse HAS/conditional cache differences remain documented
 separately; this does not claim complete phase-graph parity or native acceptance.
 
+## M9.7B: public vocabulary and source-confirmed special scope
+
+Default BACK tokens now parse as property arguments, activate their complete
+sentences and project the back capability. The already wired production session
+planner handles clocks/history/playback; default gameplay needs no custom token
+registration. FEELING BACK and WORD object sentences use the ordinary compiler.
+Tests also use RW_PlanLevelAction/RW_CommitLevelTree rather than only the session
+helper, checking retained clocks, reload and whole-tree Undo. The existing
+session scheduler regression now asserts the public default instead of injecting
+the token. Public admission does not change the world-only diagnostic API contract.
+
+Installed blocks.lua ~580 calls findallfeature(nil,"is","back",true). features.lua
+~245 explicitly excludes EMPTY when that fourth argument is true; tools.lua
+findall() enumerates unitlists/codeunits. Real LEVEL blocks therefore participate,
+but no virtual EMPTY observer or map-wide synthetic LEVEL playback is invented.
+No BACK branch was found in levelblock(). This replaces the earlier generic
+"synthetic LEVEL/EMPTY pending" note for this property with source-confirmed
+non-participation. Ordinary EMPTY/scoped declaration queries may still project
+BACK, but their projection does not create runtime clocks, IDs or playback.
+
+The installed findfeature/findallfeature/findall functions run unchanged in 32
+scope-oracle cases covering real LEVEL/Text, ignored EMPTY, failed conditions,
+BROKEN and duplicate declarations. Tests verify linked real level-block replay
+preserves the configured destination. Source inspection across base Data Lua
+(excluding Worlds/mods) found paradox only initialized/cleared/read; convert.lua
+~443 has its sole indexed write commented out. Production therefore keeps the
+empty/default guard; existing explicit playback helpers still support nonempty
+guard maps for diagnostics. No unsupported native host writer is fabricated.
+
 ## Still pending
 
-BACK remains pending in the official catalog and is not registered as a public
-word yet. Native paradox routing and synthetic
-LEVEL/EMPTY semantics remain
-explicit gaps, as do broader native phase-graph/conditional intra-phase differences.
+Broader native phase-graph/conditional intra-phase differences remain. The
+installed selection oracle preserves repeated declarations, while the current
+scheduler coalesces eligibility per physical unit; exact duplicate processing
+against retiring/replaced native handles remains a declaration/lifetime gap.
+Future native host evidence of a nonempty paradox writer would require an
+explicit transaction-owned integration rather than guessing new persistent facts.
 Opaque host lifetime updateundo behavior and history beyond this engine's existing
 128-turn window remain integration limits. Do not treat the current session
 scheduler as completed public BACK.

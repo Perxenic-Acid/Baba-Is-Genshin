@@ -82,7 +82,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | 3D | excluded by user request |
 | property | ANGRY | rule capability/catalog implemented; frontend deferred |
 | property | AUTO | unit motion and pure LEVEL queue/pulses implemented; native clock/boundary parity pending |
-| property | BACK | pending |
+| property | BACK | public real-unit history playback implemented; native phase/declaration/lifetime parity pending |
 | property | BEST | rule capability/catalog implemented; frontend deferred |
 | property | BLACK | implemented within documented scope |
 | property | BLUE | implemented within documented scope |

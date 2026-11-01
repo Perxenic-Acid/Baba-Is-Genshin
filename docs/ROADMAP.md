@@ -831,3 +831,17 @@ including changed facing. Added 384 installed alignment oracles, 32 inverse-path
 complete/isolated scheduler routing, ownership, rejection and Undo coverage.
 Native phase-graph/conditional differences, paradox and synthetic scope remain;
 public BACK is still pending.
+
+## M9.7B — public BACK and source-confirmed special scope
+
+Register BACK in the default property vocabulary and behavior registry. Preserve
+the existing session-aware production path and history/Undo contracts. Public
+tests cover activation, FEELING, NOT/BROKEN, WORD sentences, linked real LEVEL
+blocks, inert synthetic LEVEL/EMPTY, production tree actions and reload/Undo.
+32 unchanged installed selection oracle cases confirm that BACK ignores virtual
+EMPTY and enumerates real LEVEL/Text through unitlists/codeunits. No synthetic
+map-wide BACK branch exists in levelblock(). Vanilla Lua has no active paradox
+writer; its sole indexed assignment is commented out. Explicit helper guards stay.
+The official catalog marks public BACK partial, retaining native phase, duplicate
+declaration/retired-handle, opaque lifetime and 128-frame integration limitations.
+Startup remains below 2M; no frontend or authored-level changes are included.

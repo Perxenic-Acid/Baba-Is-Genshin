@@ -1049,7 +1049,10 @@ local function lower_simple(ast_rules, registry)
         if semantics and semantics.negative_property == "deny_trait" and has_subject
             and negated and negated.tag == "property" and type(negated.name) == "string" then
             generated[#generated+1]={when=ast.when,effects={{op="deny_trait",target=has_subject,trait=negated.name}},source=ast.source}
-            if level_subject then conversions[#conversions+1]={op="deny_level_trait",trait=negated.name,source=ast.source} end
+            if level_subject then
+                conversions[#conversions+1]={op="deny_level_trait",trait=negated.name,source=ast.source}
+                if negated.name=="revert" then conversions[#conversions+1]={op="forbid_transform",source_type=subject_type.block_type or "level_block",target_type="@revert",source=ast.source} end
+            end
         elseif semantics and semantics.negative_noun == "forbid_transform" and simple_subject and negated
             and ast.when.op == "always" and ((negated.tag == "special" and negated.name == "text")
                 or (negated.tag == "noun" and type(negated.type) == "table" and negated.type.tag == "object")) then
@@ -1070,6 +1073,7 @@ local function lower_simple(ast_rules, registry)
         elseif level_subject and semantics and semantics.property == "grant_trait"
             and object.tag == "property" and type(object.name) == "string" and object.name ~= "" then
             conversions[#conversions+1] = {op="level_trait",trait=object.name,source=ast.source}
+            if object.name=="revert" then conversions[#conversions+1]={op="transform",source_type=subject_type.block_type or "level_block",target_type="@revert",source=ast.source} end
             generated[#generated+1] = {when=ast.when,effects={{op="grant_trait",
                 target={kind="archetype",value=subject_type.block_type or "level_block"},trait=object.name}},source=ast.source}
         elseif simple_subject and semantics and semantics.noun == "transform"
@@ -1443,6 +1447,19 @@ function RW_PlanConversions(world, conversions, generated_rules)
                     or relation.op == "transform_all" and "@all" or relation.target_type end
             end
         end
+        -- conversion() inserts REVERT at the front (last declaration first).
+        -- convert() stops collecting products after its first effective revert.
+        local concrete=entity.class=="text" and "text_"..entity.text.name or entity.archetype
+        local origin=entity.original_name or concrete
+        if not virtual and origin~=concrete then
+            for index=#choices,1,-1 do
+                local choice=choices[index]
+                local becoming=type(choice)=="table" and choice.become_target~=nil
+                local target=becoming and choice.become_target or choice
+                if target=="@revert" and not (becoming and become_bans or bans)[target]
+                    and (becoming or not protect and not bans[source]) then choices={choice};break end
+            end
+        end
         local has_become=false
         for _,choice in ipairs(choices) do if type(choice)=="table" and choice.become_target then has_become=true;break end end
         -- Preserve established IS self-negation, while BECOME is independently selected.
@@ -1473,6 +1490,13 @@ function RW_PlanConversions(world, conversions, generated_rules)
                         end
                     end
                     if becoming and not virtual then converted_ids[entity.id]=true end
+                elseif target=="@revert" then
+                    if not virtual and origin~=concrete then
+                        if origin=="@empty" then remove=true
+                        elseif origin:sub(1,5)=="text_" then products[#products+1]={text_name=origin:sub(6)}
+                        else products[#products+1]=origin end
+                        if becoming then converted_ids[entity.id]=true end
+                    end
                 elseif target=="@empty" then remove=true
                 else
                     products[#products+1]=target
@@ -2077,6 +2101,9 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     op=objnot and "deny_trait" or "grant_trait",trait=obj.name,
                     target=special and (key == "@text" and {kind="class",value="text"} or {kind="empty",value="empty"})
                         or {kind="archetype",value=key}}}}
+                if obj.name=="revert" and sem.noun=="transform" then
+                    relations[#relations+1]={op=objnot and "forbid_transform" or "transform",source_type=key,target_type="@revert",source=ast.source}
+                end
                 supported=true
             elseif sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "contain" and not objnot
                 and obj.tag == "special" and (obj.name == "all" or obj.name == "empty") then

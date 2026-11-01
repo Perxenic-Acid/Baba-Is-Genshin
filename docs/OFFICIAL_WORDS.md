@@ -135,7 +135,7 @@ A pending word is not complete merely because its name could be stored as a Text
 | property | PUSH | implemented within documented scope |
 | property | RED | implemented within documented scope |
 | property | REVERSE | implemented within documented scope |
-| property | REVERT | pending |
+| property | REVERT | real/Text/EMPTY conversion implemented; scoped LEVEL reversion pending |
 | property | RIGHT | implemented within documented scope |
 | property | ROSY | implemented within documented scope |
 | property | SAD | rule capability/catalog implemented; frontend deferred |

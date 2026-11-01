@@ -618,3 +618,16 @@ see REVERT.md for exact source references and next steps. Also fixed AUTO input
 fallback to inspect authored/default YOU2 declarations even with no matching unit.
 Installed provenance assignment and new regressions verify source tracking,
 creation resets, Preview/Commit/Undo and malformed/stale data rejection.
+
+
+## M9.6J — REVERT ordinary conversion
+
+Public REVERT now lowers indirect IS conversions plus queryable declarations.
+Effective REVERT preempts ordinary/duplicate products, while unchanged origins
+leave other conversions eligible. Preserved identity/NOT, contextual conditions,
+Text origins, EMPTY deletion without HAS and allocator-free virtual EMPTY no-op;
+GROUP/MIMIC/ALL and physical LEVEL blocks retain their usual identity/link behavior.
+WRITE supports the REVERT literal; BECOME remains noun-only per original editor
+argument typing. Installed convert() collection oracle covers 96 combinations;
+public tests cover compiler, conversion, conditions, metadata and atomic Undo.
+Scoped LEVEL reversion remains pending, explicitly partial in the official audit.

@@ -519,3 +519,5 @@ dofile("tests/end.lua")
 dofile("tests/auto.lua")
 
 dofile("tests/original_name.lua")
+
+dofile("tests/revert.lua")

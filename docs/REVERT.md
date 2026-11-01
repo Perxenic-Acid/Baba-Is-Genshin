@@ -1,4 +1,4 @@
-# REVERT prerequisites (M9.6I)
+# REVERT progress (M9.6J)
 
 ## Primary references
 
@@ -33,11 +33,47 @@ cover repeated and duplicate IS/TEXT/WRITE/BECOME conversion, physical Text,
 HAS/MORE reset, invalid data, immutable retype, Preview/Commit/Undo, and execute
 the installed conversion provenance assignment unchanged.
 
-## Not yet implemented
+## Conversion implemented in M9.6J
 
-REVERT remains pending in the official catalog. Public parsing/lowering,
-conversion target selection and same-name suppression, EMPTY removal semantics,
-scoped LEVEL reversion and interaction with competing/negative conversions still
-need implementation and source-oracle tests. Origin tracking alone is not REVERT.
+Public REVERT is registered as the installed quality/property token. Ordinary
+`A IS REVERT` lowers both its property declaration (for FEELING/MIMIC/GROUP and
+negative declaration queries) and an indirect `@revert` conversion target.
+Conditions, NOT and left-side expansions reuse the normal compiler/relations.
+Physical Text and physical level blocks can revert; destination links remain
+identity-bound through retyping. WRITE REVERT writes that literal Text token.
+
+Installed conversion() inserts REVERT declarations before ordinary products;
+convert() stops collecting after the first effective revert. We preserve that
+priority and collapse effective duplicate REVERTs to one product. An unchanged
+original name produces nothing and does not prevent other ordinary conversions.
+IS identity protection and NOT REVERT suppress IS REVERT; a ban on the concrete
+original noun is not a ban on the indirect REVERT target. Return to an original
+Text uses identity-preserving retype; return to EMPTY deletes without HAS.
+Virtual EMPTY IS REVERT produces no persistent units or allocator activity.
+The normal conversion status initialization, terminal handling and Undo apply.
+
+The installed BECOME editor entry has noun arguments (rules.lua defaults argtype
+{0}); REVERT is type 2. Do not expand BECOME syntax to accept arbitrary properties.
+The prepared conversion IR retains its existing verb handling, but the physical
+BECOME REVERT sentence is not accepted by the parser. This differs from WRITE's
+explicit user-requested syntax-word-literal extension.
+
+Tests execute installed convert() unchanged for 96 combinations of original
+name, duplicate REVERT/ordinary targets and condition applicability, comparing
+selected products. Additional public-pipeline tests cover conditions/NOT/BROKEN,
+identity protection, Text/EMPTY, GROUP/MIMIC/ALL, physical LEVEL links, RHS AND,
+WRITE literals, source purity and Undo. The oracle covers product collection,
+not the native MF_emptycreate/remove host implementation. Native success is not
+inferred.
+
+## Remaining scope
+
+Synthetic scoped LEVEL reversion (restore the current room's tracked entrance
+products) is still pending; the catalog therefore marks REVERT partial. Conditional
+scoped LEVEL evaluation retains its existing subsystem gap. Arbitrary metadata
+must not be used to invent missing historical entrance origins. Exact self-negated
+conversion and native host failure interactions outside the existing conversion
+model remain shared parity limits.
+
 BACK remains a separate pending subsystem: it indexes historical per-unit changes
 and conversion creation/removal pairs, rather than restoring original type.

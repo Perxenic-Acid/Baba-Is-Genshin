@@ -292,3 +292,56 @@ local unchanged,p=step(noop,right);local no_order=stages(p);local back=p.stages[
 assert(#back.changes==0 and not back.motion_history and back.tele_suppressed[id])
 assert(not no_order.code_status_after_back and not unchanged.world.entities[id].broken)
 print("PASS: zero-net BACK Text dispatch triggers one code-status barrier before frozen contacts and Undo")
+
+-- SHIFT's blocked facing update invalidates Text reading even if final belt
+-- alignment restores the initial facing, leaving no final Text change.
+local shifted=RW_Undo(RW_Undo(s))
+shifted.world.entities[id].back_init=nil
+for _,belt_id in ipairs({2,3}) do
+ local belt=shifted.world.entities[belt_id];belt.x=3;belt.y=2;belt.direction=belt_id==2 and "Left" or "Right"
+end
+local wall=shifted.world.next_entity_id;shifted.world.next_entity_id=wall+1
+shifted.world.entities[wall]={id=wall,kind="object",class="object",archetype="rock",x=2,y=2,direction="Right"}
+shifted.world.rule_sources[#shifted.world.rule_sources+1]={when={op="always"},effects={
+ {op="deny_trait",target={kind="class",value="text"},trait="back"},
+ {op="grant_trait",target={kind="id",value=2},trait="shift"},
+ {op="grant_trait",target={kind="id",value=3},trait="shift"},
+ {op="grant_trait",target={kind="id",value=2},trait="still"},
+ {op="grant_trait",target={kind="id",value=2},trait="sleep"},
+ {op="grant_trait",target={kind="id",value=3},trait="still"},
+ {op="grant_trait",target={kind="id",value=wall},trait="block_entry"}}}
+local shift_services=copy(services);shift_services.shift=RW_ResolveShift
+local after,p=step(shifted,right,shift_services);local indices=stages(p)
+local shift=p.stages[indices.shift].plan
+for _,change in ipairs(shift.changes) do assert(change.entity_id~=id) end
+assert(after.world.entities[id].x==3 and after.world.entities[id].direction=="Right" and after.world.entities[id].broken==1)
+assert(indices.shift<indices.code_status_after_move and indices.code_status_after_move<indices.sink)
+assert(RW_Undo(after).world==shifted.world and not shifted.world.entities[id].broken)
+for _,reason in ipairs({"word_rule_limit","rule_complexity_limit"}) do
+ local limited=copy(shift_services)
+ limited.evaluate=function(w) if w.entities[id].broken==1 then return nil,reason end;return services.evaluate(w) end
+ local terminal,p=step(shifted,right,limited)
+ assert(terminal.world[reason=="word_rule_limit" and "infinite_loop" or "too_complex"] and terminal.world.entities[id].broken==1)
+ assert(not stages(p).sink and RW_Undo(terminal).world==shifted.world)
+end
+local failing=copy(shift_services)
+failing.preview=function(w,p)
+ if p.reason=="broken_status" then for _,op in ipairs(p.changes) do if op.entity_id==id and op.to==1 then return nil,"injected_shift_status_failure" end end end
+ return RW_PreviewPlan(w,p)
+end
+local rejected,e=RW_PlanTurn(shifted.world,right,failing,shifted)
+assert(not rejected and e.stage=="code_status_after_move" and e.reason=="injected_shift_status_failure")
+assert(not shifted.world.entities[id].broken and shifted.world.entities[1].x==2 and not shifted.world.chance_seed)
+local malformed=copy(shift_services)
+malformed.shift=function() return {consumes_turn=true,changes={},motion_history={{}}} end
+local rejected,e=RW_PlanTurn(shifted.world,right,malformed,shifted)
+assert(not rejected and e.stage=="preview_shift")
+local alignment=copy(shifted)
+alignment.world.rule_sources[#alignment.world.rule_sources+1]={when={op="always"},effects={
+ {op="grant_trait",target={kind="id",value=id},trait="still"}}}
+local unchanged,p=step(alignment,right,shift_services)
+assert(not stages(p).code_status_after_move and not unchanged.world.entities[id].broken)
+for _,row in ipairs(p.stages[stages(p).shift].plan.motion_history or {}) do
+ if row.entity_id==id then assert(row.retain==false and row.from.direction==row.to.direction) end
+end
+print("PASS: zero-net blocked SHIFT Text facing refreshes code status before conversion and Undo")

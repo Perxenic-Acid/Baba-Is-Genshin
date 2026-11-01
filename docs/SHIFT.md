@@ -82,3 +82,24 @@ BACK replays the path once, including equal-update TELE suppression; no transien
 marks/history are stored on entities. See BACK.md M9.7A and shift_history.lua for
 384 installed alignment oracle cases, 32 inverse-path cases and scheduler/Undo
 coverage. Native intra-impulse death/HAS and conditional-cache differences remain.
+
+## M9.7F: effective SHIFT dispatch invalidates reading
+
+Installed tools.lua update()/updatedir() sets updatecode on effective physical
+Text updates. blocks.lua moveblock() final SHIFT alignment instead calls addundo
+and assigns DIR directly, without setting updatecode. A blocked impulse can turn
+a Text and final alignment can restore its starting facing; the empty final Text
+summary must not erase the earlier invalidation.
+
+The movement code-status barrier additionally observes validated effective
+motion_history rows from the pre-conversion motion phases. SHIFT's direct
+alignment rows (retain=false) do not independently trigger this new path. The
+flag is transient plan-local data; intermediate boards are not recompiled, and
+the existing single status pass remains before conversions and frozen contacts.
+Tests use actual SHIFT resolution with a sleeping left-facing source, an awake
+right-facing source and a STOP wall, plus TEXT ON AVATAR IS BROKEN. They cover
+cancelled Text facing, one status barrier, whole-turn Undo and no refresh from
+pure equal-facing alignment, both compile-limit terminal prefixes, atomic late
+failure and malformed history rejection before inspection. Existing final-summary and conservative WORD
+invalidation behavior remains unchanged; this does not claim exact native
+intra-phase code timing or WORD dependency parity.

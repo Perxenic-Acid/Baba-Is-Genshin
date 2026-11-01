@@ -299,6 +299,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             return movement_prefix,nil,trace
         end
     end
+    local movement_reading_event=false
     local automatic_active=false
     for _,effect in ipairs(effects) do
         local trait=effect.trait
@@ -321,6 +322,12 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         stages[#stages+1]={name=motion_phase,plan={consumes_turn=true,changes=shift.changes,random_state=shift.random_state,motion_history=shift.motion_history}}
         local after,problem=services.preview(preview,stages[#stages].plan)
         if not after then return fail("preview_"..motion_phase,problem) end
+        -- SHIFT alignment writes DIR directly and does not invalidate code.
+        -- Effective solver dispatches do, including paths with no net change.
+        for _,row in ipairs(shift.motion_history or {}) do
+            if row.retain~=false and (row.from.x~=row.to.x or row.from.y~=row.to.y or row.from.direction~=row.to.direction)
+                and reading_changed(preview,{row},before_rules) then movement_reading_event=true;break end
+        end
         local destruction_terminal
         if #(shift.destructions or {})>0 then
             local ids,contents={},{}
@@ -356,7 +363,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         return fail("rules_after", post_error)
     end
 
-    if code_status and #code_status.changes>0 and reading_changed(world,movement_prefix.changes,before_rules) then
+    if code_status and #code_status.changes>0 and (movement_reading_event or reading_changed(world,movement_prefix.changes,before_rules)) then
         local updated,why=services.preview(preview,code_status)
         if not updated then return fail("code_status_after_move",why) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,changes=movement.changes,board_shift=movement.board_shift}}}
@@ -2371,7 +2378,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7E initialized")
+    print("[RuleWorld] M9.7F initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

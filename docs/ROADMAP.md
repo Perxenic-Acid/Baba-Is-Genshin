@@ -878,3 +878,11 @@ Real TEXT ON AVATAR IS BROKEN tests cover displacement/turn cancellation,
 no-op latching, both terminal compile limits, atomic failure and Undo. The 432
 installed dispatch oracles additionally verify native updatecode behavior.
 Exact WORD dependency invalidation and other recorded native gaps remain.
+
+## M9.7F — SHIFT zero-net Text code-status barrier
+
+Observe effective validated SHIFT motion history at the existing movement
+code-status barrier, so blocked Text turns cancelled by final alignment still
+refresh reading status before conversion. Direct alignment-only rows do not
+independently invalidate reading. Real solver/compiler tests cover the zero-net
+path, one status pass, no-op alignment and Undo. No frontend/level changes.

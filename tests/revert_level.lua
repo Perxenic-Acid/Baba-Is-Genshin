@@ -171,3 +171,85 @@ local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs))
 assert(#frame.deferred>0)
 for _,relation in ipairs(frame.relations) do assert(relation.op~='forbid_become_level') end
 print('PASS: real LEVEL BECOME preserves facing/origin/links and Undo; synthetic self-negative destruction stays explicitly deferred')
+
+-- Scoped ALL products use the authored ordinary palette; NOT ALL only denies
+-- that expansion, while ordinary negative targets filter matching products.
+for _,case in ipairs({
+ {copies=1}, {copies=2}, {copies=1,ban_flag=true},
+ {copies=1,ban_all=true,literal_flag=true}, {copies=1,ban_all=true},
+ {copies=0,empty=true}
+}) do
+ local rows={}
+ for i=1,case.copies do rows[#rows+1]={'LEVEL','BECOME','ALL'} end
+ if case.ban_flag then rows[#rows+1]={'LEVEL','BECOME','NOT','FLAG'} end
+ if case.ban_all then rows[#rows+1]={'LEVEL','BECOME','NOT','ALL'} end
+ if case.literal_flag then rows[#rows+1]={'LEVEL','BECOME','FLAG'} end
+ if case.empty then rows[#rows+1]={'LEVEL','BECOME','EMPTY'} end
+ local tree,parent=fixture({},false,false,rows)
+ local child=RW_GetActiveLevel(tree).world;local frame=assert(RW_CompileWorld(child,cs));assert(#frame.deferred==0)
+ local expected={}
+ if not case.ban_all then for i=1,case.copies do for _,name in ipairs(RW_NounPalette(child)) do
+  if not (case.ban_flag and name=='flag') then expected[name]=(expected[name] or 0)+1 end
+ end end end
+ if case.literal_flag then expected.flag=(expected.flag or 0)+1 end
+ local p,e=RW_PlanLevelAction(tree,{type='wait'},services);assert(p,e and e.reason)
+ local n,r=RW_CommitLevelTree(tree,p);assert(r.accepted,r.reason)
+ if next(expected) then
+  assert(n.active_id==parent)
+  local got={};for _,unit in pairs(RW_GetActiveLevel(n).world.entities) do if unit.level_link then got[unit.archetype]=(got[unit.archetype] or 0)+1 end end
+  for name,count in pairs(expected) do assert(got[name]==count,name);got[name]=nil end
+  assert(not next(got))
+ else assert(n.active_id==tree.active_id and n.instances[parent].world==tree.instances[parent].world) end
+ assert(RW_UndoLevelTree(n).level_transforms==tree.level_transforms)
+end
+local tree=fixture({},false,false,{{'LEVEL','BECOME','EMPTY'}})
+local session=RW_GetActiveLevel(tree)
+session.world.entities[1]={id=1,kind='object',class='object',archetype='level_block',x=18,y=18,direction='Down'}
+local p,e=RW_PlanTurn(session.world,{type='wait'},services);assert(p,e and e.reason)
+local n,r=RW_Commit(session,p);assert(r.accepted and not n.world.entities[1] and not p.level_transform)
+assert(RW_Undo(n).world==session.world)
+print('PASS: scoped LEVEL BECOME ALL multiplicity/own negative origins, inert scoped EMPTY and real Level EMPTY deletion/Undo')
+
+-- Execute original subrules RHS ALL expansion plus original conversion() queue
+-- building, so the raw createall marker is not mistaken for a scoped product.
+local file=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/rules.lua]],'rb'))
+local rules_source=file:read('*a');file:close()
+local all_branch=assert(rules_source:match('(\t\t\tif %(rule%[3%] == "all"%).-)\n\t\t\tif %(rule%[1%] == "all"%)'))
+local native_env=setmetatable({featureindex={},objectlist={rock=true,flag=true,all=true,empty=true,text=true,level=true},
+ findnoun=function(name) return name=='all' or name=='empty' or name=='text' or name=='level' end,
+ invertconds=function() return {{enabled=false}} end},{__index=_G})
+local expand=assert(load('return function(rule,conds,ids,tags) '..all_branch..' end','@installed_BECOME_ALL_subrules','t',native_env))()
+assert(load(source,'@installed_BECOME_ALL_convert','t',native_env))()
+native_env.map={[0]={}};native_env.nlist={brief={}};native_env.unitreference={rock='rock',flag='flag'}
+native_env.getmat=function(name) return native_env.objectlist[name] and name or nil end
+native_env.getmat_text=function() return true end
+local count=0
+for copies=1,3 do for blocked=0,1 do
+ local features={};native_env.featureindex={level={}}
+ if blocked==1 then native_env.featureindex['not all']={{{'level','become','not all'},{}}} end
+ native_env.addoption=function(rule,conditions)
+  local record={rule,conditions};features[#features+1]=record
+  native_env.featureindex.level[#native_env.featureindex.level+1]=record
+ end
+ for i=1,copies do native_env.addoption({'level','become','all'},{});expand({'level','become','all'},{},{},{}) end
+ native_env.features=features;native_env.levelconversions={};native_env.conversion(true)
+ local got={}
+ for _,mat in ipairs(native_env.levelconversions) do
+  local enabled=true;for _,condition in ipairs(mat[2]) do if condition.enabled==false then enabled=false end end
+  if enabled and (mat[1]=='rock' or mat[1]=='flag') then got[mat[1]]=(got[mat[1]] or 0)+1 end
+ end
+ local rows={};for i=1,copies do rows[#rows+1]={'LEVEL','BECOME','ALL'} end
+ if blocked==1 then rows[#rows+1]={'LEVEL','BECOME','NOT','ALL'} end
+ local tree=fixture({},false,false,rows);local w=RW_GetActiveLevel(tree).world
+ w.language.nouns={LEVEL={tag='level',block_type='level_block'},ROCK='rock',FLAG='flag'}
+ local p,e=RW_PlanTurn(w,{type='wait'},services);assert(p,e and e.reason)
+ local products=type(p.level_transform)=='table' and p.level_transform or p.level_transform and {p.level_transform} or {}
+ for _,name in ipairs(products) do assert(got[name] and got[name]>0);got[name]=got[name]-1 end
+ for _,n in pairs(got) do assert(n==0) end
+ count=count+1
+end end
+assert(count==6)
+print('PASS: installed subrules/conversion scoped BECOME ALL expansion oracle (6 duplicate/NOT ALL cases)')
+native_env.features={{{'level','become','empty'},{}}}
+native_env.featureindex={level=native_env.features};native_env.levelconversions={}
+native_env.conversion(true);assert(#native_env.levelconversions==0)

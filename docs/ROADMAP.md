@@ -915,3 +915,12 @@ reuse the 50-product terminal limit. BECOME LEVEL selects original scoped REVERT
 Real compiler/tree tests, 32 installed selection oracle cases and physical
 49/50/51-product boundaries cover the change. Conditional scope, ALL/EMPTY and
 self-negative level destruction remain explicit gaps in BECOME.md.
+
+## M9.7J — scoped LEVEL BECOME ALL / EMPTY
+
+Expand scoped ALL to the authored ordinary palette with duplicate multiplicity
+and explicit ALL-origin denial tracking. Keep literal products independent of
+BECOME NOT ALL and honor per-noun bans. Recognize EMPTY as no scoped product while
+retaining physical Level-block deletion. Compiler/tree/Undo tests plus unchanged
+installed subrules/conversion queue oracles cover these paths. Conditional scoped
+LEVEL and self-negative level destruction remain explicit BECOME gaps.

@@ -1,4 +1,4 @@
-# BECOME (M9.7I)
+# BECOME (M9.7J)
 
 Primary reference: installed Baba Is You `Data/convert.lua`, conversion() and
 convert(), and `Data/rules.lua` identity-protection and negative-rule processing.
@@ -26,8 +26,8 @@ Native acceptance is waived by the user; offline results do not establish native
 runtime parity. BECOME is available as a loose full-name word in the sparse MOTION
 room.
 
-Deliberate gaps: conditional scoped LEVEL BECOME, scoped ALL/EMPTY targets and
-synthetic self-negative destruction remain deferred (see M9.7I below). Existing IS self-negation
+Deliberate gaps: conditional scoped LEVEL BECOME and synthetic self-negative
+destruction remain deferred (see M9.7I/J below). Existing IS self-negation
 precedence is preserved; mixed negative self-conversions beyond the tested matrix
 are not claimed as exhaustive original parity. EMPTY lifecycle/HAS limitations and
 ALL authored-vocabulary boundaries remain as documented in SPECIAL_NOUNS.md.
@@ -62,3 +62,32 @@ Remaining scoped gaps: conditional LEVEL surroundings; ALL/EMPTY target handling
 LEVEL BECOME NOT LEVEL's original error/destroylevel path. That self-negative
 form is explicitly deferred instead of being misrepresented as a ban on REVERT.
 The earlier blanket scoped LEVEL deferral is superseded by this section.
+
+## Scoped ALL and EMPTY targets (M9.7J)
+
+Installed rules.lua subrules() expands RHS ALL for verbs other than IS into
+ordinary objectlist targets. conversion(true) retains the raw ALL/createall
+marker in its queue, but dolevelconversions() has no material for that marker;
+only the ordinary expansion products become parent entrances. Our authored ALL
+palette deliberately excludes TEXT/EMPTY/LEVEL, as for existing ordinary ALL.
+
+LEVEL BECOME ALL now emits scoped products for each ordinary palette member,
+with full duplicate clause multiplicity. Retain origin=@all on these commands:
+BECOME NOT ALL suppresses only ALL-derived products, leaving a literal BECOME
+FLAG intact. BECOME NOT FLAG suppresses matching expanded products too. The
+real-unit LEVEL BECOME ALL relation still uses the ordinary conversion subsystem.
+IS identity protection does not suppress these scoped BECOME products.
+
+LEVEL BECOME EMPTY is recognized without a synthetic map conversion: installed
+conversion(true) emits no conversion material for EMPTY. It still lowers the
+real level-block conversion relation, which deletes those units without HAS.
+There is no synthetic EMPTY entity, allocation or parent-entry transform.
+
+Real compiler/tree tests cover one/two ALL clauses, per-noun and ALL-origin bans,
+literal products beside a banned expansion, inert scoped EMPTY, real Level EMPTY
+deletion and Undo. Six source oracles execute unchanged installed RHS ALL expansion
+plus conversion(true), preserving duplicate/NOT ALL behavior; a native EMPTY
+queue assertion verifies its lack of scoped products. Conditional scoped LEVEL
+and self-negative destroylevel remain open. Broader ordinary ALL conversion
+lifecycle differences remain in their existing subsystem scope; this batch does
+not claim native objectlist iteration order or frontend acceptance.

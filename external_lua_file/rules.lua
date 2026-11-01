@@ -982,7 +982,7 @@ end
 -- M9.3C: typed Rule AST -> property IR + conversion declarations.
 -- Default IS executes positive properties/conversions; HAS declares contents.
 -- A level registry may assign those capabilities to a different relation ID.
-local function lower_simple(ast_rules, registry)
+local function lower_simple(ast_rules, registry,world)
     if type(ast_rules) ~= "table" then
         return nil, "invalid_ast_rules"
     end
@@ -1052,9 +1052,19 @@ local function lower_simple(ast_rules, registry)
             if term.tag=="noun" and term.type then
                 if term.type.tag=="object" then physical=term.type.name;scoped=physical
                 elseif term.type.tag=="level" then physical=term.type.block_type or "level_block";scoped="@revert" end
-            elseif term.tag=="special" and term.name=="text" then physical="@text";scoped="text_level" end
-            if scoped and not (negated and scoped=="@revert") and (not negated or semantics.negative_noun=="forbid_become") then
-                conversions[#conversions+1]={op=negated and "forbid_become_level" or "become_level",target_type=scoped,source=ast.source}
+            elseif term.tag=="special" then
+                if term.name=="text" then physical="@text";scoped="text_level"
+                elseif term.name=="all" or term.name=="empty" then physical="@"..term.name;scoped=physical end
+            end
+            if scoped and not (negated and scoped=="@revert") and (scoped~="@all" or negated or world)
+                and (not negated or semantics.negative_noun=="forbid_become") then
+                if scoped=="@all" and not negated then
+                    for _,name in ipairs(RW_NounPalette(world)) do
+                        conversions[#conversions+1]={op="become_level",target_type=name,origin="@all",source=ast.source}
+                    end
+                elseif scoped~="@empty" then
+                    conversions[#conversions+1]={op=negated and "forbid_become_level" or "become_level",target_type=scoped,source=ast.source}
+                end
                 conversions[#conversions+1]={op=negated and "forbid_become" or "become",
                     source_type=subject_type.block_type or "level_block",target_type=physical,source=ast.source,when={op="always"}}
             else deferred[#deferred+1]={reason="unsupported_level_become",rule=ast} end
@@ -2199,7 +2209,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     supported=true
                 else
                     if contextual then rule.when={op="always"} end
-                    local g,d,r=lower_simple({rule},registry)
+                    local g,d,r=lower_simple({rule},registry,world)
                     if not g then return nil,d end
                     append(generated,g);append(relations,r);supported=supported or #d == 0
                 end
@@ -2210,7 +2220,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 supported=false -- Scoped LEVEL surroundings require the campaign context.
             else
                 if contextual then rule.when={op="always"} end
-                local g,d,r=lower_simple({rule},registry)
+                local g,d,r=lower_simple({rule},registry,world)
                 if not g then return nil,d end
                 append(generated,g);append(relations,r);supported=supported or #d == 0
             end

@@ -394,7 +394,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if conversion.op == "transform_level" then
             if not protected then level_targets[#level_targets+1]=conversion.target_type end
         elseif conversion.op=="become_level" then
-            if not become_bans[conversion.target_type] then
+            if not become_bans[conversion.target_type] and not (conversion.origin=="@all" and become_bans["@all"]) then
                 if conversion.target_type=="@revert" then become_revert=true
                 else level_targets[#level_targets+1]=conversion.target_type end
             end
@@ -2401,7 +2401,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7I initialized")
+    print("[RuleWorld] M9.7J initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

@@ -9,9 +9,12 @@ services.active=RW_GetActiveLevel;services.update=RW_UpdateActiveLevel;services.
 services.selectors=RW_LevelSelectorIDs;services.place_selectors=RW_PlaceLevelSelectors;services.bind_entry=RW_BindLevelEntry
 services.commit_session=RW_Commit;services.outcome=RW_RecordLevelOutcome;services.candidates=RW_LevelSelectionCandidates
 services.win=RW_HasWinContact;services.level_outcome=RW_ResolveLevelPropertyOutcome
-local function fixture(rows)
+local function fixture(rows,parent_objects)
  local root=RW_CreateSession().world
  root.entities={[1]={id=1,kind='object',class='object',archetype='level_block',x=3,y=3,direction='Left',level_link={target='child',definition_id='child',source_type='level_block'}}};root.next_entity_id=10
+ for index,obj in ipairs(parent_objects or {}) do
+  local id=index+1;root.entities[id]={id=id,kind='object',class='object',archetype=obj[1],x=3+obj[2],y=3+obj[3],direction='None'}
+ end
  local w=RW_CreateSession().world;w.width=32;w.height=32
  w.language.nouns.LEVEL={tag='level',block_type='level_block'};w.language.nouns.ROCK='rock';w.language.nouns.FLAG='flag'
  w.entities={[1]={id=1,kind='object',class='object',archetype='avatar',x=22,y=22,direction='Up'},
@@ -88,7 +91,7 @@ for _,prefix in ipairs({'OFTEN','SELDOM'}) do
 end
 assert(differed.often and differed.seldom and checked==64)
 -- Parent-dependent spatial tests remain deferred, including mixtures with IDLE.
-for _,words in ipairs({{'LEVEL','ON','ROCK','IS','SAFE'},{'IDLE','LEVEL','ON','ROCK','IS','SAFE'}}) do
+for _,words in ipairs({{'LEVEL','ABOVE','ROCK','IS','SAFE'},{'IDLE','LEVEL','ABOVE','ROCK','IS','SAFE'}}) do
  local tree=fixture({words});local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#frame.deferred>0)
 end
 print('PASS: scoped input-prefix BROKEN/protection/destruction, 64 pure chance plans with independent map/physical identities, and explicit spatial deferral')
@@ -190,3 +193,45 @@ for _,case in ipairs({
  local n=act(tree,wait);assert((n.active_id==parent)==case.fires,table.concat(row,' '))
 end
 print('PASS: scoped LEVEL WITHOUT global shortages, duplicate quotas, synthetic/physical LEVEL counts, complements and Undo')
+
+for _,case in ipairs({
+ {relation='ON',params={'ROCK'},parent={{'rock',0,0}},fires=true},
+ {relation='ON',params={'ROCK'},fires=false},
+ {relation='ON',params={'ROCK'},child=true,fires=true},
+ {relation='ON',params={'ROCK','AND','ROCK'},parent={{'rock',0,0}},fires=true},
+ {relation='ON',params={'ROCK','AND','ROCK'},child=true,fires=false},
+ {relation='NEAR',params={'ROCK'},parent={{'rock',1,1}},fires=true},
+ {relation='NEXTTO',params={'ROCK'},parent={{'rock',1,1}},fires=true},
+ {relation='NEXTTO',params={'ROCK'},parent={{'rock',0,0}},fires=false},
+ {relation='ON',params={'TEXT'},fires=true},
+ {relation='ON',params={'LEVEL'},fires=true},
+ {relation='NEAR',params={'LEVEL'},fires=false},
+ {relation='ON',params={'ROCK'},negative=true,fires=true}
+}) do
+ local row={'LEVEL'};if case.negative then row[#row+1]='NOT' end
+ row[#row+1]=case.relation;for _,word in ipairs(case.params) do row[#row+1]=word end
+ row[#row+1]='BECOME';row[#row+1]='FLAG'
+ local tree,parent=fixture({row},case.parent);local w=RW_GetActiveLevel(tree).world
+ if case.child then w.entities[3]={id=3,kind='object',class='object',archetype='rock',x=25,y=25,direction='Right'} end
+ local f=assert(RW_CompileWorld(w,cs));assert(#f.deferred==0)
+ local n=act(tree,wait);assert((n.active_id==parent)==case.fires,table.concat(row,' '))
+end
+for _,action in ipairs({wait,right}) do
+ local tree,parent=fixture({{'IDLE','LEVEL','ON','ROCK','BECOME','FLAG'}},{{'rock',0,0}})
+ local n=act(tree,action);assert((n.active_id==parent)==(action==wait))
+end
+print('PASS: scoped spatial tree conversions use child contents plus saved parent regions, repeatable names, diagonal NEXTTO, mixed IDLE and whole-tree Undo')
+
+local tree=fixture({{'LEVEL','ON','ROCK','IS','POWER'}})
+local w=RW_GetActiveLevel(tree).world
+w.entities[3]={id=3,kind='object',class='object',archetype='rock',x=25,y=25,direction='Right'}
+local frame=assert(RW_CompileWorld(w,cs))
+local condition={op='spatial',clauses={{relation='on',negated=false,parameters={{tag='noun',type={tag='object',name='rock'}}}}}}
+local context={};for k,v in pairs(w) do context[k]=v end
+context._condition_rules=frame.rules
+local map={id=0,class='level',x=0,y=0,direction='None'}
+assert(RW_TestEntityCondition(context,condition,map)==true)
+context.entities={};for id,e in pairs(w.entities) do if id~=3 then context.entities[id]=e end end
+assert(RW_TestEntityCondition(context,condition,map)==false)
+assert(w.entities[3] and not w._condition_rules and #w.level_surrounds.o==0)
+print('PASS: scoped spatial frozen declarations observe child deletion without changing saved surroundings or source runtime')

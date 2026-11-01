@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7P)
+# Scoped LEVEL conditions (M9.7R)
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -98,3 +98,27 @@ execute installed getlevelsurrounds across six intrinsic directions and sparse/
 stacked neighborhoods, including transformed Text entrances and explicit unit
 order. They also cover pre-reset movement, reload isolation, schema rejection and
 whole-tree Undo. Startup remains 1,980,000 instructions; native success is unclaimed.
+
+## M9.7R ON / NEAR / NEXTTO consumers
+
+Execute the installed synthetic LEVEL branches, rather than transplanting ordinary
+object geometry. Search child contents globally first, consuming distinct child
+identities (and vacancy witnesses for EMPTY). ON may consume real Level shapes;
+NEAR/NEXTTO do not take this positive LEVEL shortcut. Positive TEXT succeeds even
+without a physical Text witness. Negative parameters can consume Text here, unlike
+ordinary spatial complement queries. Child complement traversal uses the engine's
+existing stable identity-order normalization instead of native unitlists hash order.
+
+Then search saved entrance names: ON uses o; NEAR uses all nine regions; NEXTTO uses
+all eight non-o regions (including diagonals in the original synthetic branch).
+Parent names are reusable across repeated parameters, and '-' remains a literal
+name for complementary matching, not an EMPTY object. Preserve concrete-before-
+complement parameter order, NOT-clause inversion and current/frozen child contents.
+No query result or witness set is saved to world state. Physical Level blocks keep
+ordinary spatial semantics and never use the enclosing map's surroundings.
+
+Compiler/tree cases cover parent-only/child-only witnesses, duplicate parameters,
+Text/Level special behavior, mixed IDLE and conversion/Undo. The installed branch
+oracle covers 9,216 normalized cases, full/empty child rooms, parent patterns and
+positive/negative parameters. ABOVE/BELOW/side rays, FACING/FACEDBY/SEEING remain
+explicit scoped gaps; ordinary implementations are unchanged.

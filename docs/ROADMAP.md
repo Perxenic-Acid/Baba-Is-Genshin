@@ -996,3 +996,14 @@ Respect custom unit order, stacked names, Text/Level naming and native empty-cel
 sentinels. Installed getlevelsurrounds oracle, malformed-data checks, reload and
 Undo tests pass with full regressions; startup stays 1,980,000. This is transport
 infrastructure: scoped parent-spatial consumers are the next integration step.
+
+## M9.7R — scoped LEVEL ON / NEAR / NEXTTO
+
+Consume entry surroundings and live/frozen child contents using the original
+synthetic LEVEL branches: child quotas before reusable parent names, native Text
+and Level special cases, EMPTY witnesses, NOT and diagonal synthetic NEXTTO.
+Preserve physical-block semantics separately. Real compiler/tree conversion/Undo
+checks and 9,216 installed normalized source cases pass. Remaining scoped spatial
+branches are documented in LEVEL_CONDITIONS.md; frontend/layouts remain deferred.
+Full regressions, catalog/layout audits and diff checks pass; startup remains
+1,980,000 instructions. Frozen-frame child deletion is covered independently.

@@ -97,8 +97,10 @@ s=fixture({{'ROCK','IS','SAFE'},{'ROCK','ON','CRATE','IS','NOT','SAFE'}})
 p=frame(s);assert(not p.entities[2].behaviors.safe and p.entities[3].behaviors.safe)
 s=fixture({{'LEVEL','ON','ROCK','IS','SAFE'}})
 s.world.language.nouns.LEVEL={tag='level',block_type='level_block'}
-p,f=frame(s);assert(#f.deferred==1 and #f.relations==0)
-print('PASS: complete subject-AND path multiplicity, ALL/NOT ALL parameters, conditional denials and explicit scoped-LEVEL boundary')
+p,f=frame(s);assert(#f.deferred==0)
+local scoped=false;for _,r in ipairs(f.relations) do if r.op=="level_trait" and r.trait=="safe" then scoped=true end end
+assert(scoped)
+print('PASS: complete subject-AND path multiplicity, ALL/NOT ALL parameters, conditional denials and scoped-LEVEL ON child witnesses')
 
 s=fixture({{'ROCK','ON','NOT','EMPTY','IS','SAFE'}});p=frame(s)
 assert(p.entities[2].behaviors.safe)

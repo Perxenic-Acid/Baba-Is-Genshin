@@ -492,6 +492,46 @@ local function without_condition(world,parameters,entity,negated)
     if negated then return not (allfound>0) end
     return allfound==#parameters
 end
+-- Synthetic LEVEL ON/NEAR/NEXTTO first search the child contents, then
+-- saved entrance names. Parent names are reusable; child identities are consumed.
+local function level_spatial_condition(world,parameters,relation,negated)
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    ids=world.unit_order or ids
+    local used,allfound={},0
+    local surrounds=world.level_surrounds or {}
+    local regions=relation=="on" and {"o"} or relation=="nextto"
+        and {"r","u","l","d","dr","ur","ul","dl"}
+        or {"r","u","l","d","dr","ur","ul","dl","o"}
+    for _,p in ipairs(parameters) do
+        local wanted=p.name=="@text" and "text" or p.name=="@level" and "level"
+            or p.name=="@empty" and "empty" or p.name
+        local matched=false
+        if p.negative or (wanted~="empty" and wanted~="level") or (relation=="on" and wanted=="level") then
+            for _,id in ipairs(ids) do local e=world.entities[id]
+                local name=e.class=="text" and "text" or e.archetype=="level_block" and "level" or e.archetype
+                if not used[id] and (not p.negative and name==wanted or p.negative and name~=wanted) then
+                    used[id]=true;matched=true;break
+                end
+            end
+        elseif wanted=="empty" then
+            local occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
+            for y=1,world.height do for x=1,world.width do
+                local cell=x+y*world.width
+                if not matched and not occupied[x..":"..y] and not used[cell] then
+                    used[cell]=true;matched=true
+                end
+            end end
+        end
+        if not matched and not (wanted=="text" and not p.negative) then
+            for _,region in ipairs(regions) do for _,name in ipairs(surrounds[region] or {}) do
+                if not p.negative and name==wanted or p.negative and name~=wanted then matched=true end
+            end end
+        end
+        if matched or (wanted=="text" and not p.negative) then allfound=allfound+1 end
+    end
+    local found=#parameters>0 and allfound==#parameters
+    return negated and not found or not negated and found
+end
 -- FACEDBY visits neighbors first, then parameters (unlike forward FACING).
 local function facedby_condition(world,parameters,entity,negated)
     local vectors={{1,0},{0,-1},{-1,0},{0,1}}
@@ -622,7 +662,9 @@ function RW_TestEntityCondition(world,node,entity)
             end
         end
         for _,index in ipairs(remove) do table.remove(parameters,index-offset);offset=offset+1 end
-        if clause.relation=="often" or clause.relation=="seldom" then
+        if entity.class=="level" and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto") then
+            result=result and level_spatial_condition(world,parameters,clause.relation,clause.negated)
+        elseif clause.relation=="often" or clause.relation=="seldom" then
             if #parameters~=0 or (clause.chance_key~=nil and type(clause.chance_key)~="string") then return nil,"invalid_chance_clause" end
             local identity=entity.class=="empty" and ("empty:"..entity.x..":"..entity.y) or tostring(entity.id)
             local key=(clause.chance_key or clause.relation)..":"..identity
@@ -2141,7 +2183,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             if clause.relation~="idle" and clause.relation~="often" and clause.relation~="seldom"
                 and clause.relation~="powered" and clause.relation~="powered2" and clause.relation~="powered3"
                 and clause.relation~="lonely" and clause.relation~="feeling"
-                and clause.relation~="without" then return false end
+                and clause.relation~="without" and clause.relation~="on"
+                and clause.relation~="near" and clause.relation~="nextto" then return false end
         end
         for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
         return true

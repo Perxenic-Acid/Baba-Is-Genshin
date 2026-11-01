@@ -562,3 +562,4 @@ dofile("tests/back_update_history.lua")
 
 dofile("tests/level_prefixes.lua")
 dofile("tests/level_surrounds.lua")
+dofile("tests/reference_level_spatial.lua")

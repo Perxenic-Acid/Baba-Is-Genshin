@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6M)
+# BACK infrastructure progress (M9.6N)
 
 ## Installed primary references
 
@@ -46,12 +46,27 @@ metadata-only turns, plan/query ownership, rejection purity, cap alignment, lega
 history, terminal Undo, tree/sibling isolation and boundary/whole-tree restoration.
 Native success is not inferred.
 
+## Selected-frame motion primitive
+
+RW_PlanBackMotion accepts explicit identity/snapshot/journal selections. It reconstructs
+implicit historical facing forward, then replays updates newest-first. Displacements
+restore absolute historical positions; direction-only and zero-displacement updates
+retain the current position. Collision, FLOAT and motion locks do not intervene.
+Paradox-map presence suppresses playback. Every replayed update returns a transient
+TELE-suppression mark, even when the final plan has no persistent changes.
+
+The pure plan preserves identity/links and uses ordinary atomic Commit/Undo. Invalid
+or stale records fail without writes. Selected lifecycle operations explicitly return
+back_conversion_history_pending; they are never silently skipped. An unchanged
+installed BACK update-branch oracle covers 72 combinations of motion records,
+current positions/facing and paradox presence. No scheduler or startup work is added.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
 word yet. Activation/retraction clocks, the native current/open-frame index mapping,
-per-unit historical motion and conversion playback, born/dead/paradox handling,
-tele suppression, status/reading barriers and synthetic LEVEL/EMPTY semantics
+automatic per-unit history selection and conversion playback, born/dead handling,
+TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
 still need implementation and source-oracle verification. Native unchanged-turn
 pruning and history beyond this engine's existing 128-turn window remain explicit
 integration limits. Do not treat the journal infrastructure as completed BACK.

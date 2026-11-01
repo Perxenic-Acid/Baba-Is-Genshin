@@ -1577,3 +1577,81 @@ function RW_ResolveHold(world)
     end
     return {consumes_turn=true,changes=changes,reason="hold"}
 end
+
+
+-- BACK motion primitive for explicitly selected historical frames. Activation,
+-- eligibility and age selection belong to the future status/scheduler integration.
+-- Conversion rows deliberately fail until their create/remove playback is ready.
+function RW_PlanBackMotion(world,selections,paradox)
+    if type(world)~="table" or type(world.entities)~="table" then return nil,"invalid_world" end
+    if type(world.width)~="number" or world.width%1~=0 or world.width<1
+        or type(world.height)~="number" or world.height%1~=0 or world.height<1 then return nil,"invalid_world" end
+    if world.infinite_loop then return nil,"infinite_loop_undo_only" end
+    if world.too_complex then return nil,"too_complex_undo_only" end
+    local function list(v)
+        if type(v)~="table" then return false end
+        local n=0;for k in pairs(v) do if type(k)~="number" or k<1 or k%1~=0 then return false end;n=n+1 end
+        return n==#v
+    end
+    if not list(selections) or (paradox~=nil and type(paradox)~="table") then return nil,"invalid_back_selection" end
+    paradox=paradox or {}
+    local directions={Left=true,Up=true,Right=true,Down=true,Mid=true,None=true}
+    local function point(x,y,d)
+        return type(x)=="number" and x%1==0 and type(y)=="number" and y%1==0
+            and x>=1 and x<=world.width and y>=1 and y<=world.height and directions[d]==true
+    end
+    local changes,suppressed,seen={},{},{}
+    for _,selection in ipairs(selections) do
+        if type(selection)~="table" then return nil,"invalid_back_selection" end
+        local id=selection.entity_id;local entity=world.entities[id]
+        if type(id)~="number" or id%1~=0 or id<1 or not entity or seen[id] then return nil,"invalid_back_identity" end
+        seen[id]=true
+        local before,record=selection.before,selection.record
+        if type(before)~="table" or before.id~=id or not point(before.x,before.y,before.direction or "None") then return nil,"invalid_back_source" end
+        if type(record)~="table" or not list(record.phases) or #record.phases==0 then return nil,"back_history_unavailable" end
+        local x,y,d=before.x,before.y,before.direction or "None"
+        local rows={}
+        for _,phase in ipairs(record.phases) do
+            if type(phase)~="table" or not list(phase.changes) then return nil,"invalid_back_history" end
+            for _,op in ipairs(phase.changes) do
+                if type(op)~="table" then return nil,"invalid_back_history" end
+                if op.entity_id==id then
+                    if op.kind=="move" then
+                        local from,to=op.from,op.to
+                        if type(from)~="table" or type(to)~="table" or from.x~=x or from.y~=y
+                            or (from.direction~=nil and from.direction~=d) then return nil,"stale_back_source" end
+                        local nd=to.direction or d
+                        if not point(to.x,to.y,nd) then return nil,"invalid_back_history" end
+                        rows[#rows+1]={x=x,y=y,direction=d,moved=x~=to.x or y~=to.y}
+                        x,y,d=to.x,to.y,nd
+                    elseif op.kind=="direction" then
+                        if op.from~=d then return nil,"stale_back_source" end
+                        if not directions[op.to] then return nil,"invalid_back_history" end
+                        rows[#rows+1]={x=x,y=y,direction=d,moved=false};d=op.to
+                    elseif op.kind=="create" or op.kind=="delete" or op.kind=="retype" or op.kind=="transform" then
+                        return nil,"back_conversion_history_pending"
+                    elseif op.kind~="broken" and op.kind~="holder" and op.kind~="followed" then
+                        return nil,"invalid_back_history"
+                    end
+                end
+            end
+        end
+        x,y,d=entity.x,entity.y,entity.direction or "None"
+        if not point(x,y,d) then return nil,"invalid_back_identity" end
+        if paradox[id]==nil then
+            for index=#rows,1,-1 do
+                local row=rows[index]
+                if row.moved then x,y=row.x,row.y end
+                d=row.direction;suppressed[id]=true
+            end
+        end
+        if x~=entity.x or y~=entity.y then
+            changes[#changes+1]={kind="move",entity_id=id,
+                from={x=entity.x,y=entity.y,direction=entity.direction or "None"},to={x=x,y=y,direction=d}}
+        elseif d~=(entity.direction or "None") then
+            changes[#changes+1]={kind="direction",entity_id=id,from=entity.direction or "None",to=d}
+        end
+    end
+    table.sort(changes,function(a,b) return a.entity_id<b.entity_id end)
+    return {consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back"}
+end

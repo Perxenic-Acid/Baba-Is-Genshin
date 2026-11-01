@@ -667,3 +667,14 @@ alignment; rejection writes nothing, legacy frames stay unavailable, and the
 An unchanged installed addundo() oracle verifies newest-first motion-row ordering.
 BACK itself remains pending: activation clocks, playback and native index mapping
 are not claimed by this prerequisite. See BACK.md for source details and limits.
+
+
+## M9.6N — selected-frame BACK motion
+
+Added a pure explicitly selected journal-frame motion planner: absolute historical
+positions, direction-only updates, reconstructed implicit facing, paradox presence
+and transient TELE suppression. Ordinary atomic Commit/Undo preserves identities
+and links. Lifecycle history fails explicitly pending conversion playback. Added 72
+unchanged installed BACK update-branch oracle cases. Public BACK registration,
+activation clocks, native frame mapping and scheduler integration remain pending;
+see BACK.md. No native-success claim or frontend changes.

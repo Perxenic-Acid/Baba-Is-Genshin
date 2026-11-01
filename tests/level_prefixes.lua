@@ -91,7 +91,7 @@ for _,prefix in ipairs({'OFTEN','SELDOM'}) do
 end
 assert(differed.often and differed.seldom and checked==64)
 -- Parent-dependent spatial tests remain deferred, including mixtures with IDLE.
-for _,words in ipairs({{'LEVEL','FACING','ROCK','IS','SAFE'},{'IDLE','LEVEL','FACING','ROCK','IS','SAFE'}}) do
+for _,words in ipairs({{'LEVEL','FACEDBY','ROCK','IS','SAFE'},{'IDLE','LEVEL','FACEDBY','ROCK','IS','SAFE'}}) do
  local tree=fixture({words});local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));assert(#frame.deferred>0)
 end
 print('PASS: scoped input-prefix BROKEN/protection/destruction, 64 pure chance plans with independent map/physical identities, and explicit spatial deferral')
@@ -255,3 +255,18 @@ for _,side in ipairs({'ABOVE','BELOW','BESIDELEFT','BESIDERIGHT'}) do
  local n=act(tree,wait);assert((n.active_id==parent)==(side=='BELOW' or side=='BESIDERIGHT'))
 end
 print('PASS: scoped directional EMPTY retains native lookup asymmetry without crashing on a missing unitlists.empty')
+
+for _,direction in ipairs({'Right','Up','Left','Down','Mid','None'}) do
+ for _,params in ipairs({{'ROCK'},{'ROCK','AND','ROCK'},{'RIGHT'},{'NOT','ROCK'}}) do
+  local row={'LEVEL','FACING'};for _,word in ipairs(params) do row[#row+1]=word end
+  row[#row+1]='BECOME';row[#row+1]='FLAG'
+  local tree,parent=fixture({row},{{'rock',-1,0}})
+  local w=RW_GetActiveLevel(tree).world
+  local dirs={Right=0,Up=1,Left=2,Down=3,Mid=4,None=4};w.level_surrounds.dir=dirs[direction]
+  local f=assert(RW_CompileWorld(w,cs));assert(#f.deferred==0)
+  local n=act(tree,wait)
+  local expected=direction=='Left' and params[1]=='ROCK' or direction~='Left' and direction~='Mid' and direction~='None' and params[1]=='NOT'
+  assert((n.active_id==parent)==expected,direction..':'..table.concat(params,' '))
+ end
+end
+print('PASS: scoped LEVEL FACING uses saved entrance direction/region, repeatable names, literal direction arguments, none-facing and whole-tree Undo')

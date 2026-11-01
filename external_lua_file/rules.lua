@@ -533,6 +533,21 @@ local function level_spatial_condition(world,parameters,relation,negated)
     local found=#parameters>0 and allfound==#parameters
     return negated and not found or not negated and found
 end
+local function level_facing_condition(world,parameters,negated)
+    local surrounds=world.level_surrounds or {}
+    local side=({[0]="r",[1]="u",[2]="l",[3]="d"})[surrounds.dir]
+    local found=side~=nil and #parameters>0
+    for _,p in ipairs(parameters) do
+        local wanted=p.name=="@text" and "text" or p.name=="@level" and "level"
+            or p.name=="@empty" and "empty" or p.name:match("^@direction:(.+)$") or p.name
+        local matched=false
+        for _,name in ipairs(side and surrounds[side] or {}) do
+            if not p.negative and name==wanted or p.negative and name~=wanted then matched=true end
+        end
+        found=found and matched
+    end
+    return negated and not found or not negated and found
+end
 -- FACEDBY visits neighbors first, then parameters (unlike forward FACING).
 local function facedby_condition(world,parameters,entity,negated)
     local vectors={{1,0},{0,-1},{-1,0},{0,1}}
@@ -663,7 +678,9 @@ function RW_TestEntityCondition(world,node,entity)
             end
         end
         for _,index in ipairs(remove) do table.remove(parameters,index-offset);offset=offset+1 end
-        if entity.class=="level" and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto"
+        if entity.class=="level" and clause.relation=="facing" then
+            result=result and level_facing_condition(world,parameters,clause.negated)
+        elseif entity.class=="level" and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto"
             or clause.relation=="above" or clause.relation=="below" or clause.relation=="besideleft" or clause.relation=="besideright") then
             result=result and level_spatial_condition(world,parameters,clause.relation,clause.negated)
         elseif clause.relation=="often" or clause.relation=="seldom" then
@@ -2188,7 +2205,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 and clause.relation~="without" and clause.relation~="on"
                 and clause.relation~="near" and clause.relation~="nextto"
                 and clause.relation~="above" and clause.relation~="below"
-                and clause.relation~="besideleft" and clause.relation~="besideright" then return false end
+                and clause.relation~="besideleft" and clause.relation~="besideright"
+                and clause.relation~="facing" then return false end
         end
         for _,term in ipairs(node.requirements or {}) do if not input_prefixes(term) then return false end end
         return true

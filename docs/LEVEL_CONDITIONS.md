@@ -1,4 +1,4 @@
-# Scoped LEVEL conditions (M9.7S)
+# Scoped LEVEL conditions (M9.7T)
 
 Installed conditions.lua testcond() uses unitid=1 for the synthetic map, obtains
 its parent-entry surroundings from parsesurrounds(), and separately handles its
@@ -143,3 +143,22 @@ The seven-branch source oracle now covers 43,008 normalized cases, including all
 four cardinal parent regions, wrong sides, full rooms and repeated/NOT parameters.
 Compiler/tree tests verify correct/opposite/diagonal/child-only witnesses and Undo.
 FACING/FACEDBY/SEEING remain scoped gaps. No frontend or authored layout changes.
+
+## M9.7T FACING
+
+Installed conditions.lua facing() uses the saved entrance dir for unitid=1, then
+checks only that one surrounding region. It does not search child contents, use
+current physical-block facing, or consume distinct parent names. Repeated noun
+parameters may reuse a name. Direction 4 fails positive FACING, including negative
+noun parameters; a NOT FACING clause still reverses that result.
+
+Direction arguments are literal names in this synthetic branch. LEVEL FACING
+RIGHT does not directly mean the map entrance points right; it seeks a saved name
+'right' on the selected side. EMPTY likewise matches the literal name 'empty', not
+the '-' vacancy sentinel. The physical-unit branch keeps existing direction and
+next-cell semantics. Frozen queries read the saved boundary context unchanged.
+
+Compiler/tree tests cover six intrinsic directions, repeated names, complements,
+literal direction arguments and conversion/Undo. Installed facing() comparisons
+cover 1,040 direction/region/parameter/NOT cases. FACEDBY and SEEING remain scoped
+gaps; the surrounding snapshot and other conditional subsystems are unchanged.

@@ -1018,3 +1018,13 @@ Expanded installed comparisons cover 43,008 cases; tree conversions/Undo cover
 all directions, wrong sides/diagonals, child witnesses and EMPTY asymmetry.
 Full regressions and catalog/layout/diff audits pass; startup stays at 1,980,000
 instructions. No native success claim is inferred from offline checks.
+
+## M9.7T — scoped LEVEL FACING
+
+Select the parent snapshot region using entry-time direction; match reusable
+literal names with no child-grid search. Preserve native synthetic direction/EMPTY
+argument quirks and none-direction behavior, separately from physical FACING.
+Compiler/tree conversion/Undo and 1,040 installed source cases cover the change.
+FACEDBY/SEEING remain explicit scoped gaps.
+Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
+instructions. Native acceptance is not inferred from offline checks.

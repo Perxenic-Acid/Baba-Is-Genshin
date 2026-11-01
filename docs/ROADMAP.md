@@ -796,3 +796,16 @@ Added 392 installed retention/pruning oracle cases plus compiler/session tests f
 conditions, current/past frames, FOLLOW/TELE, reading barriers, terminal states,
 replay and local/tree/boundary Undo. Boot/birth/conversion clocks, restored newborn
 status/grace, paradox and synthetic scope remain; public BACK stays pending.
+
+## M9.6Y — BACK newborn clocks and saved-clock reset
+
+Carry the session native count through conversion/HAS/MORE/MAKE/EAT/BONUS services
+as explicit transient arguments. Newborns reset inherited clocks, initialize BROKEN,
+then query BACK in the current raw/frozen source frame; primary-ID reuse and
+same-name BECOME receive validated clock updates too. Keep source witnesses and
+ordered duplicates. Recursive status limits preserve earlier clocks and zero on
+the triggering product without speculative source replacement. Boot/boundaries
+clear saved runtime clocks without creating an activation/history/input/RNG pass.
+Added 648 installed reset/status oracle cases, scheduled lifecycle/terminal/Undo
+tests and isolated Invoke count propagation. Native SHIFT no-op history rows,
+restored WEAK grace, paradox and synthetic scope remain; BACK is still pending.

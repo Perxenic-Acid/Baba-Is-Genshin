@@ -1251,23 +1251,26 @@ function RW_PlanCodeStatus(world,generated_rules,effective)
     return RW_PlanRuleStatus(world,generated_rules,selected)
 end
 
--- addunit() initializes a newborn's BROKEN status immediately, before later
--- births and later destruction phases. The source/victims still exist here.
-function RW_InitializeBirthSpecifications(world,specifications,generated_rules)
+-- addunit() initializes BROKEN, then BACK, before later births/destructions.
+-- The source/victims still exist here. Native BACK counts are explicit context,
+-- never world facts; omitted counts retain the world-only diagnostic contract.
+function RW_InitializeBirthSpecifications(world,specifications,generated_rules,back_count)
     if type(world)~="table" or type(world.entities)~="table" or type(world.next_entity_id)~="number"
         or not dense_list(specifications) or (generated_rules~=nil and not dense_list(generated_rules)) then
         return nil,"invalid_birth_status_input"
     end
+    if back_count~=nil and (type(back_count)~="number" or back_count%1~=0 or back_count<0) then return nil,"invalid_back_clock" end
     if #specifications==0 then return specifications end
     local needed=false
     for _,rules in ipairs({world.rule_sources or {},generated_rules or {}}) do
         for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
-            if effect.trait=="broken" then needed=true;break end
+            if effect.trait=="broken" or (back_count~=nil and effect.trait=="back") then needed=true;break end
         end end
     end
     for _,spec in ipairs(specifications) do
         if type(spec)~="table" or (spec.broken~=nil and spec.broken~=0 and spec.broken~=1) then return nil,"invalid_birth_status_specification" end
         if spec.broken~=nil then needed=true end
+        if back_count~=nil and spec.back_init~=nil then needed=true end
     end
     if not needed then return specifications end
     local context={};for k,v in pairs(world) do context[k]=v end
@@ -1276,6 +1279,7 @@ function RW_InitializeBirthSpecifications(world,specifications,generated_rules)
     local initialized={}
     for index,spec in ipairs(specifications) do
         local product=query_clone(spec)
+        if back_count~=nil then product.back_init=nil end
         local entity=query_clone(product);entity.id=world.next_entity_id+index-1;entity.broken=0
         if context.entities[entity.id] then return nil,"birth_status_id_collision" end
         context.entities[entity.id]=entity
@@ -1290,6 +1294,17 @@ function RW_InitializeBirthSpecifications(world,specifications,generated_rules)
         end
         entity.broken=active and 1 or 0
         product.broken=active and 1 or nil
+        if back_count~=nil then
+            local active,err=query_trait(context,entity,"back")
+            if active==nil then
+                if err=="word_rule_limit" or err=="word_rule_cycle" or err=="rule_complexity_limit" then
+                    initialized[#initialized+1]=product;return nil,err,initialized
+                end
+                return nil,err
+            end
+            entity.back_init=active and back_count+1 or 0
+            product.back_init=active and back_count+1 or nil
+        end
         initialized[#initialized+1]=product
     end
     return initialized
@@ -1305,7 +1320,7 @@ function RW_StatusInitializationNeeded(world)
     local properties=(world.language or {}).properties or {}
     local has_token=false;for _,trait in pairs(properties) do if trait=="broken" then has_token=true;break end end
     for _,entity in pairs(world.entities) do
-        if entity.broken==1 then return true end
+        if entity.broken==1 or (entity.back_init or 0)~=0 then return true end
         if has_token then
             local token=entity.class=="text" and entity.text and entity.text.name or RW_NounTextName(world,entity)
             if properties[token]=="broken" then return true end
@@ -1343,9 +1358,10 @@ function RW_RelationApplies(world,relation,entity)
     end
     return true
 end
-function RW_PlanConversions(world, conversions, generated_rules)
+function RW_PlanConversions(world, conversions, generated_rules,back_count)
     if type(world) ~= "table" or type(world.entities) ~= "table"
         or not dense_list(conversions) then return nil,"invalid_conversion_input" end
+    if back_count~=nil and (type(back_count)~="number" or back_count%1~=0 or back_count<0) then return nil,"invalid_back_clock" end
     local targets,protected,forbidden,conditional={},{},{},{}
     for _,relation in ipairs(conversions) do
         if type(relation) ~= "table" or type(relation.source_type) ~= "string" or relation.source_type == "" then
@@ -1391,16 +1407,16 @@ function RW_PlanConversions(world, conversions, generated_rules)
     local back_conversions={}
     local terminal_reason,group_products
     local status_context
-    if generated_rules~=nil then
-        if not dense_list(generated_rules) then return nil,"invalid_rule_sources" end
-        local needed=false
-        for _,rules in ipairs({world.rule_sources or {},generated_rules}) do
+    if generated_rules~=nil or back_count~=nil then
+        if generated_rules~=nil and not dense_list(generated_rules) then return nil,"invalid_rule_sources" end
+        local needed=back_count~=nil
+        for _,rules in ipairs({world.rule_sources or {},generated_rules or {}}) do
             for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
                 if effect.trait=="broken" then needed=true;break end
             end end
         end
         if needed then
-            status_context=condition_context(world,generated_rules)
+            status_context=condition_context(world,generated_rules or {})
             status_context.entities={};for id,entity in pairs(world.entities) do status_context.entities[id]=entity end
         end
     end
@@ -1408,6 +1424,7 @@ function RW_PlanConversions(world, conversions, generated_rules)
         if not status_context then return true end
         group_products[#group_products+1]=product
         product.broken=nil
+        if back_count~=nil then product.back_init=nil end
         -- Native doconvert creates all products before deleting its source.
         -- A transient negative-ID witness retains the old source when our first
         -- product reuses its persistent identity. It is never emitted in a plan.
@@ -1420,6 +1437,12 @@ function RW_PlanConversions(world, conversions, generated_rules)
         local active,err=query_trait(status_context,unit,"broken")
         if active==nil then return nil,err end
         unit.broken=active and 1 or 0;product.broken=active and 1 or nil
+        if back_count~=nil then
+            local active,err=query_trait(status_context,unit,"back")
+            if active==nil then return nil,err end
+            unit.back_init=active and back_count+1 or 0
+            product.back_init=active and back_count+1 or nil
+        end
         return true
     end
     local function create(product)
@@ -1535,6 +1558,9 @@ function RW_PlanConversions(world, conversions, generated_rules)
                 end
                 if not retyped and (product.broken or 0)~=(entity.broken or 0) then
                     changes[#changes+1]={kind="broken",entity_id=entity.id,from=entity.broken,to=product.broken or 0}
+                end
+                if not retyped and (product.back_init or 0)~=(entity.back_init or 0) then
+                    changes[#changes+1]={kind="back_init",entity_id=entity.id,from=entity.back_init,to=product.back_init or 0}
                 end
                 event.product_ids[#event.product_ids+1]=entity.id
                 used=true

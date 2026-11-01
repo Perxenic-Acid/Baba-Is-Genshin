@@ -551,3 +551,5 @@ dofile("tests/back_isolation.lua")
 dofile("tests/back_scheduler.lua")
 
 dofile("tests/back_retention.lua")
+
+dofile("tests/back_birth_clocks.lua")

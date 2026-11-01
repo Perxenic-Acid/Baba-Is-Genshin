@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6X)
+# BACK infrastructure progress (M9.6Y)
 
 ## Installed primary references
 
@@ -320,12 +320,62 @@ acceptance remains waived; offline success is not native acceptance.
 The separate-global host test now also runs the complete compiler/status/session
 planner across Invoke adapters, including BACK/TELE, native counts, RNG and Undo.
 
+## Birth/conversion clocks and saved runtime reset
+
+Installed syntax.lua addunit() resets back_init and broken to zero before its
+statusblock call. blocks.lua statusblock() refreshes BROKEN first, then queries
+BACK; active newborns receive #undobuffer+1. convert.lua doconvert() calls addunit
+for each product before removing its source, without restoring the source clock.
+This includes primary products, same-name BECOME and WRITE retypes. BACK's own
+restoration is different: addunit(...,true) skips that status branch, and moveblock
+explicitly restores the historical source clock. The existing back_restore helper
+continues to implement that distinction.
+
+The session scheduler now supplies the absolute current native count explicitly to
+convert, destruction/contact, MORE, MAKE, EAT and BONUS services. Those Invoke
+adapters forward it through initialization helpers to rules.lua. It is transient
+call context, never a new world/compiler fact or a global variable. World-only
+diagnostic calls may omit it and retain their prior clock behavior.
+
+RW_InitializeBirthSpecifications(..., back_count) clears inherited clocks, initializes
+BROKEN, then queries BACK in the same raw/frozen frame. Each prior initialized birth
+remains a witness for later products. HAS queries still see the dying parent, and
+movement death frames retain their shifted temporary allocators. MORE copies and
+late MAKE births get new clocks, without retaining the source's old activation.
+
+RW_PlanConversions(..., back_count) uses the same ordered query sequence, with its
+existing negative-ID source witness when the primary reuses a persistent ID. Full
+retypes store the new clock directly; primary transforms/same-name conversions emit
+stale-checked back_init operations when needed. Duplicate products initialize
+separately. BROKEN or a failed/denied BACK condition leaves the reset zero clock.
+
+Query limits retain earlier initialized clocks and a zero clock on the triggering
+newborn. Interrupted conversion groups materialize their allocated prefix while
+keeping the old source and its old clock; speculative primary updates are discarded.
+HAS similarly preserves the triggering parent and earlier completed deaths/births.
+These terminal plans remain atomically undoable; ordinary errors reject everything.
+
+Boot/boundary initialization treats saved nonzero clocks as runtime data: the cheap
+authored status guard detects them and the existing reset phase clears them before
+the ordered BROKEN initialization pass. No BACK activation pass or history/RNG/input
+entry is added at startup. In the installed Lua loader, clear/clearunits clears
+feature/history state; addunit resets clock zero and startblock only runs
+moveblock(true), without BACK playback. The backend keeps its documented fresh
+one-open-frame normalization and lets the first input status pass activate clocks.
+Opaque MF_* loader scheduling/initial retained host frames are not reconstructed.
+
+648 unchanged installed reset/brokenblock/hasfeature/BACK clause cases compare real
+Object/Text birth and primary-conversion clocks, old values, conditions and BROKEN
+gating. Scheduled tests cover HAS (contacts/movement/EAT/BONUS), MORE/MAKE, duplicate
+conversions, ON source witnesses, WRITE/BECOME, recursive-query terminal prefixes,
+saved clock reset and local/tree Undo. Separate-global tests verify the session
+count crosses Invoke into conversion initialization. Startup still runs no tests.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
-word yet. Boot/boundary initialization and native addunit birth/conversion clock
-timing still need implementation and source-oracle verification. Restored newborn
-status/grace, native paradox routing and synthetic LEVEL/EMPTY semantics remain
+word yet. Restored newborn WEAK grace, native paradox routing and synthetic
+LEVEL/EMPTY semantics remain
 explicit gaps, as do broader native phase-graph/conditional intra-phase differences.
 In particular, native moveblock() SHIFT alignment writes an update history row even
 when facing is unchanged; the current effective-change journal omits such no-op

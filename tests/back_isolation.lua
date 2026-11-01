@@ -137,3 +137,12 @@ local transported=commit(n,plan)
 assert(transported.world.entities[1].x==8 and transported.world.random_state and transported.back_frame_count==3)
 assert(world:Invoke("RW_Undo",transported).world==n.world and world:Invoke("RW_Undo",n).world==s.world)
 print("PASS: fully isolated compiler/status/session scheduler, current-frame BACK, transient TELE routing, retained-frame clock, RNG and atomic Undo")
+
+-- The scheduler's native count also crosses Invoke into conversion addunit status.
+s=fixture();s.world.language.nouns.ROCK="rock";s.world.next_entity_id=13
+for i,word in ipairs({"AVATAR","IS","ROCK"}) do s.world.entities[9+i]={id=9+i,kind="object",class="text",text={name=word},x=i,y=6,direction="Right"} end
+s.world.rule_sources[#s.world.rule_sources+1]={when={op="always"},effects={{op="grant_trait",target={kind="archetype",value="rock"},trait="back"}}}
+plan,e=bootstrap:Invoke("RW_PlanTurn",s.world,{type="wait"},scheduled,s);assert(plan,e and e.reason)
+n=commit(s,plan);assert(n.world.entities[1].archetype=="rock" and n.world.entities[1].back_init==2)
+assert(world:Invoke("RW_Undo",n).world==s.world)
+print("PASS: isolated session-to-conversion native clock propagation, fresh BACK status and Undo")

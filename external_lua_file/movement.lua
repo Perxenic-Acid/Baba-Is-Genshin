@@ -1630,7 +1630,7 @@ function RW_PlanBackMotion(world,selections,paradox)
                         rows[#rows+1]={x=x,y=y,direction=d,moved=false};d=op.to
                     elseif op.kind=="create" or op.kind=="delete" or op.kind=="retype" or op.kind=="transform" then
                         return nil,"back_conversion_history_pending"
-                    elseif op.kind~="broken" and op.kind~="holder" and op.kind~="followed" then
+                    elseif op.kind~="back_init" and op.kind~="broken" and op.kind~="holder" and op.kind~="followed" then
                         return nil,"invalid_back_history"
                     end
                 end
@@ -1654,4 +1654,39 @@ function RW_PlanBackMotion(world,selections,paradox)
     end
     table.sort(changes,function(a,b) return a.entity_id<b.entity_id end)
     return {consumes_turn=true,changes=changes,tele_suppressed=suppressed,reason="back"}
+end
+
+
+-- Explicit native buffer counts include the current/open frame. Do not derive
+-- this count from the capped local session history until pruning is integrated.
+function RW_BackFrameIndex(back_init,frame_count,dead)
+    if type(back_init)~="number" or back_init%1~=0 or back_init<0
+        or type(frame_count)~="number" or frame_count%1~=0 or frame_count<0
+        or (dead~=nil and type(dead)~="boolean") then return nil,"invalid_back_clock" end
+    local index=(frame_count-back_init)*2+1
+    if back_init==0 or dead or index>frame_count then return nil,"back_inactive" end
+    -- A newly set clock may select a nonpositive, absent Lua table index. The
+    -- original still marks updateundo=true; preserve that distinction for callers.
+    return index
+end
+
+-- The caller supplies the complete current-frame set of eligible real identities;
+-- rule queries, status timing and lifecycle inheritance remain scheduler concerns.
+function RW_PlanBackStatus(world,eligible,frame_count)
+    if type(world)~="table" or type(world.entities)~="table" then return nil,"invalid_world" end
+    if world.infinite_loop then return nil,"infinite_loop_undo_only" end
+    if world.too_complex then return nil,"too_complex_undo_only" end
+    if type(eligible)~="table" or type(frame_count)~="number" or frame_count%1~=0 or frame_count<0 then return nil,"invalid_back_clock" end
+    for id,value in pairs(eligible) do
+        if value~=true or not world.entities[id] then return nil,"invalid_back_identity" end
+    end
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local changes={}
+    for _,id in ipairs(ids) do
+        local old=world.entities[id].back_init;local clock=old or 0
+        if type(clock)~="number" or clock%1~=0 or clock<0 then return nil,"invalid_back_clock" end
+        local next_clock=eligible[id] and (clock==0 and frame_count+1 or clock) or 0
+        if next_clock~=clock then changes[#changes+1]={kind="back_init",entity_id=id,from=old,to=next_clock} end
+    end
+    return {consumes_turn=true,changes=changes,reason="back_status"}
 end

@@ -529,3 +529,5 @@ dofile("tests/level_conversion_limits.lua")
 dofile("tests/turn_records.lua")
 
 dofile("tests/back_motion.lua")
+
+dofile("tests/back_clock.lua")

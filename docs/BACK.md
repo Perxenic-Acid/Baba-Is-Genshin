@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6N)
+# BACK infrastructure progress (M9.6O)
 
 ## Installed primary references
 
@@ -61,10 +61,28 @@ back_conversion_history_pending; they are never silently skipped. An unchanged
 installed BACK update-branch oracle covers 72 combinations of motion records,
 current positions/facing and paradox presence. No scheduler or startup work is added.
 
+## Explicit native clock/status primitive
+
+RW_PlanBackStatus receives the complete eligible real-identity set and an explicit
+native buffer count (including the current/open frame). It starts back_init at
+count+1, retains a live clock, and clears it when eligibility retracts. back_init
+is validated intrinsic state with stale-checked atomic changes, journaling and
+whole-tree Undo. Clock-only history does not produce motion or TELE suppression.
+RW_BackFrameIndex preserves the native index and dead-unit gate. In particular,
+a freshly activated clock can select a nonpositive absent frame while native
+updateundo still becomes true; callers must not clamp it to the latest frame.
+
+624 unchanged installed status/index branch combinations verify absent BACK,
+failed conditions, activation/retraction, retained clocks and dead eligibility.
+These primitives do not infer native counts from capped history, prune waits,
+query BACK rules, or register/schedule BACK. Lifecycle clock inheritance remains
+part of conversion playback work. No normal-startup pass has been added.
+
 ## Still pending
 
 BACK remains pending in the official catalog and is not registered as a public
-word yet. Activation/retraction clocks, the native current/open-frame index mapping,
+word yet. Automatic activation/status timing and native current/open-frame mapping
+to this engine's retained journals,
 automatic per-unit history selection and conversion playback, born/dead handling,
 TELE-suppression integration, status/reading barriers and synthetic LEVEL/EMPTY semantics
 still need implementation and source-oracle verification. Native unchanged-turn

@@ -678,3 +678,13 @@ and links. Lifecycle history fails explicitly pending conversion playback. Added
 unchanged installed BACK update-branch oracle cases. Public BACK registration,
 activation clocks, native frame mapping and scheduler integration remain pending;
 see BACK.md. No native-success claim or frontend changes.
+
+
+## M9.6O — atomic BACK clock and native index primitives
+
+Added stale-checked intrinsic back_init changes with Commit/journal/Undo, explicit
+eligible-set status planning and native-buffer index calculation. 624 unchanged
+installed status/index branch cases cover activation, loss, failed conditions,
+retained clocks and dead units. Preserve the absent nonpositive-frame case.
+Scheduler eligibility, native-count/journal mapping, pruning and lifecycle clock
+inheritance remain pending; public BACK remains unregistered. See BACK.md.

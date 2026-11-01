@@ -1,4 +1,4 @@
-# BACK infrastructure progress (M9.6Q)
+# BACK infrastructure progress (M9.6R)
 
 ## Installed primary references
 
@@ -133,6 +133,28 @@ that case can be reproduced. Do not guess provenance from noun or original_name.
 Native host disposal details and mixed queued-update disposal are not covered by
 the isolated branch oracle; current behavior preserves distinct old/new handles.
 No public BACK registration or production scheduling is enabled.
+
+## Ordered conversion source journals
+
+RW_PlanConversions now returns optional back_conversions as its sixth result.
+Each event owns the pre-conversion source snapshot (or an EMPTY cell origin),
+ordered product IDs and a removed Boolean. Duplicate products keep distinct IDs;
+ALL/source-retaining groups do not fabricate a source removal. Same-name BECOME
+and WRITE emit events even if no shape operation is necessary. Direct conversion
+deletion records an empty product list. Interrupted status-limit groups discard
+speculative primary mappings and record only their actual allocated prefix, with
+the old source retained.
+
+The scheduler attaches these events to the conversion phase. Phase validation
+checks source snapshots/cells, unique real product identities and actual creation
+operations; journal copies own their metadata. Events are not persisted on units
+or worlds. Combined BACK playback now recognizes recorded same-name primary
+conversions and can restore their fresh origin/status defaults. Legacy single
+transform/retype rows retain the existing fallback. 48 unchanged installed
+convert() cases verify source/product identity order; integration tests cover the
+real compiler/turn/Commit path, ownership/Undo, stale metadata, EMPTY/ALL/deletion
+and interrupted groups. This records branch provenance without yet restoring
+branch copies or introducing native duplicate logical IDs.
 
 ## Still pending
 

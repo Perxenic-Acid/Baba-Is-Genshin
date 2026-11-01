@@ -1386,6 +1386,7 @@ function RW_PlanConversions(world, conversions, generated_rules)
     table.sort(ids)
     local changes,next_id,created={},world.next_entity_id,0
     local converted_ids={}
+    local back_conversions={}
     local terminal_reason,group_products
     local status_context
     if generated_rules~=nil then
@@ -1466,6 +1467,7 @@ function RW_PlanConversions(world, conversions, generated_rules)
         if bans[source] and not has_become then
             if not virtual then
                 changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)}
+                back_conversions[#back_conversions+1]={source=query_clone(entity),product_ids={},removed=true}
                 if status_context then status_context.entities[entity.id]=nil end
             end
             return true
@@ -1504,7 +1506,10 @@ function RW_PlanConversions(world, conversions, generated_rules)
                 end
             end
         end
+        if #products==0 and not remove then return true end
         local used=false
+        local event={source=not virtual and query_clone(entity) or nil,
+            empty=virtual and {x=entity.x,y=entity.y} or nil,product_ids={},removed=false}
         for _,target in ipairs(products) do
             local product=query_clone(entity)
             product.original_name=entity.original_name or (virtual and "@empty" or entity.class=="text" and "text_"..entity.text.name or entity.archetype)
@@ -1528,9 +1533,16 @@ function RW_PlanConversions(world, conversions, generated_rules)
                 if not retyped and (product.broken or 0)~=(entity.broken or 0) then
                     changes[#changes+1]={kind="broken",entity_id=entity.id,from=entity.broken,to=product.broken or 0}
                 end
+                event.product_ids[#event.product_ids+1]=entity.id
                 used=true
-            else local ok,err=create(product); if not ok then return nil,err end end
+            else
+                local id=next_id
+                local ok,err=create(product); if not ok then return nil,err end
+                event.product_ids[#event.product_ids+1]=id
+            end
         end
+        event.removed=not virtual and not retain and (used or remove) or false
+        if #event.product_ids>0 or event.removed then back_conversions[#back_conversions+1]=event end
         if not virtual and not retain and not used and remove then
             changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)}
             if status_context then status_context.entities[entity.id]=nil end
@@ -1540,6 +1552,7 @@ function RW_PlanConversions(world, conversions, generated_rules)
     end
     local function convert_group(entity,source,virtual)
         local start,frontier,allocated=#changes,next_id,created
+        local event_start=#back_conversions
         group_products={}
         local ok,err=convert(entity,source,virtual)
         if ok then return true end
@@ -1549,13 +1562,18 @@ function RW_PlanConversions(world, conversions, generated_rules)
         -- source and materializes its entire completed/trigger prefix at fresh IDs.
         for index=#changes,start+1,-1 do changes[index]=nil end
         next_id,created=frontier,allocated
+        for index=#back_conversions,event_start+1,-1 do back_conversions[index]=nil end
+        local event={source=not virtual and query_clone(entity) or nil,
+            empty=virtual and {x=entity.x,y=entity.y} or nil,product_ids={},removed=false}
         for _,product in ipairs(group_products) do
             if type(next_id)~="number" or next_id%1~=0 or next_id<1 or world.entities[next_id] then return nil,"invalid_conversion_frontier" end
             if next_id>=9007199254740991 then return nil,"entity_id_exhausted" end
             local born=query_clone(product);born.id=next_id
             changes[#changes+1]={kind="create",entity_id=next_id,to=born}
+            event.product_ids[#event.product_ids+1]=next_id
             next_id,created=next_id+1,created+1
         end
+        if #event.product_ids>0 then back_conversions[#back_conversions+1]=event end
         terminal_reason=err
         return true
     end
@@ -1575,7 +1593,8 @@ function RW_PlanConversions(world, conversions, generated_rules)
             if terminal_reason then break end
         end; if terminal_reason then break end end
     end
-    return changes,nil,created > 0 and {from=world.next_entity_id,to=next_id} or nil,converted_ids,terminal_reason
+    return changes,nil,created > 0 and {from=world.next_entity_id,to=next_id} or nil,converted_ids,terminal_reason,
+        #back_conversions>0 and back_conversions or nil
 end
 
 -- The authored vocabulary is the palette, not the objects remaining this frame.

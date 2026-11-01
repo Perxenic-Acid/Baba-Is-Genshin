@@ -309,6 +309,43 @@ local function validate_plan(world, plan)
         end
     end
 
+    if plan.back_conversions~=nil then
+        if not is_list(plan.back_conversions) then return false,"invalid_back_conversions" end
+        local products,sources={},{}
+        for _,event in ipairs(plan.back_conversions) do
+            if type(event)~="table" or type(event.removed)~="boolean" or not is_list(event.product_ids)
+                or (event.source==nil)==(event.empty==nil) then return false,"invalid_back_conversions" end
+            local source=event.source
+            if source then
+                if type(source)~="table" or not valid_id(source.id) or not same_state(world.entities[source.id],source)
+                    or sources[source.id] then return false,"stale_back_conversion_source" end
+                sources[source.id]=true
+                local source_ops=seen[source.id] or {}
+                if not event.removed and (source_ops.delete or source_ops.transform or source_ops.retype or source_ops.back_restore) then return false,"invalid_back_conversion_removal" end
+                if event.removed and #event.product_ids>0 and event.product_ids[1]~=source.id then return false,"invalid_back_conversion_product" end
+                if event.removed and #event.product_ids==0 and not (seen[source.id] and seen[source.id].delete) then return false,"invalid_back_conversion_removal" end
+            else
+                local empty=event.empty
+                if type(empty)~="table" or not is_integer(empty.x) or not is_integer(empty.y)
+                    or empty.x<1 or empty.x>world.width or empty.y<1 or empty.y>world.height
+                    or event.removed then return false,"invalid_back_conversion_empty" end
+                local key=empty.x..":"..empty.y
+                if sources[key] then return false,"invalid_back_conversion_empty" end
+                sources[key]=true
+                for _,entity in pairs(world.entities) do
+                    if entity.x==empty.x and entity.y==empty.y then return false,"stale_back_conversion_empty" end
+                end
+            end
+            for _,id in ipairs(event.product_ids) do
+                if not valid_id(id) or products[id] then return false,"invalid_back_conversion_product" end
+                products[id]=true
+                if world.entities[id] then
+                    if not source or id~=source.id or not event.removed or (seen[id] and seen[id].delete) then return false,"invalid_back_conversion_product" end
+                elseif not created[id] then return false,"missing_back_conversion_product" end
+            end
+        end
+    end
+
     for _,operations in pairs(seen) do
         if operations.retype or operations.back_restore then
             local exclusive=operations.retype and "retype" or "back_restore"
@@ -725,7 +762,7 @@ local function preview_transaction(world, plan)
         return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.infinite_loop == true or plan.too_complex == true
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
-        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil
+        or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.back_conversions~=nil
         or not is_list(plan.stages) or #plan.stages == 0 or #plan.stages > 32 then
         return nil,"invalid_stage_sequence"
     end
@@ -788,7 +825,7 @@ local function valid_turn_records(records,count)
 end
 local function journal_phase(plan,name)
     local phase={name=type(name)=="string" and name or nil,changes=clone(plan.changes)}
-    for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","infinite_loop","too_complex"}) do
+    for _,key in ipairs({"board_shift","random_state","input_state","chance_state","bonus_state","id_allocation","infinite_loop","too_complex","back_conversions"}) do
         if plan[key]~=nil then phase[key]=clone(plan[key]) end
     end
     return phase

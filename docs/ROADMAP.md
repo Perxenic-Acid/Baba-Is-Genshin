@@ -712,3 +712,15 @@ this path. 54 unchanged installed create/remove branch oracle cases plus atomic
 stale/conflict, motion-handle and source-clock/Undo tests pass. Branched/repeated
 lifecycle history remains explicit pending provenance/identity work; production
 BACK registration/scheduling and host disposal parity are not claimed. See BACK.md.
+
+
+## M9.6R — ordered conversion provenance for BACK
+
+Added source snapshots/EMPTY cells, ordered product IDs and source-removal facts
+as owned conversion-phase journal metadata. Preserve duplicate branches, ALL
+retention, no-op same-name BECOME/WRITE and interrupted allocated product prefixes.
+Validate source/product preconditions atomically; route real scheduler events into
+Commit/Undo. BACK primary playback now recognizes recorded same-name conversions.
+48 installed convert() identity-order cases and pipeline/terminal/ownership tests
+pass. Branch restoration/native duplicate logical identity and production BACK
+scheduling remain pending; see BACK.md.

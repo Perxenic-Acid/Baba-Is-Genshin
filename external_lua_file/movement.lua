@@ -1746,6 +1746,13 @@ function RW_PlanBackPlayback(world,selections,paradox)
         if type(value)~="table" then return value end
         local result={};for k,v in pairs(value) do result[k]=copy(v) end;return result
     end
+    local function equal(a,b)
+        if type(a)~=type(b) then return false end
+        if type(a)~="table" then return a==b end
+        for k,v in pairs(a) do if not equal(v,b[k]) then return false end end
+        for k in pairs(b) do if a[k]==nil then return false end end
+        return true
+    end
     for _,selection in ipairs(selections) do
         if type(selection)~="table" or not world.entities[selection.entity_id] or seen[selection.entity_id] then return nil,"invalid_back_identity" end
         local id=selection.entity_id;seen[id]=true
@@ -1754,11 +1761,25 @@ function RW_PlanBackPlayback(world,selections,paradox)
         local cursor,source=copy(selection.before),nil
         for _,phase in ipairs(selection.record.phases) do
             if type(phase)~="table" or not list(phase.changes) then return nil,"invalid_back_history" end
+            local recorded=false
+            if phase.back_conversions~=nil then
+                if not list(phase.back_conversions) then return nil,"invalid_back_history" end
+                for _,event in ipairs(phase.back_conversions) do
+                    if type(event)~="table" or not list(event.product_ids) or type(event.removed)~="boolean" then return nil,"invalid_back_history" end
+                    for _,product in ipairs(event.product_ids) do if product==id then
+                        if type(event.source)~="table" or event.source.id~=id then return nil,"back_conversion_history_pending" end
+                        if not event.removed then return nil,"invalid_back_history" end
+                        if source or recorded then return nil,"back_conversion_history_pending" end
+                        if not equal(event.source,cursor) then return nil,"stale_back_source" end
+                        source=copy(event.source);recorded=true
+                    end end
+                end
+            end
             for _,op in ipairs(phase.changes) do
                 if type(op)~="table" then return nil,"invalid_back_history" end
                 if op.entity_id==id then
                     if op.kind=="create" or op.kind=="delete" or op.kind=="back_restore" then return nil,"back_conversion_history_pending" end
-                    if op.kind=="transform" or op.kind=="retype" then
+                    if (op.kind=="transform" or op.kind=="retype") and not recorded then
                         if source then return nil,"back_conversion_history_pending" end
                         source=copy(cursor)
                     end

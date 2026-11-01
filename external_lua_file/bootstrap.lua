@@ -351,13 +351,13 @@ local function plan_turn(world, action, services, initial_frame)
         elseif #level_targets == 1 then target_type=level_targets[1]
         elseif #level_targets > 1 then target_type=level_targets end
     end
-    local operations, conversion_error, allocation, converted_ids, conversion_terminal = services.convert(preview, entity_conversions, post_rules)
+    local operations, conversion_error, allocation, converted_ids, conversion_terminal, back_conversions = services.convert(preview, entity_conversions, post_rules)
     if not operations then return fail("conversions", conversion_error) end
 
     -- Keep phase-local preconditions: conversion reads the movement snapshot,
     -- while the transaction still has a single Commit/Undo boundary.
     local movement_stage = {consumes_turn=true,changes={},board_shift=movement.board_shift}
-    local conversion_stage = {consumes_turn=true,changes={},id_allocation=allocation}
+    local conversion_stage = {consumes_turn=true,changes={},id_allocation=allocation,back_conversions=back_conversions}
     for _, change in ipairs(movement.changes) do movement_stage.changes[#movement_stage.changes+1]=change end
     for _, change in ipairs(operations) do conversion_stage.changes[#conversion_stage.changes+1]=change end
     local stages=movement_prefix.stages or {{name="movement",plan=movement_stage}}
@@ -2238,7 +2238,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.6Q initialized")
+    print("[RuleWorld] M9.6R initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

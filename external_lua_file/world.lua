@@ -1521,8 +1521,8 @@ function RW_ReloadLevel(tree,id)
             if not session.world.entities[entity_id] then return nil,"persistent_level_block_missing" end
             local entity=session.world.entities[entity_id]
             entity.original_name=original_name(entity)
-            if archetype == "text_level" then
-                entity.class,entity.archetype,entity.text="text",nil,{name="LEVEL"}
+            if archetype:sub(1,5)=="text_" and #archetype>5 then
+                entity.class,entity.archetype,entity.text="text",nil,{name=archetype:sub(6):upper()}
             else entity.archetype = archetype end
         end
     end
@@ -1659,7 +1659,7 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
     if kind == "transform" then
         if not is_list(targets) or #targets == 0 then return nil,"invalid_level_transform" end
         for _,target in ipairs(targets) do
-            if type(target) ~= "string" or target == "" then return nil,"invalid_level_transform" end
+            if type(target) ~= "string" or target == "" or target=="text_" then return nil,"invalid_level_transform" end
         end
     end
     local result = copy_map(tree)
@@ -1686,8 +1686,8 @@ function RW_RecordLevelOutcome(tree, kind, target_type)
             local product=clone(block)
             product.original_name=original_name(block)
             product.id=nil
-            if target == "text_level" then
-                product.class,product.archetype,product.text="text",nil,{name="LEVEL"}
+            if target:sub(1,5)=="text_" and #target>5 then
+                product.class,product.archetype,product.text="text",nil,{name=target:sub(6):upper()}
             else product.class,product.archetype,product.text="object",target,nil end
             products[#products+1]=product
         end

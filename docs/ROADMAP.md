@@ -1070,3 +1070,13 @@ queries through all six empty phases. Keep mutation refreshes and final tree que
 a call-count/accepted Commit/Undo test guards the optimization.
 Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
 instructions. No real-device result is inferred from offline checks.
+
+## M9.7Y — arbitrary scoped Text product persistence
+
+Decode text_<token> products in parent conversion/reload instead of handling only
+text_level. Preserve mixed/duplicate products, links/facing/origin, copy-entry
+replacement and whole-tree Undo; reject an empty Text marker. Extend legacy string
+record decoding too. Boundary tests and an 8-case installed WRITE prefix oracle
+cover this transport foundation; scoped WRITE rule selection remains pending.
+Full regressions and catalog/layout/diff audits pass; startup remains 1,980,000
+instructions. No native acceptance is inferred from offline checks.

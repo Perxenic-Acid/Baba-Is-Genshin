@@ -158,3 +158,19 @@ unchanged child allocation/parent state, F/wait/direct-Commit lockout, Undo,
 REVERT/identity, prior CRASH, same-turn WIN and AUTO's triggering pulse/queue Undo.
 Six cases execute the unchanged installed dispatch branch with editor/native
 callbacks captured; no real-device success is inferred.
+
+## M9.7Y arbitrary scoped Text products
+
+Installed convert.lua dolevelconversions() prefixes WRITE targets with text_ before
+saving the parent conversion list. Extend the tree's product/reload decoder from
+its old text_level special case to any nonempty text_<token>, producing physical
+Text with the canonical uppercase token. Keep ordinary archetypes separate and
+reject the empty text_ marker. Modern persisted entity records already preserve
+full Text metadata; legacy string records now decode all Text targets too.
+
+Boundary tests cover mixed and duplicate Text products, syntax/property/noun
+labels, first-ID reuse, direction/origin/link preservation, allocated-copy entry,
+whole product-group replacement, allocator tombstones and whole-tree Undo. An
+8-case oracle executes the installed WRITE prefix branch. This batch completes
+product transport, not scoped WRITE rule selection; that remains the next step.
+No letter composition or custom vocabulary policy is introduced.

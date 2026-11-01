@@ -1,4 +1,4 @@
-# BECOME (M9.4K)
+# BECOME (M9.7I)
 
 Primary reference: installed Baba Is You `Data/convert.lua`, conversion() and
 convert(), and `Data/rules.lua` identity-protection and negative-rule processing.
@@ -26,8 +26,39 @@ Native acceptance is waived by the user; offline results do not establish native
 runtime parity. BECOME is available as a loose full-name word in the sparse MOTION
 room.
 
-Deliberate gaps: scoped LEVEL BECOME (including LEVEL BECOME LEVEL / REVERT) is
-still deferred pending REVERT metadata semantics. Existing IS self-negation
+Deliberate gaps: conditional scoped LEVEL BECOME, scoped ALL/EMPTY targets and
+synthetic self-negative destruction remain deferred (see M9.7I below). Existing IS self-negation
 precedence is preserved; mixed negative self-conversions beyond the tested matrix
 are not claimed as exhaustive original parity. EMPTY lifecycle/HAS limitations and
 ALL authored-vocabulary boundaries remain as documented in SPECIAL_NOUNS.md.
+
+## Scoped LEVEL integration (M9.7I)
+
+REVERT metadata now permits unconditional scoped LEVEL BECOME ordinary noun,
+TEXT and LEVEL. Installed convert.lua conversion()/convert() queues BECOME
+alongside IS, while dolevelconversions() rewrites BECOME LEVEL to REVERT before
+product selection. This indirect restore retains priority over other selected
+products. Physical BECOME REVERT remains invalid syntax (property argument).
+
+Typed become_level/forbid_become_level commands stay separate from real-unit
+BECOME relations. IS LEVEL identity protection suppresses IS products only;
+BECOME products preserve declaration order and multiplicity. Ordinary noun/Text
+BECOME bans affect only that verb; IS NOT REVERT does not block BECOME LEVEL.
+Scoped BROKEN suppresses these commands using the existing declaration gate.
+Real level blocks additionally use the existing identity-preserving BECOME path,
+with direction/original-name/links and no HAS conversions.
+
+The existing boundary transaction handles source-group replacement, return,
+allocator tombstones, persistent reload and Undo. The >=50 selected product
+TOO COMPLEX gate applies to BECOME too, retaining the triggering child turn.
+Tests cover scoped noun/Text/self restore, duplicate/mixed IS products, identity
+protection, own negative noun, BROKEN, parent persistence and whole-tree Undo.
+32 cases execute unchanged installed dolevelconversions selection, with IS
+protection and verb-specific negative conditions normalized; 49/50/51 physical
+BECOME rules exercise actual terminal boundary handling. No native success is
+inferred from these offline checks.
+
+Remaining scoped gaps: conditional LEVEL surroundings; ALL/EMPTY target handling;
+LEVEL BECOME NOT LEVEL's original error/destroylevel path. That self-negative
+form is explicitly deferred instead of being misrepresented as a ban on REVERT.
+The earlier blanket scoped LEVEL deferral is superseded by this section.

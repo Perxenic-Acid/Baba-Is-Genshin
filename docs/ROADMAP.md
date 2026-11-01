@@ -905,3 +905,13 @@ The 1,260 installed newundo frame queries now require all retained frames after
 180 commands; actual BACK replays the first frame across the former cutoff.
 Local full Undo and 165-turn whole-tree/reload restoration are covered. History
 memory grows with accepted play; frontend/design and other BACK gaps stay open.
+
+## M9.7I — scoped LEVEL BECOME
+
+Connect unconditional LEVEL BECOME noun/Text/LEVEL to the existing boundary
+transaction. Keep BECOME separate from IS identity protection and negative
+property bans, preserve ordered duplicate products, suppress scoped BROKEN and
+reuse the 50-product terminal limit. BECOME LEVEL selects original scoped REVERT.
+Real compiler/tree tests, 32 installed selection oracle cases and physical
+49/50/51-product boundaries cover the change. Conditional scope, ALL/EMPTY and
+self-negative level destruction remain explicit gaps in BECOME.md.

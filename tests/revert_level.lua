@@ -6,13 +6,13 @@ services.active=RW_GetActiveLevel;services.update=RW_UpdateActiveLevel;services.
 services.selectors=RW_LevelSelectorIDs;services.place_selectors=RW_PlaceLevelSelectors;services.bind_entry=RW_BindLevelEntry
 services.commit_session=RW_Commit;services.outcome=RW_RecordLevelOutcome;services.candidates=RW_LevelSelectionCandidates
 services.win=RW_HasWinContact;services.level_outcome=RW_ResolveLevelPropertyOutcome
-local function fixture(extra,converted,copy_entry)
+local function fixture(extra,converted,copy_entry,base)
  local root=RW_CreateSession().world;root.language.nouns.ROCK="rock";root.language.nouns.FLAG="flag"
  root.entities={[1]={id=1,kind="object",class="object",archetype="rock",x=3,y=3,direction="Left",level_link={target="child",definition_id="child",source_type="rock"}},
  [2]={id=2,kind="object",class="object",archetype="flag",x=6,y=6,direction="Right"}};root.next_entity_id=10
  local child=RW_CreateSession().world;child.width=24;child.height=24;child.entities={};child.next_entity_id=10
  child.language.nouns.LEVEL={tag="level",block_type="level_block"};child.language.nouns.ROCK="rock";child.language.nouns.FLAG="flag"
- local rows={{"LEVEL","IS","REVERT"}};for _,r in ipairs(extra or {}) do rows[#rows+1]=r end
+ local rows=base or {{"LEVEL","IS","REVERT"}};for _,r in ipairs(extra or {}) do rows[#rows+1]=r end
  for row,words in ipairs(rows) do for x,word in ipairs(words) do local id=child.next_entity_id;child.next_entity_id=id+1;child.entities[id]={id=id,kind="object",class="text",text={name=word},x=x,y=row*2,direction="None"} end end
  local tree=assert(RW_CreateLevelTree({root=assert(RW_CreateLevelDefinition("root",root)),child=assert(RW_CreateLevelDefinition("child",child))},"root"))
  local parent_id=tree.active_id;tree=assert(RW_EnterLevel(tree,"1","child"));tree=assert(RW_BindLevelEntry(tree,1))
@@ -85,3 +85,89 @@ n,r=RW_CommitLevelTree(t,p);assert(r.accepted)
 assert(n.instances[parent_id].world.entities[2].archetype=="crate" and n.instances[parent_id].world.entities[2].x==6)
 assert(n.level_transforms[parent_id][2].source_id==2)
 print("PASS: scoped REVERT isolates sibling persistence and resets parent runtime")
+
+-- Scoped BECOME bypasses IS identity protection and keeps verb-specific bans.
+for _,case in ipairs({
+ {rows={{'LEVEL','BECOME','FLAG'},{'LEVEL','IS','LEVEL'}},kind='transform',count=1},
+ {rows={{'LEVEL','BECOME','FLAG'},{'LEVEL','BECOME','FLAG'}},kind='transform',count=2},
+ {rows={{'LEVEL','IS','FLAG'},{'LEVEL','BECOME','FLAG'}},kind='transform',count=2},
+ {rows={{'LEVEL','BECOME','TEXT'}},kind='transform',text=true,count=1},
+ {rows={{'LEVEL','BECOME','LEVEL'}},kind='revert'},
+ {rows={{'LEVEL','BECOME','LEVEL'},{'LEVEL','IS','NOT','REVERT'}},kind='revert'},
+ {rows={{'LEVEL','BECOME','FLAG'},{'LEVEL','BECOME','NOT','FLAG'}}},
+ {rows={{'LEVEL','BECOME','FLAG'},{'LEVEL','IS','BROKEN'}}},
+ {rows={{'LEVEL','IS','REVERT'},{'LEVEL','IS','LEVEL'},{'LEVEL','BECOME','FLAG'}},kind='transform',count=1}
+}) do
+ local tree,parent=fixture({},true,false,case.rows)
+ local plan,err=RW_PlanLevelAction(tree,{type='wait'},services);assert(plan,err and err.reason)
+ local next,result=RW_CommitLevelTree(tree,plan);assert(result.accepted,result.reason)
+ if case.kind then
+  assert(next.active_id==parent and next.outcomes[tree.active_id].kind==case.kind)
+  local w=RW_GetActiveLevel(next).world
+  if case.kind=='revert' then assert(w.entities[1].archetype=='rock' and not w.entities[10])
+  else
+   local count=0
+   for _,e in pairs(w.entities) do if e.level_link then
+    count=count+1
+    if case.text then assert(e.class=='text' and e.text.name=='LEVEL') else assert(e.archetype=='flag') end
+   end end
+   assert(count==case.count)
+  end
+ else assert(next.active_id==tree.active_id and next.instances[parent].world==tree.instances[parent].world) end
+ local restored=RW_UndoLevelTree(next);assert(restored.active_id==tree.active_id and restored.level_transforms==tree.level_transforms)
+ assert(restored.instances[parent].world==tree.instances[parent].world)
+end
+print('PASS: scoped LEVEL BECOME noun/Text/LEVEL, IS protection bypass, duplicates, own NOT, BROKEN, persistence and whole-tree Undo')
+
+-- Execute installed dolevelconversions product selection for ordered mixed verbs.
+env.unitreference.rock='rock';env.tileslist.rock={name='rock'}
+env.unitreference.text_level='text_level';env.tileslist.text_level={name='text_level'}
+local become_cases=0
+for protected=0,1 do for copies=0,3 do for self=0,1 do for denied=0,1 do
+ local mats={{'flag',{enabled=protected==0},'is'}}
+ local relations={{op='transform_level',target_type='flag'}}
+ if protected==1 then relations[#relations+1]={op='protect_level'} end
+ for i=1,copies do
+  local name=i%2==1 and 'rock' or 'text_level'
+  mats[#mats+1]={name,{enabled=denied==0},'become'}
+  relations[#relations+1]={op='become_level',target_type=name}
+  if denied==1 then relations[#relations+1]={op='forbid_become_level',target_type=name} end
+ end
+ if self==1 then
+  mats[#mats+1]={'level',{},'become'}
+  relations[#relations+1]={op='become_level',target_type='@revert'}
+ end
+ env.levelconversions=mats;local expected,reverting=oracle()
+ local s=RW_CreateSession();s.world.entities={};s.world.next_entity_id=1
+ local pure={};for k,v in pairs(services) do pure[k]=v end
+ pure.evaluate=function() return {},nil,relations,{} end
+ local p,e=RW_PlanTurn(s.world,{type='wait'},pure);assert(p,e and e.reason)
+ if reverting then assert(p.level_transform=='@revert')
+ else
+  local got=type(p.level_transform)=='table' and p.level_transform or p.level_transform and {p.level_transform} or {}
+  assert(#got==#expected);for i,name in ipairs(expected) do assert(got[i]==name) end
+ end
+ become_cases=become_cases+1
+end end end end
+assert(become_cases==32)
+print('PASS: installed scoped BECOME ordered product/self-revert selection oracle (32 cases; IS protection/own bans normalized)')
+
+for _,target in ipairs({'FLAG','TEXT','LEVEL'}) do
+ local tree=fixture({},false,false,{{'LEVEL','BECOME',target}})
+ local session=RW_GetActiveLevel(tree)
+ session.world.entities[1]={id=1,kind='object',class='object',archetype='level_block',original_name='rock',x=18,y=18,direction='Down',level_link={target='child',definition_id='root',source_type='rock'}}
+ local p,e=RW_PlanTurn(session.world,{type='wait'},services);assert(p,e and e.reason)
+ local n,r=RW_Commit(session,p);assert(r.accepted,r.reason)
+ local unit=n.world.entities[1]
+ assert(unit.direction=='Down' and unit.original_name=='rock' and unit.level_link.target=='child')
+ if target=='TEXT' then assert(unit.class=='text' and unit.text.name=='LEVEL')
+ else assert(unit.archetype==(target=='LEVEL' and 'level_block' or 'flag')) end
+ assert(RW_Undo(n).world==session.world)
+end
+-- Unsupported synthetic self-negation must remain explicitly deferred rather
+-- than silently becoming a REVERT ban (native selects error/destroylevel).
+local tree=fixture({},false,false,{{'LEVEL','BECOME','NOT','LEVEL'}})
+local frame=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs))
+assert(#frame.deferred>0)
+for _,relation in ipairs(frame.relations) do assert(relation.op~='forbid_become_level') end
+print('PASS: real LEVEL BECOME preserves facing/origin/links and Undo; synthetic self-negative destruction stays explicitly deferred')

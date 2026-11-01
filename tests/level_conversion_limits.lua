@@ -6,7 +6,7 @@ services.active=RW_GetActiveLevel;services.update=RW_UpdateActiveLevel;services.
 services.selectors=RW_LevelSelectorIDs;services.place_selectors=RW_PlaceLevelSelectors;services.bind_entry=RW_BindLevelEntry
 services.commit_session=RW_Commit;services.outcome=RW_RecordLevelOutcome;services.candidates=RW_LevelSelectionCandidates
 services.win=RW_HasWinContact;services.level_outcome=RW_ResolveLevelPropertyOutcome
-local function fixture(count,extra)
+local function fixture(count,extra,verb)
  local root=RW_CreateSession().world;root.entities={[1]={id=1,kind="object",class="object",archetype="level_block",x=3,y=3,direction="Down",level_link={target="child",definition_id="child",source_type="level_block"}}};root.next_entity_id=10
  local w=RW_CreateSession().world;w.width=32;w.height=2*(count+#(extra or {})+6)+10
  w.language.nouns.LEVEL={tag="level",block_type="level_block"};w.language.nouns.FLAG="flag";w.language.nouns.CURSOR="cursor";w.language.nouns.LINE="line";w.language.properties.PATH="path"
@@ -14,7 +14,7 @@ local function fixture(count,extra)
  [2]={id=2,kind="object",class="object",archetype="cursor",x=24,y=8,direction="Up"},[3]={id=3,kind="object",class="object",archetype="line",x=25,y=8,direction="None"}}
  w.next_entity_id=10
  local rows={{"AVATAR","IS","YOU"},{"CURSOR","IS","SELECT"},{"LINE","IS","PATH"}}
- for i=1,count do rows[#rows+1]={"LEVEL","IS","FLAG"} end
+ for i=1,count do rows[#rows+1]={"LEVEL",verb or "IS","FLAG"} end
  for _,row in ipairs(extra or {}) do rows[#rows+1]=row end
  for y,words in ipairs(rows) do for x,word in ipairs(words) do local id=w.next_entity_id;w.next_entity_id=id+1;w.entities[id]={id=id,kind="object",class="text",text={name=word},x=x,y=y*2,direction="None"} end end
  local tree=assert(RW_CreateLevelTree({root=assert(RW_CreateLevelDefinition("root",root)),child=assert(RW_CreateLevelDefinition("child",w))},"root"))
@@ -24,8 +24,8 @@ local function act(t)
  local p,e=RW_PlanLevelAction(t,{type="move",dx=1,dy=0},services);assert(p,e and e.reason)
  local n,r=RW_CommitLevelTree(t,p);assert(r.accepted,r.reason);return n,p
 end
-for _,count in ipairs({49,50,51}) do
- local t,parent_id=fixture(count);local before=RW_GetActiveLevel(t).world
+for _,verb in ipairs({"IS","BECOME"}) do for _,count in ipairs({49,50,51}) do
+ local t,parent_id=fixture(count,nil,verb);local before=RW_GetActiveLevel(t).world
  local n,p=act(t);assert(not before.too_complex and #t.history==0)
  if count==49 then
   assert(n.active_id==parent_id and p.reason=="transform");local total=0;for _,u in pairs(RW_GetActiveLevel(n).world.entities) do if u.archetype=="flag" then total=total+1 end end;assert(total==49)
@@ -39,7 +39,7 @@ for _,count in ipairs({49,50,51}) do
   local _,r=RW_CommitLevelTree(n,{before=n,after=n});assert(not r.accepted and r.reason=="too_complex_undo_only")
  end
  local u=RW_UndoLevelTree(n);assert(u.active_id==t.active_id and RW_GetActiveLevel(u).world==before and u.level_transforms==t.level_transforms)
-end
+end end
 local t,parent_id=fixture(51,{{"LEVEL","IS","REVERT"}});local n,p=act(t)
 assert(n.active_id==parent_id and p.reason=="revert" and not RW_GetActiveLevel(n).world.too_complex)
 t=fixture(50,{{"LEVEL","IS","LEVEL"}});n,p=act(t);assert(n.active_id==t.active_id and not RW_GetActiveLevel(n).world.too_complex)

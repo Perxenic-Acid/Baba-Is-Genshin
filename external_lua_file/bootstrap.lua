@@ -385,8 +385,20 @@ local function plan_turn(world, action, services, initial_frame,back_context)
 
     trace[#trace + 1] = "conversions"
     local entity_conversions, level_targets, protected, level_traits = {}, {}, false, {}
+    local become_revert,become_bans=false,{}
+    for _,conversion in ipairs(conversions or {}) do
+        if conversion.op=="forbid_become_level" then become_bans[conversion.target_type]=true end
+        if conversion.op=="protect_level" then protected=true end
+    end
     for _, conversion in ipairs(conversions or {}) do
-        if conversion.op == "transform_level" then level_targets[#level_targets+1] = conversion.target_type
+        if conversion.op == "transform_level" then
+            if not protected then level_targets[#level_targets+1]=conversion.target_type end
+        elseif conversion.op=="become_level" then
+            if not become_bans[conversion.target_type] then
+                if conversion.target_type=="@revert" then become_revert=true
+                else level_targets[#level_targets+1]=conversion.target_type end
+            end
+        elseif conversion.op=="forbid_become_level" then -- Verb-specific scoped denial.
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
         elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" or conversion.op=="play" or conversion.op=="all_done" then -- Consumed by their scheduled phases, not conversion.
@@ -394,12 +406,13 @@ local function plan_turn(world, action, services, initial_frame,back_context)
     end
     level_traits=level_traits_from(conversions)
     local target_type
+    local reverting=become_revert
     if not protected then
-        local reverting=false;for _,trait in ipairs(level_traits) do if trait=="revert" then reverting=true;break end end
-        if reverting then target_type="@revert"
-        elseif #level_targets == 1 then target_type=level_targets[1]
-        elseif #level_targets > 1 then target_type=level_targets end
+        for _,trait in ipairs(level_traits) do if trait=="revert" then reverting=true;break end end
     end
+    if reverting then target_type="@revert"
+    elseif #level_targets==1 then target_type=level_targets[1]
+    elseif #level_targets>1 then target_type=level_targets end
     local operations, conversion_error, allocation, converted_ids, conversion_terminal, back_conversions = services.convert(preview, entity_conversions, post_rules,back_count)
     if not operations then return fail("conversions", conversion_error) end
 
@@ -2388,7 +2401,7 @@ local function start(run_self_tests)
     end
     render()
 
-    print("[RuleWorld] M9.7H initialized")
+    print("[RuleWorld] M9.7I initialized")
 end
 
 -- Production entry point: build the authored world, bind controls and render only.

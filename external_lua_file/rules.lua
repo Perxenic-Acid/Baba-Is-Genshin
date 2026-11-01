@@ -1046,7 +1046,19 @@ local function lower_simple(ast_rules, registry)
             elseif target_type.tag == "level" then has_product={kind="object",archetype=target_type.block_type or "level_block"} end
         elseif object.tag == "special" and object.name == "text" then has_product={kind="text"} end
         local negated=object.tag == "not" and object.operand or nil
-        if semantics and semantics.negative_property == "deny_trait" and has_subject
+        if level_subject and semantics and semantics.noun=="become" then
+            local term=negated or object
+            local physical,scoped
+            if term.tag=="noun" and term.type then
+                if term.type.tag=="object" then physical=term.type.name;scoped=physical
+                elseif term.type.tag=="level" then physical=term.type.block_type or "level_block";scoped="@revert" end
+            elseif term.tag=="special" and term.name=="text" then physical="@text";scoped="text_level" end
+            if scoped and not (negated and scoped=="@revert") and (not negated or semantics.negative_noun=="forbid_become") then
+                conversions[#conversions+1]={op=negated and "forbid_become_level" or "become_level",target_type=scoped,source=ast.source}
+                conversions[#conversions+1]={op=negated and "forbid_become" or "become",
+                    source_type=subject_type.block_type or "level_block",target_type=physical,source=ast.source,when={op="always"}}
+            else deferred[#deferred+1]={reason="unsupported_level_become",rule=ast} end
+        elseif semantics and semantics.negative_property == "deny_trait" and has_subject
             and negated and negated.tag == "property" and type(negated.name) == "string" then
             generated[#generated+1]={when=ast.when,effects={{op="deny_trait",target=has_subject,trait=negated.name}},source=ast.source}
             if level_subject then
@@ -2276,7 +2288,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         local enabled={}
         for _,relation in ipairs(filtered) do
             if relation.op~="level_trait" and relation.op~="deny_level_trait"
-                and relation.op~="transform_level" and relation.op~="protect_level" then
+                and relation.op~="transform_level" and relation.op~="protect_level"
+                and relation.op~="become_level" and relation.op~="forbid_become_level" then
                 enabled[#enabled+1]=relation
             end
         end

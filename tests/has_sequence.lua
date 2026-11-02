@@ -109,3 +109,20 @@ assert(n.world.too_complex and n.world.random_state==second and n.world.next_ent
 assert(not n.world.entities[1] and n.world.entities[2] and RW_Undo(n).world==s.world)
 assert(s.world.random_state==17)
 print('PASS: real HAS None shared/per-parent/random-only orientation, Mid extension, serial death RNG, terminal prefixes and Undo')
+
+-- Unrelated source declarations must never run their conditions at a victim.
+s,f=fixture({{'AVATAR','HAS','FLAG'},{'ROCK','HAS','ROCK'},{'TEXT','HAS','ROCK'}})
+original=RW_RelationApplies
+local unrelated=0
+RW_RelationApplies=function(w,r,entity)
+ if r.target.kind=='archetype' and r.target.value=='rock' or r.target.kind=='class' and r.target.value=='text' then
+  unrelated=unrelated+1;return nil,'rule_complexity_limit'
+ end
+ return original(w,r,entity)
+end
+local flat,flat_error=RW_PlanHasBirths(s.world,{1},f.relations)
+local stream,stream_error=RW_InitializeHasBirths(s.world,{1},f.relations,f.rules)
+RW_RelationApplies=original
+assert(flat,flat_error);assert(stream,stream_error)
+assert(unrelated==0 and names(flat)=='flag' and names(stream)=='flag')
+print('PASS: HAS source matching precedes condition/limit queries for flat and initialized streams')

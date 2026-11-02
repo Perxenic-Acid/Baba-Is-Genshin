@@ -138,3 +138,14 @@ death frames, prefix allocation and Undo. The installed inside() dispatch oracle
 now covers 243 real/EMPTY ordinary/Text/order/direction combinations, including
 real None parents. Exact original engine RNG sequence is still deliberately
 replaced by the project's deterministic transaction RNG.
+
+## M9.8X filter HAS sources before conditions
+
+Installed tools.lua inside() around997 gathers only declarations whose target
+matches the dying container name, before calling testcond(). RW_PlanHasBirths
+now checks its typed source selector first too. The initialized stream inherits
+the same behavior. Unrelated ordinary/Text HAS clauses cannot query conditions
+at this victim or produce an unrelated query-limit terminal state. Relation
+shape validation remains eager; matching declaration order/multiplicity is
+unchanged. Dedicated injected-limit tests cover both helpers, and the installed
+inside() dispatch oracle verifies source filtering before condition dispatch.

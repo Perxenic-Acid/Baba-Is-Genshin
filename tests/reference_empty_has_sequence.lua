@@ -77,3 +77,10 @@ for _,simultaneous in ipairs({false,true}) do
  assert(#products==#created and #products==(simultaneous and 0 or 1))
 end
 print('PASS: installed handledels serial/simultaneous HAS parent-presence ordering')
+env.featureindex={avatar={
+ {{'rock','has','rock'},{'unrelated'}},{{'text','has','rock'},{'unrelated'}},
+ {{'avatar','has','flag'},{'always'}}}}
+env.testcond=function(conds) assert(conds[1]~='unrelated');return true end
+created={};env.inside('avatar',5,3,1,1)
+assert(#created==1 and created[1].name=='flag')
+print('PASS: installed inside() filters unrelated HAS sources before condition dispatch')

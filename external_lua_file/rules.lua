@@ -2912,17 +2912,19 @@ function RW_PlanHasBirths(world, victims, relations)
         if not entity or seen[id] then return nil,"invalid_has_victim" end
         seen[id]=true
         for _,relation in ipairs(relations) do
-            local enabled,err=RW_RelationApplies(world,relation,entity)
-            if enabled == nil then return nil,err end
-            if matches(entity,relation.target,world) and enabled then
-                local product={kind="object",class=relation.product.kind == "text" and "text" or "object",
-                    x=entity.x,y=entity.y,direction=entity.direction}
-                if product.class == "text" then product.text={name=RW_NounTextName(world,entity)}
-                else
-                    product.archetype=relation.product.archetype
-                    product.level_link=query_clone(entity.level_link)
+            if matches(entity,relation.target,world) then
+                local enabled,err=RW_RelationApplies(world,relation,entity)
+                if enabled == nil then return nil,err end
+                if enabled then
+                    local product={kind="object",class=relation.product.kind == "text" and "text" or "object",
+                        x=entity.x,y=entity.y,direction=entity.direction}
+                    if product.class == "text" then product.text={name=RW_NounTextName(world,entity)}
+                    else
+                        product.archetype=relation.product.archetype
+                        product.level_link=query_clone(entity.level_link)
+                    end
+                    specifications[#specifications+1]=product
                 end
-                specifications[#specifications+1]=product
             end
         end
     end

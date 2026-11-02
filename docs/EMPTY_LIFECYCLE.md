@@ -364,3 +364,30 @@ offline instructions. Native success is not inferred from these checks.
 M9.8V subsequently adds real-container within-parent HAS clause sequencing; see
 [CONTACT_WORDS.md](CONTACT_WORDS.md). Exact HAS ALL/createall and the prior EMPTY
 scope notes remain separate gaps.
+
+## M9.9A anonymous EMPTY PUSH WEAK destruction
+
+Installed movement.lua trypush(), around1205, accepts unsafe WEAK without first
+requiring a clear subtree. dopush(), around1460, deletes that blocked unit even
+when unitid=2 and returns success to the pusher. Recursive anonymous EMPTY PUSH
+now mirrors this blocked-root behavior rather than rejecting the leading move.
+It snapshots speculative dependency moves/deaths, restores them on failure,
+then records one cell-local WEAK death at the pushed vacancy's source.
+
+The cell uses the existing HAS/status/direction RNG/command-delete-cache adapter
+and allocates no proxy or persistent EMPTY ID. SAFE, STILL/directional locks,
+free movement and passive SLEEP retain their separate behavior. In particular,
+this matters when the leading mover has a different FLOAT layer: direct EMPTY
+WEAK entry is layer-filtered, but the pushed vacancy's own blocked WEAK check
+does not compare itself with the leader's layer. Falling and pulling do not gain
+new blocked-root destruction from this wrapper.
+
+tests/anonymous_empty_weak.lua covers blocked/free, SAFE/STILL/locks/SLEEP,
+rolled-back real dependencies, cell HAS, positive Commit and Undo. The installed
+full trypush/dopush oracle covers 128 four-axis/layer/free/blocked/SAFE/SLEEP cases.
+The prior EMPTY EAT/unlock/WEAK collision oracles now dispatch their PUSH branch
+through the installed trypush/dopush as well, instead of treating every blocked
+anonymous push as a failure. Their existing 83,968 combined cases pass with the
+new dispatch (32,768 EAT + 16,384 real unlock + 32,768 virtual unlock + 2,048 WEAK).
+Anonymous chain unlock/EAT, complete passive collision parity, lazy per-impulse
+queries and the prior scope notes remain separate gaps.

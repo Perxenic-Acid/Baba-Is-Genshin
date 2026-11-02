@@ -265,12 +265,13 @@ function RW_ResolveMovement(world, action)
         if empty.block_entry or empty.pull then return "stop" end
     end
     local try_move,attempt_move
-    local function push_empty(x,y)
+    local push_empty
+    local function attempt_empty_push(x,y,pulling)
         local nx,ny=x+dx,y+dy
         if get_environment(world,nx,ny) == "edge" then return false,"blocked_by_edge" end
         local obstacle=empty_obstacle(nx,ny,{class="empty",behaviors=empty_at(x,y) or {}})
         if obstacle=="push" then
-            local ok,err=push_empty(nx,ny); if not ok then return false,err end
+            local ok,err=push_empty(nx,ny,pulling); if not ok then return false,err end
         elseif obstacle=="stop" then return false,"blocked_by_empty" end
         local occupants={}
         for id,entity in pairs(world.entities) do
@@ -284,6 +285,24 @@ function RW_ResolveMovement(world, action)
                 elseif has_capability(world,world.entities[id],"block_entry") then return false,"blocked_by_entity" end
             end
         end
+        return true
+    end
+    push_empty=function(x,y,pulling)
+        local source={class="empty",behaviors=empty_at(x,y) or {}}
+        if action.falling or pulling or not has_capability(world,source,"weak") or has_capability(world,source,"safe") then
+            return attempt_empty_push(x,y,pulling)
+        end
+        local old_planned,old_removed,old_visiting={},{},{}
+        for k,v in pairs(planned) do old_planned[k]=v end
+        for k,v in pairs(removed) do old_removed[k]=v end
+        for k,v in pairs(visiting) do old_visiting[k]=v end
+        local change_count,death_count=#changes,#destructions
+        local ok,reason=attempt_empty_push(x,y,pulling)
+        if ok then return true end
+        planned,removed,visiting=old_planned,old_removed,old_visiting
+        while #changes>change_count do table.remove(changes) end
+        while #destructions>death_count do table.remove(destructions) end
+        destroy_empty(x,y,"weak")
         return true
     end
     attempt_move=function(id,pulling)
@@ -312,7 +331,7 @@ function RW_ResolveMovement(world, action)
         local obstacle,empty_weak,empty_unlock,empty_eat
         if not phantom then obstacle,empty_weak,empty_unlock,empty_eat=empty_obstacle(nx,ny,entity,pulling) end
         if obstacle=="push" then
-            local ok,err=push_empty(nx,ny)
+            local ok,err=push_empty(nx,ny,pulling)
             if not ok then visiting[id]=nil; return false,err end
         elseif obstacle=="stop" then
             visiting[id]=nil; return false,"blocked_by_empty"

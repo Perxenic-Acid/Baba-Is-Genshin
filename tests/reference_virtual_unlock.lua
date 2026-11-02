@@ -17,17 +17,19 @@ local native=assert(load('return function(lockpartner) local x,y,ox,oy,dir_=4,4,
  ' local gone=false for _,v in ipairs(specials) do if not gone then local b,reason=v[1],v[2] local bx,by=5,4 '..source:sub(c,d-1)..
  ' elseif reason=="weak" then '..source:sub(e,g-1)..' end end end end return result[1],gone end','@installed_virtual_unlock','t',env))()
 local names={'open','shut','push','stop','pull','swap','still','weak','safe','float'}
+local push=dofile('tests/reference_empty_push_helper.lua')(source,env)
 local checked=0
 for mask=0,1023 do for movermask=0,15 do for _,prior in ipairs({false,true}) do
  target={};for i,name in ipairs(names) do target[name]=math.floor(mask/2^(i-1))%2==1 end
  mover={open=movermask%2==1,shut=math.floor(movermask/2)%2==1,safe=math.floor(movermask/4)%2==1,float=movermask>=8}
  deleted,order={},{};if prior then deleted[4]=true end;local classification,gone=native(mover.open and 'shut' or mover.shut and 'open' or '')
+ local allowed=classification==0 or classification==2 and push(true)
  local behaviors={};for k,v in pairs(target) do behaviors[k=='stop' and 'block_entry' or k]=v end
  local w={width=8,height=8,entities={[-1]={id=-1,class='empty',x=4,y=4,behaviors=mover},[3]={id=3,x=6,y=4,behaviors={block_entry=true}}},
   empty_cells={['5:4']={x=5,y=4,behaviors=behaviors}},empty_deleted=prior and {['4:4']=true} or nil}
  local p=RW_ResolveMovement(w,{type='move',entity_id=-1,dx=1,dy=0})
  local moved=false;for _,op in ipairs(p.changes) do if op.entity_id==-1 and op.kind=='move' then moved=true end end
- assert(moved==(classification==0 and not gone),mask..':'..movermask)
+ assert(moved==(allowed and not gone),mask..':'..movermask)
  local deaths={};for _,death in ipairs(p.destructions or {}) do if not death.skip_inside then deaths[#deaths+1]=death end end;assert(#deaths==#order)
  for index,id in ipairs(order) do
   local death=deaths[index]

@@ -355,6 +355,16 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         for _,death in ipairs(deaths or {}) do if death.class=="empty" then empty_deleted[death.x..":"..death.y]=true end end
     end
     local function prepare_empty_eaters(projected,frame,relations)
+        if services.movement_eaters then
+            local active=false
+            for _,relation in ipairs(relations or {}) do if relation.op=="eat" then active=true;break end end
+            if not active then return true end
+            local targets,why=services.movement_eaters(frame,relations)
+            if not targets then return nil,why end
+            projected.movement_eaters=targets;projected.empty_eaters={}
+            for id,items in pairs(targets) do if items['@empty'] then projected.empty_eaters[id]=true end end
+            return true
+        end
         if not services.empty_eaters then return true end
         local active=false
         for _,relation in ipairs(relations or {}) do if relation.op=="eat" and relation.target_type=="@empty" then active=true;break end end
@@ -2022,6 +2032,7 @@ local function start(run_self_tests)
         create=function(world,specifications) return world_api:Invoke("RW_PlanCreate",world,specifications) end
     }
     turn_services.empty_eaters=function(w,r) return rules_api:Invoke("RW_ResolveEmptyEatSources",w,r) end
+    turn_services.movement_eaters=function(w,r) return rules_api:Invoke("RW_ResolveMovementEatTargets",w,r) end
     turn_services.contact=function(world,effective,kind,contents,rules,count)
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services,rules,count)
     end

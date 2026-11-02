@@ -41,3 +41,31 @@ entry. Source-origin conditions refresh per motion phase; targets need no EMPTY
 property and use SAFE/FLOAT. EAT precedes unlock/WEAK and shares atomic cell HAS,
 RNG and per-command deletion dedup. Phase-snapshot versus native lazy per-impulse
 query timing remains a documented boundary in EMPTY_LIFECYCLE.md.
+
+## M9.8Y real-target movement EAT
+
+Installed movement.lua check() around1020-1045 tests EAT before ordinary target
+solidity, with per-target SAFE/FLOAT and no pulling/PHANTOM collision specials.
+move() around1567-1635 dispatches real-target lock before EAT and stops specials
+when the source is gone. This differs from the virtual-target EAT-before-lock
+ordering already covered by M9.8R.
+
+Production motion phases now query a transient per-real-source target-name map
+through RW_ResolveMovementEatTargets. It includes physical Text and passive
+PUSH participants and also supplies the existing EAT EMPTY map without duplicate
+condition queries. Eligible real targets bypass STOP/PUSH/PULL/SWAP/STILL and
+are destroyed in the common movement solver. Unrelated blockers still roll back
+speculative movement/deletion. Typed death frames retain target positions and
+HAS, initialized newborn status, allocation and RNG in atomic stages and Undo.
+Automatic/SHIFT/FEAR/FALL inherit the same collision path; late overlap EAT
+remains a separate frozen contact phase.
+
+tests/movement_eat.lua covers solidity, SAFE/FLOAT, unlock/HAS order, origin
+conditions, passive Object/Text PUSH, Text victims, no-eating pull trials,
+MOVE/FALL, rollback and Undo. tests/reference_movement_eat.lua executes installed
+real-target collision/deletion branches for 4096 SAFE/FLOAT/PHANTOM/lock/solidity
+cases and checks ordered deaths. This is offline/source validation only.
+
+Source conditions remain phase snapshots rather than original lazy per-impulse
+queries. Virtual EMPTY/scoped LEVEL source predicates and native mutable-list
+ordering remain deferred. This change does not persist the target maps as facts.

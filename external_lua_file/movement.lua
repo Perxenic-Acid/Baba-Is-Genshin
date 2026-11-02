@@ -321,7 +321,7 @@ function RW_ResolveMovement(world, action)
 
         table.sort(occupants)
 
-        local locks,swaps,weak_targets={},{},{}
+        local specials,swaps,weak_targets={},{},{}
         local partner=has_capability(world,entity,"open") and "shut"
             or has_capability(world,entity,"shut") and "open" or nil
         for _, other_id in ipairs(occupants) do
@@ -330,9 +330,15 @@ function RW_ResolveMovement(world, action)
 
                 local target_swap=has_capability(world,other,"swap") and not immobile(world,other,dx,dy)
                 local mover_swap=has_capability(world,entity,"swap")
-                if not phantom and partner and (id > 0 or entity.class=="empty") and other_id > 0 and same_layer(world,entity,other) and has_capability(world,other,partner)
-                    and (not has_capability(world,entity,"safe") or not has_capability(world,other,"safe")) then
-                    locks[#locks+1]=other_id -- Unlock takes precedence over PUSH/STOP.
+                local unlock=not phantom and partner and (id > 0 or entity.class=="empty") and other_id > 0 and same_layer(world,entity,other) and has_capability(world,other,partner)
+                    and (not has_capability(world,entity,"safe") or not has_capability(world,other,"safe"))
+                local targets=world.movement_eaters and world.movement_eaters[id]
+                local eat=not phantom and not pulling and targets and targets[other.class=="text" and "@text" or other.archetype]
+                    and same_layer(world,entity,other) and not has_capability(world,other,"safe")
+                if unlock or eat then
+                    -- Native real-target specials queue lock before eat.
+                    if unlock then specials[#specials+1]={id=other_id,kind="unlock"} end
+                    if eat then specials[#specials+1]={id=other_id,kind="eat"} end
                 elseif action.falling and not phantom and same_layer(world,entity,other)
                     and has_capability(world,other,"weak") and not has_capability(world,other,"safe")
                     and not has_capability(world,other,"push") then
@@ -361,11 +367,15 @@ function RW_ResolveMovement(world, action)
         end
 
         for _,other_id in ipairs(weak_targets) do destroy(other_id,nil,"weak") end
-        for _,other_id in ipairs(locks) do
+        for _,special in ipairs(specials) do
             if removed[id] then break end
+            local other_id=special.id
             if not removed[other_id] then
-                if not has_capability(world,world.entities[other_id],"safe") then destroy(other_id) end
-                if not has_capability(world,entity,"safe") then destroy(id,direction_for(dx,dy)) end
+                if special.kind=="eat" then destroy(other_id,nil,"eat")
+                else
+                    if not has_capability(world,world.entities[other_id],"safe") then destroy(other_id) end
+                    if not has_capability(world,entity,"safe") then destroy(id,direction_for(dx,dy)) end
+                end
             end
         end
         if empty_eat then destroy_empty(nx,ny,"eat") end

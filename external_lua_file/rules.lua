@@ -3099,6 +3099,28 @@ function RW_ResolveEmptyEatSources(world,relations)
     return sources
 end
 
+-- Collision EAT capabilities are phase-local queries, not saved behaviors.
+function RW_ResolveMovementEatTargets(world,relations)
+    local sources={}
+    for _,relation in ipairs(relations or {}) do
+        if relation.op=="eat" and relation.source_type~="@empty" then
+            local selector=relation.source_type=="@text" and {kind="class",value="text"}
+                or {kind="archetype",value=relation.source_type}
+            for _,id in ipairs(RW_SelectEntities(world,selector)) do
+                local targets=sources[id]
+                if not targets or not targets[relation.target_type] then
+                    local enabled,why=RW_RelationApplies(world,relation,world.entities[id])
+                    if enabled==nil then return nil,why end
+                    if enabled then
+                        targets=targets or {};targets[relation.target_type]=true;sources[id]=targets
+                    end
+                end
+            end
+        end
+    end
+    return sources
+end
+
 function RW_ResolveVerbTargets(world,relations,verb)
     local groups={}
     for _,relation in ipairs(relations or {}) do

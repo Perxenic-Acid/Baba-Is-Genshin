@@ -448,3 +448,23 @@ The installed classification/queue oracle now covers 512 combinations including
 SWAP. Turn tests cover ordinary and FLOAT/PUSH targets, PHANTOM source,
 STILL, unrelated blockers and whole-tree Undo. Full trailing PULL dispatch,
 pulling-source SWAP and lazy per-impulse queries remain separate gaps.
+
+## M9.9E real trailing PULL behind an anonymous PUSH
+
+Installed movement.lua dopush(), around1413, inspects backward PULL candidates
+after successful forward movement and recursively dispatches them without
+canceling the leader. Anonymous EMPTY pushes now collect unplanned real PULL
+units behind their source, excluding the active pusher/dependency ancestors.
+Each trial uses the ordinary movement solver in pulling mode, with its failed
+speculative moves/deaths rolled back independently. The already departing
+vacancy is temporarily nonblocking for those trials; this is solver-local data,
+never persisted or allocated. SLEEP/FLOAT do not prevent passive PULL, while
+STILL/locks and scoped HOLD retain the common checks. Blocked pulled WEAK does
+not shatter. FALL does not acquire trailing pulls.
+
+tests/anonymous_empty_pull.lua executes installed recursive dopush with isolated
+backward check() eligibility for 128 four-axis/status combinations; it is a
+dispatch oracle, not a replacement for the condition/collision oracles. Turn
+tests cover a stacked real follower, a recursive chain, STILL, pure planning,
+positive Commit and Undo. Virtual trailing PULL chains, pulling-source SWAP,
+exact native queued-collision timing and lazy per-impulse queries remain gaps.

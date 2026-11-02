@@ -189,6 +189,7 @@ function RW_ResolveMovement(world, action)
     local planned,removed,destructions = {},{},{}
     local visiting = {}
     local changes = {}
+    local empty_departures={}
     local destroy_empty
     local function destroy(id,direction,cause)
         if removed[id] then return end
@@ -239,6 +240,7 @@ function RW_ResolveMovement(world, action)
         return source.eat_targets or world.movement_eaters and world.movement_eaters[source.id]
     end
     local function empty_obstacle(x,y,source,pulling)
+        if empty_departures[x..":"..y] then return nil end
         local empty,cell=empty_at(x,y)
         if not empty then return nil end
         local same=(empty.float==true)==has_capability(world,source,"float")
@@ -336,6 +338,33 @@ function RW_ResolveMovement(world, action)
                     to={x=x,y=y,direction=other.direction or "None"}}
             end
         end
+        -- dopush schedules real trailing PULL units after a successful EMPTY
+        -- push. The vacancy's source is already departing for these trials.
+        local followers={}
+        if not action.falling then
+            for id,other in pairs(world.entities) do
+                if id>0 and not planned[id] and not removed[id] and not visiting[id]
+                    and other.x==x-dx and other.y==y-dy and has_capability(world,other,"pull") then
+                    followers[#followers+1]=id
+                end
+            end
+        end
+        table.sort(followers)
+        local departure_key=x..":"..y
+        local previous_departure=empty_departures[departure_key];empty_departures[departure_key]=true
+        for _,id in ipairs(followers) do
+            local old_planned,old_removed,old_visiting={},{},{}
+            for k,v in pairs(planned) do old_planned[k]=v end
+            for k,v in pairs(removed) do old_removed[k]=v end
+            for k,v in pairs(visiting) do old_visiting[k]=v end
+            local change_count,death_count=#changes,#destructions
+            if not try_move(id,true) then
+                planned,removed,visiting=old_planned,old_removed,old_visiting
+                while #changes>change_count do table.remove(changes) end
+                while #destructions>death_count do table.remove(destructions) end
+            end
+        end
+        empty_departures[departure_key]=previous_departure
         return true
     end
     push_empty=function(x,y,pulling)

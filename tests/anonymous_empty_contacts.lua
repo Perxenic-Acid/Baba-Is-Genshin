@@ -77,6 +77,17 @@ assert(n.world.entities[1].x==4 and n.world.entities[2].x==6)
 s=fixture({{'ROCK','IS','SWAP'},{'WALL','IS','STOP'}})
 s.world.entities[3]={id=3,kind='object',class='object',archetype='wall',x=6,y=3,direction='Down'}
 n=run(s);assert(n.world.entities[1].x==4 and n.world.entities[2].x==6)
+-- A PUSH vacancy pulls real units stacked with its pusher, then their chain.
+for _,still in ipairs({false,true}) do
+ local extra={{'EMPTY','FACING','ROCK','IS','PHANTOM'},{'FLAG','IS','PULL'},{'CRATE','IS','PULL'}}
+ if still then extra[#extra+1]={'FLAG','IS','STILL'} end
+ s=fixture(extra)
+ s.world.entities[3]={id=3,kind='object',class='object',archetype='flag',x=4,y=3,direction='Up'}
+ s.world.entities[4]={id=4,kind='object',class='object',archetype='crate',x=3,y=3,direction='Left'}
+ n=run(s);assert(n.world.entities[1].x==5)
+ assert(n.world.entities[3].x==(still and 4 or 5) and n.world.entities[4].x==(still and 3 or 4))
+ assert(n.world.next_entity_id==s.world.next_entity_id and n.world.entities[2])
+end
 -- Anonymous virtual-target dispatch preserves EAT-before-lock and never
 -- promotes its string-local source key into an entity or operation ID.
 for _,source_safe in ipairs({false,true}) do for _,target_safe in ipairs({false,true}) do

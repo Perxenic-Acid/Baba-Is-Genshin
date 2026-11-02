@@ -102,6 +102,20 @@ for _,still in ipairs({false,true}) do
  n=run(s);assert(n.world.entities[1].x==11 and n.world.entities[2].x==(still and 10 or 9))
  assert(n.world.entities[2].direction=='Up' and n.world.next_entity_id==s.world.next_entity_id)
 end
+for _,eat in ipairs({false,true}) do
+ local extra={{'AVATAR','IS','PHANTOM'},{'EMPTY','IS','PULL'}}
+ if eat then extra[#extra+1]={'EMPTY','EAT','ROCK'}
+ else extra[#extra+1]={'EMPTY','IS','OPEN'};extra[#extra+1]={'ROCK','IS','SHUT'} end
+ s=fixture(extra);s.world.entities[1].x=10;s.world.entities[2].x=10
+ n=run(s);assert(n.world.entities[1].x==11 and not n.world.entities[2])
+ assert(n.world.entities[s.world.next_entity_id].archetype=='flag' and n.world.entities[s.world.next_entity_id].x==10)
+ assert(n.world.next_entity_id==s.world.next_entity_id+(eat and 1 or 2))
+ if not eat then assert(n.world.entities[s.world.next_entity_id+1].archetype=='crate' and n.world.entities[s.world.next_entity_id+1].x==9) end
+end
+s=fixture({{'AVATAR','IS','PHANTOM'},{'EMPTY','IS','PULL'},{'ROCK','IS','PUSH'},{'WALL','IS','STOP'}})
+s.world.entities[1].x=10;s.world.entities[2].x=10
+s.world.entities[3]={id=3,kind='object',class='object',archetype='wall',x=11,y=3,direction='Down'}
+n=run(s);assert(n.world.entities[1].x==11 and n.world.entities[2].x==10 and n.world.next_entity_id==s.world.next_entity_id)
 -- Anonymous virtual-target dispatch preserves EAT-before-lock and never
 -- promotes its string-local source key into an entity or operation ID.
 for _,source_safe in ipairs({false,true}) do for _,target_safe in ipairs({false,true}) do

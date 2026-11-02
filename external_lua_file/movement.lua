@@ -266,12 +266,15 @@ function RW_ResolveMovement(world, action)
         if empty.push then return "push" end
         if empty.block_entry or empty.pull then return "stop" end
     end
-    local try_move,attempt_move
-    local function pull_empty_tail(x,y)
+    local try_move,attempt_move,push_empty
+    local active_empty_pulls={}
+    local function pull_empty_tail(x,y,pusher_id)
         if action.falling then return end
         local tx,ty=x-dx,y-dy
         local traversed=false
         while get_environment(world,tx,ty)~="edge" do
+            local source_key=tx..":"..ty
+            if active_empty_pulls[source_key] then return end
             local empty,cell=empty_at(tx,ty)
             if not empty then break end
             local count=cell and cell.trait_counts and cell.trait_counts.reverse or (empty.reverse and 1 or 0)
@@ -293,6 +296,23 @@ function RW_ResolveMovement(world, action)
                         to={x=tx,y=ty,direction=other.direction or "None"}}
                 end
             end
+            -- Native dopush checks forward with pulling=false even while
+            -- traversing a backward PULL chain. Preserve its source SWAP queue
+            -- but isolate failed forward dependencies from the successful lead.
+            local old_planned,old_removed,old_visiting={},{},{}
+            for k,v in pairs(planned) do old_planned[k]=v end
+            for k,v in pairs(removed) do old_removed[k]=v end
+            for k,v in pairs(visiting) do old_visiting[k]=v end
+            local change_count,death_count=#changes,#destructions
+            active_empty_pulls[source_key]=true
+            local ok=push_empty(tx,ty,false,{pusher_id=pusher_id})
+            active_empty_pulls[source_key]=nil
+            if not ok then
+                planned,removed,visiting=old_planned,old_removed,old_visiting
+                while #changes>change_count do table.remove(changes) end
+                while #destructions>death_count do table.remove(destructions) end
+            end
+            pusher_id=nil
             traversed=true;tx,ty=tx-dx,ty-dy
         end
         if not traversed then return end
@@ -317,8 +337,7 @@ function RW_ResolveMovement(world, action)
             end
         end
     end
-    local push_empty
-    local function attempt_empty_push(x,y,pulling)
+    local function attempt_empty_push(x,y,pulling,pull_context)
         local nx,ny=x+dx,y+dy
         if get_environment(world,nx,ny) == "edge" then return false,"blocked_by_edge" end
         local source={id="anonymous:"..x..":"..y,class="empty",x=x,y=y,behaviors=empty_at(x,y) or {},
@@ -338,12 +357,12 @@ function RW_ResolveMovement(world, action)
         local partner=has_capability(world,source,"open") and "shut" or has_capability(world,source,"shut") and "open"
         local targets=eating_targets(source,nx,ny)
         for _,id in ipairs(occupants) do
-            if not planned[id] then
+            if not planned[id] and not (pull_context and id==pull_context.pusher_id) then
                 local other=world.entities[id]
                 local target_swap=not pulling and has_capability(world,other,"swap") and not immobile(world,other,dx,dy)
                 -- dopush queues destination SWAP independently of PHANTOM and
                 -- contact specials. Its update keeps the displaced direction.
-                if not pulling and has_capability(world,other,"swap") and not has_capability(world,other,"still")
+                if not pulling and not pull_context and has_capability(world,other,"swap") and not has_capability(world,other,"still")
                     and not held_by_level(world,other) then swaps[#swaps+1]=id end
                 local unlock=not pulling and not phantom and partner and same_layer(world,source,other) and has_capability(world,other,partner)
                     and (not has_capability(world,source,"safe") or not has_capability(world,other,"safe"))
@@ -388,6 +407,7 @@ function RW_ResolveMovement(world, action)
                     to={x=x,y=y,direction=other.direction or "None"}}
             end
         end
+        if pull_context then return true end
         -- dopush schedules real trailing PULL units after a successful EMPTY
         -- push. The vacancy's source is already departing for these trials.
         local followers={}
@@ -418,10 +438,10 @@ function RW_ResolveMovement(world, action)
         pull_empty_tail(x,y)
         return true
     end
-    push_empty=function(x,y,pulling)
+    push_empty=function(x,y,pulling,pull_context)
         local source={class="empty",behaviors=empty_at(x,y) or {}}
-        if action.falling or pulling or not has_capability(world,source,"weak") or has_capability(world,source,"safe") then
-            return attempt_empty_push(x,y,pulling)
+        if action.falling or pulling or pull_context or not has_capability(world,source,"weak") or has_capability(world,source,"safe") then
+            return attempt_empty_push(x,y,pulling,pull_context)
         end
         local old_planned,old_removed,old_visiting={},{},{}
         for k,v in pairs(planned) do old_planned[k]=v end
@@ -574,7 +594,7 @@ function RW_ResolveMovement(world, action)
         }
 
         -- A failed trailing pull never cancels an already successful mover.
-        pull_empty_tail(entity.x,entity.y)
+        pull_empty_tail(entity.x,entity.y,id)
         local followers={}
         for other_id,other in pairs(world.entities) do
             if other_id > 0 and not action.falling and not planned[other_id] and not removed[other_id] and other.x==entity.x-dx and other.y==entity.y-dy

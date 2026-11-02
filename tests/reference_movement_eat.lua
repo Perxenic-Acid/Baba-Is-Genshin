@@ -24,8 +24,8 @@ local native=assert(load('return function(lockpartner) local x,y,ox,oy=4,4,1,0 l
  'local gone=false for _,v in ipairs(specials) do if not gone and not deleted_units[v[1]] then local b,reason=v[1],v[2] local bx,by=5,4 '..source:sub(c,d-1)..
  'end end end return valid,gone end','@installed_real_movement_eat','t',env))()
 local count=0
-for _,mode in ipairs({'real','virtual','anonymous'}) do
-local virtual=mode~='real';local anonymous=mode=='anonymous'
+for _,mode in ipairs({'real','virtual','anonymous','pulled'}) do
+local virtual=mode~='real';local anonymous=mode=='anonymous';local pulled=mode=='pulled'
 env.mover_name=virtual and 'empty' or 'avatar';env.mover_id=virtual and 2 or 100
 for mask=0,63 do for mmask=0,63 do
  target={block_entry=true};for i,name in ipairs({'open','shut','safe','float','push','still'}) do target[name]=math.floor(mask/2^(i-1))%2==1 end
@@ -37,25 +37,25 @@ for mask=0,63 do for mmask=0,63 do
   [source_id]={id=source_id,class=virtual and 'empty' or 'object',archetype=virtual and nil or 'avatar',x=4,y=4,direction='Right',behaviors=mover,eat_targets=virtual and {rock=mover.eat} or nil},
   [2]={id=2,class='object',archetype='rock',x=5,y=4,direction='Up',behaviors=target},
   [3]={id=3,class='object',archetype='wall',x=6,y=4,behaviors={block_entry=true}}},movement_eaters={[1]={rock=mover.eat}}}
- if anonymous then
-  w.entities[source_id]=nil;w.entities[1]={id=1,x=3,y=4,behaviors={}}
-  local b={push=true};for k,value in pairs(mover) do b[k]=value end
+ if anonymous or pulled then
+  w.entities[source_id]=nil;w.entities[1]={id=1,x=pulled and 5 or 3,y=4,behaviors={phantom=pulled}}
+  local b={push=anonymous,pull=pulled};for k,value in pairs(mover) do b[k]=value end
   w.empty_cells={['4:4']={x=4,y=4,behaviors=b}}
   w.movement_eaters={empty_cells={['4:4']={rock=mover.eat},['5:4']={rock=mover.eat}}}
  end
- local root_id=anonymous and 1 or source_id
+ local root_id=(anonymous or pulled) and 1 or source_id
  local p=assert(RW_ResolveMovement(w,{type='move',entity_id=root_id,dx=1,dy=0}))
  local moved=false;for _,op in ipairs(p.changes) do if op.entity_id==root_id and op.kind=='move' then moved=true end end
- assert(moved==((not valid or mover.phantom) and (anonymous or not gone)),mode..':'..mask..':'..mmask)
+ assert(moved==(pulled or (not valid or mover.phantom) and (anonymous or not gone)),mode..':'..mask..':'..mmask)
  local deaths=p.destructions or {};assert(#deaths==#order,mask..':'..mmask..' death count')
  for i,id in ipairs(order) do
-  local expected=id==env.mover_id and (anonymous and 'empty:4:4' or source_id) or 2
+  local expected=id==env.mover_id and ((anonymous or pulled) and 'empty:4:4' or source_id) or 2
   assert(deaths[i].entity_id==expected,mode..':'..mask..':'..mmask..' death order')
  end
  count=count+1
 end end
 end
-print('PASS: installed real/virtual/anonymous mover lock-before-EAT, SAFE/FLOAT/PHANTOM, STOP/PUSH/STILL and death order ('..count..' cases)')
+print('PASS: installed real/virtual/anonymous/pulled mover lock-before-EAT, SAFE/FLOAT/PHANTOM, STOP/PUSH/STILL and death order ('..count..' cases)')
 env.mover_name='empty';env.mover_id=2
 for mask=0,7 do
  local origin_rock=mask%2==1;local destination_rock=math.floor(mask/2)%2==1;local origin_text=mask>=4

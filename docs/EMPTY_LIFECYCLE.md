@@ -501,3 +501,22 @@ tests/reference_empty_pull_swap.lua executes that installed source branch for
 coordinates. Turn tests cover retained facing, STILL partner protection, no
 allocation and Undo. Virtual forward collision side effects and exact native
 queued-collision timing remain gaps; this is not full dopush parity.
+
+## M9.9H virtual PULL forward collision trials
+
+Installed movement.lua dopush(), around1363, calls forward check(...,false)
+even when its own pulling argument is true. Virtual backward traversal now
+runs that forward trial through the anonymous solver, excluding the real pusher,
+then continues the backward scan. OPEN/SHUT, EAT, PHANTOM and real PUSH dependencies
+reuse their existing source/target order, SAFE/FLOAT tests and typed HAS deaths.
+Destination SWAP updates remain disabled for pulled EMPTY as in dopush(); source
+SWAP queued earlier is retained. Failed forward dependencies roll back without
+canceling the leader or previously queued source SWAP. A transient active-cell
+guard prevents forward dependencies from re-entering the same virtual pull scan.
+
+The real-target contact oracle adds pulled sources (16,384 total cases); turn
+tests cover target-first real/EMPTY HAS, EAT births, blocked PUSH rollback and
+Undo. The user-required no-shatter rule for blocked pulled WEAK remains: unlike
+the isolated native dopush weak branch, this trial does not add blocked-source
+WEAK destruction. Exact queued-collision timing, virtual forward PUSH recursion
+under pulling context and the prior scope notes still require further work.

@@ -89,13 +89,17 @@ end
 -- snapshot, and IDs are allocated only in the returned plan.
 function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, rules,back_count)
     local specifications,err,terminal,removed_ids
+    local state=world.random_state or 1
+    local real_contents={};for _,r in ipairs(contents or {}) do if r.op~="empty_has" then real_contents[#real_contents+1]=r end end
+    local real_ids=ids
+    if deaths then real_ids={};for _,id in ipairs(ids) do if type(id)=="number" and id>0 then real_ids[#real_ids+1]=id end end end
     local function is_limit(reason)
         return reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit"
     end
     if deaths then
         specifications={}
         for index,death in ipairs(deaths) do
-            if type(death.frame) ~= "table" or not death.frame[death.entity_id] then return nil,"invalid_death_frame" end
+            if type(death.frame) ~= "table" or (death.class~="empty" and not death.frame[death.entity_id]) then return nil,"invalid_death_frame" end
             local context={};for key,value in pairs(world) do context[key]=value end
             context.entities={};for id,entity in pairs(death.frame) do context.entities[id]=entity end
             -- Earlier deaths' HAS products already exist for later conditional HAS queries.
@@ -104,25 +108,34 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
                 entity.id=world.next_entity_id+index-1;context.entities[entity.id]=entity
             end
             context.next_entity_id=world.next_entity_id+#specifications
-            local born,why,prefix=services.births(context,{death.entity_id},contents,rules,back_count)
+            context.random_state=state
+            local born,why,prefix
+            if death.class=="empty" then
+                if not services.empty_products or not services.initialize then return nil,"missing_empty_birth_services" end
+                local products,problem,random=services.empty_products(context,{{x=death.x,y=death.y}},contents,rules)
+                if random then state=random.to end
+                if products then born,why,prefix=services.initialize(context,products,rules,back_count)
+                elseif is_limit(problem) then born,why,prefix=nil,problem,{}
+                else return nil,problem end
+            else born,why,prefix=services.births(context,{death.entity_id},real_contents,rules,back_count) end
             if not born then
                 if not prefix or not is_limit(why) then return nil,why end
                 born=prefix;terminal=why;removed_ids={}
-                for prior=1,index-1 do removed_ids[#removed_ids+1]=deaths[prior].entity_id end
+                for prior=1,index-1 do if deaths[prior].class~="empty" then removed_ids[#removed_ids+1]=deaths[prior].entity_id end end
             end
             for _,spec in ipairs(born) do specifications[#specifications+1]=spec end
             if terminal then break end
         end
     else
         local prefix
-        specifications,err,prefix=services.births(world,ids,contents,rules,back_count)
+        specifications,err,prefix=services.births(world,ids,real_contents,rules,back_count)
         if not specifications then
             if not prefix or not is_limit(err) or not services.birth_products then return nil,err end
             -- Products have already been selected in the frozen pre-delete frame.
             -- Locate the triggering parent's group without re-running status queries.
             local count=0;removed_ids={}
             for _,id in ipairs(ids) do
-                local products,why=services.birth_products(world,{id},contents)
+                local products,why=services.birth_products(world,{id},real_contents)
                 if not products then return nil,why end
                 count=count+#products
                 if count>=#prefix then break end
@@ -132,15 +145,17 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
             specifications=prefix;terminal=err
         end
     end
-    removed_ids=removed_ids or ids
+    removed_ids=removed_ids or real_ids
     local removal,remove_error=services.delete(world,removed_ids)
     if not removal then return nil,remove_error end
     local creation,create_error=services.create(world,specifications)
     if not creation then return nil,create_error end
     local plan={consumes_turn=true,changes={},id_allocation=creation.id_allocation,events={}}
+    if state~=(world.random_state or 1) then plan.random_state={from=world.random_state or 1,to=state} end
     for _,change in ipairs(removal.changes) do plan.changes[#plan.changes+1]=change end
     for _,change in ipairs(creation.changes) do plan.changes[#plan.changes+1]=change end
-    for index,id in ipairs(removed_ids) do plan.events[#plan.events+1]={kind="destroy",cause=(deaths and deaths[index] and deaths[index].cause) or kind,entity_id=id} end
+    local causes={};for _,death in ipairs(deaths or {}) do causes[death.entity_id]=death.cause end
+    for _,id in ipairs(removed_ids) do plan.events[#plan.events+1]={kind="destroy",cause=causes[id] or kind,entity_id=id} end
     if terminal then lock_compile_failure(plan,terminal) end
     return plan
 end
@@ -192,8 +207,11 @@ function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_coun
         end
         context.next_entity_id=world.next_entity_id+#specifications;context.random_state=state
         local products,why,random=services.products(context,{cell},relations,rules)
-        if not products then return nil,why end
         if random then state=random.to end
+        if not products then
+            if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then terminal=why;break end
+            return nil,why
+        end
         local initialized,why,prefix=services.initialize(context,products,rules,back_count)
         if not initialized then
             if not prefix or (why~="word_rule_limit" and why~="word_rule_cycle" and why~="rule_complexity_limit") then return nil,why end
@@ -215,6 +233,7 @@ end
 
 function RW_PlanEmptyLateContacts(world,projected,relations,rules,services,back_count)
     local cells,bonus,evidence,immediate=services.victims(projected)
+    local filtered={};for _,cell in ipairs(cells) do if not (projected.empty_deleted and projected.empty_deleted[cell.x..":"..cell.y]) then filtered[#filtered+1]=cell end end;cells=filtered
     if immediate then
         local plan,why=services.create(world,{})
         if not plan then return nil,why end
@@ -230,7 +249,7 @@ function RW_PlanEmptyLateContacts(world,projected,relations,rules,services,back_
     local boom,why=services.boom(world,projected,rules)
     if not boom then return nil,why end
     local seen={};for _,cell in ipairs(cells) do seen[cell.x..":"..cell.y]=true end
-    for _,cell in ipairs(boom.cells) do if not seen[cell.x..":"..cell.y] then
+    for _,cell in ipairs(boom.cells) do if not seen[cell.x..":"..cell.y] and not (projected.empty_deleted and projected.empty_deleted[cell.x..":"..cell.y]) then
         seen[cell.x..":"..cell.y]=true;cells[#cells+1]=cell
     end end
     table.sort(cells,function(a,b) if a.x~=b.x then return a.x<b.x end;return a.y<b.y end)
@@ -312,6 +331,10 @@ end
 local function plan_turn(world, action, services, initial_frame,back_context)
     local trace = {}
     local tele_suppressed
+    local empty_deleted={}
+    local function remember_empty(deaths)
+        for _,death in ipairs(deaths or {}) do if death.class=="empty" then empty_deleted[death.x..":"..death.y]=true end end
+    end
     local back_count=back_context and back_context.session.back_frame_count
     if type(world) == "table" and world.infinite_loop then return nil,{stage="input",reason="infinite_loop_undo_only"} end
     if type(world) == "table" and world.too_complex then return nil,{stage="input",reason="too_complex_undo_only"} end
@@ -352,7 +375,9 @@ local function plan_turn(world, action, services, initial_frame,back_context)
     if not effective then return fail("project", projection_error) end
 
     trace[#trace + 1] = "movement"
+    effective.empty_deleted=empty_deleted
     local movement, movement_error = services.resolve(effective, action)
+    if movement then remember_empty(movement.destructions) end
     if not movement then return fail("movement", movement_error) end
     if not movement.consumes_turn then
         return movement, nil, trace
@@ -367,7 +392,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if type(services.destroy) ~= "function" then return fail("movement_destruction","missing_destruction_service") end
         local victims,contents={},{}
         for _,death in ipairs(movement.destructions) do victims[#victims+1]=death.entity_id end
-        for _,relation in ipairs(before_conversions or {}) do if relation.op == "has" then contents[#contents+1]=relation end end
+        for _,relation in ipairs(before_conversions or {}) do if relation.op == "has" or relation.op=="empty_has" then contents[#contents+1]=relation end end
         trace[#trace+1]="movement_destruction"
         local destruction,why=services.destroy(preview,victims,contents,"movement",movement.destructions,before_rules,back_count)
         if not destruction then return fail("movement_destruction",why) end
@@ -401,7 +426,9 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if not refreshed then return after_failure(movement_prefix,motion_phase.."_rules",why) end
         local shifted_world,err=services.project(preview,refreshed,level_traits_from(before_conversions))
         if not shifted_world then return fail(motion_phase.."_project",err) end
+        shifted_world.empty_deleted=empty_deleted
         local shift,shift_error=services[motion_phase](shifted_world,before_conversions,before_rules)
+        if shift then remember_empty(shift.destructions) end
         if not shift then return fail(motion_phase,shift_error) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,
             changes=movement.changes,board_shift=movement.board_shift}}}
@@ -427,7 +454,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if #(shift.destructions or {})>0 then
             local ids,contents={},{}
             for _,death in ipairs(shift.destructions) do ids[#ids+1]=death.entity_id end
-            for _,relation in ipairs(before_conversions or {}) do if relation.op=="has" then contents[#contents+1]=relation end end
+            for _,relation in ipairs(before_conversions or {}) do if relation.op=="has" or relation.op=="empty_has" then contents[#contents+1]=relation end end
             if not services.destroy then return fail(motion_phase.."_destruction","missing_destruction_service") end
             local destruction,why=services.destroy(after,ids,contents,motion_phase,shift.destructions,before_rules,back_count)
             if not destruction then return fail(motion_phase.."_destruction",why) end
@@ -610,7 +637,9 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if has_fall then
             local projected,why=services.project(complete,effects,level_traits_from(relations))
             if not projected then return fail("fall_project",why) end
+            projected.empty_deleted=empty_deleted
             local fall,why=services.fall(projected)
+            if fall then remember_empty(fall.destructions) end
             if not fall then return fail("fall",why) end
             local fall_stage={consumes_turn=true,changes=fall.changes}
             local after,why=services.preview(complete,fall_stage)
@@ -620,7 +649,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             if #(fall.destructions or {})>0 then
                 local ids,contents={},{}
                 for _,death in ipairs(fall.destructions) do ids[#ids+1]=death.entity_id end
-                for _,relation in ipairs(relations or {}) do if relation.op=="has" then contents[#contents+1]=relation end end
+                for _,relation in ipairs(relations or {}) do if relation.op=="has" or relation.op=="empty_has" then contents[#contents+1]=relation end end
                 if not services.destroy then return fail("fall_destruction","missing_destruction_service") end
                 local destruction,why=services.destroy(after,ids,contents,"fall",fall.destructions,rules,back_count)
                 if not destruction then return fail("fall_destruction",why) end
@@ -894,6 +923,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 if not effects then return after_failure(plan,"empty_contact_rules",why) end
                 local projected,why=services.project(complete,effects,plan.level_traits)
                 if not projected then return fail("empty_contact_project",why) end
+                projected.empty_deleted=empty_deleted
                 local contact,why,preliminary=services.empty_contacts(complete,projected,frozen_relations,frozen_rules,back_count)
                 if preliminary then
                     local next_world,err=services.preview(complete,preliminary)
@@ -1942,6 +1972,8 @@ local function start(run_self_tests)
     }
 
     local contact_services = {
+        empty_products=function(w,c,r,raw) return rules_api:Invoke("RW_PlanEmptyHasBirths",w,c,r,raw) end,
+        initialize=function(w,p,r,c) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r,c) end,
         victims=function(world,kind) return properties_api:Invoke("RW_ResolveContactVictims",world,kind) end,
         birth_products=function(world,ids,contents) return rules_api:Invoke("RW_PlanHasBirths",world,ids,contents) end,
         births=function(world,ids,contents,rules,count)

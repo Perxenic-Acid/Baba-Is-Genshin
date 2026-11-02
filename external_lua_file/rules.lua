@@ -2946,13 +2946,13 @@ function RW_PlanEmptyHasBirths(world,cells,relations,rules)
         seen[key]=true
         local source={class="empty",x=cell.x,y=cell.y}
         local direction,why=RW_QueryEmptyDirection(world,cell.x,cell.y,rules)
-        if not direction then return nil,why end
+        if not direction then return nil,why,state~=original and {from=original,to=state} or nil end
         if direction=="None" then
             state=(state*48271)%2147483647;direction=({"Right","Up","Left","Down"})[state%4+1]
         end
         for _,relation in ipairs(relations or {}) do if relation.op=="empty_has" then
             local enabled,why=RW_RelationApplies(world,relation,source)
-            if enabled==nil then return nil,why end
+            if enabled==nil then return nil,why,state~=original and {from=original,to=state} or nil end
             if enabled then
                 local product={kind="object",class=relation.product.kind=="text" and "text" or "object",
                     x=cell.x,y=cell.y,direction=direction}

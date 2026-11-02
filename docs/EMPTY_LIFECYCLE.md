@@ -180,3 +180,40 @@ queued-work callbacks. Post-delete outcome tests remain separate.
 Remaining boundaries: cross-phase virtual delete deduplication, movement
 unlock/WEAK/EAT virtual victims, exact HAS ALL bookkeeping, native mutable real
 victim ordering and synthetic LEVEL lifecycle. Frontend/level design remain deferred.
+
+## M9.8P moving into EMPTY WEAK and cell deletion transactions
+
+Installed movement.lua check around1140 queues an unsafe same-FLOAT EMPTY WEAK
+special and bypasses its STOP/PUSH/PULL/STILL collision. move around1634 deletes
+the vacancy only for a real mover (unitid != 2); an EMPTY mover passes without
+calling delete. PHANTOM skips this collision branch. tools.lua delete around509
+keys EMPTY deletion by coordinates, once per command, and inside around977 queries
+cell direction before HAS. The existing virtual LEVEL HOLD exception is unchanged.
+
+The common solver now emits typed transient empty destruction records with
+coordinates, cause and the pre-move positive-identity frame. These record keys
+are diagnostics, not allocated entities. YOU, automatic, FEAR, SHIFT and FALL
+retain the records in their existing sequential destruction stages. Ordinary
+real delete operations receive only positive IDs. Cell HAS runs in the saved
+frame, with earlier initialized births and allocator/RNG advances visible to
+later records. Products retain ordinary status initialization/newborn treatment.
+
+A command-local coordinate cache suppresses repeated cell delete/HAS in convergent
+SHIFT and later self-contact/BOOM phases. It does not suppress the properties,
+blast selection, rewards or outcome evidence of that still-virtual cell. No cache
+is saved in world or Undo; the next command begins empty. A products-query compile
+limit commits triggering movement and any returned orientation draw, then locks
+the appropriate only-Undo state. Birth-initialization limits keep their existing
+product-prefix adapter. Ordinary errors reject the entire transaction.
+
+Tests cover source-frame conditions, compiled SAFE/FLOAT/PHANTOM/solidity,
+BROKEN/CRASH births, automatic/FALL propagation, convergent SHIFT, late conditional
+HAS suppression and next-command reset, RNG-only deaths, stale metadata, limits
+and Undo. tests/reference_empty_weak.lua executes installed check and move WEAK
+branches for 2,048 cases; existing inside() and collision oracles supplement it.
+
+Remaining: movement OPEN/SHUT and EAT EMPTY, failed virtual mover WEAK semantics,
+query-limit partial products within a single HAS clause-selection batch, exact
+HAS ALL/createall behavior, dynamically re-queried conditional vacancies created
+inside one motion solver, and native mutable dispatch order. No native acceptance
+or complete EMPTY lifecycle parity is claimed.

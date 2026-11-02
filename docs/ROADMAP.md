@@ -1213,3 +1213,12 @@ STOP/PUSH/PULL, immobile SWAP falls back to its remaining capabilities. Preserve
 SLEEP, counted REVERSE lock queries, PHANTOM and virtual HOLD policy. Compiled
 turn/Undo tests and 24,576 installed check/cantmove cases validate the path;
 virtual movement destruction/HAS is still separate. See EMPTY_MOTION.md.
+
+## M9.8P — movement EMPTY WEAK lifecycle
+
+Queue typed cell destruction with pre-move frames through all common motion
+adapters, initialize real HAS births atomically, and retain orientation RNG and
+terminal prefixes. Keep positive-only world operations and command-local cell
+delete deduplication through late EMPTY contacts/BOOM. Tests cover compiled turns,
+SHIFT convergence, cross-phase reset, limits/stale RNG/Undo, plus 2,048 installed
+check/move WEAK cases. OPEN/SHUT, EAT and other gaps remain in EMPTY_LIFECYCLE.md.

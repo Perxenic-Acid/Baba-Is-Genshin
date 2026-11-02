@@ -23,6 +23,13 @@ local function has_capability(world, entity, capability)
     return entity.traits and entity.traits[legacy[capability]] == true
 end
 
+-- Transient per-command EMPTY delete() cache; never mutate a projected input.
+local function remember_empty_death(working,death)
+    if death.class~="empty" then return end
+    local deleted={};for k,v in pairs(working.empty_deleted or {}) do deleted[k]=v end
+    deleted[death.x..":"..death.y]=true;working.empty_deleted=deleted
+end
+
 local function same_layer(world,a,b)
     return has_capability(world,a,"float")==has_capability(world,b,"float")
 end
@@ -198,6 +205,16 @@ function RW_ResolveMovement(world, action)
         destructions[#destructions+1]={entity_id=id,x=entity.x,y=entity.y,
             direction=dying.direction,cause=cause or "unlock",frame=frame}
     end
+    local function destroy_empty(x,y,cause)
+        local key="empty:"..x..":"..y
+        if removed[key] or world.empty_deleted and world.empty_deleted[x..":"..y] then return end
+        local frame={}
+        for id,entity in pairs(world.entities) do if id>0 and not removed[id] then
+            local copy={};for k,v in pairs(entity) do copy[k]=v end;frame[id]=copy
+        end end
+        removed[key]=true
+        destructions[#destructions+1]={entity_id=key,class="empty",x=x,y=y,cause=cause,frame=frame}
+    end
 
     local function empty_at(x,y)
         for id,entity in pairs(world.entities) do
@@ -206,9 +223,10 @@ function RW_ResolveMovement(world, action)
         local cell=world.empty_cells and world.empty_cells[x .. ":" .. y]
         return cell and cell.behaviors or world.empty_behaviors,cell
     end
-    local function empty_obstacle(x,y)
+    local function empty_obstacle(x,y,source)
         local empty,cell=empty_at(x,y)
         if not empty then return nil end
+        if empty.weak and not empty.safe and (empty.float==true)==has_capability(world,source,"float") then return nil,true end
         local qx,qy=dx,dy
         local count=cell and cell.trait_counts and cell.trait_counts.reverse or (empty.reverse and 1 or 0)
         if count%2==1 then qx,qy=-qx,-qy end
@@ -226,7 +244,7 @@ function RW_ResolveMovement(world, action)
     local function push_empty(x,y)
         local nx,ny=x+dx,y+dy
         if get_environment(world,nx,ny) == "edge" then return false,"blocked_by_edge" end
-        local obstacle=empty_obstacle(nx,ny)
+        local obstacle=empty_obstacle(nx,ny,{class="empty",behaviors=empty_at(x,y) or {}})
         if obstacle=="push" then
             local ok,err=push_empty(nx,ny); if not ok then return false,err end
         elseif obstacle=="stop" then return false,"blocked_by_empty" end
@@ -267,7 +285,8 @@ function RW_ResolveMovement(world, action)
         end
 
         local phantom=has_capability(world,entity,"phantom")
-        local obstacle=not phantom and empty_obstacle(nx,ny)
+        local obstacle,empty_weak
+        if not phantom then obstacle,empty_weak=empty_obstacle(nx,ny,entity) end
         if obstacle=="push" then
             local ok,err=push_empty(nx,ny)
             if not ok then visiting[id]=nil; return false,err end
@@ -335,6 +354,7 @@ function RW_ResolveMovement(world, action)
                 if not has_capability(world,entity,"safe") then destroy(id,direction_for(dx,dy)) end
             end
         end
+        if empty_weak and id>0 then destroy_empty(nx,ny,"weak") end
         visiting[id] = nil
         planned[id] = true
         if removed[id] then return true end
@@ -690,7 +710,8 @@ local function resolve_you_turn(world, action, intentions)
                 end
                 for _,death in ipairs(part.destructions or {}) do
                     death_records[death.entity_id]=death;death_order[#death_order+1]=death
-                    working.entities[death.entity_id]=nil;displaced[death.entity_id]=true
+                    working.entities[death.entity_id]=nil
+                    remember_empty_death(working,death);displaced[death.entity_id]=true
                 end
             end
         end
@@ -934,6 +955,7 @@ function RW_ResolveShift(world)
                 for _,change in ipairs(part.changes) do queued[#queued+1]=change end
                 for _,death in ipairs(part.destructions or {}) do
                     deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+                    remember_empty_death(working,death)
                 end
             end
         end
@@ -1107,8 +1129,9 @@ function RW_ResolveAutomatic(world,empty_directions)
             end
         end
         for _,death in ipairs(part.destructions or {}) do
-            if death.entity_id>0 then deaths[#deaths+1]=death end
+            if death.class=="empty" or death.entity_id>0 then deaths[#deaths+1]=death end
             records[death.entity_id]=death;working.entities[death.entity_id]=nil
+            remember_empty_death(working,death)
         end
     end
     for _,spec in ipairs({{"move"},{"nudgeright","Right"},{"nudgeup","Up"},{"nudgeleft","Left"},{"nudgedown","Down"}}) do
@@ -1212,6 +1235,7 @@ function RW_ResolveFall(world)
                     for _,death in ipairs(part.destructions or {}) do
                         if death.entity_id==id then death.direction=facing;death.frame[id].direction=facing end
                         deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+                        remember_empty_death(working,death)
                     end
                     if working.entities[id] then working.entities[id].direction=facing end
                     moved=true
@@ -1538,8 +1562,9 @@ function RW_ResolveFear(world,targets)
                     elseif change.kind=="direction" then e.direction=change.to end
                 end
                 for _,death in ipairs(part.destructions or {}) do
-                    if death.entity_id>0 then deaths[#deaths+1]=death end
+                    if death.class=="empty" or death.entity_id>0 then deaths[#deaths+1]=death end
                     records[death.entity_id]=death;working.entities[death.entity_id]=nil
+                    remember_empty_death(working,death)
                 end
             end
         end

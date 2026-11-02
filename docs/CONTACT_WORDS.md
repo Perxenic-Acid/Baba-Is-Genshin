@@ -116,4 +116,25 @@ tests/has_sequence.lua covers clause order, ON/WITHOUT, repeated/Text products,
 BROKEN newborn witnesses, completed-parent removal, zero/nonzero limit prefixes,
 both adapter paths and Undo. The installed inside() dispatch oracle now covers
 162 combined real/EMPTY clause combinations. Exact HAS ALL/createall behavior
-and real None-direction randomization remain documented separate gaps.
+remains a documented separate gap. M9.8W below adds real None-direction draws.
+
+## M9.8W real HAS None orientation
+
+Installed tools.lua inside() begins by drawing fixedrandom(0,3) when direction
+is 4, before inspecting whether HAS exists. Production real-container streams
+now draw once per None-facing parent, even without products, and share that
+direction across its products. Cardinal directions stay unchanged; Mid remains
+the project's explicit six-direction extension and consumes no draw.
+
+The stream returns pure random_state metadata in addition to completed parent
+IDs. Both contact and mixed movement-death planners thread it through prior
+births and preserve consumed draws in recognized terminal prefixes. No host RNG
+is touched, ordinary errors reject the transaction, and whole-tree Undo restores
+the seed with entities and allocators. The legacy flat product API remains a
+diagnostic specification helper without random draws.
+
+tests/has_sequence.lua covers shared/per-parent/random-only draws, Mid, mixed
+death frames, prefix allocation and Undo. The installed inside() dispatch oracle
+now covers 243 real/EMPTY ordinary/Text/order/direction combinations, including
+real None parents. Exact original engine RNG sequence is still deliberately
+replaced by the project's deterministic transaction RNG.

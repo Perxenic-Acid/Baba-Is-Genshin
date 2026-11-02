@@ -122,7 +122,11 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
                 if products then born,why,prefix=services.initialize(context,products,rules,back_count)
                 elseif is_limit(problem) then born,why,prefix=nil,problem,{}
                 else return nil,problem end
-            else born,why,prefix=services.births(context,{death.entity_id},real_contents,rules,back_count) end
+            else
+                local completed,random
+                born,why,prefix,completed,random=services.births(context,{death.entity_id},real_contents,rules,back_count)
+                if random then state=random.to end
+            end
             if not born then
                 if not prefix or not is_limit(why) then return nil,why end
                 born=prefix;terminal=why;removed_ids={}
@@ -132,8 +136,9 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
             if terminal then break end
         end
     elseif services.initialized_births then
-        local prefix,completed
-        specifications,err,prefix,completed=services.initialized_births(world,ids,real_contents,rules,back_count,kind)
+        local prefix,completed,random
+        specifications,err,prefix,completed,random=services.initialized_births(world,ids,real_contents,rules,back_count,kind)
+        if random then state=random.to end
         if not specifications then
             if not prefix or not completed or not is_limit(err) then return nil,err end
             specifications=prefix;removed_ids=completed;terminal=err

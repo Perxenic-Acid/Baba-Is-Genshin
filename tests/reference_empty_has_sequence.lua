@@ -18,7 +18,8 @@ env.create=function(name,x,y,dir) created[#created+1]={name=name,direction=dir} 
 assert(load(source:sub(first,last-1),'@installed_inside_sequence','t',env))()
 local cs={read=RW_ReadLines,parse=RW_ParseRuleAST,lower=RW_LowerRuleAST,evaluate=RW_EvaluateRules,project=RW_ProjectWorld,words=RW_WordTokenMap}
 local count=0
-for _,container in ipairs({'empty','avatar'}) do
+for _,source_spec in ipairs({{'empty','None'},{'avatar','Up'},{'avatar','None'}}) do
+local container,direction=source_spec[1],source_spec[2]
 for _,a in ipairs({'always','on','without'}) do for _,b in ipairs({'always','on','without'}) do
  for _,pa in ipairs({'flag','rock','text'}) do for _,pb in ipairs({'flag','rock','text'}) do
   local w=RW_CreateSession().world;w.width,w.height=24,20;w.entities={};w.next_entity_id=10;w.random_state=17
@@ -32,12 +33,12 @@ for _,a in ipairs({'always','on','without'}) do for _,b in ipairs({'always','on'
     w.entities[id]={id=id,kind='object',class='text',text={name=name},x=x,y=8+i*2,direction='None'}
    end
   end
-  if container=='avatar' then w.entities[1]={id=1,kind='object',class='object',archetype='avatar',x=5,y=3,direction='Up'} end
-  env.featureindex={[container]=rows};created={};state=17;env.inside(container,5,3,container=='empty' and 4 or 1,container=='empty' and 2 or 1)
+  if container=='avatar' then w.entities[1]={id=1,kind='object',class='object',archetype='avatar',x=5,y=3,direction=direction} end
+  env.featureindex={[container]=rows};created={};state=17;env.inside(container,5,3,direction=='None' and 4 or 1,container=='empty' and 2 or 1)
   local frame,e=RW_CompileWorld(w,cs);assert(frame,e and e.reason)
   local products,why,rng
   if container=='empty' then local prefix;products,why,prefix,rng=RW_InitializeEmptyHasBirths(w,{{x=5,y=3}},frame.relations,frame.rules)
-  else products,why=RW_InitializeHasBirths(w,{1},frame.relations,frame.rules) end
+  else local prefix,completed;products,why,prefix,completed,rng=RW_InitializeHasBirths(w,{1},frame.relations,frame.rules) end
   assert(products,why);assert(#products==#created and (rng and rng.to or 17)==state)
   for i,p in ipairs(products) do
    local name=p.class=='text' and 'text_'..p.text.name:lower() or p.archetype

@@ -74,3 +74,38 @@ end
 end
 end
 print('PASS: sequential real HAS clauses/parents, spatial/global/Text/BROKEN witnesses, exact terminal parent boundaries, movement/contact adapters and Undo')
+
+-- Native inside() draws even without products, once per None-facing parent.
+s,f=fixture({{'AVATAR','HAS','FLAG'},{'AVATAR','HAS','ROCK'}})
+s.world.random_state=17;s.world.entities[1].direction='None'
+s.world.entities[2]={id=2,kind='object',class='object',archetype='avatar',x=8,y=3,direction='None'}
+local first=17*48271%2147483647;local second=first*48271%2147483647
+local products,why,prefix,completed,rng=RW_InitializeHasBirths(s.world,{1,2},f.relations,f.rules)
+assert(products,why);assert(#products==4 and rng.from==17 and rng.to==second)
+for i,product in ipairs(products) do assert(product.direction==({'Right','Up','Left','Down'})[(i<=2 and first or second)%4+1]) end
+for _,deaths in ipairs({false,{
+ {entity_id=1,frame=s.world.entities,cause='weak'},
+ {entity_id=2,frame=s.world.entities,cause='weak'}}}) do
+ local plan,e=RW_PlanDestructionPhase(s.world,{1,2},f.relations,'sink',services,deaths or nil,f.rules)
+ assert(plan,e);assert(plan.random_state.to==second)
+ local n,result=RW_Commit(s,plan);assert(result.accepted,result.reason)
+ assert(n.world.random_state==second and RW_Undo(n).world==s.world)
+end
+products,why,prefix,completed,rng=RW_InitializeHasBirths(s.world,{1,2},{},f.rules)
+assert(products,why);assert(#products==0 and rng.to==second)
+s.world.entities[1].direction='Mid'
+products,why,prefix,completed,rng=RW_InitializeHasBirths(s.world,{1},f.relations,f.rules)
+assert(products,why);assert(not rng and products[1].direction=='Mid')
+s.world.entities[1].direction='None'
+original=RW_RelationApplies
+RW_RelationApplies=function(w,r,entity)
+ if entity.id==2 and r.product.archetype=='rock' then return nil,'rule_complexity_limit' end
+ return original(w,r,entity)
+end
+local plan,e=RW_PlanDestructionPhase(s.world,{1,2},f.relations,'sink',services,nil,f.rules)
+RW_RelationApplies=original
+assert(plan,e);local n,result=RW_Commit(s,plan);assert(result.accepted,result.reason)
+assert(n.world.too_complex and n.world.random_state==second and n.world.next_entity_id==s.world.next_entity_id+3)
+assert(not n.world.entities[1] and n.world.entities[2] and RW_Undo(n).world==s.world)
+assert(s.world.random_state==17)
+print('PASS: real HAS None shared/per-parent/random-only orientation, Mid extension, serial death RNG, terminal prefixes and Undo')

@@ -3028,14 +3028,20 @@ function RW_InitializeHasBirths(world,victims,relations,rules,back_count,simulta
     local context={};for k,v in pairs(world) do context[k]=v end
     context.entities={};for id,entity in pairs(world.entities) do context.entities[id]=entity end
     local products,completed={},{}
+    local original=world.random_state or 1;local state=original
+    local function random_metadata() return state~=original and {from=original,to=state} or nil end
     local function failure(reason)
-        if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then return nil,reason,products,completed end
+        if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then return nil,reason,products,completed,random_metadata() end
         return nil,reason
     end
     for _,id in ipairs(victims) do
+        local direction=context.entities[id].direction or "None"
+        if direction=="None" then state=state*48271%2147483647;direction=({"Right","Up","Left","Down"})[state%4+1] end
+        context.random_state=state
         for _,relation in ipairs(relations) do
             local selected,why=RW_PlanHasBirths(context,{id},{relation})
             if not selected then return failure(why) end
+            for _,spec in ipairs(selected) do spec.direction=direction end
             local initialized,why,prefix=RW_InitializeBirthSpecifications(context,selected,rules,back_count)
             if not initialized and not prefix then return failure(why) end
             for _,spec in ipairs(initialized or prefix) do
@@ -3048,7 +3054,7 @@ function RW_InitializeHasBirths(world,victims,relations,rules,back_count,simulta
         end
         if not simultaneous then context.entities[id]=nil;completed[#completed+1]=id end
     end
-    return products,nil,nil,completed
+    return products,nil,nil,completed,random_metadata()
 end
 
 -- levelblock() compares floating(real,2,victim_x,victim_y): the virtual layer

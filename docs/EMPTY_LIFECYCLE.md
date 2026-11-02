@@ -432,3 +432,19 @@ fragment for 256 STOP/PULL/PUSH/WEAK/SAFE/FLOAT/STILL combinations against a wal
 The turn integration suite checks same-layer unsafe/SAFE passage and different-layer
 blocking with Commit/Undo. Complete passive SWAP/PULL dispatch, FALL distinctions
 and lazy per-impulse querying remain separate gaps.
+
+## M9.9D anonymous EMPTY PUSH destination SWAP
+
+Installed movement.lua dopush(), around1304, queues destination SWAP updates
+for non-pulling EMPTY pushes independently of PHANTOM and contact specials.
+The anonymous branch now bypasses ordinary solidity for movable SWAP targets
+and moves surviving destination SWAP units to the vacancy's source position,
+preserving their facing. STILL and scoped LEVEL HOLD prevent displacement;
+an unrelated blocker cancels speculative updates with the rest of the plan.
+FLOAT does not filter SWAP. Source SWAP does not gain active swapping during
+this forward passive push; the original source-SWAP branch is pulling-only.
+
+The installed classification/queue oracle now covers 512 combinations including
+SWAP. Turn tests cover ordinary and FLOAT/PUSH targets, PHANTOM source,
+STILL, unrelated blockers and whole-tree Undo. Full trailing PULL dispatch,
+pulling-source SWAP and lazy per-impulse queries remain separate gaps.

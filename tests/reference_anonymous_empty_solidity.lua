@@ -13,8 +13,16 @@ local native=assert(load('return function() local obsname,id,unitid="rock",200,2
  'local pulling=false local specials,result,results={},{},{} local valid=true local localresult=0 local obsunit={visible=true} '..
  source:sub(a,b-1)..' return result[1] or 0 end','@installed_anonymous_solidity','t',env))()
 local count=0
-for mask=0,127 do for layer=0,1 do
- target={};for i,name in ipairs({'stop','pull','push','weak','safe','float','still'}) do target[name]=math.floor(mask/2^(i-1))%2==1 end
+local qa=assert(source:find('local swaps = findfeatureat',source:find('function dopush(',1,true),true))
+local qb=assert(source:find('\n\tif pulling then',qa,true))
+local updates
+env.findfeatureat=function() return target.swap and not target.still and {200} or nil end
+env.findupdate=function() return {} end
+env.addaction=function(id,action) updates[#updates+1]={id=id,action=action} end
+local queue=assert(load('return function() local x,y,ox,oy,unitid=5,4,1,0,2 local pulling=false '..
+ source:sub(qa,qb-1)..' end','@installed_anonymous_swap_queue','t',env))()
+for mask=0,255 do for layer=0,1 do
+ target={};for i,name in ipairs({'stop','pull','push','weak','safe','float','still','swap'}) do target[name]=math.floor(mask/2^(i-1))%2==1 end
  mover={float=layer==1}
  local classification=native()
  local behavior={};for k,v in pairs(target) do behavior[k=='stop' and 'block_entry' or k]=v end
@@ -30,6 +38,15 @@ for mask=0,127 do for layer=0,1 do
  local deaths=plan.destructions or {}
  assert(#deaths==((classification==200 and target.weak and not target.safe) and 1 or 0),mask..':'..layer..' deaths')
  if #deaths>0 then assert(deaths[1].entity_id==2 and deaths[1].cause=='weak') end
+ updates={};if succeeds then queue() end
+ local displaced
+ for _,op in ipairs(plan.changes) do if op.entity_id==2 then displaced=op end end
+ local expected=#updates>0 and #deaths==0
+ assert((displaced~=nil)==expected,mask..':'..layer..' swap queue')
+ if displaced then
+  assert(displaced.to.x==updates[1].action[2] and displaced.to.y==updates[1].action[3])
+  assert(displaced.from.direction=='Up' and displaced.to.direction=='Up')
+ end
  count=count+1
 end end
-print('PASS: installed anonymous EMPTY versus real STOP/PULL/PUSH/WEAK/SAFE/FLOAT/STILL solidity ('..count..' cases)')
+print('PASS: installed anonymous EMPTY real STOP/PULL/PUSH/WEAK/SAFE/FLOAT/STILL/SWAP classification and swap queue ('..count..' cases)')

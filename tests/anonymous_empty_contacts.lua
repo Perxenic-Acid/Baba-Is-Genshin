@@ -65,6 +65,18 @@ for _,safe in ipairs({false,true}) do
 end
 s=fixture({{'ROCK','IS','WEAK'},{'ROCK','IS','FLOAT'}});n=run(s)
 assert(n.world.entities[1].x==4 and n.world.entities[2])
+for _,extra in ipairs({{{'ROCK','IS','SWAP'}},
+ {{'ROCK','IS','SWAP'},{'ROCK','IS','FLOAT'},{'ROCK','IS','PUSH'}},
+ {{'ROCK','IS','SWAP'},{'EMPTY','FACING','ROCK','IS','PHANTOM'}}}) do
+ s=fixture(extra);n=run(s)
+ assert(n.world.entities[1].x==5 and n.world.entities[2].x==5 and n.world.entities[2].direction=='Up')
+ assert(n.world.next_entity_id==s.world.next_entity_id)
+end
+s=fixture({{'ROCK','IS','SWAP'},{'ROCK','IS','STILL'}});n=run(s)
+assert(n.world.entities[1].x==4 and n.world.entities[2].x==6)
+s=fixture({{'ROCK','IS','SWAP'},{'WALL','IS','STOP'}})
+s.world.entities[3]={id=3,kind='object',class='object',archetype='wall',x=6,y=3,direction='Down'}
+n=run(s);assert(n.world.entities[1].x==4 and n.world.entities[2].x==6)
 -- Anonymous virtual-target dispatch preserves EAT-before-lock and never
 -- promotes its string-local source key into an entity or operation ID.
 for _,source_safe in ipairs({false,true}) do for _,target_safe in ipairs({false,true}) do

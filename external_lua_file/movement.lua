@@ -282,12 +282,17 @@ function RW_ResolveMovement(world, action)
             if id > 0 and not removed[id] and entity.x == nx and entity.y == ny then occupants[#occupants+1]=id end
         end
         table.sort(occupants)
-        local specials={}
+        local specials,swaps={},{}
         local partner=has_capability(world,source,"open") and "shut" or has_capability(world,source,"shut") and "open"
         local targets=eating_targets(source,nx,ny)
         for _,id in ipairs(occupants) do
             if not planned[id] then
                 local other=world.entities[id]
+                local target_swap=not pulling and has_capability(world,other,"swap") and not immobile(world,other,dx,dy)
+                -- dopush queues destination SWAP independently of PHANTOM and
+                -- contact specials. Its update keeps the displaced direction.
+                if not pulling and has_capability(world,other,"swap") and not has_capability(world,other,"still")
+                    and not held_by_level(world,other) then swaps[#swaps+1]=id end
                 local unlock=not pulling and not phantom and partner and same_layer(world,source,other) and has_capability(world,other,partner)
                     and (not has_capability(world,source,"safe") or not has_capability(world,other,"safe"))
                 local eat=not pulling and not phantom and targets and targets[other.class=="text" and "@text" or other.archetype]
@@ -296,6 +301,7 @@ function RW_ResolveMovement(world, action)
                     if unlock then specials[#specials+1]={id=id,kind="unlock"} end
                     if eat then specials[#specials+1]={id=id,kind="eat"} end
                 elseif phantom then
+                elseif target_swap then
                 elseif has_capability(world,other,"weak") and same_layer(world,source,other)
                     and (not has_capability(world,other,"push") or immobile(world,other,dx,dy)) then
                     -- check() removes STOP/PULL solidity for same-layer WEAK,
@@ -321,6 +327,14 @@ function RW_ResolveMovement(world, action)
         if empty_unlock then
             if not empty_at(nx,ny).safe then destroy_empty(nx,ny,"unlock") end
             if not has_capability(world,source,"safe") then destroy_empty(x,y,"unlock") end
+        end
+        for _,id in ipairs(swaps) do
+            if not removed[id] and not planned[id] then
+                local other=world.entities[id];planned[id]=true
+                changes[#changes+1]={kind="move",entity_id=id,
+                    from={x=other.x,y=other.y,direction=other.direction or "None"},
+                    to={x=x,y=y,direction=other.direction or "None"}}
+            end
         end
         return true
     end

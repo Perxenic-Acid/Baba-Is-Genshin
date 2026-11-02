@@ -1189,3 +1189,11 @@ Preserve SAFE, deduplication, frozen newborns, BONUS and real/virtual limit pref
 Turn tests plus 1,280 installed BOOM/floating cases validate the path. Scoped BOOM,
 movement cell victims and native mutable ordering remain documented gaps; see
 EMPTY_LIFECYCLE.md.
+
+## M9.8M — original-tile EMPTY post-delete outcomes
+
+Retain WIN/END tile evidence across late deletion/HAS and condition retraction,
+check final occupancy, preserve END pairing and late WIN priority, and keep terminal
+states outcome-free. Fix SAFE virtual DEFEAT's win veto. Turn/tree tests and 16
+installed dead-cell/order/HAS outcome cases cover the path; alive-cell immediate
+scan returns remain separate work in EMPTY_LIFECYCLE.md.

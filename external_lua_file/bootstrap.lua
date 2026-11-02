@@ -214,7 +214,7 @@ function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_coun
 end
 
 function RW_PlanEmptyLateContacts(world,projected,relations,rules,services,back_count)
-    local cells,bonus=services.victims(projected)
+    local cells,bonus,evidence=services.victims(projected)
     local boom,why=services.boom(world,projected,rules)
     if not boom then return nil,why end
     local seen={};for _,cell in ipairs(cells) do seen[cell.x..":"..cell.y]=true end
@@ -238,6 +238,18 @@ function RW_PlanEmptyLateContacts(world,projected,relations,rules,services,back_
         if not context then return nil,why end
     end
     local plan,why=RW_PlanEmptyContactPhase(context,cells,relations,rules,services,back_count,bonus)
+    if plan and not plan.infinite_loop and not plan.too_complex and evidence
+        and (#evidence.win>0 or #evidence.ending>0) then
+        local post,err=services.preview(context,plan)
+        if not post then return nil,err,preliminary end
+        local occupied={};for _,entity in pairs(post.entities) do occupied[entity.x..":"..entity.y]=true end
+        for _,cell in ipairs(evidence.win) do if not occupied[cell.x..":"..cell.y] then plan.empty_win_contact=true;break end end
+        if not plan.empty_win_contact then
+            for _,cell in ipairs(evidence.ending) do if not occupied[cell.x..":"..cell.y] then
+                plan.end_contact={source={kind="empty",x=cell.x,y=cell.y},target={kind="empty",x=cell.x,y=cell.y}};break
+            end end
+        end
+    end
     return plan,why,preliminary
 end
 
@@ -885,6 +897,8 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 local next_world,why=services.preview(complete,contact)
                 if not next_world then return fail("empty_contact_preview",why) end
                 plan.stages[#plan.stages+1]={name="empty_contact",plan=contact}
+                plan.empty_win_contact=contact.empty_win_contact
+                plan.end_contact=contact.end_contact
                 for _,change in ipairs(contact.changes) do plan.changes[#plan.changes+1]=change end
                 for _,event in ipairs(contact.events or {}) do
                     plan.events=plan.events or {};plan.events[#plan.events+1]=event
@@ -921,7 +935,8 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 if not late_contact_world then return fail("end_project",why) end
                 local contact,why=services.ending(late_contact_world)
                 if why then return fail("end_contact",why) end
-                plan.end_contact=contact;trace[#trace+1]="end_contact"
+                if not plan.empty_win_contact then plan.end_contact=plan.end_contact or contact end
+                trace[#trace+1]="end_contact"
             end
         end
         local bonus_declared=false
@@ -1060,7 +1075,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         plan.stages[#plan.stages+1]={name="level_destroy",plan=removal}
         for _,change in ipairs(removal.changes) do plan.changes[#plan.changes+1]=change end
         plan.level_destroy=true;plan.level_traits={};plan.contact_frame=nil
-        plan.end_contact,plan.done_win,plan.bonus_win_contact=nil,nil,nil
+        plan.end_contact,plan.done_win,plan.bonus_win_contact,plan.empty_win_contact=nil,nil,nil,nil
         trace[#trace+1]="level_destroy"
     end
     return plan, nil, trace
@@ -1353,7 +1368,7 @@ function RW_PlanLevelAction(tree, action, services)
         if contact.source.kind=="level" or contact.target.kind=="level" then turn.end_contact=nil end
     end
     local outcome = turn.level_transform and (turn.level_transform=="@revert" and "revert" or "transform") or level_outcome
-        or ((turn.end_contact or turn.done_win or turn.bonus_win_contact or services.win(post)) and "win" or nil)
+        or ((turn.end_contact or turn.done_win or turn.bonus_win_contact or turn.empty_win_contact or services.win(post)) and "win" or nil)
     if select_after_defeat and outcome == "defeat" then outcome = nil end
     local outcome_diagnostic
     if outcome == "win" then

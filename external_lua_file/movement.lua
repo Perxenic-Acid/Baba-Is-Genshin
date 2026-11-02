@@ -1369,7 +1369,8 @@ function RW_HasWinContact(world)
         if empty_win and (empty_float==true)==(level.float==true) then return true end
     end
     for _,cell in pairs(world.empty_cells or {}) do
-        if (cell.behaviors.control or cell.behaviors.control2) and cell.behaviors.win and not cell.behaviors.defeat then return true end
+        if (cell.behaviors.control or cell.behaviors.control2) and cell.behaviors.win
+            and (not cell.behaviors.defeat or cell.behaviors.safe) then return true end
     end
     for _, actor in pairs(world.entities) do
         if has_capability(world, actor, "control") or has_capability(world,actor,"control2") then

@@ -118,3 +118,37 @@ Remaining boundaries include native real-victim mutable unitmap traversal (the
 project normalizes victim IDs), cross-phase virtual delete deduplication, movement
 unlock/WEAK/EAT cell victims, exact HAS ALL bookkeeping and late-empty WIN/END
 scheduling. Scoped LEVEL BOOM and other synthetic lifecycle paths are separate.
+
+## M9.8M original-tile post-delete WIN/END evidence
+
+Installed levelblock records ewintiles/eendtiles while scanning, before delete()
+and serial HAS. After deletion, around2440 onward, it checks those original tiles
+for current occupancy. A self-defeated winning vacancy can therefore win if it
+remains empty; a HAS product occupying it blocks this route. Later births can
+retract the WIN/END condition without erasing the already-recorded tile. WIN tiles
+are tested before END tiles. The original END-first pairing quirk remains intact.
+
+Virtual unsafe self-contact selection now records ordered transient outcome cells
+for those queued deaths. After real and virtual HAS previews, the phase emits
+empty_win_contact/end_contact evidence for surviving vacant original tiles. That
+metadata belongs to the turn plan, never to persisted world facts or the renderer.
+The tree outcome adapter consumes it alongside existing ordinary contact evidence;
+late END queries cannot overwrite it or outrank a recorded late EMPTY WIN. Scoped
+LEVEL terminal/conversion precedence remains the project's existing explicit policy.
+Final compile/CRASH terminal states still suppress outcomes and permit only Undo.
+
+SAFE EMPTY YOU+WIN+DEFEAT also retains ordinary victory, since SAFE prevents that
+self DEFEAT removal. This fixes the previous unconditional DEFEAT veto in the
+standalone win-contact query. No physical entity contact semantics change.
+
+Turn/tree tests cover both WIN/DEFEAT orders, MELT/BONUS destruction, HAS occupancy,
+SAFE, END pairing/priority, birth-induced condition retraction and terminal lockout.
+Tests/reference_empty_outcomes.lua executes installed selection and original-tile
+post-check branches for 16 dead-cell/order/HAS cases. These checks supplement the
+65,536 selection and 320 inside() cases; they do not claim complete native scheduling.
+
+Remaining immediate-return gap: native victory/ending at an alive scanned cell can
+return before queued BOOM/cell deletions and HAS, even for an unsafe BOOM source
+which does not clear the local alive flag. That scan-prefix interruption, and its
+interaction with earlier BONUS rewards and ordinary/synthetic outcomes, still
+needs separate implementation. This milestone handles the post-delete path only.

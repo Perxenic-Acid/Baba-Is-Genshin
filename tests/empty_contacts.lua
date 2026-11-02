@@ -179,3 +179,30 @@ local prefix=assert(RW_PlanEmptyLateContacts(s.world,projected,frame.relations,f
 assert(not products_called and prefix.infinite_loop and prefix.bonus_state.to==1 and not prefix.random_state)
 n,result=RW_Commit(s,prefix);assert(result.accepted and n.world.bonus_count==1 and RW_Undo(n).world==s.world)
 print('PASS: EMPTY BOOM real/virtual creation limits retain blast/reward prefixes, avoid later RNG and reject ordinary errors atomically')
+-- Native post-delete victory checks the original tile, even after self DEFEAT.
+local function tree_step(s)
+ local tree=assert(RW_CreateLevelTree({root=assert(RW_CreateLevelDefinition('root',s.world))},'root'))
+ local p,e=RW_PlanLevelAction(tree,{type='wait'},nav);assert(p,e and e.reason)
+ local t,r=RW_CommitLevelTree(tree,p);assert(r.accepted,r.reason);assert(RW_UndoLevelTree(t).active_id==tree.active_id)
+ return t,p
+end
+for _,traits in ipairs({{'YOU','DEFEAT','WIN'},{'WIN','DEFEAT','YOU'},{'HOT','MELT','YOU','WIN'},{'YOU','BONUS','WIN'}}) do
+ s=fixture(traits,{});local t,p=tree_step(s);assert(t.outcomes[t.active_id] and t.outcomes[t.active_id].kind=='win')
+ s=fixture(traits);t,p=tree_step(s);assert(not t.outcomes[t.active_id])
+end
+s=fixture({'YOU','WIN','DEFEAT','SAFE'},{});local t,p=tree_step(s);assert(t.outcomes[t.active_id].kind=='win')
+-- Preserve the original END-first pairing quirk and WIN-before-END late priority.
+s=fixture({'END','YOU','DEFEAT'},{});t,p=tree_step(s);assert(t.ending and t.outcomes[t.active_id].kind=='win')
+s=fixture({'END','YOU','DEFEAT'});t,p=tree_step(s);assert(not t.ending and not t.outcomes[t.active_id])
+s=fixture({'YOU','END','DEFEAT'},{});t,p=tree_step(s);assert(not t.ending and not t.outcomes[t.active_id])
+s=fixture({'END','YOU','DEFEAT','WIN'},{});t,p=tree_step(s);assert(not t.ending and t.outcomes[t.active_id].kind=='win')
+print('PASS: EMPTY post-delete WIN/END original-tile evidence, HAS occupancy veto, SAFE DEFEAT, END order, late WIN priority and tree Undo')
+-- Remember the original winning tile even if earlier HAS births retract its rule.
+s=fixture({},{{'EMPTY','NEAR','ROCK','IS','YOU'},{'EMPTY','NEAR','ROCK','IS','DEFEAT'},
+ {'EMPTY','WITHOUT','FLAG','IS','WIN'},{'EMPTY','WITHOUT','FLAG','HAS','FLAG'}})
+t,p=tree_step(s);assert(t.outcomes[t.active_id] and t.outcomes[t.active_id].kind=='win')
+-- A final CRASH still enters the only-Undo state without publishing that outcome.
+s=fixture({},{{'EMPTY','NEAR','ROCK','IS','YOU'},{'EMPTY','NEAR','ROCK','IS','DEFEAT'},
+ {'EMPTY','WITHOUT','FLAG','IS','WIN'},{'EMPTY','WITHOUT','FLAG','HAS','FLAG'},{'FLAG','IS','CRASH'}})
+t,p=tree_step(s);assert(RW_GetActiveLevel(t).world.infinite_loop and not t.outcomes[t.active_id])
+print('PASS: EMPTY late WIN evidence survives condition retraction but never escapes terminal-only Undo')

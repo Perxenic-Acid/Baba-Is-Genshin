@@ -548,6 +548,7 @@ end
 -- SINK/WEAK do not destroy a vacant cell merely for possessing that property.
 function RW_ResolveEmptyContactVictims(world)
     local victims={};local level=world.level_behaviors or {};local bonus
+    local evidence={win={},ending={}}
     for _,cell in pairs(world.empty_cells or {}) do
         local b=cell.behaviors
         if not b.safe then
@@ -558,11 +559,23 @@ function RW_ResolveEmptyContactVictims(world)
             local defeat=(b.control or b.control2) and (b.defeat or same and level.defeat)
             local pickup=b.bonus and (b.control or b.control2 or same and (level.control or level.control2))
             if pickup and (not bonus or cell.x<bonus.x or cell.x==bonus.x and cell.y<bonus.y) then bonus={x=cell.x,y=cell.y} end
-            if unlock or melt or defeat or pickup then victims[#victims+1]={x=cell.x,y=cell.y} end
+            if unlock or melt or defeat or pickup then
+                victims[#victims+1]={x=cell.x,y=cell.y}
+                if (b.control or b.control2) and (b.win or same and level.win) then
+                    evidence.win[#evidence.win+1]={x=cell.x,y=cell.y}
+                end
+                if b["end"] and (((b.control or b.control2) and cell.end_contact)
+                    or same and (level.control or level.control2)) then
+                    evidence.ending[#evidence.ending+1]={x=cell.x,y=cell.y}
+                end
+            end
         end
     end
     table.sort(victims,function(a,b) if a.x~=b.x then return a.x<b.x end;return a.y<b.y end)
-    return victims,bonus
+    for _,cells in ipairs({evidence.win,evidence.ending}) do
+        table.sort(cells,function(a,b) if a.x~=b.x then return a.x<b.x end;return a.y<b.y end)
+    end
+    return victims,bonus,evidence
 end
 
 -- Custom/editor levelpack END evidence. No host ending/credits side effects here.

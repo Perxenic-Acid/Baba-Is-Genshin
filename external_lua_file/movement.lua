@@ -223,10 +223,15 @@ function RW_ResolveMovement(world, action)
         local cell=world.empty_cells and world.empty_cells[x .. ":" .. y]
         return cell and cell.behaviors or world.empty_behaviors,cell
     end
-    local function empty_obstacle(x,y,source)
+    local function empty_obstacle(x,y,source,pulling)
         local empty,cell=empty_at(x,y)
         if not empty then return nil end
-        if empty.weak and not empty.safe and (empty.float==true)==has_capability(world,source,"float") then return nil,true end
+        local same=(empty.float==true)==has_capability(world,source,"float")
+        local weak=not pulling and empty.weak and not empty.safe and same
+        local partner=has_capability(world,source,"open") and "shut" or has_capability(world,source,"shut") and "open"
+        local unlock=not pulling and source.id and source.id>0 and partner and empty[partner] and same
+            and (not empty.safe or not has_capability(world,source,"safe"))
+        if weak or unlock then return nil,weak,unlock end
         local qx,qy=dx,dy
         local count=cell and cell.trait_counts and cell.trait_counts.reverse or (empty.reverse and 1 or 0)
         if count%2==1 then qx,qy=-qx,-qy end
@@ -262,7 +267,7 @@ function RW_ResolveMovement(world, action)
         end
         return true
     end
-    attempt_move=function(id)
+    attempt_move=function(id,pulling)
         -- An entity can participate only once in this plan.
         if planned[id] then
             return true
@@ -285,8 +290,8 @@ function RW_ResolveMovement(world, action)
         end
 
         local phantom=has_capability(world,entity,"phantom")
-        local obstacle,empty_weak
-        if not phantom then obstacle,empty_weak=empty_obstacle(nx,ny,entity) end
+        local obstacle,empty_weak,empty_unlock
+        if not phantom then obstacle,empty_weak,empty_unlock=empty_obstacle(nx,ny,entity,pulling) end
         if obstacle=="push" then
             local ok,err=push_empty(nx,ny)
             if not ok then visiting[id]=nil; return false,err end
@@ -354,7 +359,11 @@ function RW_ResolveMovement(world, action)
                 if not has_capability(world,entity,"safe") then destroy(id,direction_for(dx,dy)) end
             end
         end
-        if empty_weak and id>0 then destroy_empty(nx,ny,"weak") end
+        if empty_unlock then
+            if not empty_at(nx,ny).safe then destroy_empty(nx,ny,"unlock") end
+            if not has_capability(world,entity,"safe") then destroy(id,direction_for(dx,dy),"unlock") end
+        end
+        if empty_weak and id>0 and not removed[id] then destroy_empty(nx,ny,"weak") end
         visiting[id] = nil
         planned[id] = true
         if removed[id] then return true end
@@ -411,7 +420,7 @@ function RW_ResolveMovement(world, action)
         local entity=world.entities[id]
         if not (action.fear_probe and id==action.entity_id) and immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
         if action.falling or pulling or id < 1 or not has_capability(world,entity,"weak") or has_capability(world,entity,"safe") then
-            return attempt_move(id)
+            return attempt_move(id,pulling)
         end
         -- A failed weak subtree shatters only its root, not speculative pushes.
         local old_planned,old_removed={},{}

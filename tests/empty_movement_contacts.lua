@@ -114,3 +114,45 @@ for _,has in ipairs({false,true}) do
  local unchanged,result=RW_Commit(s,p);assert(not result.accepted and unchanged==s and s.world.random_state==7)
 end
 print('PASS: EMPTY movement shared inside orientation, RNG-only destruction, stale-stage atomic rejection and Undo')
+
+-- Real mover/EMPTY unlock uses target-before-mover HAS and independent SAFE.
+for _,case in ipairs({{false,false},{true,false},{false,true},{true,true}}) do
+ local mover_safe,empty_safe=case[1],case[2]
+ local traits={'SHUT','STOP'};if empty_safe then traits[#traits+1]='SAFE' end
+ local extra={{'AVATAR','IS','OPEN'},{'AVATAR','HAS','ROCK'}}
+ if mover_safe then extra[#extra+1]={'AVATAR','IS','SAFE'} end
+ s=fixture(traits,extra);n=run(s)
+ local base=s.world.next_entity_id
+ if mover_safe and empty_safe then assert(n.world.entities[1].x==4 and n.world.next_entity_id==base)
+ elseif mover_safe then assert(n.world.entities[1].x==5 and n.world.entities[base].archetype=='flag' and n.world.entities[base].x==5)
+ elseif empty_safe then assert(not n.world.entities[1] and n.world.entities[base].archetype=='rock' and n.world.entities[base].x==4)
+ else
+  assert(not n.world.entities[1] and n.world.entities[base].archetype=='flag' and n.world.entities[base].x==5)
+  assert(n.world.entities[base+1].archetype=='rock' and n.world.entities[base+1].x==4)
+ end
+end
+s=fixture({'SHUT','PUSH','STILL','WEAK'},{{'AVATAR','IS','OPEN'},{'AVATAR','HAS','ROCK'}})
+n=run(s);assert(not n.world.entities[1] and n.world.next_entity_id==s.world.next_entity_id+2)
+s=fixture({'SHUT','STOP','FLOAT'},{{'AVATAR','IS','OPEN'}});n=run(s);assert(n.world.entities[1].x==4 and n.world.next_entity_id==s.world.next_entity_id)
+s=fixture({'OPEN','STOP'},{{'AVATAR','IS','SHUT'},{'AVATAR','IS','PHANTOM'}})
+n=run(s);assert(n.world.entities[1].x==5 and n.world.next_entity_id==s.world.next_entity_id)
+-- Earlier cell products participate in the later real victim's conditional HAS.
+s=fixture({'SHUT','STOP'},{{'AVATAR','IS','OPEN'},{'AVATAR','WITHOUT','FLAG','HAS','ROCK'}})
+n=run(s);assert(not n.world.entities[1] and n.world.next_entity_id==s.world.next_entity_id+1)
+print('PASS: EMPTY unlock independent SAFE/FLOAT/PHANTOM, target-first mixed HAS/allocators, WEAK dedup, source positions, conditional witnesses and Undo')
+
+-- Unlock in a PUSH dependency retains source frames; unrelated blockers roll it back.
+for _,blocked in ipairs({false,true}) do
+ local extra={{'ROCK','IS','OPEN'},{'ROCK','IS','PUSH'},{'ROCK','HAS','ROCK'}}
+ if blocked then extra[#extra+1]={'FLAG','IS','STOP'} end
+ s=fixture({'SHUT','STOP'},extra);s.world.entities[1].x=3
+ s.world.entities[3]={id=3,kind='object',class='object',archetype='rock',x=4,y=3,direction='Up'}
+ if blocked then s.world.entities[4]={id=4,kind='object',class='object',archetype='flag',x=4,y=3,direction='Down'} end
+ n=run(s)
+ if blocked then assert(n.world.entities[1].x==3 and n.world.entities[3] and n.world.next_entity_id==s.world.next_entity_id)
+ else
+  assert(n.world.entities[1].x==4 and not n.world.entities[3] and n.world.entities[2].x==6)
+  assert(n.world.entities[s.world.next_entity_id].x==5 and n.world.entities[s.world.next_entity_id+1].x==4)
+ end
+end
+print('PASS: EMPTY unlock PUSH dependency origins and unrelated-blocker atomic rollback')

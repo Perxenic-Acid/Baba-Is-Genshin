@@ -1222,3 +1222,11 @@ terminal prefixes. Keep positive-only world operations and command-local cell
 delete deduplication through late EMPTY contacts/BOOM. Tests cover compiled turns,
 SHIFT convergence, cross-phase reset, limits/stale RNG/Undo, plus 2,048 installed
 check/move WEAK cases. OPEN/SHUT, EAT and other gaps remain in EMPTY_LIFECYCLE.md.
+
+## M9.8Q — real mover unlocks EMPTY
+
+Add same-layer OPEN/SHUT entry with independent SAFE, target-first cell/real HAS,
+source positions and weak-delete dedup. Preserve PHANTOM and pulling exclusions.
+Compiled transaction tests plus 16,384 installed check/move lock cases validate
+the branch. Virtual movers' unlock and EAT entry remain separate; see
+EMPTY_LIFECYCLE.md.

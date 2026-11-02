@@ -217,3 +217,30 @@ query-limit partial products within a single HAS clause-selection batch, exact
 HAS ALL/createall behavior, dynamically re-queried conditional vacancies created
 inside one motion solver, and native mutable dispatch order. No native acceptance
 or complete EMPTY lifecycle parity is claimed.
+
+## M9.8Q real mover unlocks EMPTY
+
+Installed check around1131 queues lock before weak, bypassing vacancy solidity
+when OPEN/SHUT partners share FLOAT and at least one is unsafe. move around1567
+checks each participant's SAFE independently, deletes the target first, then the
+mover at its source, and skips remaining specials when the mover is gone. Two SAFE
+participants retain ordinary collisions. OPEN takes precedence when the mover
+also has SHUT. Pulling probes do not queue these EMPTY unlock/WEAK specials.
+
+Real-unit entry now uses that branch of the shared collision solver. Mixed cell
+and real destruction records preserve native order through the M9.8P transaction
+adapter: target HAS allocations/witnesses precede the mover's HAS, origins remain
+separate, and duplicate WEAK deletion of the same vacancy is suppressed. An unsafe
+mover dies without reaching the vacancy; a SAFE mover can enter after the unsafe
+vacancy's deletion. PHANTOM bypasses this interaction and FLOAT still gates it.
+
+Turn tests cover the SAFE matrix, target-before-source birth IDs and positions,
+conditional HAS seeing the earlier cell product, WEAK dedup, solidity/PHANTOM/layers
+and Undo. tests/reference_empty_unlock.lua executes installed check and move
+lock/weak branches for 16,384 partner/safety/layer/solidity cases. Existing real
+unlock semantics and atomically staged HAS are retained.
+
+Still deferred: virtual EMPTY movers' own unlock deletion and virtual pushing
+chains with unlock, EAT EMPTY entry, exact native mutable scheduling and the other
+M9.8P limitations. The new branch covers real movers targeting virtual vacancies;
+it does not claim complete virtual-vs-virtual lifecycle parity.

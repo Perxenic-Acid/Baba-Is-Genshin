@@ -1433,7 +1433,7 @@ function RW_FindFears(world,id,targets)
         local v=vectors[i];local x,y=entity.x+v[1],entity.y+v[2]
         local occupied=false;local found={}
         for other_id,other in pairs(world.entities) do
-            if other.x==x and other.y==y then
+            if other_id>0 and other.x==x and other.y==y then
                 occupied=true
                 if other_id~=id then found[other.class=="text" and "@text" or other.archetype]=true end
             end
@@ -1450,6 +1450,15 @@ function RW_FindFears(world,id,targets)
     for i=1,4 do if scores[i]>=maxfear then tied=tied+1 else scores[i]=0 end end
     if tied>1 then
         resultdir=dir
+        -- Native emptydir may be unset: check then probes its empty source cell
+        -- with ndirs[5]={0,0}, retaining a non-displacing None intention.
+        if dir==4 and entity.class=="empty" then
+            local solid=(has_capability(world,entity,"block_entry") or has_capability(world,entity,"pull"))
+                and not has_capability(world,entity,"push") and not has_capability(world,entity,"swap")
+            if has_capability(world,entity,"phantom")
+                or (has_capability(world,entity,"weak") and not has_capability(world,entity,"safe")) then solid=false end
+            if not solid then return true,"None",maxfear end
+        end
         for tests=0,3 do
             local v=vectors[resultdir+1]
             local problem=scores[resultdir+1]==1 or not v
@@ -1478,12 +1487,20 @@ function RW_ResolveFear(world,targets)
         working.entities[id]=copy;ids[#ids+1]=id
     end
     table.sort(ids)
+    working.trait_counts={};for id,counts in pairs(world.trait_counts or {}) do working.trait_counts[id]=counts end
+    local intentions={};for id,list in pairs(targets) do if type(id)=="number" then intentions[id]=list end end
+    for index,cell in ipairs(targets.empty_cells or {}) do
+        local id=-index
+        working.entities[id]={id=id,kind="object",class="empty",x=cell.x,y=cell.y,
+            direction=cell.direction or "None",behaviors=cell.behaviors or {}}
+        working.trait_counts[id]=cell.trait_counts or {};ids[#ids+1]=id;intentions[id]=cell.targets
+    end
     -- Collect every intention against the same snapshot, as original take 7 does.
     for _,id in ipairs(ids) do
-        local entity=world.entities[id]
-        if targets[id] and not has_capability(world,entity,"sleep") then
-            local valid,dir,count=RW_FindFears(world,id,targets[id])
-            if valid and count>0 then tasks[id]={direction=dir,count=count} end
+        local entity=working.entities[id]
+        if intentions[id] and not has_capability(working,entity,"sleep") then
+            local valid,dir,count=RW_FindFears(working,id,intentions[id])
+            if valid and count>0 and dir~="None" then tasks[id]={direction=dir,count=count} end
         end
     end
     local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
@@ -1496,7 +1513,7 @@ function RW_ResolveFear(world,targets)
                 entity.direction=task.direction
                 local v=vectors[task.direction]
                 -- take 7 checks STILL/locks before queuing the reversed intention.
-                if immobile(world,entity,v[1],v[2]) then break end
+                if immobile(working,entity,v[1],v[2]) then break end
                 local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=v[1],dy=v[2]})
                 for _,change in ipairs(part.changes) do
                     local e=working.entities[change.entity_id]
@@ -1504,13 +1521,15 @@ function RW_ResolveFear(world,targets)
                     elseif change.kind=="direction" then e.direction=change.to end
                 end
                 for _,death in ipairs(part.destructions or {}) do
-                    deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+                    if death.entity_id>0 then deaths[#deaths+1]=death end
+                    records[death.entity_id]=death;working.entities[death.entity_id]=nil
                 end
             end
         end
     end
     local changes={}
     for _,id in ipairs(ids) do
+        if id>0 then
         local before=world.entities[id];local after=working.entities[id] or records[id]
         if before.x~=after.x or before.y~=after.y then
             changes[#changes+1]={kind="move",entity_id=id,
@@ -1518,6 +1537,7 @@ function RW_ResolveFear(world,targets)
                 to={x=after.x,y=after.y,direction=after.direction or "None"}}
         elseif (before.direction or "None")~=(after.direction or "None") then
             changes[#changes+1]={kind="direction",entity_id=id,from=before.direction or "None",to=after.direction or "None"}
+        end
         end
     end
     return {consumes_turn=true,changes=changes,destructions=deaths,reason="fear"}

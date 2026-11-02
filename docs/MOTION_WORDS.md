@@ -245,3 +245,9 @@ Virtual automatic MOVE/AUTO/CHILL/nudges and destruction/HAS remain pending.
 M9.8G implements EMPTY MOVE/AUTO/CHILL/nudge intentions and shared emptydir,
 including real PUSH dependencies/destruction and atomic RNG/Undo. Conditional
 global slot indexing and virtual lifecycle remain deferred; see EMPTY_MOTION.md.
+
+M9.8I adds virtual EMPTY FEAR sources, including shared emptydir/None tie behavior,
+per-cell conditions and bans, duplicate strength, typed movement and real HAS
+transactions. The installed findfears oracle adds 5,120 virtual cases. Scoped LEVEL
+FEAR, virtual destruction and exact source-specific zero-vector probes remain
+pending; see EMPTY_MOTION.md for scope and validation.

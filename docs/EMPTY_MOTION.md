@@ -93,3 +93,41 @@ per-cell-slot gap is resolved within the engine's declaration order. Native
 mutable feature/unit-list ordering, exceptional malformed/negative rule rewriting
 and complete multi-agent collision scheduling remain separate parity boundaries.
 Virtual destruction/HAS and other lifecycle gaps listed above remain pending.
+
+## M9.8I virtual FEAR sources
+
+Installed movement.lua take7 explicitly calls findfears(2,targets,x,y), checks
+EMPTY SLEEP/cantmove at the source and queues amount impulses. tools.lua
+findfears:2071 obtains EMPTY facing through emptydir and scans real occupants or
+vacant cells in four cardinal neighbors. Repeated parameters increase strength;
+stacked equal-name witnesses do not. Its exact score==1 tie test is retained.
+
+Lowering now admits EMPTY FEAR with the existing predicate bans/conditions/ALL
+expansion. The rules-script collector enumerates current vacancies only when an
+EMPTY FEAR relation exists, applies BROKEN/conditions/exclusions per cell and
+queries shared emptydir from the raw frame. It returns transient typed source
+records with projected capabilities/counts; direction-query failure propagates
+instead of emitting partial intentions. The native script bridge supplies raw
+rules explicitly, without assuming shared script globals.
+
+Movement collects every real and virtual intention against one snapshot. Temporary
+agents are not physical witnesses, collision occupants or persisted IDs. Real
+PUSH/PULL/WEAK/unlock dependencies use the existing solver; real deaths retain
+source-frame HAS and newborn grace through the scheduler. Only positive-ID changes
+and real death records leave the phase. REVERSE multiplicity, locks and the explicit
+virtual LEVEL HOLD exemption share the existing typed-agent path. Whole-tree Undo
+restores dependent motion, births and allocations; no virtual facing is saved.
+
+For unset EMPTY facing, the native tie search can retain direction None by probing
+its own empty cell. The implementation retains that no-displacement intention,
+including ordinary STOP/PULL obstruction and PHANTOM/unsafe-WEAK bypass. Exact
+zero-vector PUSH/SWAP/unlock/EAT probing and virtual destruction remain lifecycle
+gaps, alongside native mutable multi-source retry ordering and scoped LEVEL FEAR.
+
+Tests/empty_fear.lua uses the production compile/phase/Commit/Undo pipeline for
+conditions, negative targets, duplicate strength, FOLLOW, BROKEN, SLEEP/STILL/locks,
+REVERSE, real WEAK/HAS, positive-only changes and late atomic rejection.
+Tests/reference_fear.lua adds 5,120 installed findfears comparisons for virtual
+cardinal/None facing, counts, ties, static neighbor and source-cell STOP blockers.
+It retains 2,048 real-source cases. This does not claim a complete native movement
+state-machine oracle or native-device acceptance.

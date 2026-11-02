@@ -1153,3 +1153,11 @@ matches and nonmatching EMPTY placeholders. Resolve cross-property suppression
 across all vacancies, not independently per cell. Whole-turn RNG/Undo tests and
 4,096 additional installed collection cases close the conditional slot-hole gap
 from M9.8G within the engine's current declaration order; see EMPTY_MOTION.md.
+
+## M9.8I — virtual EMPTY FEAR
+
+Enable per-cell FEAR lowering/conditions/bans with shared emptydir, transient typed
+agents and ordinary real dependencies/destruction. Keep strength, SLEEP/locks,
+REVERSE counts, None-facing ties and whole-tree Undo. Turn tests and 5,120 installed
+virtual findfears cases pass; scoped FEAR, exceptional zero-vector probes, virtual
+lifecycle and native retry ordering remain documented in EMPTY_MOTION.md.

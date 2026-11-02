@@ -2341,7 +2341,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 if objnot then add_ban(play_bans,ast.verb,key,obj.name,ast.when)
                 else relations[#relations+1]={op="play",source_type=key,note=obj.name,when=query_clone(ast.when),verb=ast.verb} end
                 supported=true
-            elseif sem and key and (key~="@empty" or sem.noun=="make" or sem.noun=="follow") and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
+            elseif sem and key and (key~="@empty" or sem.noun=="make" or sem.noun=="follow" or sem.noun=="fear") and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
                 and (not objnot or sem.negative_noun=="forbid_"..sem.noun) then
                 local target=subject_key(obj)
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
@@ -2942,7 +2942,36 @@ function RW_ResolveVerbTargets(world,relations,verb)
     return groups
 end
 
-function RW_ResolveFearTargets(world,relations) return RW_ResolveVerbTargets(world,relations,"fear") end
+function RW_ResolveFearTargets(world,relations,rules)
+    local groups=RW_ResolveVerbTargets(world,relations,"fear")
+    local occupied,cells
+    for _,relation in ipairs(relations or {}) do if relation.op=="fear" and relation.source_type=="@empty" then
+        if not occupied then
+            occupied,cells={},{}
+            for _,entity in pairs(world.entities) do occupied[entity.x..":"..entity.y]=true end
+            for y=1,world.height do for x=1,world.width do if not occupied[x..":"..y] then
+                cells[#cells+1]={class="empty",x=x,y=y,targets={}}
+            end end end
+        end
+        for _,cell in ipairs(cells) do
+            local enabled,why=RW_RelationApplies(world,relation,cell)
+            if enabled==nil then return nil,why end
+            if enabled then cell.targets[#cell.targets+1]=relation.target_type end
+        end
+    end end
+    if cells then
+        groups.empty_cells={}
+        for _,cell in ipairs(cells) do if #cell.targets>0 then
+            local direction,why=RW_QueryEmptyDirection(world,cell.x,cell.y,rules)
+            if not direction then return nil,why end
+            cell.direction=direction
+            local projected=(world.empty_cells or {})[cell.x..":"..cell.y] or {}
+            cell.behaviors,cell.trait_counts=projected.behaviors or {},projected.trait_counts or {}
+            groups.empty_cells[#groups.empty_cells+1]=cell
+        end end
+    end
+    return groups
+end
 
 -- Original emptydir is a query over ordered declarations, not saved EMPTY state.
 -- FOLLOW locks its first successful target list; later IS directions still win.

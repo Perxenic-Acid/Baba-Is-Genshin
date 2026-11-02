@@ -46,3 +46,25 @@ for mask=0,15 do for blocks=0,15 do for dir=0,3 do for count=1,2 do
     checked=checked+1
 end end end end
 print('PASS: installed findfears cardinal/count/tie/blocker matrix ('..checked..' cases)')
+-- EMPTY observers use queried emptydir, including None, and never become witnesses.
+local virtual=0
+local sourceblock=false
+env.check=function(_,_,_,dir) return {(dir==4 and sourceblock or bit(obstacles,dir+1)) and 1 or 0} end
+for mask=0,15 do for blocks=0,15 do for dir=0,4 do for count=1,2 do for own=0,1 do
+ sourceblock=own==1;obstacles=blocks;units={};env.unitmap={};env.emptydir=function() return dir end
+ local w={width=11,height=11,entities={[-1]={id=-1,class='empty',x=5,y=5,direction=dirs[dir+1] or 'None',behaviors={block_entry=sourceblock}}}}
+ for i,v in ipairs(vectors) do
+  if bit(mask,i) then
+   units[20+i]={name='avatar',values={5+v[1],5+v[2],0}}
+   w.entities[20+i]={id=20+i,archetype='avatar',class='object',x=5+v[1],y=5+v[2],direction='Right',behaviors={}}
+  end
+  if bit(blocks,i) then w.entities[30+i]={id=30+i,archetype='wall',class='object',x=5+v[1],y=5+v[2],direction='None',behaviors={block_entry=true}} end
+ end
+ local targets={};for i=1,count do targets[i]='avatar' end
+ local valid,expected,amount=env.findfears(2,targets,5,5)
+ local ok,facing,n=RW_FindFears(w,-1,targets)
+ assert(ok==valid and (not valid or facing==(dirs[expected+1] or 'None')) and n==amount,
+  'EMPTY:'..table.concat({mask,blocks,dir,count,tostring(ok),facing,tostring(valid),expected},':'))
+ virtual=virtual+1
+end end end end end
+print('PASS: installed EMPTY findfears direction/None/count/tie/blocker matrix ('..virtual..' cases)')

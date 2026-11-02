@@ -1888,8 +1888,9 @@ local function start(run_self_tests)
         local targets=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"follow")
         return movement_api:Invoke("RW_ResolveFollow",world,targets)
     end
-    turn_services.fear=function(world,relations)
-        local targets=rules_api:Invoke("RW_ResolveFearTargets",world,relations)
+    turn_services.fear=function(world,relations,rules)
+        local targets,why=rules_api:Invoke("RW_ResolveFearTargets",world,relations,rules)
+        if not targets then return nil,why end
         return movement_api:Invoke("RW_ResolveFear",world,targets)
     end
     turn_services.shift=function(world) return movement_api:Invoke("RW_ResolveShift",world) end

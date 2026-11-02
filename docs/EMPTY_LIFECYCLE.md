@@ -304,3 +304,33 @@ Still pending: anonymous recursive EMPTY PUSH-chain unlock (as distinct from a
 collected moving agent), failed virtual WEAK movers, EMPTY/LEVEL EAT predicates,
 per-impulse dynamic querying, exact HAS ALL/createall and earlier scope notes.
 No proxy is promoted into an authored or persisted EMPTY entity.
+
+## M9.8T blocked EMPTY WEAK roots and MOVE retry ordering
+
+Installed movement.lua final blocked branch around799 calls delete(data.unitid,x,y)
+for unsafe WEAK without excluding unitid=2. Root EMPTY agents now use the typed
+cell-death adapter when blocked, retaining source position, HAS, direction RNG,
+proxy retirement and command-local dedup. SAFE, SLEEP and STILL suppress the
+respective destruction/intention as before. Falling and failed pulling retain
+their existing no-root-shatter behavior.
+
+The same source shows MOVE/CHILL advancing to the reversal state before final
+WEAK destruction; state3 around518 rotates the intention. Automatic resolution
+now defers only the root's first WEAK shatter until the reverse trial. A free
+reverse direction saves both real and virtual movers; both blocked directions
+break them. Passive weak dependencies still use their ordinary solver behavior.
+AUTO/nudges do not gain this bounce. The old real-MOVE regression expecting
+immediate edge shatter was corrected and now checks both the free reverse and a
+second blocker before HAS.
+
+Installed tools.lua findfears around2159 checks collision/trypush while selecting
+a tie direction; it does not dispatch root WEAK death during the probe. The solver
+now suppresses root shatter for fear_probe (while retaining dependency behavior).
+The actual selected FEAR movement still executes ordinary unsafe WEAK destruction.
+
+Turn tests cover virtual YOU/nudges, SAFE/STILL/SLEEP, real/virtual MOVE retries,
+source coordinates and cell-derived versus real intrinsic HAS direction with Undo.
+Installed state3/final-WEAK snippets cover 384 static STOP/four-axis/SAFE/AUTO/nudge
+cases. Installed findfears covers 2,048 real WEAK and 5,120 virtual WEAK cases.
+Anonymous EMPTY PUSH-chain destruction, exact per-impulse requery, the None/zero-
+vector dispatch boundary, native lock-dependent retry nuances and prior gaps remain.

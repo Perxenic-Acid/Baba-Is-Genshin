@@ -251,3 +251,10 @@ per-cell conditions and bans, duplicate strength, typed movement and real HAS
 transactions. The installed findfears oracle adds 5,120 virtual cases. Scoped LEVEL
 FEAR, virtual destruction and exact source-specific zero-vector probes remain
 pending; see EMPTY_MOTION.md for scope and validation.
+
+M9.8T: MOVE/CHILL now defer root WEAK destruction until their reverse trial;
+unsafe real or virtual roots break only when the retry also fails. AUTO/nudges
+keep their own no-bounce behavior. FEAR direction probes no longer count root
+shattering as a free direction; actual selected movement still destroys blocked
+unsafe WEAK. Installed retry/final-death and WEAK findfears oracles supplement
+turn/HAS/Undo cases. See EMPTY_LIFECYCLE.md for virtual scope and remaining gaps.

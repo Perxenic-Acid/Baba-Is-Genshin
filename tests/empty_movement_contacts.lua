@@ -233,3 +233,41 @@ n=run(s,{type='wait'});assert(not n.world.entities[1] and n.world.next_entity_id
 assert(n.world.entities[s.world.next_entity_id].x==4 and n.world.entities[s.world.next_entity_id+1].x==5)
 services.fear=nil
 print('PASS: automatic/FEAR virtual unlock retirement, ordered real/cell HAS and positive-only Undo')
+
+-- Blocked virtual WEAK roots now retire through the same cell-HAS transaction.
+for _,guard in ipairs({'NONE','SAFE','STILL','SLEEP'}) do
+ local traits={'YOU','WEAK'};if guard~='NONE' then traits[#traits+1]=guard end
+ s=fixture(traits,{{'ROCK','IS','STOP'}})
+ for id,e in pairs(s.world.entities) do if e.class=='text' and e.y==8 then s.world.entities[id]=nil end end
+ n=run(s);assert(n.world.entities[2] and n.world.next_entity_id==s.world.next_entity_id+(guard=='NONE' and 1 or 0))
+ if guard=='NONE' then assert(n.world.entities[s.world.next_entity_id].x==5) end
+end
+services.automatic=function(w,r,raw) return RW_ResolveAutomatic(w,assert(RW_CollectEmptyMotionDirections(w,raw))) end
+-- MOVE gets one bounce before root WEAK; AUTO and directional nudges do not.
+for _,virtual in ipairs({false,true}) do for _,both_sides in ipairs({false,true}) do
+ local traits=virtual and {'MOVE','WEAK'} or {}
+ local extra={{'ROCK','IS','STOP'}}
+ if virtual then if both_sides then extra[#extra+1]={'AVATAR','IS','STOP'} end
+ else
+  extra[#extra+1]={'AVATAR','IS','MOVE'};extra[#extra+1]={'AVATAR','IS','WEAK'};extra[#extra+1]={'AVATAR','HAS','FLAG'}
+  if both_sides then extra[#extra+1]={'FLAG','IS','STOP'} end
+ end
+ s=fixture(traits,extra)
+ if virtual then
+  for id,e in pairs(s.world.entities) do if e.class=='text' and e.y==8 then s.world.entities[id]=nil end end
+ else
+  s.world.entities[1].x=5;s.world.entities[1].direction='Right'
+  if both_sides then s.world.entities[3]={id=3,kind='object',class='object',archetype='flag',x=4,y=3,direction='None'} end
+ end
+ n=run(s,{type='wait'})
+ assert(n.world.next_entity_id==s.world.next_entity_id+(both_sides and 1 or 0))
+ if not virtual then assert((n.world.entities[1]~=nil)==not both_sides);if not both_sides then assert(n.world.entities[1].x==4) end end
+ if both_sides then
+  local born=n.world.entities[s.world.next_entity_id];assert(born.x==5 and born.direction==(virtual and 'Right' or 'Left'))
+ end
+end end
+s=fixture({'NUDGERIGHT','WEAK'},{{'ROCK','IS','STOP'}})
+for id,e in pairs(s.world.entities) do if e.class=='text' and e.y==8 then s.world.entities[id]=nil end end
+n=run(s,{type='wait'});assert(n.world.entities[s.world.next_entity_id].x==5)
+services.automatic=nil
+print('PASS: blocked virtual WEAK YOU/nudges, SAFE/STILL/SLEEP, real/virtual MOVE bounce-before-break, cell-vs-intrinsic HAS facing and Undo')

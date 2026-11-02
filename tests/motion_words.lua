@@ -66,6 +66,9 @@ s=fixture({{'ROCK','IS','LEFT','AND','SLEEP'}});n=step(s);assert(n.world.entitie
 s=fixture({{'ROCK','IS','MOVE','AND','RIGHT'}});n=step(s);assert(n.world.entities[2].x==7 and n.world.entities[2].direction=='Right')
 -- Automatic movement deaths use the existing source frame and HAS/Undo contract.
 s=fixture({{'ROCK','IS','MOVE','AND','WEAK'},{'ROCK','HAS','FLAG'}});s.world.entities[2].x=24
+n=step(s);assert(n.world.entities[2].x==23 and n.world.next_entity_id==s.world.next_entity_id)
+s=fixture({{'ROCK','IS','MOVE','AND','WEAK'},{'ROCK','HAS','FLAG'},{'AVATAR','IS','STOP'}})
+s.world.entities[2].x=24;s.world.entities[1].x,s.world.entities[1].y=23,3
 n=step(s);assert(not n.world.entities[2])
 local born=n.world.entities[s.world.next_entity_id];assert(born.archetype=='flag' and born.x==24 and born.y==3)
 -- A late error discards movement and orientation and leaves the original history intact.

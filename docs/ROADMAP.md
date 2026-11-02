@@ -1246,3 +1246,11 @@ independent SAFE/FLOAT and target/source HAS order. Retire already-deleted sourc
 proxies without repeated inside()/RNG. Test YOU/automatic/FEAR plus pure
 projection/Commit/Undo, and 32,768 installed virtual check/move/cache cases.
 Anonymous EMPTY pushing and remaining gaps stay in EMPTY_LIFECYCLE.md.
+
+## M9.8T — blocked virtual WEAK and MOVE retry
+
+Retire blocked EMPTY WEAK roots with cell HAS; preserve SAFE/STILL/SLEEP and
+positive-only transactions. Correct real/virtual MOVE bounce-before-break and
+FEAR root probe semantics. Turn/Undo tests, 384 installed retry/death cases and
+7,168 installed WEAK findfears cases cover the changes. Scope is recorded in
+EMPTY_LIFECYCLE.md and MOTION_WORDS.md.

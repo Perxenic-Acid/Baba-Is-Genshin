@@ -429,7 +429,8 @@ function RW_ResolveMovement(world, action)
     try_move=function(id,pulling)
         local entity=world.entities[id]
         if not (action.fear_probe and id==action.entity_id) and immobile(world,entity,dx,dy) then return false,"blocked_by_still" end
-        if action.falling or pulling or id < 1 or not has_capability(world,entity,"weak") or has_capability(world,entity,"safe") then
+        if action.falling or pulling or ((action.defer_weak or action.fear_probe) and id==action.entity_id)
+            or not has_capability(world,entity,"weak") or has_capability(world,entity,"safe") then
             return attempt_move(id,pulling)
         end
         -- A failed weak subtree shatters only its root, not speculative pushes.
@@ -1181,7 +1182,8 @@ function RW_ResolveAutomatic(world,empty_directions)
                 local vector=vectors[direction]
                 if vector and not intent_immobile(working,entity,vector[1],vector[2]) then
                     local old_direction=entity.direction or "None"
-                    local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
+                    local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2],
+                        defer_weak=spec[1]=="move" and task.reason~="auto"})
                     if spec[1]=="move" and task.reason~="auto" and #part.changes==0 and #(part.destructions or {})==0 then
                         direction=opposite[direction];vector=vectors[direction]
                         entity.direction=direction

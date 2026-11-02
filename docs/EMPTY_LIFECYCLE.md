@@ -391,3 +391,28 @@ anonymous push as a failure. Their existing 83,968 combined cases pass with the
 new dispatch (32,768 EAT + 16,384 real unlock + 32,768 virtual unlock + 2,048 WEAK).
 Anonymous chain unlock/EAT, complete passive collision parity, lazy per-impulse
 queries and the prior scope notes remain separate gaps.
+
+## M9.9B anonymous EMPTY PUSH unlock/EAT contacts
+
+The installed movement.lua check()/move() handling for unitid=2 applies to queued
+anonymous PUSH moves as well as controlled EMPTY. The anonymous branch now
+queues real-target OPEN/SHUT before EAT, and virtual-target EAT before OPEN/SHUT,
+using the same independent SAFE/FLOAT tests and per-cell source-any/destination-
+specific EAT gates as M9.8Z. Source PHANTOM skips forward collision specials;
+passive SLEEP does not. Pull trials gain no EAT/unlock destruction.
+
+An internal string key identifies the anonymous query source but never enters
+an entity or Plan operation. Source deletion calls the existing typed cell death
+adapter directly. Both source/target HAS ordering and prior births as witnesses
+remain serial; parent movement succeeds when its pushed empty source unlocks and
+disappears. Unrelated blockers cancel pending specials, and the existing WEAK
+wrapper rolls back speculative dependency work before shattering only its source.
+Virtual-to-virtual WEAK still does not delete the target.
+
+tests/anonymous_empty_contacts.lua covers real/vacant targets, SAFE/FLOAT,
+target-first conditional HAS and direction context, PHANTOM/SLEEP, mixed special
+order, unrelated-blocker rollback, positive-only Commit and Undo. The installed
+real-target check/move oracle now covers 12,288 real/controlled/anonymous source
+cases; the anonymous-to-EMPTY oracle covers 2,048 virtual target cases. Complete
+passive SWAP/PULL/WEAK solidity parity, lazy per-impulse querying and prior scope
+notes remain gaps rather than being inferred from these matrices.

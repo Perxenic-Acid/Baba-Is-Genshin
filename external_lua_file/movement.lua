@@ -269,7 +269,11 @@ function RW_ResolveMovement(world, action)
     local function attempt_empty_push(x,y,pulling)
         local nx,ny=x+dx,y+dy
         if get_environment(world,nx,ny) == "edge" then return false,"blocked_by_edge" end
-        local obstacle=empty_obstacle(nx,ny,{class="empty",behaviors=empty_at(x,y) or {}})
+        local source={id="anonymous:"..x..":"..y,class="empty",x=x,y=y,behaviors=empty_at(x,y) or {},
+            eat_targets=world.movement_eaters and world.movement_eaters.empty_cells and world.movement_eaters.empty_cells[x..":"..y]}
+        local phantom=not pulling and has_capability(world,source,"phantom")
+        local obstacle,empty_weak,empty_unlock,empty_eat
+        if not phantom then obstacle,empty_weak,empty_unlock,empty_eat=empty_obstacle(nx,ny,source,pulling) end
         if obstacle=="push" then
             local ok,err=push_empty(nx,ny,pulling); if not ok then return false,err end
         elseif obstacle=="stop" then return false,"blocked_by_empty" end
@@ -278,12 +282,40 @@ function RW_ResolveMovement(world, action)
             if id > 0 and not removed[id] and entity.x == nx and entity.y == ny then occupants[#occupants+1]=id end
         end
         table.sort(occupants)
+        local specials={}
+        local partner=has_capability(world,source,"open") and "shut" or has_capability(world,source,"shut") and "open"
+        local targets=eating_targets(source,nx,ny)
         for _,id in ipairs(occupants) do
             if not planned[id] then
-                if has_capability(world,world.entities[id],"push") then
+                local other=world.entities[id]
+                local unlock=not pulling and not phantom and partner and same_layer(world,source,other) and has_capability(world,other,partner)
+                    and (not has_capability(world,source,"safe") or not has_capability(world,other,"safe"))
+                local eat=not pulling and not phantom and targets and targets[other.class=="text" and "@text" or other.archetype]
+                    and same_layer(world,source,other) and not has_capability(world,other,"safe")
+                if unlock or eat then
+                    if unlock then specials[#specials+1]={id=id,kind="unlock"} end
+                    if eat then specials[#specials+1]={id=id,kind="eat"} end
+                elseif phantom then
+                elseif has_capability(world,other,"push") then
                     local ok,err=try_move(id); if not ok then return false,err end
-                elseif has_capability(world,world.entities[id],"block_entry") then return false,"blocked_by_entity" end
+                elseif has_capability(world,other,"block_entry") then return false,"blocked_by_entity" end
             end
+        end
+        local gone=false
+        for _,special in ipairs(specials) do
+            if gone then break end
+            if not removed[special.id] then
+                if special.kind=="eat" then destroy(special.id,nil,"eat")
+                else
+                    if not has_capability(world,world.entities[special.id],"safe") then destroy(special.id) end
+                    if not has_capability(world,source,"safe") then destroy_empty(x,y,"unlock");gone=true end
+                end
+            end
+        end
+        if empty_eat then destroy_empty(nx,ny,"eat") end
+        if empty_unlock then
+            if not empty_at(nx,ny).safe then destroy_empty(nx,ny,"unlock") end
+            if not has_capability(world,source,"safe") then destroy_empty(x,y,"unlock") end
         end
         return true
     end

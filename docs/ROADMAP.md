@@ -1172,3 +1172,11 @@ random-only turns, newborn BROKEN/CRASH and Undo. Installed branch oracles cover
 are included; exact HAS ALL,
 other virtual destruction paths and native late victory timing remain pending;
 see EMPTY_LIFECYCLE.md.
+
+## M9.8K — virtual EMPTY BONUS
+
+Add once-per-scan EMPTY rewards, SAFE/layer/scoped YOU selection, shared cell HAS,
+stale-checked bonus counters, campaign reload/Undo and ID-free committed event
+formatting. Expand the installed selection oracle to 65,536 cases and exercise the
+actual native event branch. Synthetic LEVEL BONUS and virtual BOOM/movement deaths
+remain pending; see EMPTY_LIFECYCLE.md.

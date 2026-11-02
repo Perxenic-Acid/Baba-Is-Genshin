@@ -5,32 +5,35 @@ local source=f:read('*a'):gsub('\r\n','\n');f:close()
 local a=assert(source:find('local keypair = ""',1,true))
 local b=assert(source:find('if emptyboom then',a,true))
 local c=assert(source:find('local alive = true',b,true))
-local d=assert(source:find('if bonus and',c,true))
+local d=assert(source:find('if victory and alive',c,true))
 local current_level,current_same
 local env=setmetatable({},{__index=_G})
 env.testcond=function() return true end
 env.hasfeature=function(name,_,property) return name=='level' and current_level[property] and true or nil end
 env.floating_level=function() return current_same end
 env.setsoundname=function() end;env.MF_particles=function() end
+env.MF_playsound=function() end;env.MF_bonus=function() end;env.addundo=function() end
 env.math=setmetatable({random=function() return 2 end},{__index=math})
-local native=assert(load('return function(emptythings,esafe) local i,j=5,5 local ewintiles,eendtiles,edelthese={},{},{} '..source:sub(a,b-1)..source:sub(c,d-1)..' return #edelthese>0 end','@installed_empty_self_contacts','t',env))()
-local names={'open','shut','hot','melt','you','you2','defeat'}
-local capabilities={you='control',you2='control2',open='open',shut='shut',hot='hot',melt='melt',defeat='defeat'}
+local native=assert(load('return function(emptythings,esafe) local i,j=5,5 local ewintiles,eendtiles,edelthese={},{},{} local emptybonus=false '..source:sub(a,b-1)..source:sub(c,d-1)..' return #edelthese>0,emptybonus end','@installed_empty_self_contacts','t',env))()
+local names={'open','shut','hot','melt','you','you2','defeat','bonus'}
+local capabilities={you='control',you2='control2',open='open',shut='shut',hot='hot',melt='melt',defeat='defeat',bonus='bonus'}
 local count=0
-for mask=0,127 do for levelmask=0,15 do for safe=0,1 do for layer=0,1 do for reverse=0,1 do
+for mask=0,255 do for levelmask=0,31 do for safe=0,1 do for layer=0,1 do for reverse=0,1 do
  local rows,b={},{}
  for index=1,#names do local i=reverse==0 and index or #names+1-index
   if math.floor(mask/2^(i-1))%2==1 then rows[#rows+1]={{'empty','is',names[i]}, {}};b[capabilities[names[i]]]=true end
  end
  b.safe=safe==1;b.float=layer==1
- current_level={};for i,name in ipairs({'open','shut','hot','defeat'}) do current_level[name]=math.floor(levelmask/2^(i-1))%2==1 end
+ current_level={};for i,name in ipairs({'open','shut','hot','defeat','you'}) do current_level[name]=math.floor(levelmask/2^(i-1))%2==1 end
+ current_level.control=current_level.you
  current_same=not b.float
- local expected=native(rows,b.safe)
- local result=RW_ResolveEmptyContactVictims({empty_cells={['5:5']={x=5,y=5,behaviors=b}},level_behaviors=current_level})
+ local expected,award=native(rows,b.safe)
+ local result,bonus=RW_ResolveEmptyContactVictims({empty_cells={['5:5']={x=5,y=5,behaviors=b}},level_behaviors=current_level})
+ assert((bonus~=nil)==award,'EMPTY BONUS award')
  assert((#result==1)==expected,table.concat({mask,levelmask,safe,layer,reverse},':'))
  count=count+1
 end end end end end
-print('PASS: installed EMPTY OPEN/SHUT, HOT/MELT, YOU/DEFEAT self/scoped contacts, order/SAFE/FLOAT ('..count..' cases)')-- inside() draws once at deletion even with no products, sharing orientation
+print('PASS: installed EMPTY OPEN/SHUT, HOT/MELT, YOU/DEFEAT/BONUS self/scoped contacts, order/SAFE/FLOAT ('..count..' cases)')-- inside() draws once at deletion even with no products, sharing orientation
 -- across duplicate ordinary/Text HAS declarations for the same empty victim.
 dofile('external_lua_file/world.lua');dofile('external_lua_file/rules.lua')
 local file=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/tools.lua]],'rb'))

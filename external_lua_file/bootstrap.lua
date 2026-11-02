@@ -181,7 +181,7 @@ end
 
 -- Native EMPTY delete() calls run serially: earlier HAS births are witnesses for
 -- later conditions/status, while all virtual victims were selected beforehand.
-function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_count)
+function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_count,bonus)
     local specifications={};local state=world.random_state or 1;local terminal
     for _,cell in ipairs(cells) do
         local context={};for key,value in pairs(world) do context[key]=value end
@@ -205,6 +205,10 @@ function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_coun
     local plan,why=services.create(world,specifications)
     if not plan then return nil,why end
     if state~=(world.random_state or 1) then plan.random_state={from=world.random_state or 1,to=state} end
+    if bonus then
+        plan.bonus_state={from=world.bonus_count or 0,to=(world.bonus_count or 0)+1}
+        plan.events={{kind="bonus",source="empty",x=bonus.x,y=bonus.y,amount=1}}
+    end
     if terminal then lock_compile_failure(plan,terminal) end
     return plan
 end
@@ -828,7 +832,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             for _,frame in ipairs({complete.rule_sources or {},frozen_rules}) do for _,row in ipairs(frame) do
                 for _,effect in ipairs(row.effects or {}) do
                     if effect.op=="grant_trait" and effect.target and effect.target.kind=="empty"
-                        and (effect.trait=="open" or effect.trait=="shut" or effect.trait=="melt"
+                        and (effect.trait=="open" or effect.trait=="shut" or effect.trait=="melt" or effect.trait=="bonus"
                             or effect.trait=="you" or effect.trait=="you2") then active=true;break end
                 end
                 if active then break end
@@ -844,6 +848,9 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 if not next_world then return fail("empty_contact_preview",why) end
                 plan.stages[#plan.stages+1]={name="empty_contact",plan=contact}
                 for _,change in ipairs(contact.changes) do plan.changes[#plan.changes+1]=change end
+                for _,event in ipairs(contact.events or {}) do
+                    plan.events=plan.events or {};plan.events[#plan.events+1]=event
+                end
                 complete=next_world;trace[#trace+1]="empty_contact"
                 if #contact.changes>0 then
                     local ok,why=refresh_scoped()
@@ -1883,11 +1890,11 @@ local function start(run_self_tests)
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services,rules,count)
     end
     turn_services.empty_contacts=function(world,projected,relations,rules,count)
-        local cells=properties_api:Invoke("RW_ResolveEmptyContactVictims",projected)
+        local cells,bonus=properties_api:Invoke("RW_ResolveEmptyContactVictims",projected)
         return RW_PlanEmptyContactPhase(world,cells,relations,rules,{
             products=function(w,c,r,raw) return rules_api:Invoke("RW_PlanEmptyHasBirths",w,c,r,raw) end,
             initialize=function(w,p,r,c) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r,c) end,
-            create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end},count)
+            create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end},count,bonus)
     end
     turn_services.more=function(world,projected,rules,count)
         local products,why=properties_api:Invoke("RW_ResolveMoreProducts",projected)
@@ -2436,7 +2443,11 @@ local function start(run_self_tests)
         elseif event.kind=="all_done" then
             print(string.format("[RuleWorld] ALL DONE matched=%d required=%d",event.matched,event.required))
         elseif event.kind=="bonus" then
-            print(string.format("[RuleWorld] BONUS unit=%d collector=%d total=%d",event.entity_id,event.collector_id,next_tree.bonus_count or 0))
+            if event.source=="empty" then
+                print(string.format("[RuleWorld] BONUS empty=(%d,%d) total=%d",event.x,event.y,next_tree.bonus_count or 0))
+            else
+                print(string.format("[RuleWorld] BONUS unit=%d collector=%d total=%d",event.entity_id,event.collector_id,next_tree.bonus_count or 0))
+            end
         end end
         if plan.outcome_diagnostic then print("[RuleWorld] WIN evidence: " .. plan.outcome_diagnostic) end
         level_tree = next_tree

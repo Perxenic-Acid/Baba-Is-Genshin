@@ -54,3 +54,26 @@ witnesses for later HAS conditions/status, advances tentative allocators and RNG
 purely, and finally emits one atomic creation plan. A creation-limit prefix stops
 before later victims and their orientation draws. Tests include WITHOUT-driven
 birth witnesses and terminal-prefix RNG/allocation/Undo.
+## M9.8K virtual BONUS pickups
+
+The same installed levelblock branch pairs EMPTY BONUS with YOU/YOU2, or with
+matching-layer scoped LEVEL YOU/YOU2. Unsafe qualifying cells enter the shared
+virtual destruction set; SAFE prevents both this cell's reward and deletion.
+Unlike real BONUS's property-instance multiplication, emptybonus gates exactly
+one award across all qualifying cells in the entire scan. Another contact killing
+the cell does not suppress the award, and multiple causes still run HAS once.
+
+The late empty_contact stage now carries a stale-checked bonus_state increment
+and one transient event with cell coordinates, without fabricated entity IDs.
+Events reach campaign accounting and native diagnostics only after accepted
+whole-tree Commit. The actual native event dispatch distinguishes an EMPTY cell
+from real entity/collector IDs. Undo restores local and campaign reward totals,
+products, allocation and RNG; reload retains the campaign total. Existing serial
+HAS and creation-terminal handling retain rewards issued before delete() calls.
+
+The installed selection oracle now covers 65,536 combinations including BONUS and
+scoped YOU as well as SAFE/FLOAT, duplicate pair ordering and other contact deaths.
+Turn tests cover one/many cells, duplicate grants, both YOU variants, SAFE, layers,
+shared HAS, stale counters, campaign reload/Undo and actual native event formatting.
+Synthetic LEVEL BONUS, virtual BOOM and movement-specific destruction are still
+separate remaining paths; original late-empty WIN/END ordering remains documented.

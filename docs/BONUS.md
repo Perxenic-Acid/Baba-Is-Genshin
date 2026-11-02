@@ -51,3 +51,9 @@ The installed removal-array/fixed-ID aliasing accident is not mapped onto our sm
 persistent identity allocator. Physical unitlist ordering is sorted IDs here; the
 ordinary engine's serial handledels condition-order differences remain documented
 contact-system gaps. This does not claim full original board/event scheduling parity.
+
+M9.8K adds virtual EMPTY BONUS through its separate native late-cell scan: one
+reward per scan, cell-local HAS, SAFE suppressing the empty pickup, matching-layer
+scoped LEVEL YOU, atomic counters/events, campaign reload and whole-tree Undo.
+Real BONUS multiplicity/SAFE behavior is unchanged. Synthetic LEVEL BONUS remains
+pending; see [EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md) for source evidence and tests.

@@ -335,6 +335,16 @@ local function plan_turn(world, action, services, initial_frame,back_context)
     local function remember_empty(deaths)
         for _,death in ipairs(deaths or {}) do if death.class=="empty" then empty_deleted[death.x..":"..death.y]=true end end
     end
+    local function prepare_empty_eaters(projected,frame,relations)
+        if not services.empty_eaters then return true end
+        local active=false
+        for _,relation in ipairs(relations or {}) do if relation.op=="eat" and relation.target_type=="@empty" then active=true;break end end
+        if not active then return true end
+        local sources,why=services.empty_eaters(frame,relations)
+        if not sources then return nil,why end
+        projected.empty_eaters=sources
+        return true
+    end
     local back_count=back_context and back_context.session.back_frame_count
     if type(world) == "table" and world.infinite_loop then return nil,{stage="input",reason="infinite_loop_undo_only"} end
     if type(world) == "table" and world.too_complex then return nil,{stage="input",reason="too_complex_undo_only"} end
@@ -376,6 +386,8 @@ local function plan_turn(world, action, services, initial_frame,back_context)
 
     trace[#trace + 1] = "movement"
     effective.empty_deleted=empty_deleted
+    local ready,why=prepare_empty_eaters(effective,world,before_conversions)
+    if not ready then return after_failure({consumes_turn=true,changes={}},"movement_eat_query",why) end
     local movement, movement_error = services.resolve(effective, action)
     if movement then remember_empty(movement.destructions) end
     if not movement then return fail("movement", movement_error) end
@@ -427,6 +439,8 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         local shifted_world,err=services.project(preview,refreshed,level_traits_from(before_conversions))
         if not shifted_world then return fail(motion_phase.."_project",err) end
         shifted_world.empty_deleted=empty_deleted
+        local ready,why=prepare_empty_eaters(shifted_world,preview,before_conversions)
+        if not ready then return after_failure(movement_prefix,motion_phase.."_eat_query",why) end
         local shift,shift_error=services[motion_phase](shifted_world,before_conversions,before_rules)
         if shift then remember_empty(shift.destructions) end
         if not shift then return fail(motion_phase,shift_error) end
@@ -638,6 +652,8 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             local projected,why=services.project(complete,effects,level_traits_from(relations))
             if not projected then return fail("fall_project",why) end
             projected.empty_deleted=empty_deleted
+            local ready,why=prepare_empty_eaters(projected,complete,relations)
+            if not ready then return after_failure(plan,"fall_eat_query",why) end
             local fall,why=services.fall(projected)
             if fall then remember_empty(fall.destructions) end
             if not fall then return fail("fall",why) end
@@ -1984,6 +2000,7 @@ local function start(run_self_tests)
         delete=function(world,ids) return world_api:Invoke("RW_PlanDelete",world,ids) end,
         create=function(world,specifications) return world_api:Invoke("RW_PlanCreate",world,specifications) end
     }
+    turn_services.empty_eaters=function(w,r) return rules_api:Invoke("RW_ResolveEmptyEatSources",w,r) end
     turn_services.contact=function(world,effective,kind,contents,rules,count)
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services,rules,count)
     end

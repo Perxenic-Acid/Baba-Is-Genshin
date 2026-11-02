@@ -2989,6 +2989,22 @@ end
 
 -- Resolve predicates per source identity using the current phase positions.
 -- Keep duplicate physical declarations; FEAR strength counts target parameters.
+function RW_ResolveEmptyEatSources(world,relations)
+    local sources={}
+    for _,relation in ipairs(relations or {}) do
+        if relation.op=="eat" and relation.target_type=="@empty" and relation.source_type~="@empty" then
+            local selector=relation.source_type=="@text" and {kind="class",value="text"}
+                or {kind="archetype",value=relation.source_type}
+            for _,id in ipairs(RW_SelectEntities(world,selector)) do if not sources[id] then
+                local enabled,why=RW_RelationApplies(world,relation,world.entities[id])
+                if enabled==nil then return nil,why end
+                if enabled then sources[id]=true end
+            end end
+        end
+    end
+    return sources
+end
+
 function RW_ResolveVerbTargets(world,relations,verb)
     local groups={}
     for _,relation in ipairs(relations or {}) do

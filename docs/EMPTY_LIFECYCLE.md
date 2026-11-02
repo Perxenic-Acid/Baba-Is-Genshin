@@ -244,3 +244,35 @@ Still deferred: virtual EMPTY movers' own unlock deletion and virtual pushing
 chains with unlock, EAT EMPTY entry, exact native mutable scheduling and the other
 M9.8P limitations. The new branch covers real movers targeting virtual vacancies;
 it does not claim complete virtual-vs-virtual lifecycle parity.
+
+## M9.8R real EAT EMPTY entry
+
+Installed movement.lua check around1122 queues eat before lock/weak when the
+source has EAT EMPTY and the vacancy is unsafe on the same FLOAT layer. This
+bypasses its collision traits. move around1620 deletes the vacancy, then may run
+unlock and weak; the command-local delete cache prevents duplicate HAS. Source
+SAFE/SLEEP do not protect the target. PHANTOM and pulling probes skip the special.
+conditions.lua testcond's real-unit branch uses the unit's own position/direction,
+not check's supplied target coordinates; features.lua hasfeature returns on the
+first successful declaration.
+
+RW_ResolveEmptyEatSources evaluates lowered positive/negative/conditional EAT
+relations per real identity, short-circuiting already-enabled sources. Bootstrap
+bridges this pure data through Invoke and rebuilds the transient source map before
+YOU, automatic/FEAR/SHIFT and FALL against their current frames. The solver uses
+it for root and passive PUSH participants. Unadorned vacancies are valid targets,
+without fabricating persistent EMPTY units. Cell HAS, RNG, status/terminal handling,
+ordered mixed deaths, deduplication and Undo reuse M9.8P/Q.
+
+Compiled tests cover bare/STOP/PUSH/STILL targets, duplicate/negative predicates,
+source-origin spatial conditions, SAFE/FLOAT/PHANTOM/BROKEN, EAT-unlock-WEAK order,
+Object/Text PUSH and post-YOU condition refresh. tests/reference_empty_eat.lua runs
+installed check and move eat/lock/weak branches for 32,768 combinations. Normal
+startup remains below the unchanged 2M instruction budget; no native acceptance
+is inferred.
+
+Scope: the eater map is a motion-phase snapshot, like the existing projected
+capabilities. Conditions do not re-query after each impulse within one solver;
+inert-source eager query/limit ordering is normalized rather than a complete
+native lazy-dispatch match. Virtual EMPTY/LEVEL EAT sources, virtual-vs-virtual
+unlock, dynamic intermediate vacancy conditions, and prior lifecycle gaps remain.

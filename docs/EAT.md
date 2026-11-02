@@ -35,3 +35,9 @@ Checks:
 The user waived routine native acceptance as a progress gate. Continue using
 simulations/source comparisons and record scope gaps; do not label these as native
 verification or wait for a manual test before implementing the next word.
+
+M9.8R: real movers (including passive Object/Text PUSH) can EAT EMPTY during
+entry. Source-origin conditions refresh per motion phase; targets need no EMPTY
+property and use SAFE/FLOAT. EAT precedes unlock/WEAK and shares atomic cell HAS,
+RNG and per-command deletion dedup. Phase-snapshot versus native lazy per-impulse
+query timing remains a documented boundary in EMPTY_LIFECYCLE.md.

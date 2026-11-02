@@ -1230,3 +1230,11 @@ source positions and weak-delete dedup. Preserve PHANTOM and pulling exclusions.
 Compiled transaction tests plus 16,384 installed check/move lock cases validate
 the branch. Virtual movers' unlock and EAT entry remain separate; see
 EMPTY_LIFECYCLE.md.
+
+## M9.8R — real EAT EMPTY entry
+
+Bridge pure per-source EAT EMPTY applicability into each motion phase. Support
+bare vacancies and passive Object/Text PUSH, SAFE/FLOAT/PHANTOM, source-origin
+conditions and EAT-before-unlock/WEAK cell HAS. Compiled turn tests and 32,768
+installed check/move combinations validate the path. Per-impulse lazy query
+ordering and virtual sources remain documented in EMPTY_LIFECYCLE.md.

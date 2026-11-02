@@ -221,7 +221,7 @@ function RW_ResolveMovement(world, action)
             if id > 0 and not removed[id] and entity.x == x and entity.y == y then return nil end
         end
         local cell=world.empty_cells and world.empty_cells[x .. ":" .. y]
-        return cell and cell.behaviors or world.empty_behaviors,cell
+        return cell and cell.behaviors or world.empty_behaviors or (world.empty_eaters and {}),cell
     end
     local function empty_obstacle(x,y,source,pulling)
         local empty,cell=empty_at(x,y)
@@ -231,7 +231,9 @@ function RW_ResolveMovement(world, action)
         local partner=has_capability(world,source,"open") and "shut" or has_capability(world,source,"shut") and "open"
         local unlock=not pulling and source.id and source.id>0 and partner and empty[partner] and same
             and (not empty.safe or not has_capability(world,source,"safe"))
-        if weak or unlock then return nil,weak,unlock end
+        local eat=not pulling and source.id and source.id>0 and world.empty_eaters and world.empty_eaters[source.id]
+            and not empty.safe and same
+        if weak or unlock or eat then return nil,weak,unlock,eat end
         local qx,qy=dx,dy
         local count=cell and cell.trait_counts and cell.trait_counts.reverse or (empty.reverse and 1 or 0)
         if count%2==1 then qx,qy=-qx,-qy end
@@ -290,8 +292,8 @@ function RW_ResolveMovement(world, action)
         end
 
         local phantom=has_capability(world,entity,"phantom")
-        local obstacle,empty_weak,empty_unlock
-        if not phantom then obstacle,empty_weak,empty_unlock=empty_obstacle(nx,ny,entity,pulling) end
+        local obstacle,empty_weak,empty_unlock,empty_eat
+        if not phantom then obstacle,empty_weak,empty_unlock,empty_eat=empty_obstacle(nx,ny,entity,pulling) end
         if obstacle=="push" then
             local ok,err=push_empty(nx,ny)
             if not ok then visiting[id]=nil; return false,err end
@@ -359,6 +361,7 @@ function RW_ResolveMovement(world, action)
                 if not has_capability(world,entity,"safe") then destroy(id,direction_for(dx,dy)) end
             end
         end
+        if empty_eat then destroy_empty(nx,ny,"eat") end
         if empty_unlock then
             if not empty_at(nx,ny).safe then destroy_empty(nx,ny,"unlock") end
             if not has_capability(world,entity,"safe") then destroy(id,direction_for(dx,dy),"unlock") end

@@ -156,3 +156,45 @@ for _,blocked in ipairs({false,true}) do
  end
 end
 print('PASS: EMPTY unlock PUSH dependency origins and unrelated-blocker atomic rollback')
+
+services.empty_eaters=RW_ResolveEmptyEatSources
+-- EAT is a source predicate, not a property of the target vacancy.
+for _,traits in ipairs({{}, {'STOP'}, {'PUSH','STILL'}, {'WEAK','SHUT','STOP'}}) do
+ s=fixture(traits,{{'AVATAR','EAT','EMPTY'},{'AVATAR','EAT','EMPTY'},{'AVATAR','IS','OPEN'}})
+ n=run(s);assert(n.world.next_entity_id==s.world.next_entity_id+1)
+ assert(n.world.entities[s.world.next_entity_id].x==5 and not n.world.empty_eaters)
+ if #traits==3 then assert(not n.world.entities[1]) else assert(n.world.entities[1].x==5) end
+end
+for _,traits in ipairs({{'SAFE','STOP'},{'FLOAT','STOP'}}) do
+ s=fixture(traits,{{'AVATAR','EAT','EMPTY'}});n=run(s)
+ assert(n.world.entities[1].x==4 and n.world.next_entity_id==s.world.next_entity_id)
+end
+s=fixture({'STOP','FLOAT'},{{'AVATAR','EAT','EMPTY'},{'AVATAR','IS','FLOAT'}});n=run(s);assert(n.world.entities[1].x==5)
+s=fixture({'STOP'},{{'AVATAR','EAT','EMPTY'},{'AVATAR','IS','PHANTOM'}});n=run(s);assert(n.world.entities[1].x==5 and n.world.next_entity_id==s.world.next_entity_id)
+-- Conditions use the eater's origin, not the target coordinates passed by check().
+s=fixture({'STOP'},{{'AVATAR','ON','ROCK','EAT','EMPTY'}});n=run(s);assert(n.world.entities[1].x==4)
+s=fixture({'STOP'},{{'AVATAR','NEAR','ROCK','EAT','EMPTY'}});n=run(s);assert(n.world.entities[1].x==4)
+s=fixture({'STOP'},{{'AVATAR','NEAR','FLAG','EAT','EMPTY'}})
+s.world.entities[3]={id=3,kind='object',class='object',archetype='flag',x=3,y=3,direction='None'}
+n=run(s);assert(n.world.entities[1].x==5 and n.world.entities[s.world.next_entity_id])
+s=fixture({'STOP'},{{'AVATAR','EAT','EMPTY'},{'AVATAR','EAT','NOT','EMPTY'}});n=run(s);assert(n.world.entities[1].x==4)
+s=fixture({'STOP'},{{'AVATAR','EAT','EMPTY'},{'AVATAR','IS','BROKEN'}});s.world.entities[1].broken=1;n=run(s);assert(n.world.entities[1].x==4 and n.world.next_entity_id==s.world.next_entity_id)
+print('PASS: real EAT EMPTY entry without target traits, duplicate/negative/spatial predicates, origin conditions, SAFE/FLOAT/PHANTOM/BROKEN and unlock/WEAK order with Undo')
+
+-- Refresh eater conditions after YOU, before autonomous motion.
+services.automatic=RW_ResolveAutomatic
+s=fixture({},{{'AVATAR','NEAR','FLAG','EAT','EMPTY'},{'AVATAR','IS','MOVE'}})
+s.world.entities[1].direction='Right';s.world.entities[2].x=8
+s.world.entities[3]={id=3,kind='object',class='object',archetype='flag',x=6,y=4,direction='None'}
+n=run(s);assert(n.world.entities[1].x==6 and n.world.next_entity_id==s.world.next_entity_id+1)
+assert(n.world.entities[s.world.next_entity_id].x==6 and n.world.entities[s.world.next_entity_id].y==3)
+services.automatic=nil
+-- Passive real/Text PUSH participants retain their own EAT capability.
+for _,text in ipairs({false,true}) do
+ local extra=text and {{'TEXT','EAT','EMPTY'}} or {{'ROCK','EAT','EMPTY'},{'ROCK','IS','PUSH'}}
+ s=fixture({'STOP'},extra);s.world.entities[1].x=3
+ s.world.entities[3]=text and {id=3,kind='object',class='text',text={name='ROCK'},x=4,y=3,direction='Up'}
+  or {id=3,kind='object',class='object',archetype='rock',x=4,y=3,direction='Up'}
+ n=run(s);assert(n.world.entities[1].x==4 and n.world.entities[3].x==5 and n.world.entities[s.world.next_entity_id].x==5)
+end
+print('PASS: EMPTY EAT conditions refresh between YOU/automatic phases, and passive Object/Text PUSH participants eat independently')

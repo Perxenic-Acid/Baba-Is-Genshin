@@ -111,6 +111,10 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
             context.random_state=state
             local born,why,prefix
             if death.class=="empty" and death.skip_inside then born={}
+            elseif death.class=="empty" and services.empty_births then
+                local random
+                born,why,prefix,random=services.empty_births(context,{{x=death.x,y=death.y}},contents,rules,back_count)
+                if random then state=random.to end
             elseif death.class=="empty" then
                 if not services.empty_products or not services.initialize then return nil,"missing_empty_birth_services" end
                 local products,problem,random=services.empty_products(context,{{x=death.x,y=death.y}},contents,rules)
@@ -207,13 +211,15 @@ function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_coun
             entity.id=world.next_entity_id+index-1;context.entities[entity.id]=entity
         end
         context.next_entity_id=world.next_entity_id+#specifications;context.random_state=state
-        local products,why,random=services.products(context,{cell},relations,rules)
-        if random then state=random.to end
-        if not products then
-            if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then terminal=why;break end
-            return nil,why
+        local initialized,why,prefix,random
+        if services.births then initialized,why,prefix,random=services.births(context,{cell},relations,rules,back_count)
+        else
+            local products
+            products,why,random=services.products(context,{cell},relations,rules)
+            if products then initialized,why,prefix=services.initialize(context,products,rules,back_count)
+            elseif why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then prefix={} end
         end
-        local initialized,why,prefix=services.initialize(context,products,rules,back_count)
+        if random then state=random.to end
         if not initialized then
             if not prefix or (why~="word_rule_limit" and why~="word_rule_cycle" and why~="rule_complexity_limit") then return nil,why end
             initialized=prefix;terminal=why
@@ -1989,6 +1995,7 @@ local function start(run_self_tests)
     }
 
     local contact_services = {
+        empty_births=function(w,c,r,raw,n) return rules_api:Invoke("RW_InitializeEmptyHasBirths",w,c,r,raw,n) end,
         empty_products=function(w,c,r,raw) return rules_api:Invoke("RW_PlanEmptyHasBirths",w,c,r,raw) end,
         initialize=function(w,p,r,c) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r,c) end,
         victims=function(world,kind) return properties_api:Invoke("RW_ResolveContactVictims",world,kind) end,
@@ -2011,6 +2018,7 @@ local function start(run_self_tests)
             boom=function(w,p,r) return rules_api:Invoke("RW_ResolveEmptyBoom",w,p,r) end,
             destroy=function(w,ids,c,r,n) return RW_PlanDestructionPhase(w,ids,c,"empty_boom",contact_services,nil,r,n) end,
             preview=turn_services.preview,
+            births=function(w,c,r,raw,n) return rules_api:Invoke("RW_InitializeEmptyHasBirths",w,c,r,raw,n) end,
             products=function(w,c,r,raw) return rules_api:Invoke("RW_PlanEmptyHasBirths",w,c,r,raw) end,
             initialize=function(w,p,r,c) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r,c) end,
             create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end},count)

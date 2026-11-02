@@ -2965,6 +2965,54 @@ function RW_PlanEmptyHasBirths(world,cells,relations,rules)
     return products,nil,state~=original and {from=original,to=state} or nil
 end
 
+-- Native inside() creates each product before testing the next HAS clause.
+-- Return initialized prefixes on query/status limits without exposing real IDs.
+function RW_InitializeEmptyHasBirths(world,cells,relations,rules,back_count)
+    if type(world)~="table" or not dense_list(cells) or not dense_list(relations) then return nil,"invalid_empty_has_input" end
+    local valid,why=RW_InitializeBirthSpecifications(world,{},rules,back_count)
+    if not valid then return nil,why end
+    local seen={}
+    for _,cell in ipairs(cells) do
+        if type(cell)~="table" or type(cell.x)~="number" or type(cell.y)~="number"
+            or cell.x%1~=0 or cell.y%1~=0 or cell.x<1 or cell.y<1 or cell.x>world.width or cell.y>world.height then return nil,"invalid_empty_victim" end
+        local key=cell.x..":"..cell.y;if seen[key] then return nil,"duplicate_empty_victim" end;seen[key]=true
+    end
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context.entities={};for id,entity in pairs(world.entities) do context.entities[id]=entity end
+    local products={};local state=world.random_state or 1
+    local function random_metadata() return state~=(world.random_state or 1) and {from=world.random_state or 1,to=state} or nil end
+    local function failure(reason)
+        if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then return nil,reason,products,random_metadata() end
+        return nil,reason
+    end
+    local function register(spec)
+        products[#products+1]=spec
+        local entity={};for k,v in pairs(spec) do entity[k]=v end
+        entity.id=world.next_entity_id+#products-1;context.entities[entity.id]=entity
+        context.next_entity_id=entity.id+1
+    end
+    for _,cell in ipairs(cells) do
+        local source={class="empty",x=cell.x,y=cell.y}
+        local direction,why=RW_QueryEmptyDirection(context,cell.x,cell.y,rules)
+        if not direction then return failure(why) end
+        if direction=="None" then state=state*48271%2147483647;direction=({"Right","Up","Left","Down"})[state%4+1] end
+        context.random_state=state
+        for _,relation in ipairs(relations) do if relation.op=="empty_has" then
+            local enabled,why=RW_RelationApplies(context,relation,source)
+            if enabled==nil then return failure(why) end
+            if enabled then
+                local product={kind="object",class=relation.product.kind=="text" and "text" or "object",x=cell.x,y=cell.y,direction=direction}
+                if product.class=="text" then product.text={name="EMPTY"} else product.archetype=relation.product.archetype end
+                local initialized,why,prefix=RW_InitializeBirthSpecifications(context,{product},rules,back_count)
+                if not initialized and not prefix then return failure(why) end
+                for _,spec in ipairs(initialized or prefix) do register(spec) end
+                if not initialized then return failure(why) end
+            end
+        end end
+    end
+    return products,nil,nil,random_metadata()
+end
+
 -- levelblock() compares floating(real,2,victim_x,victim_y): the virtual layer
 -- is queried at the victim, even though the BOOM source is another vacant cell.
 function RW_ResolveEmptyBoom(world,projected,rules)

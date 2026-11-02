@@ -1,7 +1,7 @@
 local cs={read=RW_ReadLines,parse=RW_ParseRuleAST,lower=RW_LowerRuleAST,evaluate=RW_EvaluateRules,project=RW_ProjectWorld,words=RW_WordTokenMap}
 local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,convert=RW_PlanConversions,refresh=RW_EvaluateRules,
  destroy=function(w,ids,c,k,d,r,n) return RW_PlanDestructionPhase(w,ids,c,k,{
-  births=RW_PlanHasBirths,empty_products=RW_PlanEmptyHasBirths,initialize=RW_InitializeBirthSpecifications,
+  births=RW_PlanHasBirths,empty_births=RW_InitializeEmptyHasBirths,empty_products=RW_PlanEmptyHasBirths,initialize=RW_InitializeBirthSpecifications,
   create=RW_PlanCreate,delete=RW_PlanDelete},d,r,n) end,
  contact=function(w,p,k,c) return RW_PlanContactPhase(w,p,k,c,{victims=RW_ResolveContactVictims,births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete}) end,
  evaluate=function(w) local f,e=RW_CompileWorld(w,cs);if not f then return nil,e.reason end;return f.effects,nil,f.relations,f.rules end}

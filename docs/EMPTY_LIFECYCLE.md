@@ -334,3 +334,32 @@ Installed state3/final-WEAK snippets cover 384 static STOP/four-axis/SAFE/AUTO/n
 cases. Installed findfears covers 2,048 real WEAK and 5,120 virtual WEAK cases.
 Anonymous EMPTY PUSH-chain destruction, exact per-impulse requery, the None/zero-
 vector dispatch boundary, native lock-dependent retry nuances and prior gaps remain.
+
+## M9.8U per-clause EMPTY HAS births
+
+Installed tools.lua inside(), around977-1030, gathers ordered declarations, then
+tests each clause and immediately creates its product before testing the next.
+Production EMPTY destruction now uses RW_InitializeEmptyHasBirths: later clauses
+see earlier same-cell births, including initialized BROKEN/BACK status. ON and
+WITHOUT therefore observe creation order; a newly satisfied earlier clause is
+not revisited. The frozen declarations are not recompiled during this stream.
+
+The cell chooses its direction once, even with no products, and all its HAS
+products share it. Prior-cell and mixed real/cell death-frame witnesses remain
+visible. Tentative IDs stay private to planning; creation, allocator, RNG and
+terminal-prefix changes commit atomically and Undo restores them. Query/status
+limits retain the initialized prefix and consumed direction draw; ordinary
+errors reject the transaction. Both movement deaths and late EMPTY contacts use
+the new native Invoke bridge. The old flat products API remains for compatibility
+with diagnostic adapters.
+
+tests/empty_has_sequence.lua covers same-cell conditions, duplicate and Text
+products, status feedback, pure repeated planning, limits and both transaction
+adapters. tests/reference_empty_has_sequence.lua executes installed inside() for
+81 ordered ordinary/Text/ON/WITHOUT combinations; its predicate stubs isolate
+dispatch/creation sequencing rather than claiming a new condition-engine oracle.
+Full regression and catalog/layout audits pass; native startup remains 1,980,000
+offline instructions. Native success is not inferred from these checks.
+
+Real-container within-parent HAS clause sequencing and exact HAS ALL/createall
+remain separate gaps, along with the prior EMPTY scope notes.

@@ -1180,3 +1180,12 @@ stale-checked bonus counters, campaign reload/Undo and ID-free committed event
 formatting. Expand the installed selection oracle to 65,536 cases and exercise the
 actual native event branch. Synthetic LEVEL BONUS and virtual BOOM/movement deaths
 remain pending; see EMPTY_LIFECYCLE.md.
+
+## M9.8L — virtual EMPTY BOOM
+
+Collect count-scaled late EMPTY blasts, query virtual FLOAT at real victim cells,
+and split real destruction/HAS from serial virtual HAS with atomic allocators.
+Preserve SAFE, deduplication, frozen newborns, BONUS and real/virtual limit prefixes.
+Turn tests plus 1,280 installed BOOM/floating cases validate the path. Scoped BOOM,
+movement cell victims and native mutable ordering remain documented gaps; see
+EMPTY_LIFECYCLE.md.

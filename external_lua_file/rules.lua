@@ -2965,6 +2965,28 @@ function RW_PlanEmptyHasBirths(world,cells,relations,rules)
     return products,nil,state~=original and {from=original,to=state} or nil
 end
 
+-- levelblock() compares floating(real,2,victim_x,victim_y): the virtual layer
+-- is queried at the victim, even though the BOOM source is another vacant cell.
+function RW_ResolveEmptyBoom(world,projected,rules)
+    local result={ids={},cells={}};local selected={}
+    local context=rules and condition_context(world,rules) or world
+    for _,source in pairs(projected.empty_cells or {}) do if source.behaviors.boom then
+        local radius=math.min(((source.trait_counts or {}).boom or 1)-1,math.max(world.width,world.height))
+        if not source.behaviors.safe then result.cells[#result.cells+1]={x=source.x,y=source.y} end
+        for id,entity in pairs(projected.entities) do
+            if not selected[id] and not entity.behaviors.safe
+                and math.abs(entity.x-source.x)<=radius and math.abs(entity.y-source.y)<=radius then
+                local layer,why=query_trait(context,{class="empty",x=entity.x,y=entity.y},"float")
+                if layer==nil then return nil,why end
+                if (entity.behaviors.float==true)==layer then selected[id]=true end
+            end
+        end
+    end end
+    for id in pairs(selected) do result.ids[#result.ids+1]=id end;table.sort(result.ids)
+    table.sort(result.cells,function(a,b) if a.x~=b.x then return a.x<b.x end;return a.y<b.y end)
+    return result
+end
+
 -- Resolve predicates per source identity using the current phase positions.
 -- Keep duplicate physical declarations; FEAR strength counts target parameters.
 function RW_ResolveVerbTargets(world,relations,verb)

@@ -2,9 +2,14 @@ local cs={read=RW_ReadLines,parse=RW_ParseRuleAST,lower=RW_LowerRuleAST,evaluate
 local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,convert=RW_PlanConversions,refresh=RW_EvaluateRules,
  contact=function(w,p,k,c) return RW_PlanContactPhase(w,p,k,c,{victims=RW_ResolveContactVictims,births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete}) end,
  empty_contacts=function(w,p,r,raw,count)
-  local cells,bonus=RW_ResolveEmptyContactVictims(p)
-  return RW_PlanEmptyContactPhase(w,cells,r,raw,
-   {products=RW_PlanEmptyHasBirths,initialize=RW_InitializeBirthSpecifications,create=RW_PlanCreate},count,bonus) end,
+  return RW_PlanEmptyLateContacts(w,p,r,raw,{
+   victims=RW_ResolveEmptyContactVictims,boom=RW_ResolveEmptyBoom,preview=RW_PreviewPlan,
+   products=RW_PlanEmptyHasBirths,initialize=RW_InitializeBirthSpecifications,create=RW_PlanCreate,
+   destroy=function(w,ids,c,r,n)
+    return RW_PlanDestructionPhase(w,ids,c,'empty_boom',{
+     births=function(w,ids,c,r,n) local specs,e=RW_PlanHasBirths(w,ids,c);if not specs then return nil,e end;return RW_InitializeBirthSpecifications(w,specs,r,n) end,
+     birth_products=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},nil,r,n)
+   end},count) end,
  evaluate=function(w) local f,e=RW_CompileWorld(w,cs);if not f then return nil,e.reason end;return f.effects,nil,f.relations,f.rules end}
 local function fixture(traits,extra)
  local s=RW_CreateSession();local w=s.world;w.width,w.height=24,30;w.next_entity_id=10
@@ -118,3 +123,59 @@ local dispatch=assert(load('return function(plan,next_tree) '..source:sub(first,
 dispatch({events={{kind='bonus',source='empty',x=5,y=3,amount=1},{kind='bonus',entity_id=1,collector_id=2,amount=1}}},{bonus_count=2})
 assert(#messages==2 and messages[1]:find('empty=(5,3)',1,true) and messages[2]:find('unit=1 collector=2',1,true))
 print('PASS: EMPTY BONUS campaign totals/reload/tree Undo and actual post-Commit native diagnostic dispatch')
+for count=1,3 do
+ local traits={};for i=1,count do traits[#traits+1]='BOOM' end
+ s=fixture(traits);n,plan=step(s)
+ assert((n.world.entities[1]~=nil)==(count==1))
+ assert(n.world.entities[s.world.next_entity_id].archetype=='flag' and n.world.entities[s.world.next_entity_id].x==5)
+end
+s=fixture({'BOOM','BOOM','SAFE'});n=step(s);assert(not n.world.entities[1] and n.world.next_entity_id==s.world.next_entity_id)
+s=fixture({'BOOM','BOOM'},{{'ROCK','IS','SAFE'},{'EMPTY','HAS','FLAG'}});n=step(s);assert(n.world.entities[1] and n.world.next_entity_id==s.world.next_entity_id+1)
+-- Original floating(real,2,x,y) queries EMPTY FLOAT at the victim, not the source.
+s=fixture({'BOOM','BOOM','FLOAT'});n=step(s);assert(not n.world.entities[1])
+s=fixture({'BOOM','BOOM'},{{'EMPTY','ON','ROCK','IS','FLOAT'},{'EMPTY','HAS','FLAG'}});n=step(s);assert(n.world.entities[1])
+s=fixture({'BOOM','BOOM'},{{'EMPTY','ON','ROCK','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'EMPTY','HAS','FLAG'}});n=step(s);assert(not n.world.entities[1])
+-- Real HAS runs before virtual HAS, with disjoint atomic allocator stages.
+s=fixture({'BOOM','BOOM'},{{'ROCK','HAS','AVATAR'},{'EMPTY','HAS','FLAG'}});n,plan=step(s)
+local allocated=s.world.next_entity_id
+assert(n.world.entities[allocated].archetype=='avatar' and n.world.entities[allocated+1].archetype=='flag')
+local indices={};for i,stage in ipairs(plan.stages) do indices[stage.name]=i end
+assert(indices.empty_boom<indices.empty_contact and n.world.next_entity_id==allocated+2)
+s=fixture({'BOOM','BOOM'},{{'ROCK','HAS','FLAG'},{'EMPTY','WITHOUT','FLAG','HAS','FLAG'}});n=step(s)
+assert(n.world.next_entity_id==s.world.next_entity_id+1 and n.world.entities[s.world.next_entity_id].x==6)
+-- SAFE/Text/diagonal victims are selected simultaneously, and newborns do not explode.
+s=fixture({'BOOM','BOOM','BOOM'},{{'ROCK','HAS','AVATAR'},{'EMPTY','HAS','FLAG'}})
+s.world.entities[2]={id=2,kind='object',class='object',archetype='flag',x=7,y=5,direction='None'}
+s.world.entities[3]={id=3,kind='object',class='text',text={name='IS'},x=6,y=3,direction='None'}
+n=step(s);assert(not n.world.entities[1] and not n.world.entities[2] and not n.world.entities[3])
+assert(n.world.entities[s.world.next_entity_id].archetype=='avatar')
+s=fixture({'YOU','BONUS','BOOM','BOOM'});n,plan=step(s);assert(n.world.bonus_count==1 and not n.world.entities[1])
+local reward;for _,stage in ipairs(plan.stages) do if stage.name=='empty_boom' then reward=stage.plan end end
+assert(reward and reward.bonus_state and reward.bonus_state.to==1)
+reward.bonus_state.from=9;local same,result=RW_Commit(s,plan);assert(not result.accepted and same==s)
+print('PASS: EMPTY BOOM radius/counts, SAFE, target-coordinate FLOAT, real-before-virtual HAS/allocators, frozen newborns, BONUS prefix, stale metadata and Undo')
+-- A late virtual limit retains the already-triggered real blast/reward prefix.
+local limited={};for key,value in pairs(services) do limited[key]=value end
+local failure='word_rule_limit'
+limited.empty_contacts=function(w,p,r,raw,count)
+ return RW_PlanEmptyLateContacts(w,p,r,raw,{victims=RW_ResolveEmptyContactVictims,boom=RW_ResolveEmptyBoom,preview=RW_PreviewPlan,
+  destroy=function(w,ids) return RW_PlanDelete(w,ids) end,
+  products=function() return nil,failure end,initialize=RW_InitializeBirthSpecifications,create=RW_PlanCreate},count)
+end
+s=fixture({'YOU','BONUS','BOOM','BOOM'});s.world.random_state=7
+plan=assert(RW_PlanTurn(s.world,{type='wait'},limited));assert(plan.infinite_loop)
+n,result=RW_Commit(s,plan);assert(result.accepted and n.world.infinite_loop and not n.world.entities[1])
+assert(n.world.bonus_count==1 and n.world.random_state==7 and n.world.next_entity_id==s.world.next_entity_id and RW_Undo(n).world==s.world)
+failure='invalid_empty_test'
+local rejected,why=RW_PlanTurn(s.world,{type='wait'},limited);assert(not rejected and why.reason=='invalid_empty_test' and s.world.entities[1] and s.world.random_state==7)
+-- Real victim initialization limits stop before virtual inside() calls too.
+local frame=assert(RW_CompileWorld(s.world,cs));local projected=assert(RW_ProjectWorld(s.world,frame.effects))
+local products_called=false
+local prefix=assert(RW_PlanEmptyLateContacts(s.world,projected,frame.relations,frame.rules,{
+ victims=RW_ResolveEmptyContactVictims,boom=RW_ResolveEmptyBoom,preview=RW_PreviewPlan,
+ destroy=function(w,ids) local plan=assert(RW_PlanDelete(w,ids));plan.infinite_loop=true;plan.reason='infinite_loop';return plan end,
+ products=function() products_called=true;error('virtual HAS after terminal real prefix') end,
+ initialize=RW_InitializeBirthSpecifications,create=RW_PlanCreate}))
+assert(not products_called and prefix.infinite_loop and prefix.bonus_state.to==1 and not prefix.random_state)
+n,result=RW_Commit(s,prefix);assert(result.accepted and n.world.bonus_count==1 and RW_Undo(n).world==s.world)
+print('PASS: EMPTY BOOM real/virtual creation limits retain blast/reward prefixes, avoid later RNG and reject ordinary errors atomically')

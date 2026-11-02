@@ -17,3 +17,9 @@ checks are not native acceptance or a complete original-source oracle.
 The installed BOOM loop now has a 256-case host-normalized source oracle covering
 one to four declarations, diagonal/range boundaries, SAFE/FLOAT, Text and multiple
 blast sources. This supplements the production transaction tests.
+
+M9.8L adds late virtual EMPTY BOOM with count-scaled square range, SAFE, real and
+virtual HAS stages, target-coordinate EMPTY FLOAT queries, BONUS/terminal prefixes
+and whole-tree Undo. The installed BOOM/floating oracle covers 1,280 cases.
+Scoped LEVEL BOOM and native mutable victim ordering remain pending; see
+[EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md).

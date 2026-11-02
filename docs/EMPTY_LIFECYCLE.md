@@ -41,7 +41,7 @@ These are source/dispatch oracles, not native-device acceptance.
 
 ## Remaining scope
 
-Virtual BOOM and BONUS deletion, movement unlock/WEAK/EAT virtual victims,
+Movement unlock/WEAK/EAT virtual victims,
 per-command cross-phase virtual deletion deduplication and complete scoped LEVEL
 lifecycle remain pending. This phase does not add EMPTY SINK/WEAK self-destruction
 which the original levelblock does not perform. Native late-empty victory/re-entry
@@ -77,3 +77,44 @@ Turn tests cover one/many cells, duplicate grants, both YOU variants, SAFE, laye
 shared HAS, stale counters, campaign reload/Undo and actual native event formatting.
 Synthetic LEVEL BONUS, virtual BOOM and movement-specific destruction are still
 separate remaining paths; original late-empty WIN/END ordering remains documented.
+
+## M9.8L virtual BOOM
+
+Installed blocks.lua:2293-2353 explodes every qualifying vacant source using a
+square radius of BOOM declaration count minus one. SAFE protects each real victim
+independently and prevents the source cell's own deletion, without disabling its
+blast. Ordinary victims are queued once; no new HAS product recursively explodes.
+One BOOM has radius zero, so its vacant source cannot hit a real same-cell unit.
+
+The installed floating(f,2,x,y) call is significant: tools.lua floating:1254 queries
+EMPTY FLOAT at the victim coordinates, not at the remote blast source. The rules
+planner uses current/frozen declaration queries at occupied victim cells as well,
+including conditional FLOAT and virtual BROKEN; projected vacant-source facing or
+FLOAT is not substituted for that query. Radius and multiplicity still come from
+the active source cell's compiled projection.
+
+RW_PlanEmptyLateContacts collects virtual self-contact/BOOM victims from one late
+snapshot, deduplicates cells, and plans a real empty_boom destruction/HAS stage
+before the empty_contact cell-HAS stage. Later virtual HAS queries see initialized
+real births and the advanced allocator. Each stage keeps its own stale preconditions;
+the top-level changes list is only a diagnostic summary. Frozen declarations survive
+destroyed Text until final WORD/CRASH evaluation. Scoped traits refresh after either
+stage changes units.
+
+EMPTY BONUS is awarded during the original scan, before those delete() calls.
+When a real blast stage exists, it carries the reward counter/event so a later
+virtual query/creation limit preserves that prefix. A real birth initialization
+limit likewise retains the blast/reward prefix and skips all virtual inside()
+calls. Ordinary errors reject the entire transaction. Pure RNG, actual partial
+allocations and whole-tree Undo remain intact.
+
+Turn tests cover radii/counts, diagonal/Text/SAFE victims, source-vs-target FLOAT,
+real-before-virtual HAS and allocators, earlier-birth conditions, no recursive
+newborn explosion, BONUS, stale counters and real/virtual terminal prefixes.
+Tests/reference_empty_boom.lua executes the installed BOOM body and floating()
+helper for 1,280 range/SAFE/layer/multiple-source cases.
+
+Remaining boundaries include native real-victim mutable unitmap traversal (the
+project normalizes victim IDs), cross-phase virtual delete deduplication, movement
+unlock/WEAK/EAT cell victims, exact HAS ALL bookkeeping and late-empty WIN/END
+scheduling. Scoped LEVEL BOOM and other synthetic lifecycle paths are separate.

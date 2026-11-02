@@ -484,3 +484,20 @@ cases with isolated check() eligibility. Turn tests add conditional interior
 STILL, real-tail displacement, no allocation and Undo. This closes backward
 dispatch only: virtual pulling-source SWAP, forward collision side effects during
 native virtual dopush, and exact queued-collision timing remain documented gaps.
+
+## M9.9G virtual pulling-source SWAP
+
+Installed movement.lua dopush(), around1323, lets a pulled SWAP source queue
+real occupants of its forward cell back into its source cell. The pusher and
+units with existing updates are excluded, and displaced facing is preserved.
+Virtual PULL traversal now queues these updates in source order, using sorted
+real IDs and the existing planned/removed/visiting sets; no EMPTY ID is created.
+FLOAT and SLEEP do not filter this exchange. The workspace's existing STILL-partner
+and scoped HOLD protections are retained deliberately: the original isolated
+source-SWAP branch itself does not explicitly filter target STILL/HOLD.
+
+tests/reference_empty_pull_swap.lua executes that installed source branch for
+32 four-axis/SWAP/FLOAT/SLEEP combinations, checking pusher exclusion and queued
+coordinates. Turn tests cover retained facing, STILL partner protection, no
+allocation and Undo. Virtual forward collision side effects and exact native
+queued-collision timing remain gaps; this is not full dopush parity.

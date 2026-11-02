@@ -95,6 +95,13 @@ for _,blocked in ipairs({false,true}) do
  n=run(s);assert(n.world.entities[1].x==11 and n.world.entities[2].x==(blocked and 7 or 8))
  assert(n.world.next_entity_id==s.world.next_entity_id)
 end
+for _,still in ipairs({false,true}) do
+ local extra={{'AVATAR','IS','PHANTOM'},{'EMPTY','IS','PULL'},{'EMPTY','IS','SWAP'}}
+ if still then extra[#extra+1]={'ROCK','IS','STILL'} end
+ s=fixture(extra);s.world.entities[1].x=10;s.world.entities[2].x=10
+ n=run(s);assert(n.world.entities[1].x==11 and n.world.entities[2].x==(still and 10 or 9))
+ assert(n.world.entities[2].direction=='Up' and n.world.next_entity_id==s.world.next_entity_id)
+end
 -- Anonymous virtual-target dispatch preserves EAT-before-lock and never
 -- promotes its string-local source key into an entity or operation ID.
 for _,source_safe in ipairs({false,true}) do for _,target_safe in ipairs({false,true}) do

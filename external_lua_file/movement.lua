@@ -278,6 +278,21 @@ function RW_ResolveMovement(world, action)
             local qx,qy=dx,dy;if count%2==1 then qx,qy=-qx,-qy end
             local lock=qx==1 and "lockedright" or qx==-1 and "lockedleft" or qy==-1 and "lockedup" or "lockeddown"
             if not empty.pull or empty.still or empty[lock] then return end
+            if empty.swap then
+                local swaps={}
+                for id,other in pairs(world.entities) do
+                    if id>0 and not planned[id] and not removed[id] and not visiting[id]
+                        and other.x==tx+dx and other.y==ty+dy and not has_capability(world,other,"still")
+                        and not held_by_level(world,other) then swaps[#swaps+1]=id end
+                end
+                table.sort(swaps)
+                for _,id in ipairs(swaps) do
+                    local other=world.entities[id];planned[id]=true
+                    changes[#changes+1]={kind="move",entity_id=id,
+                        from={x=other.x,y=other.y,direction=other.direction or "None"},
+                        to={x=tx,y=ty,direction=other.direction or "None"}}
+                end
+            end
             traversed=true;tx,ty=tx-dx,ty-dy
         end
         if not traversed then return end

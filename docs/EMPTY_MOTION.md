@@ -135,3 +135,27 @@ state-machine oracle or native-device acceptance.
 M9.8J adds late virtual self-contact destruction and EMPTY HAS; see
 EMPTY_LIFECYCLE.md. Movement-specific virtual deaths and serial birth witnesses
 remain pending; real movement dependencies continue to use existing HAS stages.
+
+## M9.8O passive EMPTY collision capabilities
+
+Installed movement.lua check() around1112-1190 queries cantmove for the target
+vacancy. Movable EMPTY SWAP bypasses that vacancy's STOP/PUSH/PULL checks; it does
+not create or displace a persistent partner. Immobile SWAP is disabled, so its
+remaining traits determine solidity. Immobile EMPTY PUSH blocks. tools.lua
+cantmove around2248 uses STILL and the REVERSE-adjusted directional lock query.
+SLEEP does not disable passive PUSH/SWAP. Existing project virtual EMPTY exemption
+from scoped LEVEL HOLD remains deliberate; this is not a new original-parity claim.
+
+The shared movement solver now classifies each vacancy before both root entry
+and recursive EMPTY pushing. It reads per-cell counts for REVERSE parity and does
+not persist proxies, facing, IDs or status for a passive vacancy. PHANTOM keeps
+its collision bypass. Ordinary real blockers still reject the whole speculative
+push. Automatic, FEAR, SHIFT and real PUSH dependencies reuse this solver.
+
+Turn tests exercise compiled per-cell FACING conditions, PUSH/SWAP/STILL/locks,
+duplicate REVERSE, SLEEP, PHANTOM, blocked facing, allocator stability and Undo.
+tests/reference_empty_obstacles.lua executes installed EMPTY check and cantmove
+branches for 24,576 combinations across four directions and downstream blockers.
+The oracle excludes lifecycle specials and the deliberate LEVEL HOLD policy.
+Virtual movement unlock/WEAK/EAT destruction, HAS, cross-phase deleted-cell
+tracking and exact mutable native scheduling remain separate lifecycle work.

@@ -1205,3 +1205,11 @@ retaining earlier BONUS and skipping later rewards, allocation and inside() RNG.
 Keep post-delete evidence, scoped LEVEL priority and final terminal-only Undo.
 Turn/tree regressions and 75 installed scan-prefix cases cover the boundary;
 remaining virtual/synthetic lifecycle gaps are in EMPTY_LIFECYCLE.md.
+
+## M9.8O — passive EMPTY PUSH/SWAP locks
+
+Classify EMPTY collision per cell: immobile PUSH blocks, movable SWAP bypasses
+STOP/PUSH/PULL, immobile SWAP falls back to its remaining capabilities. Preserve
+SLEEP, counted REVERSE lock queries, PHANTOM and virtual HOLD policy. Compiled
+turn/Undo tests and 24,576 installed check/cantmove cases validate the path;
+virtual movement destruction/HAS is still separate. See EMPTY_MOTION.md.

@@ -204,16 +204,32 @@ function RW_ResolveMovement(world, action)
             if id > 0 and not removed[id] and entity.x == x and entity.y == y then return nil end
         end
         local cell=world.empty_cells and world.empty_cells[x .. ":" .. y]
-        return cell and cell.behaviors or world.empty_behaviors
+        return cell and cell.behaviors or world.empty_behaviors,cell
+    end
+    local function empty_obstacle(x,y)
+        local empty,cell=empty_at(x,y)
+        if not empty then return nil end
+        local qx,qy=dx,dy
+        local count=cell and cell.trait_counts and cell.trait_counts.reverse or (empty.reverse and 1 or 0)
+        if count%2==1 then qx,qy=-qx,-qy end
+        local locked=qx==1 and "lockedright" or qx==-1 and "lockedleft" or qy==-1 and "lockedup" or "lockeddown"
+        local still=empty.still or empty[locked]
+        -- Native check() disables immobile EMPTY SWAP, and blocks immobile PUSH.
+        -- Synthetic EMPTY is exempt from LEVEL HOLD; SLEEP does not stop pushing.
+        local swap=empty.swap and not still
+        if (empty.push or swap) and still then return "stop" end
+        if swap then return nil end
+        if empty.push then return "push" end
+        if empty.block_entry or empty.pull then return "stop" end
     end
     local try_move,attempt_move
     local function push_empty(x,y)
         local nx,ny=x+dx,y+dy
         if get_environment(world,nx,ny) == "edge" then return false,"blocked_by_edge" end
-        local empty=empty_at(nx,ny)
-        if empty and empty.push then
+        local obstacle=empty_obstacle(nx,ny)
+        if obstacle=="push" then
             local ok,err=push_empty(nx,ny); if not ok then return false,err end
-        elseif empty and (empty.block_entry or empty.pull) then return false,"blocked_by_empty" end
+        elseif obstacle=="stop" then return false,"blocked_by_empty" end
         local occupants={}
         for id,entity in pairs(world.entities) do
             if id > 0 and not removed[id] and entity.x == nx and entity.y == ny then occupants[#occupants+1]=id end
@@ -251,11 +267,11 @@ function RW_ResolveMovement(world, action)
         end
 
         local phantom=has_capability(world,entity,"phantom")
-        local empty=empty_at(nx,ny)
-        if not phantom and empty and empty.push then
+        local obstacle=not phantom and empty_obstacle(nx,ny)
+        if obstacle=="push" then
             local ok,err=push_empty(nx,ny)
             if not ok then visiting[id]=nil; return false,err end
-        elseif not phantom and empty and (empty.block_entry or empty.pull) then
+        elseif obstacle=="stop" then
             visiting[id]=nil; return false,"blocked_by_empty"
         end
         -- Gather occupants deterministically.

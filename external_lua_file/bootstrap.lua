@@ -214,7 +214,19 @@ function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_coun
 end
 
 function RW_PlanEmptyLateContacts(world,projected,relations,rules,services,back_count)
-    local cells,bonus,evidence=services.victims(projected)
+    local cells,bonus,evidence,immediate=services.victims(projected)
+    if immediate then
+        local plan,why=services.create(world,{})
+        if not plan then return nil,why end
+        plan.empty_scan_return=true
+        if immediate.kind=="win" then plan.empty_win_contact=true
+        else plan.end_contact={source={kind="empty",x=immediate.x,y=immediate.y},target={kind="empty",x=immediate.x,y=immediate.y}} end
+        if bonus then
+            plan.bonus_state={from=world.bonus_count or 0,to=(world.bonus_count or 0)+1}
+            plan.events={{kind="bonus",source="empty",x=bonus.x,y=bonus.y,amount=1}}
+        end
+        return plan
+    end
     local boom,why=services.boom(world,projected,rules)
     if not boom then return nil,why end
     local seen={};for _,cell in ipairs(cells) do seen[cell.x..":"..cell.y]=true end
@@ -899,6 +911,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 plan.stages[#plan.stages+1]={name="empty_contact",plan=contact}
                 plan.empty_win_contact=contact.empty_win_contact
                 plan.end_contact=contact.end_contact
+                plan.empty_scan_return=contact.empty_scan_return
                 for _,change in ipairs(contact.changes) do plan.changes[#plan.changes+1]=change end
                 for _,event in ipairs(contact.events or {}) do
                     plan.events=plan.events or {};plan.events[#plan.events+1]=event

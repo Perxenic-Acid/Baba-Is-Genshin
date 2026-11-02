@@ -549,33 +549,41 @@ end
 function RW_ResolveEmptyContactVictims(world)
     local victims={};local level=world.level_behaviors or {};local bonus
     local evidence={win={},ending={}}
+    local immediate
     for _,cell in pairs(world.empty_cells or {}) do
         local b=cell.behaviors
+        local same=(b.float==true)==(level.float==true)
+        local unlock=b.open and (b.shut or same and level.shut)
+            or b.shut and same and level.open
+        local melt=b.melt and (b.hot or same and level.hot)
+        local defeat=(b.control or b.control2) and (b.defeat or same and level.defeat)
+        local pickup=b.bonus and (b.control or b.control2 or same and (level.control or level.control2))
+        local victory=(b.control or b.control2) and (b.win or same and level.win)
+        local ending=b["end"] and (((b.control or b.control2) and cell.end_contact)
+            or same and (level.control or level.control2))
+        if (b.safe or not (unlock or melt or defeat or pickup)) and (victory or ending)
+            and (not immediate or cell.x<immediate.x or cell.x==immediate.x and cell.y<immediate.y) then
+            immediate={kind=victory and "win" or "end",x=cell.x,y=cell.y}
+        end
         if not b.safe then
-            local same=(b.float==true)==(level.float==true)
-            local unlock=b.open and (b.shut or same and level.shut)
-                or b.shut and same and level.open
-            local melt=b.melt and (b.hot or same and level.hot)
-            local defeat=(b.control or b.control2) and (b.defeat or same and level.defeat)
-            local pickup=b.bonus and (b.control or b.control2 or same and (level.control or level.control2))
             if pickup and (not bonus or cell.x<bonus.x or cell.x==bonus.x and cell.y<bonus.y) then bonus={x=cell.x,y=cell.y} end
             if unlock or melt or defeat or pickup then
                 victims[#victims+1]={x=cell.x,y=cell.y}
-                if (b.control or b.control2) and (b.win or same and level.win) then
+                if victory then
                     evidence.win[#evidence.win+1]={x=cell.x,y=cell.y}
                 end
-                if b["end"] and (((b.control or b.control2) and cell.end_contact)
-                    or same and (level.control or level.control2)) then
+                if ending then
                     evidence.ending[#evidence.ending+1]={x=cell.x,y=cell.y}
                 end
             end
         end
     end
+    if immediate and bonus and (bonus.x>immediate.x or bonus.x==immediate.x and bonus.y>immediate.y) then bonus=nil end
     table.sort(victims,function(a,b) if a.x~=b.x then return a.x<b.x end;return a.y<b.y end)
     for _,cells in ipairs({evidence.win,evidence.ending}) do
         table.sort(cells,function(a,b) if a.x~=b.x then return a.x<b.x end;return a.y<b.y end)
     end
-    return victims,bonus,evidence
+    return victims,bonus,evidence,immediate
 end
 
 -- Custom/editor levelpack END evidence. No host ending/credits side effects here.

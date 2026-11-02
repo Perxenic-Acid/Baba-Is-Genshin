@@ -1197,3 +1197,11 @@ check final occupancy, preserve END pairing and late WIN priority, and keep term
 states outcome-free. Fix SAFE virtual DEFEAT's win veto. Turn/tree tests and 16
 installed dead-cell/order/HAS outcome cases cover the path; alive-cell immediate
 scan returns remain separate work in EMPTY_LIFECYCLE.md.
+
+## M9.8N — alive EMPTY outcome scan returns
+
+Stop queued late EMPTY BOOM/HAS at the earliest alive WIN/END in x/y order,
+retaining earlier BONUS and skipping later rewards, allocation and inside() RNG.
+Keep post-delete evidence, scoped LEVEL priority and final terminal-only Undo.
+Turn/tree regressions and 75 installed scan-prefix cases cover the boundary;
+remaining virtual/synthetic lifecycle gaps are in EMPTY_LIFECYCLE.md.

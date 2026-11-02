@@ -206,3 +206,16 @@ s=fixture({},{{'EMPTY','NEAR','ROCK','IS','YOU'},{'EMPTY','NEAR','ROCK','IS','DE
  {'EMPTY','WITHOUT','FLAG','IS','WIN'},{'EMPTY','WITHOUT','FLAG','HAS','FLAG'},{'FLAG','IS','CRASH'}})
 t,p=tree_step(s);assert(RW_GetActiveLevel(t).world.infinite_loop and not t.outcomes[t.active_id])
 print('PASS: EMPTY late WIN evidence survives condition retraction but never escapes terminal-only Undo')
+-- An alive EMPTY outcome returns before every queued blast/deletion/inside().
+for _,traits in ipairs({{'YOU','WIN','BOOM','BOOM'},{'END','YOU','BOOM','BOOM'}, {'YOU','WIN','DEFEAT','SAFE','BOOM','BOOM'}}) do
+ s=fixture(traits);s.world.random_state=7
+ n,plan=step(s);assert(plan.empty_scan_return)
+ t,p=tree_step(s);local w=RW_GetActiveLevel(t).world
+ assert(t.outcomes[t.active_id].kind=='win')
+ assert((t.ending~=nil)==(traits[1]=='END'))
+ assert(w.entities[1] and w.next_entity_id==s.world.next_entity_id and w.random_state==7)
+ for _,stage in ipairs(plan.stages or {}) do assert(stage.name~='empty_boom') end
+end
+s=fixture({'YOU','WIN','BOOM','BOOM'},{{'EMPTY','HAS','FLAG'},{'ROCK','IS','CRASH'}})
+t,p=tree_step(s);assert(RW_GetActiveLevel(t).world.infinite_loop and not t.outcomes[t.active_id])
+print('PASS: alive EMPTY WIN/END skips queued BOOM/HAS/RNG, preserves SAFE and terminal lockout with tree Undo')

@@ -152,3 +152,31 @@ return before queued BOOM/cell deletions and HAS, even for an unsafe BOOM source
 which does not clear the local alive flag. That scan-prefix interruption, and its
 interaction with earlier BONUS rewards and ordinary/synthetic outcomes, still
 needs separate implementation. This milestone handles the post-delete path only.
+
+## M9.8N alive-cell scan returns
+
+Installed levelblock around 2348-2418 tests WIN/END immediately after each cell's
+unsafe self-contact/bonus handling. BOOM only queues deletion and does not clear
+alive. A surviving winning/ending vacancy therefore returns before all queued
+real blast victims and virtual delete/inside() calls, including earlier cells.
+Earlier BONUS awards survive; later cells cannot award BONUS. The first outcome
+in x-then-y order wins, with WIN before END at the same cell. An immediate END can
+outrank an earlier dead cell's queued post-delete WIN.
+
+The projection query returns the earliest alive outcome and truncates the reward
+prefix. The late planner emits transient outcome/reward metadata without querying
+BOOM or initializing HAS products, allocating IDs or consuming inside() RNG.
+Whole-tree Undo restores the transaction. Existing project scheduling remains:
+ordinary earlier phases already occurred, final CRASH/compile limits still lock
+out outcomes, and explicit scoped LEVEL conversion/terminal precedence is retained.
+This change interrupts queued EMPTY work, not the entire project's turn pipeline.
+
+Turn/tree tests cover BOOM suppression, HAS/allocator/RNG stability, SAFE,
+terminal-only Undo and outcomes. tests/reference_empty_immediate.lua executes the
+installed selection/death/bonus/return branches for 75 three-cell permutations,
+including earlier dead WIN versus immediate END, reward cutoffs and forbidden
+queued-work callbacks. Post-delete outcome tests remain separate.
+
+Remaining boundaries: cross-phase virtual delete deduplication, movement
+unlock/WEAK/EAT virtual victims, exact HAS ALL bookkeeping, native mutable real
+victim ordering and synthetic LEVEL lifecycle. Frontend/level design remain deferred.

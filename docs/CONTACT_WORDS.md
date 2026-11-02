@@ -90,3 +90,30 @@ scoped contacts now have a separate late cell-local HAS phase. It preserves seri
 birth witnesses, RNG and Undo without persistent EMPTY identities; see
 [EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md) for source evidence, tests and remaining
 movement/BOOM/BONUS lifecycle gaps.
+
+## M9.8V ordinary-container HAS streaming
+
+Installed tools.lua inside() around977-1030 creates each product immediately
+after its clause condition succeeds. delete() around509 invokes inside before
+removing the parent. Production real-container destruction now uses
+RW_InitializeHasBirths to follow that sequence: later clauses see initialized
+earlier products, the current parent remains a witness during its births, and
+completed parents are absent from subsequent parents' queries for serial phases.
+blocks.lua handledels(...,true), around1927, pre-runs every parent's inside()
+before any removal for WEAK, MELT and EAT. Those phases preserve all parents as
+witnesses throughout the birth pass; a terminal prefix removes none of them.
+Frozen rules remain unchanged throughout; no earlier contact phase is rerun.
+
+The initialized stream returns completed parent IDs alongside a limit prefix.
+Contact planning uses those IDs directly, including a zero-product prefix, so a
+terminal query/status failure retains the triggering parent and removes only
+previously completed parents. Movement death frames use the same per-parent
+stream through the native Invoke bridge. Ordinary errors still reject all work;
+whole-tree Undo restores deletion, births, statuses and allocation together.
+The flat RW_PlanHasBirths diagnostic API remains available to legacy adapters.
+
+tests/has_sequence.lua covers clause order, ON/WITHOUT, repeated/Text products,
+BROKEN newborn witnesses, completed-parent removal, zero/nonzero limit prefixes,
+both adapter paths and Undo. The installed inside() dispatch oracle now covers
+162 combined real/EMPTY clause combinations. Exact HAS ALL/createall behavior
+and real None-direction randomization remain documented separate gaps.

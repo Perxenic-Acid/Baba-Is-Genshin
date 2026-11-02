@@ -361,5 +361,6 @@ dispatch/creation sequencing rather than claiming a new condition-engine oracle.
 Full regression and catalog/layout audits pass; native startup remains 1,980,000
 offline instructions. Native success is not inferred from these checks.
 
-Real-container within-parent HAS clause sequencing and exact HAS ALL/createall
-remain separate gaps, along with the prior EMPTY scope notes.
+M9.8V subsequently adds real-container within-parent HAS clause sequencing; see
+[CONTACT_WORDS.md](CONTACT_WORDS.md). Exact HAS ALL/createall and the prior EMPTY
+scope notes remain separate gaps.

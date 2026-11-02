@@ -3013,6 +3013,44 @@ function RW_InitializeEmptyHasBirths(world,cells,relations,rules,back_count)
     return products,nil,nil,random_metadata()
 end
 
+-- Each parent remains present during inside(); remove it from the query frame
+-- only after its last clause. Completed parent IDs locate terminal prefixes.
+function RW_InitializeHasBirths(world,victims,relations,rules,back_count,simultaneous)
+    local valid,why=RW_PlanHasBirths(world,{},relations)
+    if not valid or not dense_list(victims) then return nil,why or "invalid_has_input" end
+    valid,why=RW_InitializeBirthSpecifications(world,{},rules,back_count)
+    if not valid then return nil,why end
+    local seen={}
+    for _,id in ipairs(victims) do
+        if not world.entities[id] or seen[id] then return nil,"invalid_has_victim" end
+        seen[id]=true
+    end
+    local context={};for k,v in pairs(world) do context[k]=v end
+    context.entities={};for id,entity in pairs(world.entities) do context.entities[id]=entity end
+    local products,completed={},{}
+    local function failure(reason)
+        if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then return nil,reason,products,completed end
+        return nil,reason
+    end
+    for _,id in ipairs(victims) do
+        for _,relation in ipairs(relations) do
+            local selected,why=RW_PlanHasBirths(context,{id},{relation})
+            if not selected then return failure(why) end
+            local initialized,why,prefix=RW_InitializeBirthSpecifications(context,selected,rules,back_count)
+            if not initialized and not prefix then return failure(why) end
+            for _,spec in ipairs(initialized or prefix) do
+                products[#products+1]=spec
+                local entity={};for k,v in pairs(spec) do entity[k]=v end
+                entity.id=world.next_entity_id+#products-1;context.entities[entity.id]=entity
+                context.next_entity_id=entity.id+1
+            end
+            if not initialized then return failure(why) end
+        end
+        if not simultaneous then context.entities[id]=nil;completed[#completed+1]=id end
+    end
+    return products,nil,nil,completed
+end
+
 -- levelblock() compares floating(real,2,victim_x,victim_y): the virtual layer
 -- is queried at the victim, even though the BOOM source is another vacant cell.
 function RW_ResolveEmptyBoom(world,projected,rules)

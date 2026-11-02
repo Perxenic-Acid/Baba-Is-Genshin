@@ -131,6 +131,13 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
             for _,spec in ipairs(born) do specifications[#specifications+1]=spec end
             if terminal then break end
         end
+    elseif services.initialized_births then
+        local prefix,completed
+        specifications,err,prefix,completed=services.initialized_births(world,ids,real_contents,rules,back_count,kind)
+        if not specifications then
+            if not prefix or not completed or not is_limit(err) then return nil,err end
+            specifications=prefix;removed_ids=completed;terminal=err
+        end
     else
         local prefix
         specifications,err,prefix=services.births(world,ids,real_contents,rules,back_count)
@@ -2000,10 +2007,11 @@ local function start(run_self_tests)
         initialize=function(w,p,r,c) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r,c) end,
         victims=function(world,kind) return properties_api:Invoke("RW_ResolveContactVictims",world,kind) end,
         birth_products=function(world,ids,contents) return rules_api:Invoke("RW_PlanHasBirths",world,ids,contents) end,
+        initialized_births=function(w,ids,c,r,n,kind)
+            return rules_api:Invoke("RW_InitializeHasBirths",w,ids,c,r,n,kind=="weak" or kind=="melt" or kind=="eat")
+        end,
         births=function(world,ids,contents,rules,count)
-            local products,why=rules_api:Invoke("RW_PlanHasBirths",world,ids,contents)
-            if not products then return nil,why end
-            return rules_api:Invoke("RW_InitializeBirthSpecifications",world,products,rules,count)
+            return rules_api:Invoke("RW_InitializeHasBirths",world,ids,contents,rules,count)
         end,
         delete=function(world,ids) return world_api:Invoke("RW_PlanDelete",world,ids) end,
         create=function(world,specifications) return world_api:Invoke("RW_PlanCreate",world,specifications) end

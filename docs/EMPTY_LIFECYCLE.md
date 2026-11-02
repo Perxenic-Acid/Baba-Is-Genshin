@@ -468,3 +468,19 @@ dispatch oracle, not a replacement for the condition/collision oracles. Turn
 tests cover a stacked real follower, a recursive chain, STILL, pure planning,
 positive Commit and Undo. Virtual trailing PULL chains, pulling-source SWAP,
 exact native queued-collision timing and lazy per-impulse queries remain gaps.
+
+## M9.9F virtual trailing PULL chain dispatch
+
+Installed movement.lua check(), around1157–1186, reports movable EMPTY PULL
+cells to the backward scan; dopush(), around1475, recursively continues through
+them without allocating units. The solver now traverses contiguous eligible
+vacancies behind successful real/anonymous movers and dispatches real PULL tails
+through the existing rollback-isolated solver. The scan is iterative, bounded by
+board geometry, and respects per-cell STILL/directional locks and counted REVERSE.
+It does not filter by FLOAT/SLEEP or persist synthetic IDs/departure flags.
+
+The installed dopush dispatch oracle adds 56 four-axis/length/interior-STILL
+cases with isolated check() eligibility. Turn tests add conditional interior
+STILL, real-tail displacement, no allocation and Undo. This closes backward
+dispatch only: virtual pulling-source SWAP, forward collision side effects during
+native virtual dopush, and exact queued-collision timing remain documented gaps.

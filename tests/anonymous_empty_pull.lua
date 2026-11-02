@@ -37,3 +37,32 @@ for _,axis in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do for mask=0,31 do
  count=count+1
 end end
 print('PASS: installed anonymous EMPTY trailing real PULL dispatch, four axes, STILL/SLEEP/FLOAT/WEAK/SAFE ('..count..' cases)')
+local chains=0
+for _,axis in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do for length=1,4 do for locked=0,length do
+ local dx,dy=axis[1],axis[2]
+ local cells={};for distance=1,length do
+  local x,y=6-distance*dx,6-distance*dy
+  cells[x..':'..y]={x=x,y=y,behaviors={pull=true,still=distance==locked}}
+ end
+ unit={values={x=6-(length+1)*dx,y=6-(length+1)*dy}}
+ env.check=function(id,x,y,_,pulling)
+  if not pulling then return {0},{0},{} end
+  if id==200 then return {0},{0},{} end
+  local key=(x-dx)..':'..(y-dy);local cell=cells[key]
+  if cell then return {cell.behaviors.still and 1 or 2},{2},{} end
+  return {200},{200},{}
+ end
+ env.movemap={};env.pushedunits={};env.movelist={};env.HACK_MOVES=0
+ assert(env.dopush(2,dx,dy,0,false,6,6,'you',100)==0)
+ local expected=false;for _,move in ipairs(env.movelist) do if move[1]==200 then expected=true end end
+ local w={width=12,height=12,entities={
+  [1]={id=1,x=6,y=6,direction='Mid',behaviors={}},
+  [2]={id=2,x=unit.values.x,y=unit.values.y,direction='Up',behaviors={pull=true}}},empty_cells=cells}
+ local plan=assert(RW_ResolveMovement(w,{type='move',entity_id=1,dx=dx,dy=dy}))
+ local pulled;for _,op in ipairs(plan.changes) do if op.entity_id==2 then pulled=op end;assert(op.entity_id>0) end
+ assert((pulled~=nil)==expected,length..':'..locked..' virtual chain')
+ if pulled then assert(pulled.to.x==unit.values.x+dx and pulled.to.y==unit.values.y+dy) end
+ assert(#(plan.destructions or {})==0 and not w.empty_departures)
+ chains=chains+1
+end end end
+print('PASS: installed EMPTY PULL chain dispatch to real tails, four axes, lengths and interior STILL ('..chains..' cases)')

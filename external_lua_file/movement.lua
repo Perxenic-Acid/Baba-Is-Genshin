@@ -267,6 +267,41 @@ function RW_ResolveMovement(world, action)
         if empty.block_entry or empty.pull then return "stop" end
     end
     local try_move,attempt_move
+    local function pull_empty_tail(x,y)
+        if action.falling then return end
+        local tx,ty=x-dx,y-dy
+        local traversed=false
+        while get_environment(world,tx,ty)~="edge" do
+            local empty,cell=empty_at(tx,ty)
+            if not empty then break end
+            local count=cell and cell.trait_counts and cell.trait_counts.reverse or (empty.reverse and 1 or 0)
+            local qx,qy=dx,dy;if count%2==1 then qx,qy=-qx,-qy end
+            local lock=qx==1 and "lockedright" or qx==-1 and "lockedleft" or qy==-1 and "lockedup" or "lockeddown"
+            if not empty.pull or empty.still or empty[lock] then return end
+            traversed=true;tx,ty=tx-dx,ty-dy
+        end
+        if not traversed then return end
+        local followers={}
+        for id,other in pairs(world.entities) do
+            if id>0 and not planned[id] and not removed[id] and not visiting[id]
+                and other.x==tx and other.y==ty and has_capability(world,other,"pull") then followers[#followers+1]=id end
+        end
+        table.sort(followers)
+        for _,id in ipairs(followers) do
+            local old_planned,old_removed,old_visiting={},{},{}
+            for k,v in pairs(planned) do old_planned[k]=v end
+            for k,v in pairs(removed) do old_removed[k]=v end
+            for k,v in pairs(visiting) do old_visiting[k]=v end
+            local change_count,death_count=#changes,#destructions
+            local key=(tx+dx)..":"..(ty+dy);local previous=empty_departures[key];empty_departures[key]=true
+            local ok=try_move(id,true);empty_departures[key]=previous
+            if not ok then
+                planned,removed,visiting=old_planned,old_removed,old_visiting
+                while #changes>change_count do table.remove(changes) end
+                while #destructions>death_count do table.remove(destructions) end
+            end
+        end
+    end
     local push_empty
     local function attempt_empty_push(x,y,pulling)
         local nx,ny=x+dx,y+dy
@@ -365,6 +400,7 @@ function RW_ResolveMovement(world, action)
             end
         end
         empty_departures[departure_key]=previous_departure
+        pull_empty_tail(x,y)
         return true
     end
     push_empty=function(x,y,pulling)
@@ -523,6 +559,7 @@ function RW_ResolveMovement(world, action)
         }
 
         -- A failed trailing pull never cancels an already successful mover.
+        pull_empty_tail(entity.x,entity.y)
         local followers={}
         for other_id,other in pairs(world.entities) do
             if other_id > 0 and not action.falling and not planned[other_id] and not removed[other_id] and other.x==entity.x-dx and other.y==entity.y-dy

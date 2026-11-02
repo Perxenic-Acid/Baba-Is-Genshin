@@ -520,3 +520,20 @@ Undo. The user-required no-shatter rule for blocked pulled WEAK remains: unlike
 the isolated native dopush weak branch, this trial does not add blocked-source
 WEAK destruction. Exact queued-collision timing, virtual forward PUSH recursion
 under pulling context and the prior scope notes still require further work.
+
+## M9.9I recursive virtual PUSH/PULL dispatch audit
+
+The installed dopush oracle now also lets each eligible backward EMPTY PULL
+cell carry PUSH. Its forward check reports the next virtual PUSH dependency,
+including blocked interior STILL cells, so the original recursive functions
+exercise forward re-entry into earlier cells rather than a clear-forward stub.
+The matrix grows from 56 to 112 four-axis/length/interior-block cases. Existing
+solver behavior matches real-tail dispatch without duplicate real movement or
+persisted virtual state; native runs remain below their move guard. No gameplay
+change was necessary for this matrix.
+
+This verifies the nominal recursive virtual PUSH/PULL dispatch gap from M9.9H.
+The oracle still isolates check() classification, already tested separately;
+it does not prove native update-queue collision/dodge timing, moving real pusher
+re-entry or destruction/HAS timing across all mixed recursive dependencies.
+Those remain semantic work, rather than being declared complete by this audit.

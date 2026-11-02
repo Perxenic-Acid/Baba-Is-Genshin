@@ -20,6 +20,7 @@ for _,axis in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do for mask=0,31 do
  eligible=not traits.still;unit={values={x=6-dx,y=6-dy}}
  env.movemap={};env.pushedunits={};env.movelist={};env.HACK_MOVES=0
  assert(env.dopush(2,dx,dy,0,false,6,6,'you',100)==0)
+ assert(env.HACK_MOVES<10000,'native recursive chain exhausted move guard')
  local native_pulled=false;for _,move in ipairs(env.movelist) do if move[1]==200 then native_pulled=true end end
  local behavior={pull=true};for k,v in pairs(traits) do behavior[k]=v end
  local w={width=12,height=12,entities={
@@ -38,15 +39,19 @@ for _,axis in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do for mask=0,31 do
 end end
 print('PASS: installed anonymous EMPTY trailing real PULL dispatch, four axes, STILL/SLEEP/FLOAT/WEAK/SAFE ('..count..' cases)')
 local chains=0
-for _,axis in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do for length=1,4 do for locked=0,length do
+for _,axis in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do for length=1,4 do for locked=0,length do for pushing=0,1 do
  local dx,dy=axis[1],axis[2]
  local cells={};for distance=1,length do
   local x,y=6-distance*dx,6-distance*dy
-  cells[x..':'..y]={x=x,y=y,behaviors={pull=true,still=distance==locked}}
+  cells[x..':'..y]={x=x,y=y,behaviors={pull=true,push=pushing==1,still=distance==locked}}
  end
  unit={values={x=6-(length+1)*dx,y=6-(length+1)*dy}}
  env.check=function(id,x,y,_,pulling)
-  if not pulling then return {0},{0},{} end
+  if not pulling then
+   local cell=cells[(x+dx)..':'..(y+dy)]
+   if cell and cell.behaviors.push then return {cell.behaviors.still and 1 or 2},{2},{} end
+   return {0},{0},{}
+  end
   if id==200 then return {0},{0},{} end
   local key=(x-dx)..':'..(y-dy);local cell=cells[key]
   if cell then return {cell.behaviors.still and 1 or 2},{2},{} end
@@ -54,6 +59,7 @@ for _,axis in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do for length=1,4 do for locke
  end
  env.movemap={};env.pushedunits={};env.movelist={};env.HACK_MOVES=0
  assert(env.dopush(2,dx,dy,0,false,6,6,'you',100)==0)
+ assert(env.HACK_MOVES<10000,'native recursive chain exhausted move guard')
  local expected=false;for _,move in ipairs(env.movelist) do if move[1]==200 then expected=true end end
  local w={width=12,height=12,entities={
   [1]={id=1,x=6,y=6,direction='Mid',behaviors={}},
@@ -63,6 +69,7 @@ for _,axis in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do for length=1,4 do for locke
  assert((pulled~=nil)==expected,length..':'..locked..' virtual chain')
  if pulled then assert(pulled.to.x==unit.values.x+dx and pulled.to.y==unit.values.y+dy) end
  assert(#(plan.destructions or {})==0 and not w.empty_departures)
+ local seen={};for _,op in ipairs(plan.changes) do assert(not seen[op.entity_id],'duplicate real movement');seen[op.entity_id]=true end
  chains=chains+1
-end end end
-print('PASS: installed EMPTY PULL chain dispatch to real tails, four axes, lengths and interior STILL ('..chains..' cases)')
+end end end end
+print('PASS: installed EMPTY PULL/PUSH recursive chain dispatch to real tails, four axes, lengths and interior STILL ('..chains..' cases)')

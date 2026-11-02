@@ -416,3 +416,19 @@ real-target check/move oracle now covers 12,288 real/controlled/anonymous source
 cases; the anonymous-to-EMPTY oracle covers 2,048 virtual target cases. Complete
 passive SWAP/PULL/WEAK solidity parity, lazy per-impulse querying and prior scope
 notes remain gaps rather than being inferred from these matrices.
+
+## M9.9C anonymous EMPTY versus real WEAK solidity
+
+Installed movement.lua check(), around1041–1098, excludes same-layer WEAK
+from real STOP/PULL solidity independently of SAFE. An immobilized PUSH first
+becomes STOP and receives the same exclusion. Anonymous EMPTY now follows this
+classification rather than treating every real STOP as solid. Mobile PUSH still
+uses the dependency solver, including blocked unsafe WEAK destruction. Bare
+PULL blocks forward entry. Virtual movers do not execute real-target WEAK
+deletion during movement; later ordinary contacts retain their existing phase.
+
+tests/reference_anonymous_empty_solidity.lua executes the installed classification
+fragment for 256 STOP/PULL/PUSH/WEAK/SAFE/FLOAT/STILL combinations against a wall.
+The turn integration suite checks same-layer unsafe/SAFE passage and different-layer
+blocking with Commit/Undo. Complete passive SWAP/PULL dispatch, FALL distinctions
+and lazy per-impulse querying remain separate gaps.

@@ -54,6 +54,17 @@ s.world.entities[3]={id=3,kind='object',class='object',archetype='wall',x=6,y=3,
 n=run(s);assert(n.world.entities[1].x==4 and n.world.entities[2] and n.world.next_entity_id==s.world.next_entity_id)
 s=fixture({{'EMPTY','FACING','ROCK','IS','PHANTOM'}});n=run(s)
 assert(n.world.entities[1].x==5 and n.world.entities[2] and n.world.next_entity_id==s.world.next_entity_id)
+-- Same-layer WEAK removes front solidity even when SAFE. Virtual movement
+-- does not kill the real target; the later ordinary contact phase still does.
+for _,safe in ipairs({false,true}) do
+ local extra={{'ROCK','IS','WEAK'}}
+ if safe then extra[#extra+1]={'ROCK','IS','SAFE'} end
+ s=fixture(extra);n=run(s)
+ assert(n.world.entities[1].x==5 and n.world.entities[2])
+ assert(n.world.next_entity_id==s.world.next_entity_id)
+end
+s=fixture({{'ROCK','IS','WEAK'},{'ROCK','IS','FLOAT'}});n=run(s)
+assert(n.world.entities[1].x==4 and n.world.entities[2])
 -- Anonymous virtual-target dispatch preserves EAT-before-lock and never
 -- promotes its string-local source key into an entity or operation ID.
 for _,source_safe in ipairs({false,true}) do for _,target_safe in ipairs({false,true}) do

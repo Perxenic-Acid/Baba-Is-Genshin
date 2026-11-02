@@ -296,9 +296,14 @@ function RW_ResolveMovement(world, action)
                     if unlock then specials[#specials+1]={id=id,kind="unlock"} end
                     if eat then specials[#specials+1]={id=id,kind="eat"} end
                 elseif phantom then
+                elseif has_capability(world,other,"weak") and same_layer(world,source,other)
+                    and (not has_capability(world,other,"push") or immobile(world,other,dx,dy)) then
+                    -- check() removes STOP/PULL solidity for same-layer WEAK,
+                    -- even SAFE or immobilized PUSH. Virtual movers do not
+                    -- execute the real-target WEAK deletion special.
                 elseif has_capability(world,other,"push") then
                     local ok,err=try_move(id); if not ok then return false,err end
-                elseif has_capability(world,other,"block_entry") then return false,"blocked_by_entity" end
+                elseif has_capability(world,other,"block_entry") or has_capability(world,other,"pull") then return false,"blocked_by_entity" end
             end
         end
         local gone=false

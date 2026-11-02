@@ -189,9 +189,14 @@ function RW_ResolveMovement(world, action)
     local planned,removed,destructions = {},{},{}
     local visiting = {}
     local changes = {}
+    local destroy_empty
     local function destroy(id,direction,cause)
         if removed[id] then return end
         local entity=world.entities[id]
+        if entity.class=="empty" then
+            destroy_empty(entity.x,entity.y,cause or "unlock",id,direction or entity.direction or "None")
+            removed[id]=true;planned[id]=true;return
+        end
         local frame={}
         for other_id,other in pairs(world.entities) do
             if other_id > 0 and not removed[other_id] then
@@ -205,15 +210,17 @@ function RW_ResolveMovement(world, action)
         destructions[#destructions+1]={entity_id=id,x=entity.x,y=entity.y,
             direction=dying.direction,cause=cause or "unlock",frame=frame}
     end
-    local function destroy_empty(x,y,cause)
+    destroy_empty=function(x,y,cause,proxy_id,direction)
         local key="empty:"..x..":"..y
-        if removed[key] or world.empty_deleted and world.empty_deleted[x..":"..y] then return end
+        local already=removed[key] or world.empty_deleted and world.empty_deleted[x..":"..y]
+        if already and not proxy_id then return end
         local frame={}
         for id,entity in pairs(world.entities) do if id>0 and not removed[id] then
             local copy={};for k,v in pairs(entity) do copy[k]=v end;frame[id]=copy
         end end
         removed[key]=true
-        destructions[#destructions+1]={entity_id=key,class="empty",x=x,y=y,cause=cause,frame=frame}
+        destructions[#destructions+1]={entity_id=proxy_id or key,class="empty",x=x,y=y,direction=direction or "None",
+            cause=cause,frame=frame,skip_inside=already and true or nil}
     end
 
     local function empty_at(x,y)
@@ -229,7 +236,7 @@ function RW_ResolveMovement(world, action)
         local same=(empty.float==true)==has_capability(world,source,"float")
         local weak=not pulling and empty.weak and not empty.safe and same
         local partner=has_capability(world,source,"open") and "shut" or has_capability(world,source,"shut") and "open"
-        local unlock=not pulling and source.id and source.id>0 and partner and empty[partner] and same
+        local unlock=not pulling and source.id and source.id~=0 and partner and empty[partner] and same
             and (not empty.safe or not has_capability(world,source,"safe"))
         local eat=not pulling and source.id and source.id>0 and world.empty_eaters and world.empty_eaters[source.id]
             and not empty.safe and same
@@ -323,7 +330,7 @@ function RW_ResolveMovement(world, action)
 
                 local target_swap=has_capability(world,other,"swap") and not immobile(world,other,dx,dy)
                 local mover_swap=has_capability(world,entity,"swap")
-                if not phantom and partner and id > 0 and other_id > 0 and same_layer(world,entity,other) and has_capability(world,other,partner)
+                if not phantom and partner and (id > 0 or entity.class=="empty") and other_id > 0 and same_layer(world,entity,other) and has_capability(world,other,partner)
                     and (not has_capability(world,entity,"safe") or not has_capability(world,other,"safe")) then
                     locks[#locks+1]=other_id -- Unlock takes precedence over PUSH/STOP.
                 elseif action.falling and not phantom and same_layer(world,entity,other)
@@ -451,7 +458,8 @@ function RW_ResolveMovement(world, action)
         end
         for _,death in ipairs(destructions) do
             if death.entity_id==action.entity_id then
-                death.direction=intent_direction;death.frame[action.entity_id].direction=intent_direction
+                death.direction=intent_direction
+                if death.frame[action.entity_id] then death.frame[action.entity_id].direction=intent_direction end
             end
         end
     end

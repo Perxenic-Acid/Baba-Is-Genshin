@@ -198,3 +198,38 @@ for _,text in ipairs({false,true}) do
  n=run(s);assert(n.world.entities[1].x==4 and n.world.entities[3].x==5 and n.world.entities[s.world.next_entity_id].x==5)
 end
 print('PASS: EMPTY EAT conditions refresh between YOU/automatic phases, and passive Object/Text PUSH participants eat independently')
+
+-- A YOU EMPTY proxy may unlock a real unit; only cell HAS is persisted for it.
+for _,case in ipairs({{false,false},{true,false},{false,true},{true,true}}) do
+ local source_safe,target_safe=case[1],case[2]
+ local traits={'YOU','OPEN'};if source_safe then traits[#traits+1]='SAFE' end
+ local extra={{'ROCK','IS','SHUT'},{'ROCK','IS','STOP'},{'ROCK','HAS','AVATAR'}}
+ if target_safe then extra[#extra+1]={'ROCK','IS','SAFE'} end
+ s=fixture(traits,extra)
+ for id,e in pairs(s.world.entities) do if e.class=='text' and e.y==8 then s.world.entities[id]=nil end end
+ n=run(s);local base=s.world.next_entity_id
+ assert(n.world.entities[1].x==4)
+ if source_safe and target_safe then assert(n.world.entities[2] and n.world.next_entity_id==base)
+ elseif source_safe then assert(not n.world.entities[2] and n.world.entities[base].archetype=='avatar' and n.world.entities[base].x==6)
+ elseif target_safe then assert(n.world.entities[2] and n.world.entities[base].archetype=='flag' and n.world.entities[base].x==5)
+ else
+  assert(not n.world.entities[2] and n.world.entities[base].archetype=='avatar' and n.world.entities[base].x==6)
+  assert(n.world.entities[base+1].archetype=='flag' and n.world.entities[base+1].x==5)
+ end
+ for id,e in pairs(n.world.entities) do assert(type(id)=='number' and id>0 and e.class~='empty') end
+end
+print('PASS: virtual YOU EMPTY unlocks real units with independent SAFE, ordered real/cell HAS, positive-only Commit and Undo')
+
+-- Automatic/Fear adapters retire virtual movers while retaining their cell deaths.
+services.automatic=function(w,r,raw) return RW_ResolveAutomatic(w,assert(RW_CollectEmptyMotionDirections(w,raw))) end
+s=fixture({'MOVE','OPEN'},{{'ROCK','IS','SHUT'},{'ROCK','IS','STOP'},{'ROCK','HAS','AVATAR'}})
+for id,e in pairs(s.world.entities) do if e.class=='text' and e.y==8 then s.world.entities[id]=nil end end
+n=run(s,{type='wait'});assert(not n.world.entities[2] and n.world.next_entity_id==s.world.next_entity_id+2)
+services.automatic=nil;services.fear=function(w,r,raw) return RW_ResolveFear(w,assert(RW_ResolveFearTargets(w,r,raw))) end
+s=fixture({'OPEN'},{{'EMPTY','FACING','ROCK','FEAR','ROCK'},{'FLAG','IS','SHUT'},{'FLAG','IS','STOP'},{'FLAG','HAS','AVATAR'}})
+for id,e in pairs(s.world.entities) do if e.class=='text' and e.y==8 then s.world.entities[id]=nil end end
+s.world.entities[1].archetype='flag'
+n=run(s,{type='wait'});assert(not n.world.entities[1] and n.world.next_entity_id==s.world.next_entity_id+2)
+assert(n.world.entities[s.world.next_entity_id].x==4 and n.world.entities[s.world.next_entity_id+1].x==5)
+services.fear=nil
+print('PASS: automatic/FEAR virtual unlock retirement, ordered real/cell HAS and positive-only Undo')

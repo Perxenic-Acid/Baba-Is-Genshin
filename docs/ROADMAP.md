@@ -1238,3 +1238,11 @@ bare vacancies and passive Object/Text PUSH, SAFE/FLOAT/PHANTOM, source-origin
 conditions and EAT-before-unlock/WEAK cell HAS. Compiled turn tests and 32,768
 installed check/move combinations validate the path. Per-impulse lazy query
 ordering and virtual sources remain documented in EMPTY_LIFECYCLE.md.
+
+## M9.8S — virtual EMPTY mover unlock
+
+Allow collected virtual movers to unlock real targets or vacancies, retaining
+independent SAFE/FLOAT and target/source HAS order. Retire already-deleted source
+proxies without repeated inside()/RNG. Test YOU/automatic/FEAR plus pure
+projection/Commit/Undo, and 32,768 installed virtual check/move/cache cases.
+Anonymous EMPTY pushing and remaining gaps stay in EMPTY_LIFECYCLE.md.

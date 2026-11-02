@@ -110,7 +110,8 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
             context.next_entity_id=world.next_entity_id+#specifications
             context.random_state=state
             local born,why,prefix
-            if death.class=="empty" then
+            if death.class=="empty" and death.skip_inside then born={}
+            elseif death.class=="empty" then
                 if not services.empty_products or not services.initialize then return nil,"missing_empty_birth_services" end
                 local products,problem,random=services.empty_products(context,{{x=death.x,y=death.y}},contents,rules)
                 if random then state=random.to end

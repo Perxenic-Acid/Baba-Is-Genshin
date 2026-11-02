@@ -276,3 +276,31 @@ capabilities. Conditions do not re-query after each impulse within one solver;
 inert-source eager query/limit ordering is normalized rather than a complete
 native lazy-dispatch match. Virtual EMPTY/LEVEL EAT sources, virtual-vs-virtual
 unlock, dynamic intermediate vacancy conditions, and prior lifecycle gaps remain.
+
+## M9.8S virtual EMPTY mover unlock retirement
+
+Installed check/move uses unitid=2 for virtual movers as well as EMPTY targets.
+The lock branch independently calls delete for target and source coordinates,
+then marks that movement intention gone. tools.lua delete's coordinate guard
+skips inside() for an already-deleted source, but move still retires its intention.
+Unlike EMPTY WEAK's special, lock is not restricted to real movers.
+
+The common solver now permits typed EMPTY agents to unlock real targets and other
+vacancies. Source destruction records carry the temporary proxy ID only inside
+motion diagnostics; phase adapters retire it and pass only coordinates to cell
+HAS. Commit changes remain positive real IDs. A skip_inside marker retires an
+already-deleted source without repeating HAS or its direction draw. Target-first
+mixed real/cell ordering, independent SAFE/FLOAT, source frames and atomic
+allocation/status/terminal adapters remain shared with M9.8P/Q.
+
+Compiled turn tests cover EMPTY YOU versus real targets' four SAFE combinations,
+ordered real/cell births, automatic and FEAR agent retirement, and Undo. Direct
+projection/transaction cases cover virtual-to-virtual target/source births and
+all prior-deletion cache combinations, including zero births/RNG. The installed
+check/move virtual oracle tests 32,768 solidity/partner/SAFE/FLOAT/cache cases and
+preserves the separate no-EMPTY-WEAK-delete rule for virtual movers.
+
+Still pending: anonymous recursive EMPTY PUSH-chain unlock (as distinct from a
+collected moving agent), failed virtual WEAK movers, EMPTY/LEVEL EAT predicates,
+per-impulse dynamic querying, exact HAS ALL/createall and earlier scope notes.
+No proxy is promoted into an authored or persisted EMPTY entity.

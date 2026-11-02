@@ -1145,3 +1145,11 @@ agents, independent duplicate origins, native shared collection-slot suppression
 pure RNG and real dependency destruction/HAS. Transaction tests and 720 installed
 collection/state-0 comparisons cover dispatch. Global conditional declaration slot
 holes, native scheduling and virtual lifecycle remain explicit gaps; see EMPTY_MOTION.md.
+
+## M9.8H — global EMPTY collection slots
+
+Retain MOVE/AUTO/CHILL declaration positions through projection, including real
+matches and nonmatching EMPTY placeholders. Resolve cross-property suppression
+across all vacancies, not independently per cell. Whole-turn RNG/Undo tests and
+4,096 additional installed collection cases close the conditional slot-hole gap
+from M9.8G within the engine's current declaration order; see EMPTY_MOTION.md.

@@ -61,7 +61,7 @@ Tests/reference_empty_automatic.lua executes installed collection and state-0
 code for 720 count/direction/SLEEP/STILL cases. This is a collection/dispatch
 oracle, not a complete native collision-state-machine oracle.
 
-Remaining gaps: projection retains per-cell property counts rather than global
+At M9.8G, projection retained per-cell property counts rather than global
 physical declaration slot indices. Conditional declarations matching different
 vacancies can therefore merge cross-property slots differently from native.
 Task order is normalized by real identity then vacancy y/x, rather than native
@@ -69,3 +69,27 @@ mutable lists. Virtual EMPTY destruction/HAS, source-specific special contacts,
 scoped automatic motion and exact multi-agent collision scheduling remain pending.
 The project's intentional virtual LEVEL HOLD exemption still applies. Random
 numbers use the project's transactional stream, not native fixedrandom values.
+
+## M9.8H global conditional collection slots
+
+Installed features.lua findallfeature:245 appends each matching real unit to the
+same list as one placeholder per valid EMPTY declaration, even when its vacancy
+set is empty. movement.lua seen codes refer to those global positions. Projection
+now retains per-cell motion_slots for MOVE/AUTO/CHILL, counting real matches and
+inactive EMPTY placeholders. Fully unconditional denied EMPTY declarations are
+excluded. Ordinary projection trait_counts remain unchanged.
+
+Automatic collection resolves seen slots globally across all eligible vacancies
+before proceeding to the next property. SLEEP/STILL-filtered cells do not consume
+a seen code. This fixes later CHILL at another cell being incorrectly emitted,
+and preserves later CHILL when an earlier property's slot was shifted by a real
+match or a nonmatching EMPTY declaration. These are transient projection records,
+not persisted world schema, and rendering has no role in their calculation.
+
+The installed collection/state-0 oracle adds all 4,096 combinations of two slots,
+two vacancies and three properties. Whole-turn tests exercise real offsets,
+nonmatching placeholders, cross-vacancy suppression, RNG and Undo. The earlier
+per-cell-slot gap is resolved within the engine's declaration order. Native
+mutable feature/unit-list ordering, exceptional malformed/negative rule rewriting
+and complete multi-agent collision scheduling remain separate parity boundaries.
+Virtual destruction/HAS and other lifecycle gaps listed above remain pending.

@@ -1040,14 +1040,6 @@ function RW_ResolveAutomatic(world,empty_directions)
         local total=0
         if id<0 then
             empty_tasks[id]={}
-            if not has_capability(world,entity,"sleep") and not has_capability(world,entity,"still") then
-                local moves,autos,chills=count("move"),count("auto"),count("chill")
-                for slot=1,math.max(moves,autos,chills) do
-                    local m,a=slot<=moves and 1 or 0,slot<=autos and 1 or 0
-                    empty_tasks[id][#empty_tasks[id]+1]={count=1,direction=entity.direction,
-                        reason=m>0 and "move" or a>0 and "auto" or "chill",x=entity.x,y=entity.y}
-                end
-            end
         elseif not has_capability(world,entity,"sleep") then
             local v=vectors[entity.direction]
             if v and not intent_immobile(working,entity,v[1],v[2]) then
@@ -1065,6 +1057,29 @@ function RW_ResolveAutomatic(world,empty_directions)
             end
         end
         autonomous[id]=total
+    end
+    -- EMPTY seen codes belong to the whole property list, not to one vacancy.
+    -- An earlier slot with any eligible cell suppresses that slot everywhere in
+    -- later properties, while an entirely filtered/empty slot consumes no code.
+    local seen_empty={}
+    for _,trait in ipairs({"move","auto","chill"}) do
+        local collected={}
+        for index,item in ipairs(cells) do
+            local id=-index;local entity=working.entities[id]
+            if not has_capability(world,entity,"sleep") and not has_capability(world,entity,"still") then
+                local slots=item.cell.motion_slots and item.cell.motion_slots[trait]
+                if not item.cell.motion_slots then
+                    slots={}
+                    for slot=1,(working.trait_counts[id][trait] or (entity.behaviors[trait] and 1 or 0)) do slots[#slots+1]=slot end
+                end
+                for _,slot in ipairs(slots or {}) do if not seen_empty[slot] then
+                    empty_tasks[id][#empty_tasks[id]+1]={count=1,direction=entity.direction,
+                        reason=trait,x=entity.x,y=entity.y}
+                    collected[slot]=true
+                end end
+            end
+        end
+        for slot in pairs(collected) do seen_empty[slot]=true end
     end
     local deaths,records={},{}
     local function apply(part)

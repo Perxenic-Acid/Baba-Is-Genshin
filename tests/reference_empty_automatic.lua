@@ -44,3 +44,33 @@ for mask=0,3 do
  cases=cases+1
 end end end end end
 print('PASS: installed EMPTY collection slot merging/origins, MOVE/AUTO/CHILL state-0 RNG and SLEEP/STILL ('..cases..' cases)')
+-- Conditional holes: two declarations may independently match either vacancy.
+-- Preserve globally shared slots, including empty lists and different cells.
+local holecases=0
+for pattern=0,4095 do
+ local bits=pattern;local specifications={};local cells={}
+ for i=1,2 do cells[i]={x=8,y=6+i*2,behaviors={},trait_counts={},motion_slots={}} end
+ for _,trait in ipairs({'move','auto','chill'}) do
+  local empties={}
+  for slot=1,2 do
+   local mask=bits%4;bits=math.floor(bits/4);empties[slot]={}
+   for i,cell in ipairs(cells) do if math.floor(mask/2^(i-1))%2==1 then
+    empties[slot][cell.x+cell.y*18]=true;cell.behaviors[trait]=true
+    cell.trait_counts[trait]=(cell.trait_counts[trait] or 0)+1
+    cell.motion_slots[trait]=cell.motion_slots[trait] or {};table.insert(cell.motion_slots[trait],slot)
+   end end
+  end
+  specifications[#specifications+1]={trait=trait,empty=empties}
+ end
+ sleep=false;still=false;direction=4;state=17
+ local list,seen={dir=4},{}
+ for _,spec in ipairs(specifications) do list,seen=env.add_moving_units(spec.trait,{2,2},list,seen,spec.empty) end
+ for _,node in ipairs(list) do state0(node) end
+ local w={width=18,height=18,entities={},random_state=17,empty_cells={}}
+ for _,cell in ipairs(cells) do w.empty_cells[cell.x..':'..cell.y]=cell end
+ local p=RW_ResolveAutomatic(w)
+ assert((p.random_state and p.random_state.to or 17)==state,'global EMPTY slot holes:'..pattern)
+ assert(#p.changes==0 and #p.destructions==0)
+ holecases=holecases+1
+end
+print('PASS: installed EMPTY global conditional slot holes across two vacancies ('..holecases..' cases)')

@@ -88,3 +88,15 @@ plan.stages[#plan.stages+1]={name='bad_late',plan={consumes_turn=true,changes={{
 plan.changes[#plan.changes+1]=plan.stages[#plan.stages].plan.changes[1]
 same,status=RW_Commit(s,plan);assert(not status.accepted and same==s and s.world.random_state==4)
 print('PASS: EMPTY MOVE/AUTO/CHILL/nudges, counts/direction/FOLLOW/reversal/locks/REVERSE, real WEAK/HAS, pure RNG, positive-only plans and Undo')
+-- Global slots include real matches and EMPTY placeholders with no active cells.
+for _,first in ipairs({{'ROCK','IS','MOVE'},{'EMPTY','ON','ROCK','IS','MOVE'}}) do
+ local r={{'EMPTY','IS','RIGHT'},{'ROCK','IS','PUSH'},{'ROCK','IS','SLEEP'},first,
+  {'EMPTY','FACING','ROCK','IS','MOVE'},{'EMPTY','FACING','ROCK','IS','CHILL'}}
+ s=fixture(r,4);n=step(s);assert(n.world.random_state==advance(4,1))
+end
+-- An earlier slot at a different vacancy suppresses later CHILL everywhere.
+s=fixture({{'EMPTY','IS','RIGHT'},{'ROCK','IS','PUSH'},
+ {'EMPTY','NEAR','FLAG','IS','MOVE'},{'EMPTY','FACING','ROCK','IS','CHILL'}},4)
+s.world.entities[2]={id=2,kind='object',class='object',archetype='flag',x=1,y=3,direction='None'}
+n=step(s);assert(n.world.random_state==4 and n.world.entities[1].x==6)
+print('PASS: EMPTY physical declaration slots retain real-unit offsets, inactive placeholders and cross-vacancy suppression in whole-turn plans')

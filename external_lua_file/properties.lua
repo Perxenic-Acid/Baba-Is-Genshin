@@ -183,9 +183,24 @@ function RW_ProjectWorld(world, effects, level_traits)
             end
         end
     end
+    local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
+            -- findallfeature counts real matches and EMPTY placeholders alike.
+            -- Retain holes even when this declaration has no eligible vacancy.
+            local motion_slot
+            if behavior.move or behavior.auto or behavior.chill then
+                local index=motion_indices[effect.trait] or 0
+                if effect.target and effect.target.kind=="empty" then
+                    if not empty_banned[effect.trait] then motion_slot=index+1;index=index+1 end
+                else
+                    for _,id in ipairs(effect.entity_ids) do
+                        if not (denied[id] and denied[id][effect.trait]) then index=index+1 end
+                    end
+                end
+                motion_indices[effect.trait]=index
+            end
             for _,cell in ipairs(effect.cells or {}) do
                 local key=cell.x .. ":" .. cell.y
                 if not (empty_denied[key] and empty_denied[key][effect.trait]) then
@@ -199,6 +214,13 @@ function RW_ProjectWorld(world, effects, level_traits)
                     end
                     empty.traits[effect.trait]=true
                     empty.trait_counts[effect.trait]=(empty.trait_counts[effect.trait] or 0)+1
+                    if motion_slot then
+                        empty.motion_slots=empty.motion_slots or {}
+                        for _,capability in ipairs({"move","auto","chill"}) do if behavior[capability] then
+                            local slots=empty.motion_slots[capability] or {}
+                            slots[#slots+1]=motion_slot;empty.motion_slots[capability]=slots
+                        end end
+                    end
                     for capability,enabled in pairs(behavior) do if enabled then empty.behaviors[capability]=true end end
                     projected.empty_cells[key]=empty
                 end

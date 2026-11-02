@@ -3022,6 +3022,20 @@ function RW_QueryEmptyDirection(world,x,y,rules)
     return direction,why
 end
 
+-- Native automatic collection asks emptydir before solving any displacement.
+function RW_CollectEmptyMotionDirections(world,rules)
+    local directions={}
+    for key,cell in pairs(world.empty_cells or {}) do
+        local b=cell.behaviors
+        if not b.sleep and (b.move or b.auto or b.chill or b.nudgeright or b.nudgeup or b.nudgeleft or b.nudgedown) then
+            local direction,why=RW_QueryEmptyDirection(world,cell.x,cell.y,rules)
+            if not direction then return nil,why end
+            directions[key]=direction
+        end
+    end
+    return directions
+end
+
 -- Original block() MAKE: inspect existing non-converted occupants only. Products
 -- of this same MAKE phase do not inhibit later duplicate declarations.
 function RW_PlanMakeProducts(world,relations,converted)

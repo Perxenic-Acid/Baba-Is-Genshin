@@ -1137,3 +1137,11 @@ exemption without weakening real dependency restrictions. Compiler/turn tests
 cover conditions/NOT, layers, locks, positive-only plans, allocators and Undo; 80
 installed reversecheck/cantmove cases cover virtual count/lock mapping. Startup
 stays 1,980,000. Automatic EMPTY motion and virtual lifecycle remain pending.
+
+## M9.8G — virtual EMPTY automatic intentions
+
+Connect shared emptydir to MOVE/AUTO/CHILL and four nudges with typed temporary
+agents, independent duplicate origins, native shared collection-slot suppression,
+pure RNG and real dependency destruction/HAS. Transaction tests and 720 installed
+collection/state-0 comparisons cover dispatch. Global conditional declaration slot
+holes, native scheduling and virtual lifecycle remain explicit gaps; see EMPTY_MOTION.md.

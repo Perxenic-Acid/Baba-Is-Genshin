@@ -21,7 +21,9 @@ the draw sequence. Production startup still does not execute diagnostic tests.
 
 ## Deliberate gaps
 
-Virtual EMPTY and scoped LEVEL automatic CHILL are not implemented. Real-unit
+M9.8G adds virtual EMPTY automatic CHILL; see EMPTY_MOTION.md for its separate
+collection/dispatch oracle and conditional slot-index gap. Scoped LEVEL automatic
+CHILL remains deferred. Real-unit
 collection is sorted by persistent identity rather than the original mutable
 unitlist/declaration traversal. Random draws use our existing Park-Miller state,
 not the original fixedrandom sequence. The existing automatic solver serializes

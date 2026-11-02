@@ -315,7 +315,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if not refreshed then return after_failure(movement_prefix,motion_phase.."_rules",why) end
         local shifted_world,err=services.project(preview,refreshed,level_traits_from(before_conversions))
         if not shifted_world then return fail(motion_phase.."_project",err) end
-        local shift,shift_error=services[motion_phase](shifted_world,before_conversions)
+        local shift,shift_error=services[motion_phase](shifted_world,before_conversions,before_rules)
         if not shift then return fail(motion_phase,shift_error) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,
             changes=movement.changes,board_shift=movement.board_shift}}}
@@ -1850,7 +1850,11 @@ local function start(run_self_tests)
     turn_services.back_retain=function(world,plan,active) return world_api:Invoke("RW_BackRetainDecision",world,plan,active) end
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
-    turn_services.automatic=function(world) return movement_api:Invoke("RW_ResolveAutomatic",world) end
+    turn_services.automatic=function(world,_,rules)
+        local directions,why=rules_api:Invoke("RW_CollectEmptyMotionDirections",world,rules)
+        if not directions then return nil,why end
+        return movement_api:Invoke("RW_ResolveAutomatic",world,directions)
+    end
     turn_services.ending=function(world,mode) return properties_api:Invoke("RW_ResolveEndContact",world,mode) end
     turn_services.done=function(world,projected,relations)
         local ids,events,win=properties_api:Invoke("RW_ResolveDone",projected,relations)

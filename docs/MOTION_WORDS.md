@@ -241,3 +241,7 @@ M9.8F: EMPTY YOU projections now retain per-cell declaration counts and type the
 transient agents as Empty. Duplicate REVERSE parity and the project's scoped HOLD
 exemption are covered with transactional/source tests; see EMPTY_MOTION.md.
 Virtual automatic MOVE/AUTO/CHILL/nudges and destruction/HAS remain pending.
+
+M9.8G implements EMPTY MOVE/AUTO/CHILL/nudge intentions and shared emptydir,
+including real PUSH dependencies/destruction and atomic RNG/Undo. Conditional
+global slot indexing and virtual lifecycle remain deferred; see EMPTY_MOTION.md.

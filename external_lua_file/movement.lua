@@ -262,7 +262,7 @@ function RW_ResolveMovement(world, action)
         local occupants = {}
 
         for other_id, other in pairs(world.entities) do
-            if other_id ~= id
+            if other_id > 0 and other_id ~= id
                 and not removed[other_id]
                 and other.x == nx
                 and other.y == ny then
@@ -351,7 +351,7 @@ function RW_ResolveMovement(world, action)
         -- A failed trailing pull never cancels an already successful mover.
         local followers={}
         for other_id,other in pairs(world.entities) do
-            if not action.falling and not planned[other_id] and not removed[other_id] and other.x==entity.x-dx and other.y==entity.y-dy
+            if other_id > 0 and not action.falling and not planned[other_id] and not removed[other_id] and other.x==entity.x-dx and other.y==entity.y-dy
                 and has_capability(world,other,"pull") then followers[#followers+1]=other_id end
         end
         table.sort(followers)
@@ -1003,7 +1003,7 @@ function RW_ResolveOrientation(world)
 end
 
 -- Autonomous impulses reuse the ordinary collision/destruction solver.
-function RW_ResolveAutomatic(world)
+function RW_ResolveAutomatic(world,empty_directions)
     local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
     local opposite={Right="Left",Left="Right",Up="Down",Down="Up"}
     local working={};for k,v in pairs(world) do working[k]=v end
@@ -1014,18 +1014,43 @@ function RW_ResolveAutomatic(world)
         working.entities[id]=copy;ids[#ids+1]=id
     end
     table.sort(ids)
+    working.trait_counts={};for id,counts in pairs(world.trait_counts or {}) do working.trait_counts[id]=counts end
+    local cells={}
+    for key,cell in pairs(world.empty_cells or {}) do
+        local b=cell.behaviors
+        if b.move or b.auto or b.chill or b.nudgeright or b.nudgeup or b.nudgeleft or b.nudgedown then
+            cells[#cells+1]={key=key,cell=cell}
+        end
+    end
+    table.sort(cells,function(a,b) if a.cell.y~=b.cell.y then return a.cell.y<b.cell.y end;return a.cell.x<b.cell.x end)
+    for index,item in ipairs(cells) do
+        local id=-index;local cell=item.cell
+        working.entities[id]={id=id,kind="object",class="empty",x=cell.x,y=cell.y,
+            direction=empty_directions and empty_directions[item.key] or cell.direction or "None",behaviors=cell.behaviors}
+        working.trait_counts[id]=cell.trait_counts or {};ids[#ids+1]=id
+    end
     local state=world.random_state or 1;local original_state=state
-    local autonomous,reasons={},{}
-    -- MOVE/AUTO are collected before CHILL; CHILL draws happen before any displacement.
-    -- Duplicate CHILL grants each draw; all collected properties share final facing/count.
+    local autonomous,reasons,empty_tasks={},{},{}
+    -- Real MOVE/AUTO precede CHILL; real CHILL draws occur during collection.
+    -- EMPTY draws at dispatch; later properties reuse occupied collection slots.
     for _,id in ipairs(ids) do
         local entity=working.entities[id]
-        local counts=world.trait_counts and world.trait_counts[id] or {}
+        local counts=working.trait_counts[id] or {}
         local function count(trait) return counts[trait] or (has_capability(world,entity,trait) and 1 or 0) end
         local total=0
-        if not has_capability(world,entity,"sleep") then
+        if id<0 then
+            empty_tasks[id]={}
+            if not has_capability(world,entity,"sleep") and not has_capability(world,entity,"still") then
+                local moves,autos,chills=count("move"),count("auto"),count("chill")
+                for slot=1,math.max(moves,autos,chills) do
+                    local m,a=slot<=moves and 1 or 0,slot<=autos and 1 or 0
+                    empty_tasks[id][#empty_tasks[id]+1]={count=1,direction=entity.direction,
+                        reason=m>0 and "move" or a>0 and "auto" or "chill",x=entity.x,y=entity.y}
+                end
+            end
+        elseif not has_capability(world,entity,"sleep") then
             local v=vectors[entity.direction]
-            if v and not intent_immobile(world,entity,v[1],v[2]) then
+            if v and not intent_immobile(working,entity,v[1],v[2]) then
                 local moves,autos=count("move"),count("auto")
                 total=moves+autos
                 if moves>0 then reasons[id]="move" elseif autos>0 then reasons[id]="auto" end
@@ -1034,7 +1059,7 @@ function RW_ResolveAutomatic(world)
                 state=(state*48271)%2147483647
                 entity.direction=({"Right","Up","Left","Down"})[state%4+1]
                 v=vectors[entity.direction]
-                if not intent_immobile(world,entity,v[1],v[2]) then
+                if not intent_immobile(working,entity,v[1],v[2]) then
                     total=total+1;reasons[id]=reasons[id] or "chill"
                 end
             end
@@ -1051,23 +1076,39 @@ function RW_ResolveAutomatic(world)
             end
         end
         for _,death in ipairs(part.destructions or {}) do
-            deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+            if death.entity_id>0 then deaths[#deaths+1]=death end
+            records[death.entity_id]=death;working.entities[death.entity_id]=nil
         end
     end
     for _,spec in ipairs({{"move"},{"nudgeright","Right"},{"nudgeup","Up"},{"nudgeleft","Left"},{"nudgedown","Down"}}) do
         for _,id in ipairs(ids) do
             local entity=working.entities[id]
-            local counts=world.trait_counts and world.trait_counts[id] or {}
+            local counts=working.trait_counts[id] or {}
             local count=spec[1]=="move" and autonomous[id] or (counts[spec[1]] or (entity and has_capability(world,entity,spec[1]) and 1 or 0))
-            for impulse=1,count do
+            local tasks={{count=count,reason=reasons[id]}}
+            if id<0 then
+                tasks=spec[1]=="move" and empty_tasks[id] or {}
+                if spec[2] then for i=1,count do
+                    local initial=cells[-id].cell
+                    tasks[#tasks+1]={count=1,direction=spec[2],x=initial.x,y=initial.y,reason=spec[1]}
+                end end
+            end
+            for _,task in ipairs(tasks) do
+            if id<0 and entity then entity.x,entity.y,entity.direction=task.x,task.y,task.direction end
+            for impulse=1,task.count do
                 entity=working.entities[id]
                 if not entity or has_capability(world,entity,"sleep") then break end
+                if id<0 and has_capability(world,entity,"still") then break end
+                if id<0 and ((task.reason=="move" and not vectors[entity.direction]) or task.reason=="chill") then
+                    state=(state*48271)%2147483647
+                    entity.direction=({"Right","Up","Left","Down"})[state%4+1]
+                end
                 local direction=spec[2] or entity.direction
                 local vector=vectors[direction]
-                if vector and not intent_immobile(world,entity,vector[1],vector[2]) then
+                if vector and not intent_immobile(working,entity,vector[1],vector[2]) then
                     local old_direction=entity.direction or "None"
                     local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
-                    if spec[1]=="move" and reasons[id]~="auto" and #part.changes==0 and #(part.destructions or {})==0 then
+                    if spec[1]=="move" and task.reason~="auto" and #part.changes==0 and #(part.destructions or {})==0 then
                         direction=opposite[direction];vector=vectors[direction]
                         entity.direction=direction
                         part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
@@ -1076,10 +1117,12 @@ function RW_ResolveAutomatic(world)
                     if spec[2] and working.entities[id] then working.entities[id].direction=old_direction end
                 end
             end
+            end
         end
     end
     local changes={}
     for _,id in ipairs(ids) do
+        if id>0 then
         local before=world.entities[id];local after=working.entities[id] or records[id]
         if before.x~=after.x or before.y~=after.y then
             changes[#changes+1]={kind="move",entity_id=id,
@@ -1087,6 +1130,7 @@ function RW_ResolveAutomatic(world)
                 to={x=after.x,y=after.y,direction=after.direction or "None"}}
         elseif (before.direction or "None")~=(after.direction or "None") then
             changes[#changes+1]={kind="direction",entity_id=id,from=before.direction or "None",to=after.direction or "None"}
+        end
         end
     end
     return {consumes_turn=true,changes=changes,destructions=deaths,reason="automatic",

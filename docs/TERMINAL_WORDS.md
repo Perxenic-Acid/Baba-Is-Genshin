@@ -51,3 +51,7 @@ CRASH 在 SINK/DEFEAT 后检查存活真实实体，使用冻结规则帧；已�
 `luatex --luaonly tests/run.lua` 覆盖真实 TC 输入回调/标题/锁定/Undo，及 WRITE、SAFE、
 CRASH 事务测试。完整回归不在正常开局运行。新增关卡后正常启动约 885000 条离线 Lua
 指令，仍受 2000000 预算约束；这不是游戏宿主计时器的等价测量。
+
+M9.8J adds late EMPTY self-contact destruction/HAS, including SAFE/FLOAT and
+newborn BROKEN/CRASH/WORD checks. Other virtual destruction paths remain pending;
+see [EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md).

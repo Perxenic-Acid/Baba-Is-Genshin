@@ -84,3 +84,9 @@ tests/run.lua 通过 F 宿主入口验证三张样例、最后 YOU 死亡后的 
 离线通过，真机手测待用户验证。
 
 M9.3W 已加入 HOT/MELT，接触阶段更新为 SINK → MELT → DEFEAT；详见 [HOT_MELT.md](HOT_MELT.md)。
+
+M9.8J: virtual EMPTY self OPEN/SHUT, HOT/MELT and YOU/DEFEAT plus matching
+scoped contacts now have a separate late cell-local HAS phase. It preserves serial
+birth witnesses, RNG and Undo without persistent EMPTY identities; see
+[EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md) for source evidence, tests and remaining
+movement/BOOM/BONUS lifecycle gaps.

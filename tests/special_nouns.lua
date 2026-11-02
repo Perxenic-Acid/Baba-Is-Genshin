@@ -102,9 +102,9 @@ s=fixture({{"NOT","NOT","ROCK","IS","WORD"}})
 local id=s.world.next_entity_id;s.world.next_entity_id=id+1
 s.world.entities[id]=copy(s.world.entities[4]);s.world.entities[id].id=id
 f=compile(s.world);assert(#f.ast == 2)
--- ALL HAS ALL expands one relation per palette member, and Empty HAS stays deferred.
+-- ALL HAS ALL preserves multiplicity; EMPTY HAS uses a cell-local relation.
 s=fixture({{"ALL","HAS","ALL"}});f=compile(s.world);assert(#f.relations == 18)
-s=fixture({{"EMPTY","HAS","TEXT"}});f=compile(s.world);assert(#f.deferred == 1)
+s=fixture({{"EMPTY","HAS","TEXT"}});f=compile(s.world);assert(#f.deferred == 0 and #f.relations == 1 and f.relations[1].op == "empty_has" and f.relations[1].product.kind == "text")
 -- Negative self-conversion applies to members expanded from ALL.
 s=fixture({{"ALL","IS","NOT","ROCK"}});converted=convert(s)
 assert(not converted.world.entities[1] and converted.world.entities[2] and converted.world.entities[3])

@@ -1161,3 +1161,14 @@ agents and ordinary real dependencies/destruction. Keep strength, SLEEP/locks,
 REVERSE counts, None-facing ties and whole-tree Undo. Turn tests and 5,120 installed
 virtual findfears cases pass; scoped FEAR, exceptional zero-vector probes, virtual
 lifecycle and native retry ordering remain documented in EMPTY_MOTION.md.
+
+## M9.8J — EMPTY self-contact destruction and HAS
+
+Add late cell-local OPEN/SHUT, HOT/MELT and YOU/DEFEAT destruction, including
+matching-layer scoped contacts, SAFE and real HAS products without virtual IDs.
+Preserve duplicate/Text/ALL/NOT/conditional products, direction, transactional
+random-only turns, newborn BROKEN/CRASH and Undo. Installed branch oracles cover
+16,384 selections plus 320 inside() cases. Serial births and creation-limit RNG
+are included; exact HAS ALL,
+other virtual destruction paths and native late victory timing remain pending;
+see EMPTY_LIFECYCLE.md.

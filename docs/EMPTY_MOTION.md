@@ -131,3 +131,7 @@ Tests/reference_fear.lua adds 5,120 installed findfears comparisons for virtual
 cardinal/None facing, counts, ties, static neighbor and source-cell STOP blockers.
 It retains 2,048 real-source cases. This does not claim a complete native movement
 state-machine oracle or native-device acceptance.
+
+M9.8J adds late virtual self-contact destruction and EMPTY HAS; see
+EMPTY_LIFECYCLE.md. Movement-specific virtual deaths and serial birth witnesses
+remain pending; real movement dependencies continue to use existing HAS stages.

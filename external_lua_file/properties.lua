@@ -545,6 +545,25 @@ function RW_ResolveDone(world,relations)
 end
 
 -- Custom/editor levelpack END evidence. No host ending/credits side effects here.
+-- levelblock() handles virtual self contacts after ordinary block() creation.
+-- SINK/WEAK do not destroy a vacant cell merely for possessing that property.
+function RW_ResolveEmptyContactVictims(world)
+    local victims={};local level=world.level_behaviors or {}
+    for _,cell in pairs(world.empty_cells or {}) do
+        local b=cell.behaviors
+        if not b.safe then
+            local same=(b.float==true)==(level.float==true)
+            local unlock=b.open and (b.shut or same and level.shut)
+                or b.shut and same and level.open
+            local melt=b.melt and (b.hot or same and level.hot)
+            local defeat=(b.control or b.control2) and (b.defeat or same and level.defeat)
+            if unlock or melt or defeat then victims[#victims+1]={x=cell.x,y=cell.y} end
+        end
+    end
+    table.sort(victims,function(a,b) if a.x~=b.x then return a.x<b.x end;return a.y<b.y end)
+    return victims
+end
+
 function RW_ResolveEndContact(world,mode)
     local level=world.level_behaviors or {}
     local map_float=level.float==true

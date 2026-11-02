@@ -179,6 +179,36 @@ function RW_PlanInitializedCreation(world,specifications,rules,services,back_cou
     return plan
 end
 
+-- Native EMPTY delete() calls run serially: earlier HAS births are witnesses for
+-- later conditions/status, while all virtual victims were selected beforehand.
+function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_count)
+    local specifications={};local state=world.random_state or 1;local terminal
+    for _,cell in ipairs(cells) do
+        local context={};for key,value in pairs(world) do context[key]=value end
+        context.entities={};for id,entity in pairs(world.entities) do context.entities[id]=entity end
+        for index,spec in ipairs(specifications) do
+            local entity={};for key,value in pairs(spec) do entity[key]=value end
+            entity.id=world.next_entity_id+index-1;context.entities[entity.id]=entity
+        end
+        context.next_entity_id=world.next_entity_id+#specifications;context.random_state=state
+        local products,why,random=services.products(context,{cell},relations,rules)
+        if not products then return nil,why end
+        if random then state=random.to end
+        local initialized,why,prefix=services.initialize(context,products,rules,back_count)
+        if not initialized then
+            if not prefix or (why~="word_rule_limit" and why~="word_rule_cycle" and why~="rule_complexity_limit") then return nil,why end
+            initialized=prefix;terminal=why
+        end
+        for _,spec in ipairs(initialized) do specifications[#specifications+1]=spec end
+        if terminal then break end
+    end
+    local plan,why=services.create(world,specifications)
+    if not plan then return nil,why end
+    if state~=(world.random_state or 1) then plan.random_state={from=world.random_state or 1,to=state} end
+    if terminal then lock_compile_failure(plan,terminal) end
+    return plan
+end
+
 local function turn_input_type(action)
     if action.player==3 and action.dx==0 and action.dy==0 and action.dx2==0 and action.dy2==0 then return "wait" end
     return action.type
@@ -402,7 +432,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         elseif conversion.op=="destroy_level" then level_destroy=true
         elseif conversion.op == "protect_level" then protected = true
         elseif conversion.op == "level_trait" or conversion.op == "deny_level_trait" then -- Resolved together below.
-        elseif conversion.op == "has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" or conversion.op=="play" or conversion.op=="all_done" then -- Consumed by their scheduled phases, not conversion.
+        elseif conversion.op == "has" or conversion.op=="empty_has" or conversion.op=="fear" or conversion.op=="follow" or conversion.op=="make" or conversion.op=="eat" or conversion.op=="play" or conversion.op=="all_done" then -- Consumed by their scheduled phases, not conversion.
         else entity_conversions[#entity_conversions+1] = conversion end
     end
     level_traits=level_traits_from(conversions)
@@ -789,6 +819,38 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 trace[#trace+1]="make"
                 if creation.infinite_loop or creation.too_complex then
                     plan.infinite_loop,plan.too_complex,plan.reason=creation.infinite_loop,creation.too_complex,creation.reason
+                    return plan,nil,trace
+                end
+            end
+        end
+        if services.empty_contacts then
+            local active=false
+            for _,frame in ipairs({complete.rule_sources or {},frozen_rules}) do for _,row in ipairs(frame) do
+                for _,effect in ipairs(row.effects or {}) do
+                    if effect.op=="grant_trait" and effect.target and effect.target.kind=="empty"
+                        and (effect.trait=="open" or effect.trait=="shut" or effect.trait=="melt"
+                            or effect.trait=="you" or effect.trait=="you2") then active=true;break end
+                end
+                if active then break end
+            end;if active then break end end
+            if active then
+                local effects,why=services.refresh(complete,frozen_rules)
+                if not effects then return after_failure(plan,"empty_contact_rules",why) end
+                local projected,why=services.project(complete,effects,plan.level_traits)
+                if not projected then return fail("empty_contact_project",why) end
+                local contact,why=services.empty_contacts(complete,projected,frozen_relations,frozen_rules,back_count)
+                if not contact then return fail("empty_contact",why) end
+                local next_world,why=services.preview(complete,contact)
+                if not next_world then return fail("empty_contact_preview",why) end
+                plan.stages[#plan.stages+1]={name="empty_contact",plan=contact}
+                for _,change in ipairs(contact.changes) do plan.changes[#plan.changes+1]=change end
+                complete=next_world;trace[#trace+1]="empty_contact"
+                if #contact.changes>0 then
+                    local ok,why=refresh_scoped()
+                    if not ok then return after_failure(plan,"empty_contact_level_traits",why) end
+                end
+                if contact.infinite_loop or contact.too_complex then
+                    plan.infinite_loop,plan.too_complex,plan.reason=contact.infinite_loop,contact.too_complex,contact.reason
                     return plan,nil,trace
                 end
             end
@@ -1819,6 +1881,13 @@ local function start(run_self_tests)
     }
     turn_services.contact=function(world,effective,kind,contents,rules,count)
         return RW_PlanContactPhase(world,effective,kind,contents,contact_services,rules,count)
+    end
+    turn_services.empty_contacts=function(world,projected,relations,rules,count)
+        local cells=properties_api:Invoke("RW_ResolveEmptyContactVictims",projected)
+        return RW_PlanEmptyContactPhase(world,cells,relations,rules,{
+            products=function(w,c,r,raw) return rules_api:Invoke("RW_PlanEmptyHasBirths",w,c,r,raw) end,
+            initialize=function(w,p,r,c) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r,c) end,
+            create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end},count)
     end
     turn_services.more=function(world,projected,rules,count)
         local products,why=properties_api:Invoke("RW_ResolveMoreProducts",projected)

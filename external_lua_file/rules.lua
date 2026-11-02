@@ -2395,7 +2395,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 local target=subject_key(obj)
                 if obj.tag == "special" and obj.name == "all" then target="@all" end
                 if obj.tag == "noun" and obj.type and obj.type.tag == "level" then target=obj.type.block_type or "level_block" end
-                if target and key ~= "@empty" then
+                if target then
                     add_ban(contain_bans,ast.verb,key,target,ast.when)
                     supported=true
                 end
@@ -2411,14 +2411,14 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 supported=true
             elseif sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "contain" and not objnot
                 and obj.tag == "special" and (obj.name == "all" or obj.name == "empty") then
-                if obj.name == "all" and key ~= "@empty" then
+                if obj.name == "all" then
                     for _,name in ipairs(RW_NounPalette(world)) do
-                        relations[#relations+1]={op="has",source=ast.source,
+                        relations[#relations+1]={op=key=="@empty" and "empty_has" or "has",source=ast.source,source_type=key,
                             target=key == "@text" and {kind="class",value="text"} or {kind="archetype",value=key},
                             product={kind="object",archetype=name}}
                     end
                 end
-                supported=key ~= "@empty"
+                supported=true
             elseif sem and key and (ast.when.op=="always" or ast.when.op=="spatial") and sem.noun=="become" then
                 local target=subject_key(obj)
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
@@ -2448,8 +2448,13 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     append(generated,g);append(relations,r);supported=supported or #d == 0
                 end
             elseif sem and key == "@empty" and sem.noun == "contain" then
-                -- Empty destruction/HAS needs cell-local lifecycle state, not IDs.
-                supported=false
+                local target=subject_key(obj)
+                if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
+                if target then
+                    relations[#relations+1]={op="empty_has",source_type=key,source=ast.source,
+                        product=target=="@text" and {kind="text"} or {kind="object",archetype=target}}
+                    supported=true
+                end
             elseif contextual and subject.tag == "noun" and subject.type and subject.type.tag == "level" then
                 supported=false -- Scoped LEVEL surroundings require the campaign context.
             else
@@ -2461,7 +2466,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             -- Original subrules reaches ALL HAS ALL through both expansion axes.
             local has_end=#relations
             for index=has_start,has_end do
-                if relations[index].op == "has" then
+                if relations[index].op == "has" or relations[index].op == "empty_has" then
                     contain_verbs[index]=ast.verb
                     contain_origins[index]=obj.tag == "special" and obj.name == "all" and "@all" or false
                     if subj.tag == "special" and subj.name == "all" and not subnot
@@ -2486,8 +2491,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 relation.exclusions[#relation.exclusions+1]=condition
             end
         end
-        if relation.op == "has" then
-            local key=relation.target.kind == "class" and "@text" or relation.target.value
+        if relation.op == "has" or relation.op == "empty_has" then
+            local key=relation.op=="empty_has" and "@empty" or (relation.target.kind == "class" and "@text" or relation.target.value)
             local bans=(contain_bans[contain_verbs[index]] or {})[key] or {}
             local product=relation.product.kind == "text" and "@text" or relation.product.archetype
             relation.exclusions={}
@@ -2922,6 +2927,42 @@ function RW_PlanHasBirths(world, victims, relations)
         end
     end
     return specifications
+end
+
+-- Empty deletion calls inside() without removing an entity. Keep cell witnesses
+-- out of the persistent ID namespace, and share one inside direction per victim.
+function RW_PlanEmptyHasBirths(world,cells,relations,rules)
+    if type(world)~="table" or not dense_list(cells) or not dense_list(relations) then return nil,"invalid_empty_has_input" end
+    for _,cell in ipairs(cells) do
+        if type(cell)~="table" or type(cell.x)~="number" or type(cell.y)~="number"
+            or cell.x%1~=0 or cell.y%1~=0 or cell.x<1 or cell.y<1
+            or cell.x>world.width or cell.y>world.height then return nil,"invalid_empty_victim" end
+    end
+    local products,seen={},{}
+    local state=world.random_state or 1;local original=state
+    for _,cell in ipairs(cells) do
+        local key=cell.x..":"..cell.y
+        if seen[key] then return nil,"duplicate_empty_victim" end
+        seen[key]=true
+        local source={class="empty",x=cell.x,y=cell.y}
+        local direction,why=RW_QueryEmptyDirection(world,cell.x,cell.y,rules)
+        if not direction then return nil,why end
+        if direction=="None" then
+            state=(state*48271)%2147483647;direction=({"Right","Up","Left","Down"})[state%4+1]
+        end
+        for _,relation in ipairs(relations or {}) do if relation.op=="empty_has" then
+            local enabled,why=RW_RelationApplies(world,relation,source)
+            if enabled==nil then return nil,why end
+            if enabled then
+                local product={kind="object",class=relation.product.kind=="text" and "text" or "object",
+                    x=cell.x,y=cell.y,direction=direction}
+                if product.class=="text" then product.text={name="EMPTY"}
+                else product.archetype=relation.product.archetype end
+                products[#products+1]=product
+            end
+        end end
+    end
+    return products,nil,state~=original and {from=original,to=state} or nil
 end
 
 -- Resolve predicates per source identity using the current phase positions.

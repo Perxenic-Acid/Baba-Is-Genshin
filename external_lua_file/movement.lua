@@ -230,6 +230,14 @@ function RW_ResolveMovement(world, action)
         local cell=world.empty_cells and world.empty_cells[x .. ":" .. y]
         return cell and cell.behaviors or world.empty_behaviors or (world.empty_eaters and {}),cell
     end
+    local function eating_targets(source,x,y)
+        if source.class=="empty" and world.movement_eaters and world.movement_eaters.empty_cells then
+            -- check() first tests any EAT at the source, then the named EAT at
+            -- the destination. EMPTY testcond uses those supplied coordinates.
+            return source.eat_targets and next(source.eat_targets) and world.movement_eaters.empty_cells[x..":"..y]
+        end
+        return source.eat_targets or world.movement_eaters and world.movement_eaters[source.id]
+    end
     local function empty_obstacle(x,y,source,pulling)
         local empty,cell=empty_at(x,y)
         if not empty then return nil end
@@ -238,7 +246,9 @@ function RW_ResolveMovement(world, action)
         local partner=has_capability(world,source,"open") and "shut" or has_capability(world,source,"shut") and "open"
         local unlock=not pulling and source.id and source.id~=0 and partner and empty[partner] and same
             and (not empty.safe or not has_capability(world,source,"safe"))
-        local eat=not pulling and source.id and source.id>0 and world.empty_eaters and world.empty_eaters[source.id]
+        local targets=source.class=="empty" and eating_targets(source,x,y)
+        local eat=not pulling and source.id and (world.empty_eaters and world.empty_eaters[source.id]
+            or targets and targets['@empty'])
             and not empty.safe and same
         if weak or unlock or eat then return nil,weak,unlock,eat end
         local qx,qy=dx,dy
@@ -332,7 +342,7 @@ function RW_ResolveMovement(world, action)
                 local mover_swap=has_capability(world,entity,"swap")
                 local unlock=not phantom and partner and (id > 0 or entity.class=="empty") and other_id > 0 and same_layer(world,entity,other) and has_capability(world,other,partner)
                     and (not has_capability(world,entity,"safe") or not has_capability(world,other,"safe"))
-                local targets=world.movement_eaters and world.movement_eaters[id]
+                local targets=eating_targets(entity,nx,ny)
                 local eat=not phantom and not pulling and targets and targets[other.class=="text" and "@text" or other.archetype]
                     and same_layer(world,entity,other) and not has_capability(world,other,"safe")
                 if unlock or eat then
@@ -1095,7 +1105,8 @@ function RW_ResolveAutomatic(world,empty_directions)
     for index,item in ipairs(cells) do
         local id=-index;local cell=item.cell
         working.entities[id]={id=id,kind="object",class="empty",x=cell.x,y=cell.y,
-            direction=empty_directions and empty_directions[item.key] or cell.direction or "None",behaviors=cell.behaviors}
+            direction=empty_directions and empty_directions[item.key] or cell.direction or "None",behaviors=cell.behaviors,
+            eat_targets=world.movement_eaters and world.movement_eaters.empty_cells and world.movement_eaters.empty_cells[item.key]}
         working.trait_counts[id]=cell.trait_counts or {};ids[#ids+1]=id
     end
     local state=world.random_state or 1;local original_state=state
@@ -1342,7 +1353,8 @@ function RW_ResolveTurn(world, action)
             local cell=world.empty_cells[key]
             if (cell.behaviors.control or action.player==3 and cell.behaviors.control2) and not cell.behaviors.sleep then
                 movement_world.entities[next_virtual]={id=next_virtual,kind="object",class="empty",
-                    x=cell.x,y=cell.y,direction="None",behaviors=cell.behaviors}
+                    x=cell.x,y=cell.y,direction="None",behaviors=cell.behaviors,
+                    eat_targets=world.movement_eaters and world.movement_eaters.empty_cells and world.movement_eaters.empty_cells[key]}
                 movement_world.trait_counts[next_virtual]=cell.trait_counts or {}
                 next_virtual=next_virtual-1
             end
@@ -1565,7 +1577,8 @@ function RW_ResolveFear(world,targets)
     for index,cell in ipairs(targets.empty_cells or {}) do
         local id=-index
         working.entities[id]={id=id,kind="object",class="empty",x=cell.x,y=cell.y,
-            direction=cell.direction or "None",behaviors=cell.behaviors or {}}
+            direction=cell.direction or "None",behaviors=cell.behaviors or {},
+            eat_targets=world.movement_eaters and world.movement_eaters.empty_cells and world.movement_eaters.empty_cells[cell.x..":"..cell.y]}
         working.trait_counts[id]=cell.trait_counts or {};ids[#ids+1]=id;intentions[id]=cell.targets
     end
     -- Collect every intention against the same snapshot, as original take 7 does.

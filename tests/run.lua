@@ -358,6 +358,19 @@ local function press(sequence)
  local map={D="right",A="left",W="up",S="down",F="confirm",Z="undo"}
  for key in sequence:gmatch(".") do listeners[map[key]]() end
 end
+for index,route in ipairs({"DDDDDD","DDDDDDD","DDDDDDDD"}) do
+ press("DDDDDDDDDDF"..route.."F")
+ assert(rendered.width==32 and rendered.height==30,'backend room entry '..index)
+ press(index==3 and "D" or "DD")
+ local flag,crate=false,false
+ for _,e in pairs(rendered.entities) do
+  if e.class=='object' and e.archetype=='flag' and e.y==13 and e.x==({9,8,12})[index] then flag=true end
+  if e.class=='object' and e.archetype=='crate' and e.x==9 and e.y==13 then crate=true end
+ end
+ assert(flag and (index~=1 or crate),'backend room demonstration '..index)
+ while history_depth>0 do listeners.undo() end
+end
+print('PASS: native F entry for sparse HAS/EAT/EMPTY rooms, demonstrations and whole-tree Undo')
 press("DDDDDDDDDDFDF")
 assert(rendered.width==33 and rendered.height==18)
 local function avatar(world)
@@ -488,6 +501,7 @@ dofile("tests/virtual_unlock.lua")
 dofile("tests/empty_automatic.lua")
 dofile("tests/eat.lua")
 dofile("tests/movement_eat.lua")
+dofile("tests/virtual_eat.lua")
 dofile("tests/become.lua")
 dofile("tests/mimic.lua")
 dofile("tests/play.lua")

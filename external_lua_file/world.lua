@@ -820,8 +820,8 @@ local function capture_level_surrounds(world,entity_id)
     return result
 end
 
-local function validate_definition(definition)
-    if type(definition) ~= "table" or not plain_data(definition)
+local function validate_definition(definition, already_plain)
+    if type(definition) ~= "table" or (not already_plain and not plain_data(definition))
         or type(definition.id) ~= "string" or definition.id == ""
         or type(definition.initial_world) ~= "table" then return false end
     for key in pairs(definition) do
@@ -1468,7 +1468,9 @@ function RW_CreateLevelTree(definitions, root_definition_id)
         return nil, "invalid_definitions"
     end
     for id, definition in pairs(definitions) do
-        if type(id) ~= "string" or not validate_definition(definition)
+        -- The complete graph was checked above; keep structural checks without
+        -- recursively walking the same authored data a second time.
+        if type(id) ~= "string" or not validate_definition(definition,true)
             or definition.id ~= id then return nil, "invalid_definitions" end
     end
     local definition = definitions[root_definition_id]
@@ -2223,7 +2225,7 @@ function RW_GetNavigationDefinitions()
     definitions["navigation.float"]={id="navigation.float",initial_world=floating}
     portal(root,62,12,1,"FLOAT","navigation.float")
     object(root,63,"line",12,1)
-    local motion_lab=RW_CreateSession().world
+    local motion_lab=default_world()
     motion_lab.entities={};motion_lab.next_entity_id=1
     motion_lab.width,motion_lab.height=32,32
     motion_lab.language.nouns.FLAG="flag"
@@ -2256,7 +2258,7 @@ function RW_GetNavigationDefinitions()
 
     -- BEGIN OFFICIAL REFERENCE LAYOUTS
     local function official_world(width,height,entries)
-        local world=RW_CreateSession().world
+        local world=default_world()
         world.width=width;world.height=height;world.entities={};world.next_entity_id=1
         world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall",BELT="belt",GHOST="ghost",LAVA="lava",LEVEL={tag="level",block_type="level_block"}}
         for _,spec in ipairs(entries) do
@@ -2686,7 +2688,7 @@ function RW_GetNavigationDefinitions()
         {"text_belt",5,18,"Down"},
         {"wall",10,18,"Right"},
     })}
-    local reference_map=RW_CreateSession().world
+    local reference_map=default_world()
     reference_map.entities={};reference_map.next_entity_id=1
     object(reference_map,1,"cursor",2,2)
     portal(reference_map,2,3,2,"BIY","reference.0")
@@ -2712,6 +2714,55 @@ function RW_GetNavigationDefinitions()
                 x=7+offset,y=11,direction="None"}
             world.next_entity_id=id+1
         end
+    end
+    -- Sparse native acceptance rooms; keep the established reference hub route.
+    local function backend_room(name)
+        -- Author fresh data directly; CreateLevelTree validates definitions once.
+        local w=default_world();configure(w)
+        w.language.operators={AND="and",NOT="not"}
+        w.entities={};w.next_entity_id=1;w.width,w.height=32,30
+        w.language.nouns.WATER="water";w.language.nouns.WALL="wall"
+        local function add(archetype,x,y,direction)
+            local id=w.next_entity_id;object(w,id,archetype,x,y);w.entities[id].direction=direction or "Right";return id
+        end
+        local function words(tokens,x,y)
+            for i,token in ipairs(tokens) do local id=w.next_entity_id;w.next_entity_id=id+1
+                w.entities[id]={id=id,kind="object",class="text",text={name=token},x=x+i-1,y=y,direction="None"}
+            end
+        end
+        local function loose(tokens)
+            for i,token in ipairs(tokens) do words({token},3+3*((i-1)%10),20+3*math.floor((i-1)/10)) end
+        end
+        add("cursor",1,1);portal(w,w.next_entity_id,2,1,"PARENT");add("line",1,1)
+        words({"AVATAR","IS","YOU"},3,3);add("avatar",6,13)
+        if name=="has" then
+            words({"ROCK","IS","PUSH"},3,6);words({"WATER","IS","SINK"},17,3)
+            words({"ROCK","HAS","FLAG"},17,6);words({"ROCK","ON","FLAG","HAS","CRATE"},17,9)
+            add("rock",8,13,"None");add("water",9,13)
+            loose({"WITHOUT","ON","HAS","ROCK","FLAG","CRATE","TEXT","AND","NOT","IS","HAS","FLAG","ROCK","SAFE","SINK"})
+        elseif name=="eat" then
+            words({"ROCK","IS","STOP"},3,6);words({"AVATAR","EAT","ROCK"},17,3)
+            words({"ROCK","HAS","FLAG"},17,6);add("rock",8,13,"Up")
+            add("rock",18,13,"Down");add("wall",25,13);add("flag",26,13)
+            loose({"EAT","TEXT","SAFE","FLOAT","OPEN","SHUT","PUSH","STILL","IS","AND","NOT","ROCK","AVATAR","WALL","FLAG","HAS","ON","NEAR"})
+        else
+            words({"EMPTY","IS","RIGHT"},3,6);words({"EMPTY","FACING","ROCK","IS","YOU"},17,3)
+            words({"EMPTY","EAT","ROCK"},17,6);words({"ROCK","IS","STOP"},3,9)
+            words({"ROCK","HAS","FLAG"},17,9);add("rock",12,13,"Up")
+            loose({"EMPTY","EAT","TEXT","SAFE","FLOAT","MOVE","FEAR","FLAG","IS","AND","NOT","ROCK","NEAR","FACING","HAS","STOP","RIGHT","YOU"})
+        end
+        -- These focused rooms only need the vocabulary actually supplied here.
+        local tokens={};for _,e in pairs(w.entities) do if e.class=="text" then tokens[e.text.name]=true end end
+        for _,category in ipairs({"properties","verbs","prepositions","specials"}) do
+            local selected={};for token,value in pairs(w.language[category]) do if tokens[token] then selected[token]=value end end
+            w.language[category]=selected
+        end
+        definitions["navigation.backend_"..name]={id="navigation.backend_"..name,initial_world=w}
+    end
+    for _,name in ipairs({"has","eat","empty"}) do backend_room(name) end
+    for i,spec in ipairs({{"HAS","has"},{"EAT","eat"},{"EMPTY","empty"}}) do
+        portal(reference_map,14+2*i,7+i,2,spec[1],"navigation.backend_"..spec[2])
+        object(reference_map,15+2*i,"line",7+i,2)
     end
     return definitions, "navigation.root"
 end

@@ -14,7 +14,7 @@ def generate(data):
         if tile and name:
             tiles[int(tile[1]) + 256 * int(tile[2])] = (m[1], name[1])
     out = [BEGIN, '''    local function official_world(width,height,entries)
-        local world=RW_CreateSession().world
+        local world=default_world()
         world.width=width;world.height=height;world.entities={};world.next_entity_id=1
         world.language.nouns={AVATAR="avatar",ROCK="rock",FLAG="flag",WALL="wall",BELT="belt",GHOST="ghost",LAVA="lava",LEVEL={tag="level",block_type="level_block"}}
         for _,spec in ipairs(entries) do
@@ -70,7 +70,7 @@ def generate(data):
         for name,x,y,direction in entries:
             out.append(f'        {{"{name}",{x},{y},"{direction}"}},\n')
         out.append('    })}\n')
-    out.append('''    local reference_map=RW_CreateSession().world
+    out.append('''    local reference_map=default_world()
     reference_map.entities={};reference_map.next_entity_id=1
     object(reference_map,1,"cursor",2,2)
     portal(reference_map,2,3,2,"BIY","reference.0")

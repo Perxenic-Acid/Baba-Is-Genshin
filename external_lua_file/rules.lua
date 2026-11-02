@@ -2341,7 +2341,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 if objnot then add_ban(play_bans,ast.verb,key,obj.name,ast.when)
                 else relations[#relations+1]={op="play",source_type=key,note=obj.name,when=query_clone(ast.when),verb=ast.verb} end
                 supported=true
-            elseif sem and key and (key~="@empty" or sem.noun=="make" or sem.noun=="follow" or sem.noun=="fear") and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
+            elseif sem and key and (ast.when.op=="always" or ast.when.op=="spatial") and (sem.noun=="fear" or sem.noun=="follow" or sem.noun=="make" or sem.noun=="eat")
                 and (not objnot or sem.negative_noun=="forbid_"..sem.noun) then
                 local target=subject_key(obj)
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target=obj.type.block_type or "level_block" end
@@ -3101,9 +3101,26 @@ end
 
 -- Collision EAT capabilities are phase-local queries, not saved behaviors.
 function RW_ResolveMovementEatTargets(world,relations)
-    local sources={}
+    local sources={};local cells
     for _,relation in ipairs(relations or {}) do
-        if relation.op=="eat" and relation.source_type~="@empty" then
+        if relation.op=="eat" and relation.source_type=="@empty" then
+            if not cells then
+                cells={};sources.empty_cells={}
+                -- Native EMPTY conditions are also queried at occupied target
+                -- coordinates during check(), independently of source vacancy.
+                for y=1,world.height do for x=1,world.width do
+                    cells[#cells+1]={class="empty",x=x,y=y}
+                end end
+            end
+            for _,cell in ipairs(cells) do
+                local key=cell.x..":"..cell.y;local targets=sources.empty_cells[key]
+                if not targets or not targets[relation.target_type] then
+                    local enabled,why=RW_RelationApplies(world,relation,cell)
+                    if enabled==nil then return nil,why end
+                    if enabled then targets=targets or {};targets[relation.target_type]=true;sources.empty_cells[key]=targets end
+                end
+            end
+        elseif relation.op=="eat" then
             local selector=relation.source_type=="@text" and {kind="class",value="text"}
                 or {kind="archetype",value=relation.source_type}
             for _,id in ipairs(RW_SelectEntities(world,selector)) do

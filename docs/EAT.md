@@ -69,3 +69,24 @@ cases and checks ordered deaths. This is offline/source validation only.
 Source conditions remain phase snapshots rather than original lazy per-impulse
 queries. Virtual EMPTY/scoped LEVEL source predicates and native mutable-list
 ordering remain deferred. This change does not persist the target maps as facts.
+
+## M9.8Z virtual EMPTY movement sources
+
+The same installed check() explicitly names unitid=2 as EMPTY, including its EAT
+query against real or virtual targets. EMPTY EAT predicates now lower to the
+existing typed relation IR (including negative targets/exclusions). Motion
+preparation evaluates them per cell, including occupied destination coordinates.
+Original check() requires any active EAT at the source, then a matching target
+EAT at the destination. EMPTY testcond uses the supplied coordinates (unlike
+real units, which use their intrinsic origin). YOU, MOVE/nudge and FEAR agents
+carry the source gate from their collected origin and use the destination's
+phase-local target set. No negative IDs or eater data enter persisted entities.
+
+Virtual movers use real-target lock-before-EAT and virtual-target EAT-before-lock
+ordering, with independent SAFE/FLOAT checks and the existing cell delete cache.
+tests/virtual_eat.lua covers real/vacant targets, conditions, YOU/MOVE/FEAR,
+positive-only HAS transactions and Undo. The installed real-target collision
+oracle now includes virtual movers for 8192 combinations plus eight source-any/
+destination-specific coordinate-gate cases. Anonymous recursive
+EMPTY PUSH chains, lazy per-impulse condition changes and scoped LEVEL EAT
+sources remain deferred. Late overlap EAT has no occupied EMPTY source identity.

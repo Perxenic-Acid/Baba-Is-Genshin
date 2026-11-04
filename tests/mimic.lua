@@ -76,6 +76,30 @@ s=fixture({{'ROCK','MIMIC','FLAG'},{'FLAG','HAS','CRATE'},{'ROCK','IS','YOU','AN
 n=step(s);assert(not n.world.entities[2]);local born=false
 for _,e in pairs(n.world.entities) do if e.archetype=='crate' and e.x==6 and e.y==3 then born=true end end
 assert(born,'copied HAS participates in frozen contact destruction')
+s=fixture({{'ALL','HAS','FLAG'},{'ROCK','MIMIC','CRATE'},{'ROCK','IS','YOU','AND','DEFEAT'}})
+n=step(s);local all_births=0
+for _,unit in pairs(n.world.entities) do if unit.archetype=='flag' and unit.x==6 and unit.y==3 then all_births=all_births+1 end end
+assert(all_births==2,'ALL must supply the original HAS and the pre-MIMIC CRATE declaration exactly once')
+s=fixture({{'ALL','IS','SAFE'},{'ROCK','MIMIC','CRATE'}})
+frame=assert(RW_CompileWorld(s.world,cs))
+assert(RW_ProjectWorld(s.world,frame.effects).trait_counts[2].safe==2)
+s=fixture({{'ROCK','IS','GROUP'},{'ALL','HAS','GROUP'},{'ROCK','MIMIC','CRATE'},
+ {'ROCK','IS','YOU','AND','DEFEAT'}})
+n=step(s);local group_births=0
+for id,unit in pairs(n.world.entities) do if id~=2 and unit.archetype=='rock' and unit.x==6 and unit.y==3 then group_births=group_births+1 end end
+assert(group_births==2,'ALL HAS GROUP is a consumer, not already-normalized ALL IS GROUP membership')
+print('PASS: ALL declarations expand before MIMIC without duplicating original runtime HAS/property grants, with Undo')
+do
+ local noun=function(name) return {tag='noun',type={tag='object',name=name}} end
+ local lookup={{verb='mimic',subject=noun('rock'),object=noun('crate'),when={op='always'}},
+  {verb='is',subject={tag='special',name='all'},object={tag='property',name='safe'},when={op='always'}}}
+ local row={verb='is',subject=noun('flag'),object={tag='property',name='pushable'},when={op='always'}}
+ for i=1,4998-#RW_NounPalette(s.world) do lookup[#lookup+1]=row end
+ assert(RW_LowerRuleAST(lookup,nil,s.world),'exact 5000-entry copy lookup must remain valid')
+ lookup[#lookup+1]=row
+ local generated,reason=RW_LowerRuleAST(lookup,nil,s.world)
+ assert(not generated and reason=='rule_complexity_limit','trailing original entry escaped copy lookup bound')
+end
 -- Virtual endpoints share the raw one-generation pass, not a persisted unit.
 s=fixture({{'EMPTY','MIMIC','FLAG'},{'FLAG','NEAR','ROCK','IS','PUSH'},
  {'EMPTY','NEAR','AVATAR','MIMIC','NOT','FLAG'}})

@@ -1955,13 +1955,50 @@ local function expand_mimic(ast_rules,world)
         else result[#result+1]=rule end
     end
     local count=0
+    -- subrules expands ordinary ALL subjects before its MIMIC pass. Keep
+    -- these declarations in the copy lookup only: normal lowering already
+    -- expands the original ALL rule for runtime consumers.
+    local copy_lookup={}
+    local function same_term(a,b)
+        if type(a)~=type(b) then return false end
+        if type(a)~="table" then return a==b end
+        for k,v in pairs(a) do if not same_term(v,b[k]) then return false end end
+        for k in pairs(b) do if a[k]==nil then return false end end
+        return true
+    end
+    for _,entry in ipairs(ast_rules) do
+        copy_lookup[#copy_lookup+1]=entry
+        if #copy_lookup>5000 then return nil,"rule_complexity_limit" end
+        local subject,negative=unwrap(entry.subject)
+        local object,object_negative=unwrap(entry.object)
+        local membership=entry.verb=="is" and object and object.tag=="noun" and object.type and object.type.tag=="group"
+        if entry.verb~="mimic" and subject and subject.tag=="special" and subject.name=="all" and not negative and not membership then
+            local requirements={entry.when}
+            -- Native nconds scans featureindex["not all"], not all negative
+            -- object declarations. Preserve that narrower lookup literally.
+            if not object_negative and object and object.tag=="special" and object.name=="all" then
+                for _,ban in ipairs(ast_rules) do
+                    local banned,banned_negative=unwrap(ban.object)
+                    if ban.verb==entry.verb and same_term(ban.subject,entry.subject) and banned_negative and same_term(banned,object) then
+                        requirements[#requirements+1]=invert_mimic_condition(ban.when)
+                    end
+                end
+            end
+            for _,name in ipairs(RW_NounPalette(world)) do
+                local copy=query_clone(entry);copy.subject=noun_term(name)
+                copy.when={op="spatial",clauses={},requirements=requirements}
+                copy_lookup[#copy_lookup+1]=copy
+                if #copy_lookup>5000 then return nil,"rule_complexity_limit" end
+            end
+        end
+    end
     for _,rule in ipairs(ast_rules) do if rule.verb=="mimic" then
         local target,negative=unwrap(rule.object)
         local source,destination=key(rule.subject),key(target)
         if not source or not destination then
             result[#result+1]=rule -- unsupported forms remain visible as deferred.
         elseif not negative then
-            for _,copied in ipairs(ast_rules) do
+            for _,copied in ipairs(copy_lookup) do
                 if copied.verb~="mimic" and key(copied.subject)==destination then
                     local conditions={copied.when,rule.when}
                     for _,condition in ipairs((bans[source] or {})[destination] or {}) do

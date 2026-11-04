@@ -68,3 +68,30 @@ with Undo. Existing GROUP/LEVEL copy ordering and the 250-copy limit are unchang
 This supersedes the EMPTY endpoint deferral above. ALL/ordinary NOT endpoints,
 full mutable scheduler parity and each copied verb's own restrictions remain
 separate gaps; native success is not inferred from these simulations.
+
+## M9.9N ordinary ALL declarations precede copying
+
+Installed subrules() expands positive ALL subjects before entering its MIMIC
+loop (rules.lua around1116–1207). Therefore ALL HAS FLAG plus ROCK MIMIC CRATE
+gives ROCK both its own ALL-derived HAS and a copy of CRATE's ALL-derived HAS.
+The previous lookup saw only the raw ALL statement and missed the second product.
+
+The MIMIC lookup now includes those concrete declarations, preserving authored
+palette multiplicity and per-imitator conditions. They are lookup-only records:
+the original ALL statement remains the single source for ordinary runtime
+lowering, avoiding doubled base effects. GROUP membership declarations already
+normalized by the earlier pass are not expanded twice. Other GROUP consumers,
+including HAS GROUP, still receive the ordinary ALL subject expansion. Native
+positive-ALL nconds uses its literal featureindex["not all"] lookup; ordinary
+negative-object declarations are not silently substituted for that index.
+
+tests/reference_all_mimic.lua executes installed addoption(), subrules(),
+copyrule() and invertconds() across 216 declaration/mimic multiplicity, negative
+HAS, source condition, MIMIC condition and physical-overlap cases. Runtime HAS
+counts are compared at both real identities, including original base rules.
+Physical tests add two HAS births, HAS GROUP consumers and weighted property
+counts with Undo, plus exact 5,000/5,001-entry lookup boundaries.
+Existing EMPTY and GROUP MIMIC oracles remain separate checks. The transient
+lookup is bounded to 5,000 declarations and uses the existing TOO COMPLEX path.
+ALL as the actual MIMIC endpoint and NOT-source preprocessing remain unfinished;
+this correction addresses declarations copied through ordinary endpoints.

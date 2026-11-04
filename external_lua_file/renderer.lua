@@ -27,12 +27,31 @@ local function cached_color(r,g,b,a)
     return palette[key]
 end
 local control_state=setmetatable({},{__mode="k"})
+local font_aliases={}
 local function state(control)
     if not control_state[control] then control_state[control]={} end
     return control_state[control]
 end
 local function paint(control,key,value)
     local previous=state(control)
+    if key=="fontSize" then
+        local requested=value;value=font_aliases[requested] or requested
+        if previous[key]~=value then
+            local ok,err=pcall(function() control.fontSize=value end)
+            if not ok then
+                local rejected={requested}
+                for candidate=value+1,18 do
+                    ok=pcall(function() control.fontSize=candidate end)
+                    if ok then value=candidate;break end
+                    rejected[#rejected+1]=candidate
+                end
+                if not ok then error(err) end
+                for _,size in ipairs(rejected) do font_aliases[size]=value end
+            end
+            previous[key]=value
+        end
+        return value
+    end
     if previous[key]~=value then control[key]=value;previous[key]=value end
 end
 local function set_position(control,x,y)
@@ -315,7 +334,7 @@ end
 function RW_FitTileLabel(label,width,height,font)
     if not label:match("^[%w_?:%-]+$") then return label,font end
     local columns=1
-    for size=font,4,-1 do
+    for size=math.max(6,font),6,-1 do
         columns=math.max(1,math.floor((width-1)/(size*0.65)))
         local lines=math.ceil(#label/columns)
         if lines*size*1.35<=height then
@@ -324,7 +343,9 @@ function RW_FitTileLabel(label,width,height,font)
             return table.concat(pieces,"\n"),math.floor(size)
         end
     end
-    return label,4
+    columns=math.max(1,math.floor((width-1)/(6*0.65)))
+    local pieces={};for i=1,#label,columns do pieces[#pieces+1]=label:sub(i,i+columns-1) end
+    return table.concat(pieces,"\n"),6
 end
 
 local function draw_entities(world)
@@ -406,15 +427,22 @@ local function draw_entities(world)
                             cx + offset_x, cy
                         )
 
-                        set_size(control,
-                            tile_width,
-                            CELL_SIZE - 6*board_scale
-                        )
-
                         local fitted_font=math.max(7,math.floor(font_size*board_scale+0.5))
-                        if entity.class=="text" then label,fitted_font=RW_FitTileLabel(label,tile_width,CELL_SIZE-6*board_scale,fitted_font) end
+                        if entity.class=="text" then label,fitted_font=RW_FitTileLabel(label,tile_width,CELL_STEP,fitted_font) end
+                        local actual_font=paint(control,"fontSize",fitted_font)
+                        local tile_height=CELL_SIZE-6*board_scale
+                        if entity.class=="text" then
+                            if actual_font~=fitted_font then
+                                local plain=label:gsub("\n","")
+                                local columns=math.max(1,math.floor((tile_width-1)/(actual_font*0.65)))
+                                local pieces={};for offset=1,#plain,columns do pieces[#pieces+1]=plain:sub(offset,offset+columns-1) end
+                                label=table.concat(pieces,"\n")
+                            end
+                            local lines=1;for _ in label:gmatch("\n") do lines=lines+1 end
+                            tile_height=math.max(tile_height,lines*actual_font*1.35)
+                        end
                         paint(control,"text",label)
-                        paint(control,"fontSize",fitted_font)
+                        set_size(control,tile_width,tile_height)
                         paint(control,"fontColor",fg)
                         paint(control,"bgColor",bg)
                         set_visible(control,true)

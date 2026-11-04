@@ -2,6 +2,7 @@
 local old_game, old_script, old_color, old_render = game, script, Color, RW_Render
 local controls = {}
 local calls={position=0,size=0,font=0,visible=0}
+local minimum_font=6
 local board, status = {alive=true}, {alive=true}
 local methods = setmetatable({}, {__index=function() return function() end end})
 methods.SetAnchoredPosition = function(control,x,y) calls.position=calls.position+1;control.px,control.py=x,y end
@@ -27,6 +28,7 @@ game = {
                 if key=="fontSize" then
                     calls.font=calls.font+1
                     assert(math.type(value)=="integer","native fontSize requires a Lua integer")
+                    assert(value>=minimum_font and value<=72,"native fontSize outside supported test range")
                     c.properties.fontSize=value
                 else rawset(c,key,value) end
             end})
@@ -154,6 +156,20 @@ words.entities[1].x=3;assert(RW_Render(words,0,0))
 assert(calls.position==before.position+1 and calls.size==before.size and calls.font==before.font)
 print("PASS: unchanged render makes zero repeated position/size/font/visibility calls; one moved entity updates one position")
 print("PASS: native inactive/active Text colours, same-view refresh and large-board scaling/reset")
+-- A stricter host must not abort drawing the rest of a large board. Rejected
+-- sizes are learned once; subsequent frames and movement remain cached.
+minimum_font=8;dofile('external_lua_file/renderer.lua')
+words.width=32;words.height=30;words.entities[1].text.name='LOCKEDRIGHT'
+assert(RW_Render(words,0,0))
+local fallback
+for _,c in ipairs(controls) do if c.alive and c.name=='RW_Entity_1' then fallback=c end end
+assert(fallback.fontSize>=8 and fallback.text:gsub('\n','')=='LOCKEDRIGHT')
+local frozen={};for k,v in pairs(calls) do frozen[k]=v end
+assert(RW_Render(words,0,0))
+for k,v in pairs(calls) do assert(v==frozen[k],'fallback frame repeated native '..k) end
+words.entities[1].x=5;assert(RW_Render(words,0,0));assert(fallback.px~=nil)
+assert(calls.position==frozen.position+1 and calls.font==frozen.font)
+print('PASS: native font range rejection recovers, full labels remain, and repeated/moved frames update without repeated failures')
 Enum.CursorEventType = old_cursor_events
 game, script, Color, RW_Render = old_game, old_script, old_color, old_render
 print("PASS: native renderer portal labels, status and same-size instance refresh")

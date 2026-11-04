@@ -27,3 +27,25 @@ CreateLevelTree still validates the complete plain-data graph first and every
 definition's structure; it avoids only a second recursive plain-data walk of
 the same already checked graph. Public independent definition validation is
 unchanged. These are temporary test fixtures, not the authored puzzle pack.
+
+Native report 2026-11-02: the exported 18:15 log repeatedly records
+`renderer:36: 字号超出限制` while tree movement/Undo continues to commit. The
+renderer previously fitted long scaled words down to font4/5; the mock checked
+integer type only. Fitting now starts at6, and font assignment catches a host
+rejection, tries larger sizes through the existing known-size18 path and caches
+the accepted replacement. Labels reflow and receive sufficient height for the
+accepted size; failed sizes do not get retried on every frame. No single native
+minimum is inferred from the log. Mocks cover both minimum6 and a stricter
+minimum8 host, complete labels, repeated-frame caching and subsequent movement.
+This repairs the observed render-abort path; native latency/success still needs
+observation and is not inferred from those mocks.
+
+The same EMPTY room input also exposed backend overhead independently of rendering.
+Its first demonstration move fell from 71,536,000 to 32,922,000 instructions in
+the same sampled offline input route (about 54% fewer). Fresh condition frames
+index only the presence of an EMPTY BROKEN declaration, matching the original
+conditions.lua featureindex guard; per-cell status/conditions are never cached.
+FACING filters its one witness cell directly instead of dispatching every region
+alternative per unit. A 36M unsampled first-input budget guards this route;
+the separate 2M normal-startup budget remains unchanged. This remains a large
+virtual-occupancy workload, so the measurement does not prove smooth native input.

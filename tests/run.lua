@@ -361,7 +361,13 @@ end
 for index,route in ipairs({"DDDDDD","DDDDDDD","DDDDDDDD"}) do
  press("DDDDDDDDDDF"..route.."F")
  assert(rendered.width==32 and rendered.height==30,'backend room entry '..index)
+ local room_instructions=0
+ if index==3 then debug.sethook(function() room_instructions=room_instructions+1000 end,'',1000) end
  press(index==3 and "D" or "DD")
+ if index==3 then
+  debug.sethook()
+  assert(room_instructions<=36000000,'EMPTY test room input budget: '..room_instructions)
+ end
  local flag,crate=false,false
  for _,e in pairs(rendered.entities) do
   if e.class=='object' and e.archetype=='flag' and e.y==13 and e.x==({9,8,12})[index] then flag=true end

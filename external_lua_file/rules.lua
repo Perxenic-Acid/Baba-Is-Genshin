@@ -145,9 +145,20 @@ local function contains_rule_query(node)
     for _,term in ipairs(node.requirements or {}) do if contains_rule_query(term) then return true end end
     return false
 end
+local function has_empty_broken(world,rules)
+    for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+        for _,rule in ipairs(frame) do for _,effect in ipairs(rule.effects or {}) do
+            if effect.trait=="broken" and effect.target and effect.target.kind=="empty" then return true end
+        end end
+    end
+    return false
+end
 local function condition_context(world,rules)
     local context={};for k,v in pairs(world) do context[k]=v end
     context._condition_rules=rules;context._condition_guard={};context._condition_depth=0
+    -- Declaration presence only, scoped to this fresh query frame. Conditions
+    -- and status results are still evaluated independently for every vacancy.
+    context._empty_broken_present=has_empty_broken(world,rules)
     return context
 end
 local virtual_broken
@@ -239,6 +250,11 @@ virtual_broken=function(world,entity)
         return query_level_trait(world,"broken")
     end
     if entity.class~="empty" or world._ignore_virtual_broken then return false end
+    -- Like the original featureindex guard, avoid a nested status query when
+    -- neither current declaration frame can grant EMPTY BROKEN.
+    local present=world._empty_broken_present
+    if present==nil then present=has_empty_broken(world,world._condition_rules) end
+    if not present then return false end
     local context={};for k,v in pairs(world) do context[k]=v end
     context._ignore_virtual_broken=true
     return query_trait(context,entity,"broken")
@@ -775,8 +791,19 @@ function RW_TestEntityCondition(world,node,entity,emptydir_autofail)
             if relation=="facing" then return vector and dx==vector[1] and dy==vector[2] end
         end
         local candidates={}
-        for id,target in pairs(world.entities) do
-            if id ~= entity.id and in_region(target.x,target.y) then candidates[#candidates+1]=target end
+        if clause.relation=="facing" then
+            -- FACING has a single witness cell. Avoid evaluating every region
+            -- alternative for every real unit in every virtual EMPTY query.
+            if vector then
+                local x,y=entity.x+vector[1],entity.y+vector[2]
+                for id,target in pairs(world.entities) do
+                    if id~=entity.id and target.x==x and target.y==y then candidates[#candidates+1]=target end
+                end
+            end
+        else
+            for id,target in pairs(world.entities) do
+                if id ~= entity.id and in_region(target.x,target.y) then candidates[#candidates+1]=target end
+            end
         end
         table.sort(candidates,function(a,b)
             if a.x ~= b.x then return a.x < b.x end

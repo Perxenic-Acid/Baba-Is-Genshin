@@ -537,3 +537,23 @@ The oracle still isolates check() classification, already tested separately;
 it does not prove native update-queue collision/dodge timing, moving real pusher
 re-entry or destruction/HAS timing across all mixed recursive dependencies.
 Those remain semantic work, rather than being declared complete by this audit.
+
+## M9.9J source SWAP queue versus contact destruction
+
+Installed movement.lua move(), around1540–1570, checks dodge against deleted
+units, current coordinates and movelist displacement. A queued addaction SWAP
+update is not itself a movelist entry. Virtual pulling-source SWAP therefore
+must not suppress its target's forward EAT/OPEN-SHUT special simply by marking
+it planned. Source SWAP now reserves identities, runs those specials at their
+original coordinates, and emits displacement only for surviving targets.
+Target/source HAS retains the original death frame and order. Failed forward
+trials still preserve the pre-existing SWAP queue, while deleted targets never
+produce stale move operations.
+
+The contact fragment oracle adds queued-source-SWAP sources (20,480 total cases).
+tests/reference_swap_dodge.lua executes the installed dodge fragment for 16
+queued-update/movelist/current-position/deletion combinations independently.
+Turn tests exercise EAT and unlock with/without queued SWAP, HAS and Undo; the
+existing source-SWAP oracle checks surviving displacement. This is a correction
+to queue/special ordering, not a full native queue engine: mixed PUSH movelist
+dodge, current-position updates across all dependencies and earlier gaps remain.

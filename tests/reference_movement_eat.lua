@@ -24,8 +24,8 @@ local native=assert(load('return function(lockpartner) local x,y,ox,oy=4,4,1,0 l
  'local gone=false for _,v in ipairs(specials) do if not gone and not deleted_units[v[1]] then local b,reason=v[1],v[2] local bx,by=5,4 '..source:sub(c,d-1)..
  'end end end return valid,gone end','@installed_real_movement_eat','t',env))()
 local count=0
-for _,mode in ipairs({'real','virtual','anonymous','pulled'}) do
-local virtual=mode~='real';local anonymous=mode=='anonymous';local pulled=mode=='pulled'
+for _,mode in ipairs({'real','virtual','anonymous','pulled','pulled_swap'}) do
+local virtual=mode~='real';local anonymous=mode=='anonymous';local pulled=mode=='pulled' or mode=='pulled_swap'
 env.mover_name=virtual and 'empty' or 'avatar';env.mover_id=virtual and 2 or 100
 for mask=0,63 do for mmask=0,63 do
  target={block_entry=true};for i,name in ipairs({'open','shut','safe','float','push','still'}) do target[name]=math.floor(mask/2^(i-1))%2==1 end
@@ -39,7 +39,7 @@ for mask=0,63 do for mmask=0,63 do
   [3]={id=3,class='object',archetype='wall',x=6,y=4,behaviors={block_entry=true}}},movement_eaters={[1]={rock=mover.eat}}}
  if anonymous or pulled then
   w.entities[source_id]=nil;w.entities[1]={id=1,x=pulled and 5 or 3,y=4,behaviors={phantom=pulled}}
-  local b={push=anonymous,pull=pulled};for k,value in pairs(mover) do b[k]=value end
+  local b={push=anonymous,pull=pulled,swap=mode=='pulled_swap'};for k,value in pairs(mover) do b[k]=value end
   w.empty_cells={['4:4']={x=4,y=4,behaviors=b}}
   w.movement_eaters={empty_cells={['4:4']={rock=mover.eat},['5:4']={rock=mover.eat}}}
  end
@@ -55,7 +55,7 @@ for mask=0,63 do for mmask=0,63 do
  count=count+1
 end end
 end
-print('PASS: installed real/virtual/anonymous/pulled mover lock-before-EAT, SAFE/FLOAT/PHANTOM, STOP/PUSH/STILL and death order ('..count..' cases)')
+print('PASS: installed real/virtual/anonymous/pulled/queued-SWAP lock-before-EAT, SAFE/FLOAT/PHANTOM, STOP/PUSH/STILL and death order ('..count..' cases)')
 env.mover_name='empty';env.mover_id=2
 for mask=0,7 do
  local origin_rock=mask%2==1;local destination_rock=math.floor(mask/2)%2==1;local origin_text=mask>=4

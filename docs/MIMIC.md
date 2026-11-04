@@ -125,3 +125,31 @@ This completes pre-copy NOT expansion for non-MIMIC declarations. NOT as the
 MIMIC subject itself, ALL as an actual MIMIC endpoint, and shared mutable runtime
 scheduler/ordinary declaration ordering gaps remain separate work. Native-device
 success is not claimed by the source adapters.
+
+## M9.9P NOT as the MIMIC subject
+
+The immediate addoption() NOT-subject expansion now also applies to MIMIC
+declarations themselves, before collecting mimicprotects. NOT ROCK MIMIC FLAG
+therefore creates one MIMIC declaration for each other authored ordinary noun;
+NOT ALL MIMIC FLAG creates EMPTY and TEXT declarations. Negative MIMIC targets
+expand through the same path, so their conditions/protections meet each concrete
+imitator rather than the raw literal NOT subject. Duplicate declarations remain
+distinct and the existing one-generation/250-copy limiter still applies.
+
+The source expansion preserves the native GROUP-object exception: ordinary NOT
+subjects aimed at GROUP remain deferred, whereas NOT ALL may target GROUP and
+copies raw declarations even for an empty group. NOT GROUP subjects remain
+deferred. ALL endpoints, including NOT-source MIMIC ALL, are still unfinished.
+Expansion uses the authored vocabulary contract already used for ALL/MIMIC;
+the source adapters supply those explicit objectlist entries. Expanded MIMIC
+records use the same 5,000-entry TOO COMPLEX bound, without persisted virtual IDs,
+rule caches or extra startup passes when MIMIC is absent.
+
+tests/reference_all_mimic.lua now executes 31,104 complete native addoption/
+subrules cases, adding NOT ROCK/NOT CRATE/NOT ALL MIMIC subjects and unconditional/
+conditional MIMIC NOT bans to the earlier declaration matrix. It queries actual
+Text victims as well as ordinary units, evaluates loneliness per identity, and
+checks ordered products at the ordinary imitator. Physical tests verify control
+and excluded-noun movement, unconditional protection, NOT ALL's EMPTY/Text-only
+projection (also with GROUP targets), and Undo. Earlier GROUP and direct MIMIC
+oracles remain separate checks; native-device acceptance is not inferred.

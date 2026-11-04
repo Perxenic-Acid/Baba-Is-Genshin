@@ -115,6 +115,21 @@ for _,case in ipairs({
  assert(births==case[3],'NOT declaration expansion order or GROUP exception mismatch')
 end
 print('PASS: NOT noun/NOT ALL declarations feed MIMIC before copying, EMPTY/Text targets, GROUP exceptions, HAS and Undo')
+for _,excluded in ipairs({'ROCK','CRATE'}) do
+ s=fixture({{'NOT',excluded,'MIMIC','FLAG'},{'FLAG','IS','YOU'}})
+ n=step(s,{type='move',dx=1,dy=0})
+ assert(n.world.entities[1].x==3 and n.world.entities[2].x==(excluded=='ROCK' and 6 or 7))
+end
+s=fixture({{'NOT','CRATE','MIMIC','FLAG'},{'NOT','CRATE','MIMIC','NOT','FLAG'},{'FLAG','IS','YOU'}})
+frame=assert(RW_CompileWorld(s.world,cs));local disabled=assert(RW_ProjectWorld(s.world,frame.effects))
+assert(not disabled.entities[1].behaviors.control and not disabled.entities[2].behaviors.control)
+for _,target in ipairs({'FLAG','GROUP'}) do
+ s=fixture({{'NOT','ALL','MIMIC',target},{target,'IS','SAFE'}})
+ frame=assert(RW_CompileWorld(s.world,cs));local p=assert(RW_ProjectWorld(s.world,frame.effects))
+ assert(p.empty_cells['12:3'].behaviors.safe and p.entities[10].behaviors.safe)
+ assert(not p.entities[1].behaviors.safe and not p.entities[2].behaviors.safe)
+end
+print('PASS: NOT noun MIMIC control/exclusions/bans and Undo; NOT ALL MIMIC copies only EMPTY/Text, including GROUP endpoints')
 s=fixture({{'ALL','HAS','FLAG'},{'CRATE','HAS','ROCK'},{'ROCK','MIMIC','CRATE'},
  {'ROCK','IS','YOU','AND','DEFEAT'}})
 n=step(s)

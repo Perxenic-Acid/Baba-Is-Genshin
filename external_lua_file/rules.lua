@@ -1942,6 +1942,31 @@ local function expand_mimic(ast_rules,world)
         end
         return subject_key(term)
     end
+    local mimic_subjects={}
+    for _,rule in ipairs(ast_rules) do
+        local subject,negative=unwrap(rule.subject)
+        local target=unwrap(rule.object)
+        local source=key(subject)
+        local all=subject and subject.tag=="special" and subject.name=="all"
+        local group_target=target and target.tag=="noun" and target.type and target.type.tag=="group"
+        local products
+        if rule.verb=="mimic" and negative and key(target) and (all or source and source:sub(1,7)~="@group:" and not group_target) then
+            products={}
+            if all then products={{tag="special",name="empty"},{tag="special",name="text"}}
+            else for _,name in ipairs(RW_NounPalette(world)) do
+                if name~=source then products[#products+1]=noun_term(name) end
+            end end
+        end
+        if products then
+            for _,product in ipairs(products) do
+                local copy=query_clone(rule);copy.subject=product
+                mimic_subjects[#mimic_subjects+1]=copy
+                if #mimic_subjects>5000 then return nil,"rule_complexity_limit" end
+            end
+        else mimic_subjects[#mimic_subjects+1]=rule end
+        if #mimic_subjects>5000 then return nil,"rule_complexity_limit" end
+    end
+    ast_rules=mimic_subjects
     local result,bans={},{}
     for _,rule in ipairs(ast_rules) do
         if type(rule)~="table" then return nil,"invalid_ast_rule" end

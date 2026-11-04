@@ -109,6 +109,7 @@ function RW_ProjectWorld(world, effects, level_traits)
     for id, entity in pairs(world.entities) do
         if type(entity) ~= "table" or entity.id ~= id then return nil, "invalid_entity_identity" end
     end
+    local occupied
     for _, effect in ipairs(effects) do
         if type(effect) ~= "table" or (effect.op ~= "grant_trait" and effect.op ~= "deny_trait")
             or type(effect.trait) ~= "string" or effect.trait == "" then
@@ -118,14 +119,23 @@ function RW_ProjectWorld(world, effects, level_traits)
         if effect.cells ~= nil then
             if type(world.width) ~= "number" or type(world.height) ~= "number" then return nil,"invalid_empty_grid" end
             if not dense_list(effect.cells) or #effect.entity_ids > 0 then return nil,"invalid_empty_effect" end
+            if not occupied then
+                occupied={}
+                for _,entity in pairs(world.entities) do
+                    local x,y=entity.x,entity.y
+                    -- Only numeric coordinates can equal a validated EMPTY
+                    -- cell. Numeric keys also equate integer/float coordinates.
+                    if type(x)=="number" and x==x and type(y)=="number" and y==y then
+                        occupied[x]=occupied[x] or {};occupied[x][y]=true
+                    end
+                end
+            end
             local seen_cells={}
             for _,cell in ipairs(effect.cells) do
                 if type(cell) ~= "table" or type(cell.x) ~= "number" or type(cell.y) ~= "number"
                     or cell.x % 1 ~= 0 or cell.y % 1 ~= 0 or cell.x < 1 or cell.y < 1
                     or cell.x > world.width or cell.y > world.height or seen_cells[cell.x .. ":" .. cell.y] then return nil,"invalid_empty_cell" end
-                for _,entity in pairs(world.entities) do
-                    if entity.x == cell.x and entity.y == cell.y then return nil,"occupied_empty_cell" end
-                end
+                if occupied[cell.x] and occupied[cell.x][cell.y] then return nil,"occupied_empty_cell" end
                 seen_cells[cell.x .. ":" .. cell.y]=true
             end
         end

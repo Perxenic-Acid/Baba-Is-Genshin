@@ -46,6 +46,13 @@ the same sampled offline input route (about 54% fewer). Fresh condition frames
 index only the presence of an EMPTY BROKEN declaration, matching the original
 conditions.lua featureindex guard; per-cell status/conditions are never cached.
 FACING filters its one witness cell directly instead of dispatching every region
-alternative per unit. A 36M unsampled first-input budget guards this route;
+alternative per unit. A 32M unsampled first-input budget guards this route;
 the separate 2M normal-startup budget remains unchanged. This remains a large
 virtual-occupancy workload, so the measurement does not prove smooth native input.
+
+Projection occupancy validation now builds one local numeric-coordinate index
+instead of scanning all entities for every EMPTY effect cell. It is rebuilt on
+each projection and never stored on the world. Stacked Object/Text occupancy,
+integer/float coordinate equality, grant/deny validation and moved-unit freshness
+are covered by tests/projection_occupancy.lua. With this change the same first
+EMPTY input uses 29,279,000 instructions without sampling; startup remains 1,438,000.

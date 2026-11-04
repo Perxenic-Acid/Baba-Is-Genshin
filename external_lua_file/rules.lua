@@ -2030,60 +2030,82 @@ local function expand_mimic(ast_rules,world)
     -- subrules expands ordinary ALL subjects before its MIMIC pass. Keep
     -- these declarations in the copy lookup only: normal lowering already
     -- expands the original ALL rule for runtime consumers.
-    local copy_lookup,all_lookup={},{}
-    local function same_term(a,b)
-        if type(a)~=type(b) then return false end
-        if type(a)~="table" then return a==b end
-        for k,v in pairs(a) do if not same_term(v,b[k]) then return false end end
-        for k in pairs(b) do if a[k]==nil then return false end end
-        return true
+    local copy_lookup,all_queue={},{}
+    local literal_products={}
+    local function expanded_product_verb(verb)
+        return verb=="has" or verb=="make" or verb=="eat" or verb=="fear" or verb=="follow"
     end
-    for _,entry in ipairs(ast_rules) do
+    local function add_lookup(entry)
         copy_lookup[#copy_lookup+1]=entry
-        if #copy_lookup+#all_lookup>5000 then return nil,"rule_complexity_limit" end
+        if #copy_lookup>5000 then return nil,"rule_complexity_limit" end
         local subject,negative=unwrap(entry.subject)
         local object,object_negative=unwrap(entry.object)
         local group_target=object and object.tag=="noun" and object.type and object.type.tag=="group"
-        local membership=entry.verb=="is" and group_target
-        local all=subject and subject.tag=="special" and subject.name=="all"
-        local products={}
+        local subject_all=subject and subject.tag=="special" and subject.name=="all"
+        local object_all=object and object.tag=="special" and object.name=="all"
         if entry.verb~="mimic" then
-            if all and not membership then
-                if negative then products={{tag="special",name="empty"},{tag="special",name="text"}}
-                else for _,name in ipairs(RW_NounPalette(world)) do products[#products+1]=noun_term(name) end end
-            elseif negative and not group_target then
-                local excluded=key(subject)
-                if excluded and excluded:sub(1,7)~="@group:" then
-                    for _,name in ipairs(RW_NounPalette(world)) do
-                        if name~=excluded then products[#products+1]=noun_term(name) end
+            if subject_all and not negative or object_all and not object_negative then
+                all_queue[#all_queue+1]=entry
+            end
+            if object_all and not object_negative and expanded_product_verb(entry.verb) then
+                literal_products[entry]=true
+            end
+            if negative and (subject_all or not group_target) then
+                local products={}
+                if subject_all then products={{tag="special",name="empty"},{tag="special",name="text"}}
+                else
+                    local excluded=key(subject)
+                    if excluded and excluded:sub(1,7)~="@group:" then
+                        for _,name in ipairs(RW_NounPalette(world)) do
+                            if name~=excluded then products[#products+1]=noun_term(name) end
+                        end
                     end
+                end
+                for _,product in ipairs(products) do
+                    local copy=query_clone(entry);copy.subject=product
+                    local ok,err=add_lookup(copy);if not ok then return nil,err end
                 end
             end
         end
-        if #products>0 then
-            local requirements={entry.when}
-            -- Native nconds scans featureindex["not all"], not all negative
-            -- object declarations. Preserve that narrower lookup literally.
-            if all and not negative and not object_negative and object and object.tag=="special" and object.name=="all" then
-                for _,ban in ipairs(ast_rules) do
-                    local banned,banned_negative=unwrap(ban.object)
-                    if ban.verb==entry.verb and same_term(ban.subject,entry.subject) and banned_negative and same_term(banned,object) then
-                        requirements[#requirements+1]=invert_mimic_condition(ban.when)
-                    end
+        return true
+    end
+    for _,entry in ipairs(ast_rules) do
+        local ok,err=add_lookup(entry);if not ok then return nil,err end
+    end
+    -- Native subrules walks a growing featureindex[all]. Each generated
+    -- declaration still containing literal ALL is visited later in the pass.
+    local index=1
+    while index<=#all_queue do
+        local entry=all_queue[index];index=index+1
+        local subject,negative=unwrap(entry.subject)
+        local object,object_negative=unwrap(entry.object)
+        local subject_all=subject and subject.tag=="special" and subject.name=="all" and not negative
+        local object_all=object and object.tag=="special" and object.name=="all" and not object_negative
+        local requirements={entry.when}
+        if object_all then
+            for _,ban in ipairs(copy_lookup) do
+                local banned,denied=unwrap(ban.object)
+                if ban.verb==entry.verb and literal_source(ban.subject)==literal_source(entry.subject)
+                    and denied and target_key(banned)=="@all" then
+                    requirements[#requirements+1]=invert_mimic_condition(ban.when)
                 end
             end
-            for _,product in ipairs(products) do
-                local copy=query_clone(entry);copy.subject=product
+        end
+        if object_all and expanded_product_verb(entry.verb) then
+            for _,name in ipairs(RW_NounPalette(world)) do
+                local copy=query_clone(entry);copy.object=noun_term(name)
                 copy.when={op="spatial",clauses={},requirements=requirements}
-                -- addoption expands NOT immediately; subrules appends ALL
-                -- derivatives only after all original declarations exist.
-                local lookup=all and not negative and all_lookup or copy_lookup
-                lookup[#lookup+1]=copy
-                if #copy_lookup+#all_lookup>5000 then return nil,"rule_complexity_limit" end
+                local ok,err=add_lookup(copy);if not ok then return nil,err end
+            end
+        end
+        if subject_all then
+            for _,name in ipairs(RW_NounPalette(world)) do
+                local copy=query_clone(entry);copy.subject=noun_term(name)
+                copy.when={op="spatial",clauses={},requirements=requirements}
+                local ok,err=add_lookup(copy);if not ok then return nil,err end
             end
         end
     end
-    for _,entry in ipairs(all_lookup) do copy_lookup[#copy_lookup+1]=entry end
     for _,rule in ipairs(ast_rules) do if rule.verb=="mimic" then
         local target,negative=unwrap(rule.object)
         local source,destination=key(rule.subject),target_key(target)
@@ -2108,7 +2130,10 @@ local function expand_mimic(ast_rules,world)
                     if not blocked then
                         local copy=query_clone(copied);copy.subject=query_clone(rule.subject)
                         copy.when=#combined.requirements>0 and combined or {op="always"}
-                        result[#result+1]=copy;count=count+1
+                        -- A literal non-IS RHS ALL remains a counted native
+                        -- declaration, not another runtime palette expansion.
+                        if not literal_products[copied] then result[#result+1]=copy end
+                        count=count+1
                         if count>250 then return nil,"rule_complexity_limit" end
                     end
                 end
@@ -2515,7 +2540,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                             if key=="@empty" and sem.noun=="follow" and target~="@all" and name~="@empty" and name~="level_block" then
                                 empty_directions[#empty_directions+1]={op="follow",relation=relations[#relations]}
                             end
-                            if sem.noun=="make" and subj.tag=="special" and subj.name=="all" and not subnot
+                            if sem.noun=="make" and (subnot or subj.tag=="special" and subj.name=="all")
                                 and obj.tag=="special" and obj.name=="all" then
                                 relations[#relations+1]=query_clone(relations[#relations])
                             end
@@ -2627,7 +2652,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 if relations[index].op == "has" or relations[index].op == "empty_has" then
                     contain_verbs[index]=ast.verb
                     contain_origins[index]=obj.tag == "special" and obj.name == "all" and "@all" or false
-                    if subj.tag == "special" and subj.name == "all" and not subnot
+                    if (subnot or subj.tag == "special" and subj.name == "all")
                         and obj.tag == "special" and obj.name == "all" and not objnot then
                         relations[#relations+1]=query_clone(relations[index]);contain_origins[#relations]="@all";contain_verbs[#relations]=ast.verb
                     end

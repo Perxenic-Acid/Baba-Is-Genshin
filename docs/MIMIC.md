@@ -190,3 +190,40 @@ inside the copy lookup is still incomplete; adapters above use concrete HAS
 products and do not establish that behavior. Ordinary NOT-to-GROUP exceptions,
 NOT GROUP endpoints and conditional scoped LEVEL limitations remain as recorded
 above. No native-device success is inferred from these offline comparisons.
+
+## M9.9R pre-copy RHS ALL products
+
+The copy lookup now follows the growing installed subrules() ALL queue instead
+of treating only ALL subjects. addoption() immediately appends concrete NOT
+subjects; subrules() then expands both ALL axes, visiting appended declarations
+that still contain literal ALL. This preserves the two paths of ALL HAS ALL and
+NOT noun/NOT ALL HAS ALL. NOT ALL RHS protection is inverted at the appropriate
+literal-subject expansion, while separately authored products remain independent.
+The same base negative-subject duplication is restored for HAS and MAKE.
+
+For HAS/MAKE/EAT/FEAR/FOLLOW, the raw positive RHS ALL declaration remains in the
+copy count, but does not produce another runtime palette expansion. Concrete
+pre-copy derivatives provide those products/targets. Native inside()/createall()
+finds no physical unit named ALL; the MAKE block similarly has no ALL creation
+branch. Each raw declaration still counts toward the 250-copy TOO COMPLEX limit.
+Lookup records remain transient and bounded to 5,000. Normal runtime declarations
+are not replaced by the copy-only table, and compilation without MIMIC skips it.
+
+Physical tests compare every product noun and Undo for concrete, ALL, NOT noun
+and NOT ALL source paths. The standalone reference_mimic_all_products.lua runs
+installed addoption()/subrules() and compares concrete HAS product multisets at
+each real identity, including conditional NOT ALL/NOT FLAG and native copy-limit
+outcomes. It deliberately excludes literal HAS ALL from birth expectations:
+installed inside() passes it to createall(), whose findtype({all},...) has no
+matching ordinary identity. Existing complete-pass ALL and GROUP oracles remain
+independent checks. Cross-name hash traversal order remains the documented gap.
+
+WRITE/BECOME RHS ALL lookup expansion remains pending: their literal ALL records
+have conversion behavior and must not use the inert-product shortcut above.
+Positive ALL as a MIMIC subject, NOT GROUP and other previously recorded scoped
+limitations remain pending. These tests do not establish native-device success.
+
+Validation matrix: 27,648 native RHS ALL cases, including 1,456 TOO COMPLEX
+outcomes. The adapter also executes installed inside(), createall() and findtype()
+to prove that literal HAS ALL adds no births while a concrete HAS CRATE still
+creates its product. It does not substitute a hand-written raw-ALL consumer.

@@ -153,6 +153,39 @@ for _,unit in pairs(n.world.entities) do
 end
 assert(negative_copies==2*#RW_NounPalette(s.world)+2,'NOT-source MIMIC ALL must keep both native expansion paths')
 print('PASS: MIMIC ALL targets, raw ALL declarations/duplicates, conditional NOT ALL, independent explicit targets and HAS Undo')
+for _,case in ipairs({
+ {subject={'CRATE'},target='CRATE',factor=1},
+ {subject={'ALL'},target='CRATE',factor=4},
+ {subject={'NOT','ROCK'},target='CRATE',factor=2},
+ {subject={'NOT','ALL'},target='TEXT',factor=2},
+}) do
+ local row={};for _,word in ipairs(case.subject) do row[#row+1]=word end
+ row[#row+1]='HAS';row[#row+1]='ALL'
+ s=fixture({row,{'ROCK','MIMIC',case.target},{'ROCK','IS','YOU','AND','DEFEAT'}})
+ n=step(s);local products={}
+ for _,unit in pairs(n.world.entities) do if unit.class=='object' and unit.x==6 and unit.y==3 then
+  products[unit.archetype]=(products[unit.archetype] or 0)+1
+ end end
+ for _,name in ipairs(RW_NounPalette(s.world)) do
+  assert(products[name]==case.factor,'pre-MIMIC RHS ALL birth multiplicity: '..name)
+ end
+end
+print('PASS: copied RHS ALL concrete products, two ALL axes, NOT/NOT ALL source paths and atomic HAS Undo')
+for _,verb in ipairs({'HAS','MAKE'}) do
+ local rows={{'NOT','ROCK',verb,'ALL'}}
+ if verb=='HAS' then rows[#rows+1]={'AVATAR','IS','YOU','AND','DEFEAT'} end
+ s=fixture(rows);n=step(s)
+ local products={}
+ for _,unit in pairs(n.world.entities) do if unit.class=='object' and unit.x==2 and unit.y==2 then
+  products[unit.archetype]=(products[unit.archetype] or 0)+1
+ end end
+ for _,name in ipairs(RW_NounPalette(s.world)) do
+  local expected=verb=='MAKE' and name=='avatar' and 1 or 2
+  assert(products[name]==expected,'base negative-subject '..verb..' ALL multiplicity: '..name)
+ end
+end
+print('PASS: base NOT noun HAS/MAKE ALL preserve both paths without MIMIC, old MAKE blockers and Undo')
+
 s=fixture({{'ALL','HAS','FLAG'},{'CRATE','HAS','ROCK'},{'ROCK','MIMIC','CRATE'},
  {'ROCK','IS','YOU','AND','DEFEAT'}})
 n=step(s)

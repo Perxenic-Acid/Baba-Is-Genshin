@@ -24,7 +24,7 @@ local function cond(mode)
 end
 local checked=0
 for _,declaration_source in ipairs({'all','not rock','not crate','not all'}) do
-for _,mimic_target in ipairs({'crate','empty','text'}) do
+for _,mimic_target in ipairs({'crate','empty','text','all'}) do
 for _,mimic_source in ipairs({'rock','not rock','not crate','not all'}) do for mimic_ban=0,2 do
 for declarations=1,2 do for copies=1,2 do for ban=0,2 do
 for declaration_condition=0,2 do for mimic_condition=0,2 do for overlap=0,1 do
@@ -66,9 +66,16 @@ for declaration_condition=0,2 do for mimic_condition=0,2 do for overlap=0,1 do
   local expected={};for _,name in ipairs(products) do if name~='flag' or not denied then expected[#expected+1]=name end end
   local births,err=RW_PlanHasBirths(w,{id},has);assert(births,err)
   assert(#births==#expected,'ALL before MIMIC mismatch '..checked..':'..id..':'..#births..'/'..#expected)
-  if id==1 then for index,name in ipairs(expected) do
+  if id==1 and mimic_target~='all' then for index,name in ipairs(expected) do
    assert(births[index].archetype==name,'MIMIC target declaration order mismatch '..checked..':'..index)
   end end
+  if mimic_target=='all' then
+   -- Native pairs(objectlist) has host-dependent hash order; the project uses
+   -- its authored palette order across targets. Preserve every product count.
+   local counts={};for _,name in ipairs(expected) do counts[name]=(counts[name] or 0)+1 end
+   for _,birth in ipairs(births) do counts[birth.archetype]=(counts[birth.archetype] or 0)-1 end
+   for _,count in pairs(counts) do assert(count==0,'ALL MIMIC product multiplicity mismatch '..checked) end
+  end
  end
  checked=checked+1
 end end end end end end end end end end

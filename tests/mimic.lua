@@ -130,6 +130,29 @@ for _,target in ipairs({'FLAG','GROUP'}) do
  assert(not p.entities[1].behaviors.safe and not p.entities[2].behaviors.safe)
 end
 print('PASS: NOT noun MIMIC control/exclusions/bans and Undo; NOT ALL MIMIC copies only EMPTY/Text, including GROUP endpoints')
+for _,ban in ipairs({false,true}) do for _,direct in ipairs({false,true}) do
+ local rows={{'ROCK','MIMIC','ALL'},{'FLAG','IS','SAFE'}}
+ if ban then rows[#rows+1]={'ROCK','MIMIC','NOT','ALL'} end
+ if direct then rows[#rows+1]={'ROCK','MIMIC','FLAG'} end
+ s=fixture(rows);frame=assert(RW_CompileWorld(s.world,cs))
+ local p=assert(RW_ProjectWorld(s.world,frame.effects))
+ assert((p.entities[2].behaviors.safe==true)==(not ban or direct),'NOT ALL must not ban a separate explicit MIMIC target')
+end end
+s=fixture({{'ROCK','MIMIC','ALL'},{'LONELY','ROCK','MIMIC','NOT','ALL'},{'FLAG','IS','SAFE'}})
+frame=assert(RW_CompileWorld(s.world,cs));assert(not RW_ProjectWorld(s.world,frame.effects).entities[2].behaviors.safe)
+s.world.entities[1].x=6;s.world.entities[1].y=3
+frame=assert(RW_CompileWorld(s.world,cs));assert(RW_ProjectWorld(s.world,frame.effects).entities[2].behaviors.safe)
+s=fixture({{'ALL','HAS','FLAG'},{'ROCK','MIMIC','ALL'},{'ROCK','IS','YOU','AND','DEFEAT'}})
+n=step(s);local all_copies=0
+for _,unit in pairs(n.world.entities) do if unit.archetype=='flag' and unit.x==6 and unit.y==3 then all_copies=all_copies+1 end end
+assert(all_copies==#RW_NounPalette(s.world)+2,'MIMIC ALL must retain the literal ALL declaration plus ordinary target copies and the base HAS')
+s=fixture({{'ALL','HAS','FLAG'},{'NOT','ROCK','MIMIC','ALL'},{'AVATAR','IS','YOU','AND','DEFEAT'}})
+n=step(s);local negative_copies=0
+for _,unit in pairs(n.world.entities) do
+ if unit.archetype=='flag' and unit.x==2 and unit.y==2 then negative_copies=negative_copies+1 end
+end
+assert(negative_copies==2*#RW_NounPalette(s.world)+2,'NOT-source MIMIC ALL must keep both native expansion paths')
+print('PASS: MIMIC ALL targets, raw ALL declarations/duplicates, conditional NOT ALL, independent explicit targets and HAS Undo')
 s=fixture({{'ALL','HAS','FLAG'},{'CRATE','HAS','ROCK'},{'ROCK','MIMIC','CRATE'},
  {'ROCK','IS','YOU','AND','DEFEAT'}})
 n=step(s)

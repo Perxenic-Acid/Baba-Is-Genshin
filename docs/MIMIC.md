@@ -153,3 +153,40 @@ checks ordered products at the ordinary imitator. Physical tests verify control
 and excluded-noun movement, unconditional protection, NOT ALL's EMPTY/Text-only
 projection (also with GROUP targets), and Undo. Earlier GROUP and direct MIMIC
 oracles remain separate checks; native-device acceptance is not inferred.
+
+
+## M9.9Q ALL as a MIMIC target
+
+Installed rules.lua addoption() around1081–1114 and subrules() around1116–1207
+retain a literal MIMIC ALL declaration and append one MIMIC target per authored
+ordinary noun. The literal declaration can copy raw ALL-subject declarations;
+it is not replaced by the concrete targets. MIMIC NOT ALL protects that literal
+copy and contributes inverted conditions to each generated target. A separately
+authored MIMIC ROCK remains independent of that ALL-target protection.
+
+Negative MIMIC subjects retain their literal parent during this expansion.
+NOT ROCK MIMIC ALL therefore has two ordinary-target expansion paths: the raw
+NOT parent expands its target and then its subject, while its concrete-subject
+children expand their own targets. Both paths count. NOT ALL similarly expands
+its subject to EMPTY and TEXT. Raw supported negative parents are transient
+compiler bookkeeping, never executable identities or deferred diagnostics.
+GROUP MIMIC ALL also copies original declarations before GROUP expansion.
+Existing 5,000-record and 250-copy limits remain TOO COMPLEX boundaries.
+
+The complete installed-source oracle covers 41,472 ALL/NOT declarations, direct
+and negative MIMIC subjects, ordinary/EMPTY/TEXT/ALL targets, duplicate clauses,
+negative HAS/MIMIC protection and per-identity LONELY cases. Ordinary targets
+retain ordered-product checks. ALL targets compare product multiplicities:
+original pairs(objectlist) uses a host-dependent hash order, whereas this engine
+uses authored palette order across distinct target nouns. This is a deliberate
+ordering gap; within each copied target, declaration order remains preserved.
+The GROUP complete-pass oracle adds ALL targets (1,440 cases). Physical tests
+cover conditional protection, explicit-target independence, double negative-source
+expansion and HAS births with whole-tree Undo.
+
+This supersedes earlier RHS ALL endpoint deferrals, not all ALL-related gaps.
+Positive ALL as the MIMIC subject remains deferred. Non-MIMIC RHS ALL expansion
+inside the copy lookup is still incomplete; adapters above use concrete HAS
+products and do not establish that behavior. Ordinary NOT-to-GROUP exceptions,
+NOT GROUP endpoints and conditional scoped LEVEL limitations remain as recorded
+above. No native-device success is inferred from these offline comparisons.

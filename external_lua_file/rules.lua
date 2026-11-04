@@ -1942,7 +1942,17 @@ local function expand_mimic(ast_rules,world)
         end
         return subject_key(term)
     end
+    local function target_key(term)
+        if term and term.tag=="special" and term.name=="all" then return "@all" end
+        return key(term)
+    end
     local mimic_subjects={}
+    local expanded_negative={}
+    local function literal_source(term)
+        local value,negative=unwrap(term)
+        local name=target_key(value)
+        return name and (negative and "not "..name or name)
+    end
     for _,rule in ipairs(ast_rules) do
         local subject,negative=unwrap(rule.subject)
         local target=unwrap(rule.object)
@@ -1950,7 +1960,7 @@ local function expand_mimic(ast_rules,world)
         local all=subject and subject.tag=="special" and subject.name=="all"
         local group_target=target and target.tag=="noun" and target.type and target.type.tag=="group"
         local products
-        if rule.verb=="mimic" and negative and key(target) and (all or source and source:sub(1,7)~="@group:" and not group_target) then
+        if rule.verb=="mimic" and negative and target_key(target) and (all or source and source:sub(1,7)~="@group:" and not group_target) then
             products={}
             if all then products={{tag="special",name="empty"},{tag="special",name="text"}}
             else for _,name in ipairs(RW_NounPalette(world)) do
@@ -1958,6 +1968,12 @@ local function expand_mimic(ast_rules,world)
             end end
         end
         if products then
+            -- addoption retains the literal NOT parent. Its ALL target later
+            -- expands independently of the already expanded concrete children.
+            if target_key(target)=="@all" then
+                mimic_subjects[#mimic_subjects+1]=rule
+                expanded_negative[rule]=products
+            end
             for _,product in ipairs(products) do
                 local copy=query_clone(rule);copy.subject=product
                 mimic_subjects[#mimic_subjects+1]=copy
@@ -1967,12 +1983,43 @@ local function expand_mimic(ast_rules,world)
         if #mimic_subjects>5000 then return nil,"rule_complexity_limit" end
     end
     ast_rules=mimic_subjects
+    -- subrules retains the literal MIMIC ALL and appends ordinary targets.
+    -- NOT ALL protects the literal copy and conditions every appended target.
+    local all_targets={}
+    for _,rule in ipairs(ast_rules) do
+        local target,negative=unwrap(rule.object)
+        local source=literal_source(rule.subject)
+        if rule.verb=="mimic" and (key(rule.subject) or expanded_negative[rule]) and not negative and target_key(target)=="@all" then
+            local requirements={rule.when}
+            for _,ban in ipairs(ast_rules) do
+                local banned,denied=unwrap(ban.object)
+                if ban.verb=="mimic" and literal_source(ban.subject)==source and denied and target_key(banned)=="@all" then
+                    requirements[#requirements+1]=invert_mimic_condition(ban.when)
+                end
+            end
+            for _,name in ipairs(RW_NounPalette(world)) do
+                local copy=query_clone(rule);copy.object=noun_term(name)
+                copy.when={op="spatial",clauses={},requirements=requirements}
+                if expanded_negative[rule] then
+                    for _,product in ipairs(expanded_negative[rule]) do
+                        local derived=query_clone(copy);derived.subject=query_clone(product)
+                        all_targets[#all_targets+1]=derived
+                        if #ast_rules+#all_targets>5000 then return nil,"rule_complexity_limit" end
+                    end
+                else
+                    all_targets[#all_targets+1]=copy
+                    if #ast_rules+#all_targets>5000 then return nil,"rule_complexity_limit" end
+                end
+            end
+        end
+    end
+    for _,rule in ipairs(all_targets) do ast_rules[#ast_rules+1]=rule end
     local result,bans={},{}
     for _,rule in ipairs(ast_rules) do
         if type(rule)~="table" then return nil,"invalid_ast_rule" end
         if rule.verb=="mimic" then
             local target,negative=unwrap(rule.object)
-            local source,destination=key(rule.subject),key(target)
+            local source,destination=key(rule.subject),target_key(target)
             if source and destination and negative then
                 bans[source]=bans[source] or {};bans[source][destination]=bans[source][destination] or {}
                 table.insert(bans[source][destination],rule.when)
@@ -2039,12 +2086,14 @@ local function expand_mimic(ast_rules,world)
     for _,entry in ipairs(all_lookup) do copy_lookup[#copy_lookup+1]=entry end
     for _,rule in ipairs(ast_rules) do if rule.verb=="mimic" then
         local target,negative=unwrap(rule.object)
-        local source,destination=key(rule.subject),key(target)
+        local source,destination=key(rule.subject),target_key(target)
         if not source or not destination then
-            result[#result+1]=rule -- unsupported forms remain visible as deferred.
+            if not expanded_negative[rule] then
+                result[#result+1]=rule -- unsupported forms remain visible as deferred.
+            end
         elseif not negative then
             for _,copied in ipairs(copy_lookup) do
-                if copied.verb~="mimic" and key(copied.subject)==destination then
+                if copied.verb~="mimic" and target_key(copied.subject)==destination then
                     local conditions={copied.when,rule.when}
                     for _,condition in ipairs((bans[source] or {})[destination] or {}) do
                         conditions[#conditions+1]=invert_mimic_condition(condition)

@@ -189,6 +189,17 @@ function RW_ResolveMovement(world, action)
     local planned,removed,destructions = {},{},{}
     local visiting = {}
     local changes = {}
+    local swap_operations={}
+    local function queued_swap(id)
+        if not planned[id] then return false end
+        for _,op in ipairs(changes) do
+            if op.entity_id==id and swap_operations[op] then return true end
+        end
+        return false
+    end
+    local function queue_swap(op)
+        changes[#changes+1]=op;swap_operations[op]=true
+    end
     local empty_departures={}
     local destroy_empty
     local function destroy(id,direction,cause)
@@ -314,7 +325,7 @@ function RW_ResolveMovement(world, action)
                 while #destructions>death_count do table.remove(destructions) end
             end
             for _,op in ipairs(source_swaps) do
-                if not removed[op.entity_id] then changes[#changes+1]=op end
+                if not removed[op.entity_id] then queue_swap(op) end
             end
             pusher_id=nil
             traversed=true;tx,ty=tx-dx,ty-dy
@@ -361,7 +372,7 @@ function RW_ResolveMovement(world, action)
         local partner=has_capability(world,source,"open") and "shut" or has_capability(world,source,"shut") and "open"
         local targets=eating_targets(source,nx,ny)
         for _,id in ipairs(occupants) do
-            if (not planned[id] or pull_context and pull_context.pending_swaps and pull_context.pending_swaps[id])
+            if (not planned[id] or queued_swap(id) or pull_context and pull_context.pending_swaps and pull_context.pending_swaps[id])
                 and not (pull_context and id==pull_context.pusher_id) then
                 local other=world.entities[id]
                 local target_swap=not pulling and has_capability(world,other,"swap") and not immobile(world,other,dx,dy)
@@ -376,7 +387,7 @@ function RW_ResolveMovement(world, action)
                 if unlock or eat then
                     if unlock then specials[#specials+1]={id=id,kind="unlock"} end
                     if eat then specials[#specials+1]={id=id,kind="eat"} end
-                elseif pull_context and pull_context.pending_swaps and pull_context.pending_swaps[id] then
+                elseif queued_swap(id) or pull_context and pull_context.pending_swaps and pull_context.pending_swaps[id] then
                     -- addaction SWAP updates do not dodge move() specials;
                     -- retain their queued displacement if no special deletes it.
                 elseif phantom then
@@ -410,9 +421,9 @@ function RW_ResolveMovement(world, action)
         for _,id in ipairs(swaps) do
             if not removed[id] and not planned[id] then
                 local other=world.entities[id];planned[id]=true
-                changes[#changes+1]={kind="move",entity_id=id,
+                queue_swap({kind="move",entity_id=id,
                     from={x=other.x,y=other.y,direction=other.direction or "None"},
-                    to={x=x,y=y,direction=other.direction or "None"}}
+                    to={x=x,y=y,direction=other.direction or "None"}})
             end
         end
         if pull_context then return true end
@@ -513,7 +524,7 @@ function RW_ResolveMovement(world, action)
         local partner=has_capability(world,entity,"open") and "shut"
             or has_capability(world,entity,"shut") and "open" or nil
         for _, other_id in ipairs(occupants) do
-            if not planned[other_id] then
+            if not planned[other_id] or queued_swap(other_id) then
                 local other = world.entities[other_id]
 
                 local target_swap=has_capability(world,other,"swap") and not immobile(world,other,dx,dy)
@@ -527,6 +538,9 @@ function RW_ResolveMovement(world, action)
                     -- Native real-target specials queue lock before eat.
                     if unlock then specials[#specials+1]={id=other_id,kind="unlock"} end
                     if eat then specials[#specials+1]={id=other_id,kind="eat"} end
+                elseif queued_swap(other_id) then
+                    -- SWAP addaction is not a movelist displacement. Its
+                    -- target still receives later specials at the old cell.
                 elseif action.falling and not phantom and same_layer(world,entity,other)
                     and has_capability(world,other,"weak") and not has_capability(world,other,"safe")
                     and not has_capability(world,other,"push") then
@@ -579,9 +593,9 @@ function RW_ResolveMovement(world, action)
         for _,other_id in ipairs(swaps) do
             if not removed[other_id] then
                 local other=world.entities[other_id];planned[other_id]=true
-                changes[#changes+1]={kind="move",entity_id=other_id,
+                queue_swap({kind="move",entity_id=other_id,
                     from={x=other.x,y=other.y,direction=other.direction or "None"},
-                    to={x=entity.x,y=entity.y,direction=other.direction or "None"}}
+                    to={x=entity.x,y=entity.y,direction=other.direction or "None"}})
             end
         end
 
@@ -663,9 +677,13 @@ function RW_ResolveMovement(world, action)
             end
         end
     end
+    local surviving={}
+    for _,op in ipairs(changes) do
+        if not (swap_operations[op] and removed[op.entity_id]) then surviving[#surviving+1]=op end
+    end
     return {
         consumes_turn = true,
-        changes = changes,
+        changes = surviving,
         destructions=destructions
     }
 end

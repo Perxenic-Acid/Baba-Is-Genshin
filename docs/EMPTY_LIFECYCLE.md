@@ -575,3 +575,29 @@ whole mutable movelist scheduler. In particular, blanket planned-ID suppression
 cannot encode those reason/target distinctions, and repeated real dependency
 entries/current-position mutation remain pending. No gameplay change is inferred
 solely from this audit; it establishes the cases the scheduler must preserve.
+
+## M9.9L queued SWAP targets remain eligible for later specials
+
+A concrete mixed-dependency case is now corrected: two stacked PUSH units reach
+one SWAP target. The first unit queues the exchange; the second unit's EAT or
+OPEN/SHUT must still test that target at its original coordinates. The installed
+dopush() addaction branches (around1300–1340) and move() dodge fragment establish
+that queued exchange alone is not a movelist escape.
+
+The solver tracks queued-exchange operation identities transiently, separately
+from ordinary planned displacement. Real and anonymous movers still inspect
+those targets for specials; ordinary collision/dependency work stays reserved.
+Only live operations in the current changes prefix count, so speculative rollback
+cannot leak queue reservations. If a later special destroys an exchanged target,
+its queued displacement is removed before returning the plan. No queue tags are
+persisted in operations, worlds or Undo. Previous source-SWAP handling shares the
+same classification after its local forward trial.
+
+tests/queued_swap_contacts.lua covers four axes, EAT and unlock, target-first HAS
+at original source positions, SAFE retaining the original exchange/facing,
+unrelated blocker rollback, no stale displacement
+and Undo. Running it against the preceding movement.lua fails; the corrected
+solver passes. The 1,152-case installed dodge oracle and existing 20,480-case
+movement contact matrix remain applicable. This does not implement repeated
+movelist entries, immediate current-position mutations or the full native mutable
+scheduler; WEAK's separate dodge rules remain an independent scope distinction.

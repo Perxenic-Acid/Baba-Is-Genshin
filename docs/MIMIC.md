@@ -95,3 +95,33 @@ Existing EMPTY and GROUP MIMIC oracles remain separate checks. The transient
 lookup is bounded to 5,000 declarations and uses the existing TOO COMPLEX path.
 ALL as the actual MIMIC endpoint and NOT-source preprocessing remain unfinished;
 this correction addresses declarations copied through ordinary endpoints.
+
+## M9.9O NOT declarations and pre-copy insertion order
+
+Installed addoption() (rules.lua around1081–1114) immediately expands ordinary
+NOT subjects into the other authored ordinary names. NOT ALL instead adds EMPTY
+and TEXT. MIMIC must see these declarations as copy candidates before its own
+pass. The copy-only lookup now includes them without duplicating ordinary runtime
+lowering. NOT GROUP remains literal. Ordinary NOT subjects whose object is a GROUP
+term retain the original exception; NOT ALL HAS GROUP does expand, while NOT ROCK
+HAS GROUP does not expand until the later GROUP pass. Already-normalized GROUP
+membership records are not inserted twice.
+
+The lookup also preserves stage order: immediate NOT derivatives follow their
+original declaration, while positive ALL derivatives append after all original
+declarations, as subrules() does. This matters for ordered HAS products copied
+from a target that has both direct and ALL-derived declarations. A physical test
+checks FLAG, ROCK, FLAG birth order, not just the final number of births.
+
+The installed complete-pass oracle now covers 2,592 ALL/NOT ROCK/NOT CRATE/NOT ALL
+cases, ordinary/EMPTY/TEXT MIMIC targets, conditions at the imitator, duplicate and
+negative HAS declarations, plus mixed direct-target products. It compares ordered
+births at the imitator and total birth counts at the original target. Physical
+sentences cover NOT ALL's EMPTY/Text declarations, GROUP-consumer exceptions,
+HAS and Undo. The 5,000-entry lookup bound includes both immediate and pending
+ALL records, retaining the 5,000/5,001 tests.
+
+This completes pre-copy NOT expansion for non-MIMIC declarations. NOT as the
+MIMIC subject itself, ALL as an actual MIMIC endpoint, and shared mutable runtime
+scheduler/ordinary declaration ordering gaps remain separate work. Native-device
+success is not claimed by the source adapters.

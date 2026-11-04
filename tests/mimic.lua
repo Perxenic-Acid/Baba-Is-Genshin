@@ -101,6 +101,26 @@ do
  assert(not generated and reason=='rule_complexity_limit','trailing original entry escaped copy lookup bound')
 end
 -- Virtual endpoints share the raw one-generation pass, not a persisted unit.
+for _,case in ipairs({
+ {{'NOT','ROCK','HAS','FLAG'},'CRATE',1},
+ {{'NOT','ALL','HAS','FLAG'},'EMPTY',1},
+ {{'NOT','ALL','HAS','FLAG'},'TEXT',1},
+ {{'NOT','ALL','HAS','GROUP'},'EMPTY',1},
+ {{'NOT','ROCK','HAS','GROUP'},'CRATE',0}
+}) do
+ s=fixture({case[1],{'ROCK','MIMIC',case[2]},{'FLAG','IS','GROUP'},
+  {'ROCK','IS','YOU','AND','DEFEAT'}})
+ n=step(s);local births=0
+ for _,unit in pairs(n.world.entities) do if unit.archetype=='flag' and unit.x==6 and unit.y==3 then births=births+1 end end
+ assert(births==case[3],'NOT declaration expansion order or GROUP exception mismatch')
+end
+print('PASS: NOT noun/NOT ALL declarations feed MIMIC before copying, EMPTY/Text targets, GROUP exceptions, HAS and Undo')
+s=fixture({{'ALL','HAS','FLAG'},{'CRATE','HAS','ROCK'},{'ROCK','MIMIC','CRATE'},
+ {'ROCK','IS','YOU','AND','DEFEAT'}})
+n=step(s)
+for offset,name in ipairs({'flag','rock','flag'}) do
+ assert(n.world.entities[s.world.next_entity_id+offset-1].archetype==name,'ALL derivatives must follow original target declarations in MIMIC lookup')
+end
 s=fixture({{'EMPTY','MIMIC','FLAG'},{'FLAG','NEAR','ROCK','IS','PUSH'},
  {'EMPTY','NEAR','AVATAR','MIMIC','NOT','FLAG'}})
 frame=assert(RW_CompileWorld(s.world,cs))

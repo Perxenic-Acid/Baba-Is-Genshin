@@ -1958,7 +1958,7 @@ local function expand_mimic(ast_rules,world)
     -- subrules expands ordinary ALL subjects before its MIMIC pass. Keep
     -- these declarations in the copy lookup only: normal lowering already
     -- expands the original ALL rule for runtime consumers.
-    local copy_lookup={}
+    local copy_lookup,all_lookup={},{}
     local function same_term(a,b)
         if type(a)~=type(b) then return false end
         if type(a)~="table" then return a==b end
@@ -1968,15 +1968,31 @@ local function expand_mimic(ast_rules,world)
     end
     for _,entry in ipairs(ast_rules) do
         copy_lookup[#copy_lookup+1]=entry
-        if #copy_lookup>5000 then return nil,"rule_complexity_limit" end
+        if #copy_lookup+#all_lookup>5000 then return nil,"rule_complexity_limit" end
         local subject,negative=unwrap(entry.subject)
         local object,object_negative=unwrap(entry.object)
-        local membership=entry.verb=="is" and object and object.tag=="noun" and object.type and object.type.tag=="group"
-        if entry.verb~="mimic" and subject and subject.tag=="special" and subject.name=="all" and not negative and not membership then
+        local group_target=object and object.tag=="noun" and object.type and object.type.tag=="group"
+        local membership=entry.verb=="is" and group_target
+        local all=subject and subject.tag=="special" and subject.name=="all"
+        local products={}
+        if entry.verb~="mimic" then
+            if all and not membership then
+                if negative then products={{tag="special",name="empty"},{tag="special",name="text"}}
+                else for _,name in ipairs(RW_NounPalette(world)) do products[#products+1]=noun_term(name) end end
+            elseif negative and not group_target then
+                local excluded=key(subject)
+                if excluded and excluded:sub(1,7)~="@group:" then
+                    for _,name in ipairs(RW_NounPalette(world)) do
+                        if name~=excluded then products[#products+1]=noun_term(name) end
+                    end
+                end
+            end
+        end
+        if #products>0 then
             local requirements={entry.when}
             -- Native nconds scans featureindex["not all"], not all negative
             -- object declarations. Preserve that narrower lookup literally.
-            if not object_negative and object and object.tag=="special" and object.name=="all" then
+            if all and not negative and not object_negative and object and object.tag=="special" and object.name=="all" then
                 for _,ban in ipairs(ast_rules) do
                     local banned,banned_negative=unwrap(ban.object)
                     if ban.verb==entry.verb and same_term(ban.subject,entry.subject) and banned_negative and same_term(banned,object) then
@@ -1984,14 +2000,18 @@ local function expand_mimic(ast_rules,world)
                     end
                 end
             end
-            for _,name in ipairs(RW_NounPalette(world)) do
-                local copy=query_clone(entry);copy.subject=noun_term(name)
+            for _,product in ipairs(products) do
+                local copy=query_clone(entry);copy.subject=product
                 copy.when={op="spatial",clauses={},requirements=requirements}
-                copy_lookup[#copy_lookup+1]=copy
-                if #copy_lookup>5000 then return nil,"rule_complexity_limit" end
+                -- addoption expands NOT immediately; subrules appends ALL
+                -- derivatives only after all original declarations exist.
+                local lookup=all and not negative and all_lookup or copy_lookup
+                lookup[#lookup+1]=copy
+                if #copy_lookup+#all_lookup>5000 then return nil,"rule_complexity_limit" end
             end
         end
     end
+    for _,entry in ipairs(all_lookup) do copy_lookup[#copy_lookup+1]=entry end
     for _,rule in ipairs(ast_rules) do if rule.verb=="mimic" then
         local target,negative=unwrap(rule.object)
         local source,destination=key(rule.subject),key(target)

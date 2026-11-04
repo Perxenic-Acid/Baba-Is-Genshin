@@ -557,3 +557,21 @@ Turn tests exercise EAT and unlock with/without queued SWAP, HAS and Undo; the
 existing source-SWAP oracle checks surviving displacement. This is a correction
 to queue/special ordering, not a full native queue engine: mixed PUSH movelist
 dodge, current-position updates across all dependencies and earlier gaps remain.
+
+## M9.9K contact dodge classification audit
+
+The installed move() fragment is now executed for 1,152 combinations: all four
+axes, EAT/lock/WEAK reasons, real/virtual target handles, deletion/current-position
+changes, unrelated/exact/mismatched/mixed movelist entries and queued SWAP updates.
+The comparison uses the actual d[2]/d[3] fields, without reinterpreting them as
+destination coordinates. A matching entry does not undo a prior mismatched entry;
+either ordering of mixed entries dodges. Unrelated entries never dodge.
+
+Real deleted targets dodge every special. WEAK skips real position/movelist
+checks, while virtual handle2 skips deletion and position/movelist checks.
+Queued addaction updates do not participate in this classification. These are
+native fragment results, not a claim that the current solver reproduces the
+whole mutable movelist scheduler. In particular, blanket planned-ID suppression
+cannot encode those reason/target distinctions, and repeated real dependency
+entries/current-position mutation remain pending. No gameplay change is inferred
+solely from this audit; it establishes the cases the scheduler must preserve.

@@ -76,6 +76,26 @@ s=fixture({{'ROCK','MIMIC','FLAG'},{'FLAG','HAS','CRATE'},{'ROCK','IS','YOU','AN
 n=step(s);assert(not n.world.entities[2]);local born=false
 for _,e in pairs(n.world.entities) do if e.archetype=='crate' and e.x==6 and e.y==3 then born=true end end
 assert(born,'copied HAS participates in frozen contact destruction')
+-- Virtual endpoints share the raw one-generation pass, not a persisted unit.
+s=fixture({{'EMPTY','MIMIC','FLAG'},{'FLAG','NEAR','ROCK','IS','PUSH'},
+ {'EMPTY','NEAR','AVATAR','MIMIC','NOT','FLAG'}})
+frame=assert(RW_CompileWorld(s.world,cs))
+local projected=assert(RW_ProjectWorld(s.world,frame.effects))
+assert(projected.empty_cells['5:3'].behaviors.push and not projected.empty_cells['12:3'])
+s.world.entities[1].x=6;s.world.entities[1].y=2
+frame=assert(RW_CompileWorld(s.world,cs));projected=assert(RW_ProjectWorld(s.world,frame.effects))
+assert(not projected.empty_cells['5:3'] or not projected.empty_cells['5:3'].behaviors.push)
+assert(projected.empty_cells['6:4'].behaviors.push)
+s=fixture({{'EMPTY','MIMIC','EMPTY'},{'EMPTY','IS','PUSH'}})
+frame=assert(RW_CompileWorld(s.world,cs));projected=assert(RW_ProjectWorld(s.world,frame.effects))
+assert(projected.empty_cells['12:3'].trait_counts.pushable==2)
+s=fixture({{'ROCK','MIMIC','EMPTY'},{'EMPTY','HAS','CRATE'},{'EMPTY','HAS','CRATE'},
+ {'ROCK','IS','YOU','AND','DEFEAT'}})
+n=step(s);assert(not n.world.entities[2])
+local copied_births=0
+for _,unit in pairs(n.world.entities) do if unit.archetype=='crate' and unit.x==6 and unit.y==3 then copied_births=copied_births+1 end end
+assert(copied_births==2,'EMPTY target duplicates must feed real frozen HAS')
+print('PASS: EMPTY MIMIC endpoints, per-vacancy copied/negative conditions, self multiplicity, copied real HAS and Undo')
 local ast={{verb='mimic',subject={tag='noun',type={tag='object',name='rock'}},object={tag='noun',type={tag='object',name='flag'}},when={op='always'}}}
 for i=1,251 do ast[#ast+1]={verb='is',subject={tag='noun',type={tag='object',name='flag'}},object={tag='property',name='pushable'},when={op='always'}} end
 local g,err=RW_LowerRuleAST(ast,nil,s.world);assert(not g and err=='rule_complexity_limit')

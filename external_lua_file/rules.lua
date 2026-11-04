@@ -1948,7 +1948,7 @@ local function expand_mimic(ast_rules,world)
         if rule.verb=="mimic" then
             local target,negative=unwrap(rule.object)
             local source,destination=key(rule.subject),key(target)
-            if source and destination and source~="@empty" and destination~="@empty" and negative then
+            if source and destination and negative then
                 bans[source]=bans[source] or {};bans[source][destination]=bans[source][destination] or {}
                 table.insert(bans[source][destination],rule.when)
             end
@@ -1958,7 +1958,7 @@ local function expand_mimic(ast_rules,world)
     for _,rule in ipairs(ast_rules) do if rule.verb=="mimic" then
         local target,negative=unwrap(rule.object)
         local source,destination=key(rule.subject),key(target)
-        if not source or not destination or source=="@empty" or destination=="@empty" then
+        if not source or not destination then
             result[#result+1]=rule -- unsupported forms remain visible as deferred.
         elseif not negative then
             for _,copied in ipairs(ast_rules) do

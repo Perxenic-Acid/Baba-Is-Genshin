@@ -134,6 +134,7 @@ local function fixture(rows)
  local s=RW_CreateSession();local w=s.world;w.entities={};w.width,w.height=32,32;w.next_entity_id=1
  w.language.nouns.LEVEL={tag='level',block_type='level_block'}
  w.language.nouns.ROCK='rock';w.language.nouns.FLAG='flag'
+ w.language.nouns.GROUP={tag='group',name='group'}
  w.language.properties.CHILL='chill';w.language.properties.MOVE='move'
  w.language.properties.FALL='fall';w.language.properties.FALLRIGHT='fallright'
  w.language.properties.NUDGERIGHT='nudgeright';w.language.properties.LOCKEDDOWN='lockeddown'
@@ -165,7 +166,16 @@ do
  end
  local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'ROCK','IS','SAFE'}});local n=turn(s);assert(n.world.entities[id])
  local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'LEVEL','IS','SAFE'}});local n=turn(s);assert(not n.world.entities[id])
- local s,id=outgoing({{'LEVEL','EAT','ALL'}});local n=turn(s);assert(n.world.entities[id],'native scoped ALL is a no-op')
+ local s,id=outgoing({{'LEVEL','EAT','ALL'}});local n=turn(s);assert(not n.world.entities[id],'subrules expands authored scoped ALL into ordinary nouns')
+ local s,id=outgoing({{'LEVEL','EAT','ALL'},{'LEVEL','EAT','NOT','ALL'}});local n=turn(s);assert(n.world.entities[id],'NOT ALL must protect derived scoped targets')
+ local s,id=outgoing({{'ROCK','IS','GROUP'},{'ROCK','IS','GROUP'},{'LEVEL','EAT','GROUP'},{'ROCK','HAS','ROCK'}})
+ local n=turn(s);assert(not n.world.entities[id]);local rocks=0
+ for _,e in pairs(n.world.entities) do if e.archetype=='rock' then rocks=rocks+1 end end
+ assert(rocks==1 and n.world.next_entity_id==s.world.next_entity_id+3,'raw GROUP deduplicates victims; two derived clauses eat successive HAS newborns')
+ local s,id=outgoing({{'ALL','IS','GROUP'},{'LEVEL','EAT','GROUP'}})
+ local n=turn(s);assert(not n.world.entities[id],'ordinary ALL membership copies must remain active')
+ local s,id=outgoing({{'ROCK','IS','GROUP'},{'LEVEL','EAT','GROUP'},{'LEVEL','EAT','NOT','GROUP'}})
+ local n=turn(s);assert(n.world.entities[id],'raw and derived GROUP bans must both apply')
  local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'LEVEL','EAT','NOT','ROCK'}});local n=turn(s);assert(n.world.entities[id])
  local s,id=outgoing({{'LEVEL','EAT','LEVEL'},{'LEVEL','HAS','FLAG'}},'level_block')
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities),'unsafe map eats physical LEVEL by whole-map retirement')

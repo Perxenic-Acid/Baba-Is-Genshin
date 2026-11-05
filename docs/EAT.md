@@ -169,9 +169,26 @@ HAS terminal prefixes and ordinary late errors. A mapped OnStart/input/whole-tre
 Undo test exercises production adapters. These are offline/source checks, not a
 new claim of real-device acceptance.
 
-The older outgoing direct-target deferral above is superseded. Remaining gaps:
-GROUP target aggregation/duplicate members as one native physical clause has not
-been given a scoped EAT oracle; other synthetic LEVEL effects still do not share
-this whole ordered loop. Conditional synthetic surroundings and host audiovisual
-bindings remain documented separately. Ordinary earlier EAT/contact phase order
-is preserved, rather than claimed to be complete original levelblock scheduling.
+The older outgoing direct-target deferral above is superseded.
+
+Scoped EAT GROUP follow-up: raw positive/negative GROUP consumers remain
+in authored order; grouprules-derived member consumers append afterward. Raw
+findgroup-style queries promote conditional nouns globally, gather victims once
+and deduplicate identities before serial HAS. Derived clauses can consume those
+newborns. Literal GROUP members ALL/EMPTY use concrete unit lists, without
+re-entering the direct virtual EMPTY branch. LEVEL members retain map retirement.
+
+Correction to the direct ALL branch note: installed subrules (rules.lua1112+)
+expands authored LEVEL EAT ALL into ordinary noun clauses before MIMIC and
+GROUP expansion. The raw ALL clause itself remains inert. GROUP-derived ALL
+arrives after subrules and stays inert. ALL-origin copies also retain NOT ALL
+protection. reference_level_eat_groups.lua executes installed addoption/subrules/
+grouprules in90 ordering/multiplicity cases. Another96 cases execute installed
+findgroup and the late EAT branch to check conditional global promotion, SAFE,
+duplicate victim aggregation, unit-list order and map retirement.
+level_motion.lua checks raw duplicate
+GROUP membership, successive HAS newborn consumption, bans and atomic Undo.
+Other synthetic LEVEL effects still do not share this whole ordered loop.
+Conditional synthetic surroundings and host audiovisual bindings remain deferred.
+Ordinary earlier EAT/contact phase order is preserved, rather than claimed to be
+complete original levelblock scheduling.

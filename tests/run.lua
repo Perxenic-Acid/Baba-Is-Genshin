@@ -615,3 +615,5 @@ dofile('tests/level_tele_layers.lua')
 dofile('tests/level_motion_order.lua')
 dofile('tests/reference_eat_level.lua')
 dofile('tests/reference_level_eat.lua')
+
+dofile('tests/reference_level_eat_groups.lua')

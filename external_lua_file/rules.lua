@@ -131,6 +131,7 @@ function RW_SelectEntities(world, selector)
 end
 
 local evaluate_condition
+local group_parameters
 local function contains_rule_query(node)
     if type(node)~="table" then return false end
     for _,clause in ipairs(node.clauses or {}) do
@@ -381,20 +382,31 @@ function RW_ResolveScopedEatTargets(world,rules,declaration,level_safe)
         end end
         return result
     end
-    local matching={}
-    for _,id in ipairs(ordered) do local e=world.entities[id]
-        if target=="@text" and e.class=="text" or e.class~="text" and e.archetype==(target=="@level" and (declaration.level_type or "level_block") or target) then
-            matching[#matching+1]=id
+    local targets={target}
+    if target:sub(1,7)=="@group:" then
+        targets,why=group_parameters(context,target:sub(8),false)
+        if not targets then return nil,why end
+    end
+    local selected={}
+    for _,name in ipairs(targets) do
+        local matching={}
+        -- GROUP members are concrete unit-list names. EMPTY/ALL here do not
+        -- invoke the special direct-target branches above.
+        local concrete=name=="@empty" and "empty" or name
+        for _,id in ipairs(ordered) do local e=world.entities[id]
+            if name=="@text" and e.class=="text" or e.class~="text" and e.archetype==(name=="@level" and (declaration.level_type or "level_block") or concrete) then
+                matching[#matching+1]=id
+            end
         end
-    end
-    if target=="@level" and #matching>0 then
-        if level_safe==nil then level_safe,why=query_level_trait(context,"safe");if level_safe==nil then return nil,why end end
-        if not level_safe then result.level_destroy=true;return result end
-    end
-    for _,id in ipairs(matching) do
-        local safe,why=query_trait(context,world.entities[id],"safe")
-        if safe==nil then return nil,why end
-        if not safe then result.ids[#result.ids+1]=id end
+        if name=="@level" and #matching>0 then
+            if level_safe==nil then level_safe,why=query_level_trait(context,"safe");if level_safe==nil then return nil,why end end
+            if not level_safe then result.level_destroy=true;result.ids={};return result end
+        end
+        for _,id in ipairs(matching) do if not selected[id] then
+            local safe,why=query_trait(context,world.entities[id],"safe")
+            if safe==nil then return nil,why end
+            if not safe then selected[id]=true;result.ids[#result.ids+1]=id end
+        end end
     end
     return result
 end
@@ -545,7 +557,7 @@ local function powered_condition(world,trait,negated)
     return negated and not found or not negated and found
 end
 -- findgroup() promotes a conditional member's noun when ANY real unit qualifies.
-local function group_parameters(world,name,invert)
+group_parameters=function(world,name,invert)
     local function finish(result)
         if not invert then return result end
         local found={};for _,noun in ipairs(result) do found[noun]=true end
@@ -2656,14 +2668,15 @@ local function expand_groups(ast_rules,registry,world,normalized)
         end
         return result
     end
-    local expanded,deferred={},{}
-    local function emit(rule,subject,object,condition)
+    local expanded,deferred,scoped_eat_tail={},{},{}
+    local function emit(rule,subject,object,condition,late)
         local copy=query_clone(rule);copy.subject=query_clone(subject);copy.object=query_clone(object)
         -- A raw ALL group member is a literal source, not a second ALL expansion.
         local raw,negative=unwrap(subject)
         if group(rule.subject) and not negative and raw and raw.tag=="special" and raw.name=="all" then copy.subject=noun_term("all") end
-        copy.when=combine(rule.when,condition);expanded[#expanded+1]=copy
-        if #expanded>5000 then return nil,"rule_complexity_limit" end
+        copy.when=combine(rule.when,condition)
+        local destination=late and scoped_eat_tail or expanded;destination[#destination+1]=copy
+        if #expanded+#scoped_eat_tail>5000 then return nil,"rule_complexity_limit" end
         return true
     end
     for _,rule in ipairs(ast_rules) do
@@ -2674,6 +2687,16 @@ local function expand_groups(ast_rules,registry,world,normalized)
             or (target and rule.verb=="is" and not source and not is_member)
             or (source and source_not and target and source~=target and rule.verb=="is") then
             deferred[#deferred+1]=rule
+        elseif not source and target and registry[rule.verb] and registry[rule.verb].noun=="eat"
+            and rule.subject.tag=="noun" and rule.subject.type and rule.subject.type.tag=="level" then
+            -- addoption keeps the raw GROUP target; grouprules appends its
+            -- concrete copies after ordinary features. Both execute natively.
+            expanded[#expanded+1]=query_clone(rule)
+            for _,member in ipairs(teams[target] or {}) do
+                local object=target_not and {tag="not",operand=member.term} or member.term
+                local ok,err=emit(rule,rule.subject,object,member.when,true)
+                if not ok then return nil,err end
+            end
         elseif is_member then -- Membership is a declaration, not an IS conversion.
         elseif source and target then
             if source==target and rule.verb=="is" and source_not~=target_not then
@@ -2708,6 +2731,7 @@ local function expand_groups(ast_rules,registry,world,normalized)
             expanded[#expanded+1]=rule
         end
     end
+    for _,rule in ipairs(scoped_eat_tail) do expanded[#expanded+1]=rule end
     return expanded,deferred,teams
 end
 
@@ -2716,6 +2740,29 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     registry=registry or DEFAULT_SEMANTICS
     if not valid_semantics(registry) or not dense_list(ast_rules) then return nil,"invalid_ast_rules" end
     local groups_normalized=false
+    -- Native subrules expands authored RHS ALL before MIMIC/grouprules.
+    -- Keep the raw clause (inert in levelblock), then append its noun copies.
+    -- GROUP-derived ALL arrives later and must not pass through this again.
+    local scoped_all={}
+    for _,rule in ipairs(ast_rules) do
+        scoped_all[#scoped_all+1]=rule
+    end
+    for _,rule in ipairs(ast_rules) do
+        if type(rule)~="table" or type(rule.when)~="table" then return nil,"invalid_ast_rule" end
+        local subject,negative=unwrap(rule.subject)
+        local target,target_negative=unwrap(rule.object)
+        local sem=registry[rule.verb]
+        if sem and sem.noun=="eat" and not negative and not target_negative
+            and subject and subject.tag=="noun" and subject.type and subject.type.tag=="level"
+            and target and target.tag=="special" and target.name=="all" then
+            for _,name in ipairs(RW_NounPalette(world)) do
+                local copy=query_clone(rule);copy.object=noun_term(name);copy.scoped_eat_origin="@all"
+                scoped_all[#scoped_all+1]=copy
+                if #scoped_all>5000 then return nil,"rule_complexity_limit" end
+            end
+        end
+    end
+    ast_rules=scoped_all
     if registry.mimic and registry.mimic.noun=="mimic" then
         local expanded,err,normalized=expand_mimic(ast_rules,world);if not expanded then return nil,err end
         ast_rules=expanded;groups_normalized=normalized
@@ -2802,13 +2849,14 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             local has_start=#relations+1
             if level_subject and sem and sem.noun=="eat" and level_conditions(ast.when) then
                 local target=subject_key(obj)
+                if obj.tag=="noun" and obj.type and obj.type.tag=="group" then target="@group:"..obj.type.name end
                 if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target="@level" end
                 if obj.tag=="special" and obj.name=="all" then target="@all" end
                 if target then
                     if objnot then add_ban(predicate_bans,ast.verb,"@level",target,ast.when)
                     else relations[#relations+1]={op="level_eat",source_type="@level",target_type=target,
                         level_type=target=="@level" and (obj.type.block_type or "level_block") or nil,
-                        verb=ast.verb,when=query_clone(ast.when),source=ast.source} end
+                        verb=ast.verb,when=query_clone(ast.when),source=ast.source,origin=ast.scoped_eat_origin} end
                     supported=true
                 end
             elseif level_subject and sem and sem.noun=="transform" and objnot and obj.tag=="special" and obj.name=="text" and level_conditions(ast.when) then

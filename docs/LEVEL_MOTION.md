@@ -56,11 +56,51 @@ boundary roundtrip verifies whole-tree Undo. Actual production OnStart/wait/Undo
 adapters run with mapped-script and UI mocks. `tests/run.lua` includes this test;
 real-device success is not inferred.
 
-Remaining synthetic scope: cardinal orientation/statusblock and TURN/DETURN map
-rotation, FEAR, TELE and FOLLOW. Frontend rotation is deferred. This oracle does
+Remaining synthetic scope: ongoing cardinal orientation dispatch, FEAR, TELE and
+FOLLOW. Startup cardinal assignment and TURN/DETURN are implemented below.
+Frontend rotation is deferred. This oracle does
 not establish the complete native levelblock destruction/terminal interleaving:
 our frozen contact phases remain grouped before late scrolling, and terminal
 selection retains the user's established outcome semantics. Conditional scoped
 surroundings retain their existing saved-surroundings/current-child query contract.
 Exact native mutable unit scheduling and queued conversion/host boundary dispatch
 remain shared gaps. No timer or native AUTO routing is added here.
+
+## Ordered rotation and boundary initialization
+
+Installed blocks.lua startblock() around1972–2000 resets rotation and applies
+active RIGHT/UP/LEFT/DOWN declarations in order, with the last assignment winning.
+It does not use the ordinary unit weighted-direction algorithm, nor SLEEP/STILL.
+`RW_ResolveLevelStart` performs that initialization after the existing one-pass
+status initialization on boot and reloaded boundaries. The production vocabulary
+guard avoids an extra compile when no cardinal LEVEL declaration is possible;
+it recognizes aliases, custom Level block types, WORD Level candidates and authored
+scoped declarations. Actual eligibility still comes from compilation and
+RW_QueryLevelTraits, including NOT/BROKEN and conditions. No input/RNG/local
+history advances; the outer tree transaction owns boundary Undo. Compile-limit
+boards retain the existing initialization terminal policy and are never recompiled.
+
+TURN/DETURN join the ordered late motion loop using installed blocks.lua3348–3368
+unchanged arithmetic. Both change facing and rotation despite SLEEP/STILL. Later
+MOVE/CHILL sees their new facing; the initial still/lock decision stays frozen.
+In particular, TURN computes its angle from the old facing, not the cardinal
+angle associated with the new facing. Direction and angle must remain independent.
+
+`board_offset.rotation` is an optional backend angle0/90/180/270; absent means0.
+The existing stale-checked board_shift carries it atomically with offset/facing.
+World/definition validation rejects unsupported angles. YOU scrolling preserves
+the angle, and CHILL only changes facing. Rotation-only changes retain BACK
+frames and phase journals; whole-tree/local Undo restores exact prior metadata.
+The temporary renderer ignores the angle until the deferred frontend workstream.
+
+The installed oracle now covers11340 motion/lock/turn cases and500 startblock
+assignments, including duplicate/conflicting/inactive declarations and initial
+angles. Tests additionally exercise startup guard/conditions/NOT/BROKEN, invalid
+and stale rotation, RNG-only and rotation-only journals, BACK retention, actual
+mapped OnStart/wait/Undo, enter/parent-return initialization and boundary Undo.
+
+Ongoing cardinal assignment timing is deliberately unresolved: effects.lua's
+domaprotation() defines the operation, but its rules.lua caller is commented out
+in the installed source. No per-turn binding is invented from that definition;
+native callback timing needs separate evidence. This does not block the explicit
+startblock initialization or levelblock TURN/DETURN paths above.

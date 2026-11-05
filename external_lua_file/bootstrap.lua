@@ -1300,7 +1300,7 @@ end
 
 -- A loaded runtime receives one ordered status initialization, without an input,
 -- RNG advance, local Undo entry or recursive BROKEN fixed point.
-function RW_InitializeLevelWorld(world,services)
+local function initialize_level_status(world,services)
     if type(world)~="table" or type(world.entities)~="table" or type(services)~="table" then return nil,"invalid_initialization_input" end
     if world.infinite_loop or world.too_complex then return world end
     if not services.status_required or not services.status then return world end
@@ -1323,6 +1323,16 @@ function RW_InitializeLevelWorld(world,services)
     if not status then return initialize_compile_failure(current,why,services) end
     if #status.changes==0 then return current end
     return services.preview(current,status)
+end
+
+function RW_InitializeLevelWorld(world,services)
+    local current,why=initialize_level_status(world,services)
+    if not current then return nil,why end
+    if current.infinite_loop or current.too_complex or not services.level_start then return current end
+    local start,why=services.level_start(current)
+    if not start then return initialize_compile_failure(current,why,services) end
+    if not start.board_shift then return current end
+    return services.preview(current,start)
 end
 
 -- Only the instances reloaded by this boundary are initialized. Definitions and
@@ -2104,6 +2114,15 @@ local function start(run_self_tests)
     turn_services.back_retain=function(world,plan,active) return world_api:Invoke("RW_BackRetainDecision",world,plan,active) end
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
+    turn_services.level_start=function(world)
+        local needed=rules_api:Invoke("RW_LevelStartNeeded",world)
+        if not needed then return {consumes_turn=true,changes={}} end
+        local effects,count,deferred,commands,generated,reason=evaluate(world)
+        if not effects then return nil,reason end
+        local traits,why=rules_api:Invoke("RW_QueryLevelTraits",world,generated)
+        if not traits then return nil,why end
+        return movement_api:Invoke("RW_ResolveLevelStart",world,traits)
+    end
     turn_services.level_motion=function(world,traits)
         local stop
         for index,trait in ipairs(traits) do

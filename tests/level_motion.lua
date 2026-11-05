@@ -3,7 +3,7 @@ local base=[[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/]]
 local function read(name) local f=assert(io.open(base..name,'rb'));local s=f:read('*a');f:close();return s end
 local blocks,tools=read('blocks.lua'),read('tools.lua')
 local a=assert(blocks:find('elseif (action == "move") then',1,true))
-local b=assert(blocks:find('elseif (rule[3] == "turn") then',a,true))
+local b=assert(blocks:find('elseif (action == "empty") then',a,true))
 local env=setmetatable({ndirs={{1,0},{0,-1},{-1,0},{0,1},{0,0}},tilesize=1},{__index=_G})
 local native=assert(load('return function(action,lstill,lsleep) if false then '..blocks:sub(a,b-1)..' end end','@installed_level_motion','t',env))()
 local function install(first,last)
@@ -12,11 +12,15 @@ local function install(first,last)
 end
 install('cantmove','findnoun');install('reversedir','reversecheck');install('reversecheck','simplecheck')
 local names={'Right','Up','Left','Down','None'}
-local cases=0
+local cases,start_cases=0,0
 local sequences={{'move'},{'move','move'},{'chill'},{'chill','move'},{'move','chill'},
  {'chill','chill','move'},{'nudgeright','nudgeup','nudgeleft','nudgedown'},
  {'fall'},{'fallright'},{'fallup'},{'fallleft'},
- {'fall','fallright','fallup','fallleft','move','chill','move'}}
+ {'fall','fallright','fallup','fallleft','move','chill','move'},
+ {'turn'},{'deturn'},{'turn','move'},{'move','turn'},
+ {'chill','turn','move'},{'turn','deturn','move'},
+ {'turn','turn','turn','turn'},{'deturn','deturn'},
+ {'turn','nudgeright','fall','chill','deturn','move'}}
 for dir=0,4 do for reverse=0,2 do for _,sleep in ipairs({false,true}) do
  for _,lock in ipairs({'none','still','lockedright','lockedup','lockedleft','lockeddown'}) do
   for _,sequence in ipairs(sequences) do for _,seed in ipairs({1,2,17}) do
@@ -30,22 +34,49 @@ for dir=0,4 do for reverse=0,2 do for _,sleep in ipairs({false,true}) do
    env.featureindex=reverse>0 and {reverse={}} or {}
    env.addundo=function() end
    env.mapdir,env.Xoffset,env.Yoffset=dir,3,-2
+   env.maprotation=({[1]=0,[2]=90,[17]=270})[seed]
+   local old_rotation=env.maprotation
+   env.MF_levelrotation=function() end
    env.MF_scrollroom=function(x,y) env.Xoffset,env.Yoffset=env.Xoffset+x,env.Yoffset+y end
    local rng=seed
    env.fixedrandom=function() rng=(rng*48271)%2147483647;return rng%4 end
    local still=env.cantmove('level',1,env.mapdir)
-   for _,t in ipairs(traits) do native(t,still,sleep) end
-   local w={entities={},board_offset={x=3,y=-2,direction=names[dir+1]},random_state=seed}
+   for _,t in ipairs(traits) do env.rule={'level','is',t};native(t,still,sleep) end
+   local w={entities={},board_offset={x=3,y=-2,direction=names[dir+1],rotation=old_rotation},random_state=seed}
    local p=RW_ResolveLevelMotion(w,traits)
    local shift=p.board_shift and p.board_shift.to or w.board_offset
    assert(shift.x==env.Xoffset and shift.y==env.Yoffset,'installed LEVEL scroll mismatch')
    assert(shift.direction==names[env.mapdir+1],'installed LEVEL facing mismatch')
+   assert((shift.rotation or 0)==env.maprotation,'installed LEVEL rotation mismatch')
    assert((p.random_state and p.random_state.to or seed)==rng,'LEVEL RNG draw order mismatch')
    assert(w.board_offset.x==3 and w.random_state==seed,'motion preview mutated input')
    cases=cases+1
   end end
  end
 end end end
+-- startblock assigns the last active cardinal declaration without sleep/locks.
+do
+ local first=assert(blocks:find('if (light == false) and (featureindex["level"] ~= nil) then',1,true))
+ local last=assert(blocks:find('for i,unit in ipairs(units) do',first,true))
+ local start=assert(load('return function(light) '..blocks:sub(first,last-1)..' end','@installed_level_start','t',env))()
+ env.testcond=function(conds) return conds.active end
+ local rows={{},{'right'},{'up'},{'left'},{'down'},{'right','left'},
+  {'up','up','down','right'},{'sleep','still','right'},{'turn','left','deturn'}}
+ for dir=0,4 do for rotation=0,270,90 do for _,row in ipairs(rows) do for disabled=0,#row do
+  local entries,traits={},{}
+  for i,t in ipairs(row) do entries[#entries+1]={{'level','is',t},{active=i~=disabled}}
+   if i~=disabled then traits[#traits+1]=t end
+  end
+  env.featureindex={level=entries};env.mapdir=dir;env.maprotation=rotation
+  start(false)
+  local old={x=3,y=4,direction=names[dir+1],rotation=rotation}
+  local p=RW_ResolveLevelStart({board_offset=old},traits)
+  local to=p.board_shift and p.board_shift.to or old
+  assert(to.direction==names[env.mapdir+1] and (to.rotation or 0)==env.maprotation,'installed startblock rotation mismatch')
+  assert(to.x==3 and to.y==4)
+  start_cases=start_cases+1
+ end end end end
+end
 -- Absent map state retains native Down across successive accepted MOVE turns.
 do
  local s=RW_CreateSession();local p=RW_ResolveLevelMotion(s.world,{'move'})
@@ -68,6 +99,12 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
   for index,trait in ipairs(traits) do if RW_ResolveLevelPropertyOutcome(w,{trait}) then stop=index;break end end
   return RW_ResolveLevelMotion(w,traits,stop)
  end}
+services.level_start=function(w)
+ if not RW_LevelStartNeeded(w) then return {consumes_turn=true,changes={}} end
+ local frame,e=RW_CompileWorld(w,cs);if not frame then return nil,e.reason end
+ local traits,e=RW_QueryLevelTraits(w,frame.rules);if not traits then return nil,e end
+ return RW_ResolveLevelStart(w,traits)
+end
 local function fixture(rows)
  local s=RW_CreateSession();local w=s.world;w.entities={};w.width,w.height=32,32;w.next_entity_id=1
  w.language.nouns.LEVEL={tag='level',block_type='level_block'}
@@ -88,10 +125,55 @@ local function turn(s,action)
  assert(RW_Undo(n).world==s.world,'scoped motion Undo lost earlier phases')
  return n,p
 end
+do
+ local s=fixture({{'LEVEL','IS','RIGHT'},{'LEVEL','IS','LEFT'},{'LEVEL','IS','SLEEP'}})
+ local w=assert(RW_InitializeLevelWorld(s.world,services))
+ assert(w.board_offset.direction=='Left' and w.board_offset.rotation==270)
+ assert(not w.random_state and not w.last_input and not w.chance_seed and #s.history==0 and not s.world.board_offset)
+ local valid=RW_CreateLevelDefinition('rotation',w);assert(valid)
+ local bad=RW_ResolveLevelStart(w,{'up'});bad.board_shift.from.rotation=90
+ local _,r=RW_Commit({world=w,history={}},bad);assert(not r.accepted and r.reason=='stale_board_shift')
+ local bad=RW_ResolveLevelStart(w,{'up'});bad.board_shift.to.rotation=45
+ local _,r=RW_Commit({world=w,history={}},bad);assert(not r.accepted and r.reason=='invalid_board_shift')
+ local badworld={};for k,v in pairs(w) do badworld[k]=v end
+ badworld.board_offset={x=0,y=0,direction='Right',rotation=45}
+ assert(not RW_CreateLevelDefinition('bad_rotation',badworld))
+ local no=fixture({{'LEVEL','IS','RIGHT'},{'LEVEL','IS','NOT','RIGHT'}})
+ assert(not RW_InitializeLevelWorld(no.world,services).board_offset)
+ local no=fixture({{'LEVEL','IS','RIGHT'},{'LEVEL','IS','BROKEN'}})
+ assert(not RW_InitializeLevelWorld(no.world,services).board_offset)
+ local no=fixture({{'IDLE','LEVEL','IS','RIGHT'}})
+ assert(not RW_InitializeLevelWorld(no.world,services).board_offset)
+ local world={entities={},rule_sources={},language={nouns={},properties={}}}
+ assert(not RW_LevelStartNeeded(world))
+ world.entities[1]={class='text',text={name='R'}};world.entities[2]={class='object',archetype='custom_level'}
+ world.language={nouns={L={tag='level',block_type='custom_level'}},properties={R='right'}}
+ assert(RW_LevelStartNeeded(world),'WORD/custom LEVEL candidate missed boot orientation guard')
+ local saved=services.level_start;services.level_start=function() return nil,'rule_complexity_limit' end
+ local w=assert(RW_InitializeLevelWorld(s.world,services));assert(w.too_complex and not w.board_offset)
+ services.level_start=function() error('terminal init must not query orientation') end
+ assert(RW_InitializeLevelWorld(w,services)==w)
+ services.level_start=saved
+end
 local s=fixture({{'LEVEL','IS','CHILL','AND','MOVE'}})
 local n,p=turn(s);assert(n.world.random_state==48271 and n.world.board_offset.x==0 and n.world.board_offset.y==2)
 assert(n.world.board_offset.direction=='Down')
 assert(p.stages[#p.stages].name=='level_motion')
+local turned=fixture({{'LEVEL','IS','CHILL','AND','TURN','AND','MOVE'}})
+local t=turn(turned);assert(t.world.board_offset.x==-1 and t.world.board_offset.y==1
+ and t.world.board_offset.direction=='Left' and t.world.board_offset.rotation==0)
+local sleeping=fixture({{'LEVEL','IS','TURN'},{'LEVEL','IS','SLEEP'},{'LEVEL','IS','STILL'}})
+local t=turn(sleeping);assert(t.world.board_offset.direction=='Left' and t.world.board_offset.rotation==0)
+local moving=fixture({{'LEVEL','IS','YOU'}});moving.world.board_offset={x=0,y=0,direction='Down',rotation=270}
+local t=turn(moving,{type='move',dx=1,dy=0});assert(t.world.board_offset.x==1 and t.world.board_offset.rotation==270)
+do
+ local s=RW_CreateSession();s.world.board_offset={x=0,y=0,direction='Down',rotation=0}
+ local p=RW_ResolveLevelMotion(s.world,{'turn','turn','turn','turn'})
+ assert(p.board_shift.to.direction=='Down' and p.board_shift.to.rotation==90 and RW_BackRetainDecision(s.world,p,false))
+ local n,r=RW_Commit(s,p);assert(r.accepted and n.world.board_offset.rotation==90)
+ local record=assert(RW_GetTurnRecord(n,1));assert(record.phases[1].board_shift.to.rotation==90)
+ assert(RW_BackHistoryRows(s.world,record));assert(RW_Undo(n).world==s.world)
+end
 local n2=turn(s);assert(n2.world.random_state==n.world.random_state and n2.world.board_offset.y==2)
 local s=fixture({{'LEVEL','IS','CHILL'},{'LEVEL','IS','SLEEP'},{'LEVEL','IS','FALLRIGHT'}})
 local n=turn(s);assert(n.world.random_state==48271 and n.world.board_offset.x==35 and n.world.board_offset.y==0)
@@ -148,6 +230,36 @@ do
 end
 -- Exercise the actual mapped bootstrap adapter, not just injected services.
 do
+ local root=fixture({{'LEVEL','IS','LEFT'}}).world
+ local entrance=root.next_entity_id;root.next_entity_id=entrance+2
+ root.entities[entrance]={id=entrance,kind='object',class='object',archetype='level_block',x=15,y=15,direction='Down',
+  level_link={target='child',definition_id='child',source_type='level_block'}}
+ root.entities[entrance+1]={id=entrance+1,kind='object',class='object',archetype='cursor',x=15,y=15,direction='Right'}
+ local child=fixture({{'LEVEL','IS','RIGHT'},{'LEVEL','IS','TURN'}}).world
+ local id=child.next_entity_id;child.next_entity_id=id+2
+ child.entities[id]={id=id,kind='object',class='object',archetype='level_block',x=21,y=21,direction='Down',
+  level_link={target='parent',source_type='level_block'}}
+ child.entities[id+1]={id=id+1,kind='object',class='object',archetype='cursor',x=21,y=21,direction='Right'}
+ local tree=assert(RW_CreateLevelTree({root=assert(RW_CreateLevelDefinition('root',root)),child=assert(RW_CreateLevelDefinition('child',child))},'root'))
+ services.initialize=function(w) return RW_InitializeLevelWorld(w,services) end
+ services.update_instance=RW_UpdateLevelInstance
+ tree=assert(RW_InitializeLevelBoundary(tree,{tree.active_id},services))
+ local parent=tree.active_id;assert(RW_GetActiveLevel(tree).world.board_offset.rotation==270)
+ local function action(t,a)
+  local p,e=RW_PlanLevelAction(t,a,services);assert(p,e and e.reason)
+  local n,r=RW_CommitLevelTree(t,p);assert(r.accepted,r.reason);return n
+ end
+ tree=action(tree,{type='confirm'})
+ assert(tree.active_id~=parent and RW_GetActiveLevel(tree).world.board_offset.rotation==90)
+ tree=action(tree,{type='wait'})
+ local before=RW_GetActiveLevel(tree).world;assert(before.board_offset.direction=='Down' and before.board_offset.rotation==90)
+ local returned=action(tree,{type='confirm'})
+ assert(returned.active_id==parent and RW_GetActiveLevel(returned).world.board_offset.rotation==270)
+ local undo=RW_UndoLevelTree(returned)
+ assert(undo.active_id==tree.active_id and RW_GetActiveLevel(undo).world==before,'boundary Undo lost map rotation/facing')
+end
+-- Exercise the actual mapped bootstrap adapter, not just injected services.
+do
  local old_script,old_enum,old_render,old_definitions=script,Enum,RW_Render,RW_GetNavigationDefinitions
  local old_printerr=printerr;local display,depth;local listeners={};local mapped={}
  for _,name in ipairs({'world','reader','grammar','rules','properties','movement','renderer'}) do
@@ -163,6 +275,10 @@ do
  OnStart();assert(display and not display.board_offset and depth==0)
  listeners.wait();assert(display.random_state==48271 and display.board_offset.y==2 and depth==1)
  listeners.undo();assert(not display.random_state and not display.board_offset and depth==0)
+ w=fixture({{'LEVEL','IS','RIGHT'},{'LEVEL','IS','MOVE'}}).world
+ OnStart();assert(display.board_offset.direction=='Right' and display.board_offset.rotation==90 and depth==0)
+ listeners.wait();assert(display.board_offset.x==1 and display.board_offset.y==0 and display.board_offset.rotation==90)
+ listeners.undo();assert(display.board_offset.x==0 and display.board_offset.rotation==90 and depth==0)
  script,Enum,RW_Render,RW_GetNavigationDefinitions,printerr=old_script,old_enum,old_render,old_definitions,old_printerr
 end
-print('PASS: LEVEL late MOVE/CHILL/nudges/FALL, conditions/NOT/BROKEN, terminal order, RNG/rollback/Undo; '..cases..' installed motion/lock oracle cases')
+print('PASS: LEVEL start orientation/rotation and late MOVE/CHILL/nudges/FALL/TURN/DETURN, conditions/NOT/BROKEN, terminal order, RNG/rollback/Undo; '..cases..' installed motion/lock and '..start_cases..' startblock oracle cases')

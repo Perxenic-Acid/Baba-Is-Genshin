@@ -175,6 +175,7 @@ local function valid_board_offset(value)
     return type(value) == "table" and is_integer(value.x) and is_integer(value.y)
         and math.abs(value.x) <= MAX_ID and math.abs(value.y) <= MAX_ID
         and valid_direction(value.direction)
+        and (value.rotation==nil or value.rotation==0 or value.rotation==90 or value.rotation==180 or value.rotation==270)
 end
 
 local function valid_random_state(value)

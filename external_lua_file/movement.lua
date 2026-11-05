@@ -1278,6 +1278,24 @@ function RW_ResolveOrientation(world)
     return {consumes_turn=true,changes=changes,reason="orientation"}
 end
 
+-- startblock's one-time ordered map orientation, after boot status initialization.
+function RW_ResolveLevelStart(world,traits)
+    local old=world.board_offset or {x=0,y=0,direction="None"}
+    local values={right={"Right",90},up={"Up",180},left={"Left",270},down={"Down",0}}
+    local direction,rotation=old.direction,0
+    local selected=false
+    for _,trait in ipairs(traits or {}) do
+        if values[trait] then direction,rotation=table.unpack(values[trait]);selected=true end
+    end
+    local result={consumes_turn=true,changes={},reason="level_start"}
+    if selected and (direction~=old.direction or rotation~=(old.rotation or 0))
+        or old.rotation~=nil and rotation~=old.rotation then
+        result.board_shift={from={x=old.x,y=old.y,direction=old.direction,rotation=old.rotation},
+            to={x=old.x,y=old.y,direction=direction,rotation=rotation}}
+    end
+    return result
+end
+
 -- Synthetic LEVEL motion belongs to late levelblock(), not unit collection.
 -- The caller supplies the surviving ordered declarations up to any terminal.
 function RW_ResolveLevelMotion(world,traits,stop_index)
@@ -1301,6 +1319,7 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
     local nudges={nudgeright=0,nudgeup=1,nudgeleft=2,nudgedown=3}
     local falls={fall={0,20},fallright={35,0},fallup={0,-20},fallleft={-35,0}}
     local direction=world.board_offset and old.direction or "Down"
+    local rotation=old.rotation
     for index,trait in ipairs(traits or world.level_traits or {}) do
         if stop_index and index>=stop_index then break end
         local dx,dy=0,0
@@ -1315,12 +1334,20 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
         elseif falls[trait] and not still then
             dx,dy=table.unpack(falls[trait])
             if reverse then dx,dy=-dx,-dy end
+        elseif trait=="turn" or trait=="deturn" then
+            -- Keep the original rotation formula, even where it differs from
+            -- the cardinal startblock mapping for the resulting direction.
+            rotation=((dir+1)%4)*90
+            dir=(dir+(trait=="turn" and -1 or 1))%4
+            direction=names[dir+1]
         end
         x,y=x+dx,y+dy
     end
     local result={consumes_turn=true,changes={},reason="level_motion"}
-    if x~=old.x or y~=old.y or state~=original and direction~=old.direction then
-        result.board_shift={from={x=old.x,y=old.y,direction=old.direction},to={x=x,y=y,direction=direction}}
+    if x~=old.x or y~=old.y or state~=original and direction~=old.direction
+        or (rotation or 0)~=(old.rotation or 0) or direction~=old.direction and rotation~=nil then
+        result.board_shift={from={x=old.x,y=old.y,direction=old.direction,rotation=old.rotation},
+            to={x=x,y=y,direction=direction,rotation=rotation}}
     end
     if state~=original then result.random_state={from=original,to=state} end
     return result
@@ -1654,8 +1681,8 @@ function RW_ResolveTurn(world, action)
         and not world.level_behaviors.still
         and not world.level_behaviors[action.dx==1 and "lockedright" or action.dx==-1 and "lockedleft" or action.dy==-1 and "lockedup" or "lockeddown"] then
         local current = world.board_offset or {x=0,y=0,direction="None"}
-        plan.board_shift = {from={x=current.x,y=current.y,direction=current.direction},
-            to={x=current.x+level_dx,y=current.y+level_dy,direction=direction_for(level_dx,level_dy)}}
+        plan.board_shift = {from={x=current.x,y=current.y,direction=current.direction,rotation=current.rotation},
+            to={x=current.x+level_dx,y=current.y+level_dy,direction=direction_for(level_dx,level_dy),rotation=current.rotation}}
         plan.reason = nil
     end
     if selected then

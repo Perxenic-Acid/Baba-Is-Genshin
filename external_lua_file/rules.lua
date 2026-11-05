@@ -1593,6 +1593,33 @@ function RW_InitializeBirthSpecifications(world,specifications,generated_rules,b
     return initialized
 end
 
+-- Conservative boot vocabulary guard: avoid compiling ordinary startup boards
+-- solely for synthetic map orientation. Actual activation is still compiled.
+function RW_LevelStartNeeded(world)
+    if world.board_offset and world.board_offset.rotation~=nil then return true end
+    local cardinal={right=true,up=true,left=true,down=true}
+    for _,rule in ipairs(world.rule_sources or {}) do
+        for _,d in ipairs(rule.scoped_conditions or {}) do
+            if cardinal[d.trait] then return true end
+        end
+    end
+    local level,direction=false,false
+    local language=world.language or {}
+    local level_types={level_block=true}
+    for _,noun in pairs(language.nouns or {}) do
+        if type(noun)=="table" and noun.tag=="level" then level_types[noun.block_type or "level_block"]=true end
+    end
+    for _,entity in pairs(world.entities) do
+        if entity.class=="text" then
+            local token=entity.text and entity.text.name
+            local noun=token and (language.nouns or {})[token]
+            if type(noun)=="table" and noun.tag=="level" then level=true end
+            if cardinal[token and (language.properties or {})[token]] then direction=true end
+        elseif level_types[entity.archetype] then level=true end
+    end
+    return level and direction
+end
+
 -- Cheap authored-data guard for boot/boundary initialization. The standard
 -- grounded WORD reader can only produce a property token through this vocabulary.
 function RW_StatusInitializationNeeded(world)

@@ -21,28 +21,34 @@ env.nlist={short={'group','all','text','empty','level'}}
 env.findnoun=function(name)
  return name=='all' or name=='text' or name=='empty' or name=='level' or name:sub(1,5)=='group'
 end
+assert(load(source:sub(assert(source:find('function copyrule(',1,true)),assert(source:find('function comparerules(',1,true))-1),'@original_copyrule','t',env))()
+env.getmat=function(name)return env.objectlist[name] and name or nil end
+local toggle=assert(source:match('(if %(prefix == "not "%) then.-end)'))
+local prefix=assert(load('return function(count) local prefix=""; for i=1,count do '..toggle..' end; return prefix end','@original_not_prefix','t',env))()
+local function wrapped(term,count) for i=1,count do term={tag='not',operand=term} end;return term end
 local checked=0
-for _,mixed in ipairs({false,true}) do for channel=1,3 do for _,inverse in ipairs({false,true}) do for ban=0,2 do
+for _,mixed in ipairs({false,true}) do for channel=1,3 do for not_count=0,4 do for target_not=0,3 do for ban=0,2 do
 for _,conditional in ipairs({false,true}) do for copies=1,2 do
-for _,rhs in ipairs({false,true}) do for _,transfer in ipairs({false,true}) do
+for _,rhs in ipairs({false,true}) do for _,transfer in ipairs({false,true}) do for _,consumer_not in ipairs({0,2}) do for _,mimic in ipairs({false,true}) do
  local name=channel==1 and 'group' or 'group'..channel
  local w=RW_CreateSession().world;w.entities={};w.width=20;w.height=20
  w.language.nouns.ROCK='rock';w.language.nouns.FLAG='flag'
  for id,kind in ipairs({'rock','flag','avatar'}) do w.entities[id]={id=id,kind='object',class='object',archetype=kind,x=id*4,y=3,direction='Right'} end
  w.entities[4]={id=4,kind='object',class='text',text={name='IS'},x=4,y=3,direction='None'}
  env.features={};env.featureindex={};env.visualfeatures={};env.notfeatures={};env.condfeatureindex={};env.groupfeatures={}
- env.objectlist={all=true,text=true,empty=true,level=true};for _,kind in ipairs(RW_NounPalette(w)) do env.objectlist[kind]=true end
+ env.objectlist={all=true,text=true,empty=true,level=true,group=true,group2=true,group3=true};for _,kind in ipairs(RW_NounPalette(w)) do env.objectlist[kind]=true end
  local ast={}
  local function add(subject,verb,object,condition,rawsubject,rawobject,rawconds)
   ast[#ast+1]={subject=subject,verb=verb,object=object,when=condition}
   env.addoption({rawsubject,verb,rawobject},rawconds or {},{},false,nil,{})
  end
  if mixed then add({tag='not',operand={tag='special',name='all'}},'is',{tag='not',operand={tag='property',name='float'}},when(false),'not all','not float') end
- for i=1,copies do add(inverse and {tag='not',operand={tag='special',name='all'}} or {tag='special',name='all'},'is',team(name),when(conditional),(inverse and 'not ' or '')..'all',name,conditional and {{'lonely',{}}} or {}) end
+ for i=1,copies do add(wrapped({tag='special',name='all'},not_count),'is',wrapped(team(name),target_not),when(conditional),prefix(not_count)..'all',prefix(target_not)..name,conditional and {{'lonely',{}}} or {}) end
  if ban>0 then add({tag='special',name='all'},'is',{tag='not',operand=team(name)},when(ban==2),'all','not '..name,ban==2 and {{'lonely',{}}} or {}) end
  if transfer then add(team(name),'is',team('group3'),when(false),name,'group3');name='group3' end
- if rhs then add(noun('avatar'),'has',team(name),when(false),'avatar',name)
- else add(team(name),'has',noun('flag'),when(false),name,'flag') end
+ if rhs then add(noun('avatar'),'has',wrapped(team(name),consumer_not),when(false),'avatar',name)
+ else add(wrapped(team(name),consumer_not),'has',noun('flag'),when(false),name,'flag') end
+ if mimic then add(noun('avatar'),'mimic',team(name),when(false),'avatar',name) end
  env.subrules();env.grouprules()
  local g,d,relations=RW_LowerRuleAST(ast,nil,w);assert(g,'ALL lowering failed');for _,rule in ipairs(d) do assert(rule.subject.tag=='special' and rule.subject.name=='empty','unexpected ALL deferred '..checked) end
  local has={};for _,r in ipairs(relations) do if r.op=='has' then has[#has+1]=r end end;relations=has
@@ -73,6 +79,6 @@ for _,rhs in ipairs({false,true}) do for _,transfer in ipairs({false,true}) do
   for key,count in pairs(actual) do assert(expected[key]==count,'unexpected ALL product '..checked..':'..key) end
  end
  checked=checked+1
-end end end end end end end end
-assert(checked==576)
+end end end end end end end end end end end
+assert(checked==23040)
 print('PASS: installed addoption/subrules/grouprules ALL/NOT ALL membership, exclusions, duplicate products, conditions and transfers ('..checked..' cases)')

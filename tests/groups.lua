@@ -333,3 +333,17 @@ s=negative_fixture({{'LEVEL','MIMIC','GROUP'},{'GROUP','IS','WIN'}})
 w,f=projection(s);local scoped=false;for _,r in ipairs(f.relations) do if r.op=='level_trait' and r.trait=='win' then scoped=true end end;assert(scoped)
 assert(not s.world.group_members and not s.world._condition_rules)
 print('PASS: GROUP MIMIC raw declarations/empty groups, channels, negative copies, ALL multiplicity, LEVEL and Undo')
+for _,name in ipairs({'GROUP','GROUP2','GROUP3'}) do for count=0,4 do for copies=1,2 do
+ local sentence={};for i=1,count do sentence[#sentence+1]='NOT' end
+ for _,word in ipairs({'ALL','IS',name})do sentence[#sentence+1]=word end
+ local rows={{name,'HAS','FLAG'},{'AVATAR','IS','YOU','AND','DEFEAT'}}
+ for i=1,copies do rows[#rows+1]=sentence end
+ s=fixture(rows);w,f=projection(s)
+ for _,rule in ipairs(f.deferred)do assert(rule.subject.tag=='special' and rule.subject.name=='empty')end
+ for id,e in pairs(s.world.entities)do if e.class=='text' then assert(f.active_text_ids[id]) end end
+ n,p=step(s);local flags=0
+ for _,e in pairs(n.world.entities)do if e.class=='object' and e.archetype=='flag' and e.x==2 and e.y==2 then flags=flags+1 end end
+ assert(flags==(count%2==0 and copies or 0),'wrapped ALL membership must not rerun its literal source as an ordinary palette')
+ assert(not n.world.group_members and not n.world._condition_rules,'GROUP parity query data must remain transient')
+end end end
+print('PASS: physical ALL membership 0-4 NOT parity, three channels, duplicates, activation, frozen HAS and whole-turn Undo')

@@ -349,3 +349,30 @@ Remaining MIMIC scope: ALL as an actual MIMIC endpoint, ordinary NOT/NOT GROUP
 subjects, and virtual EMPTY endpoints retain their existing deferred diagnostics.
 Conditional scoped LEVEL consumers and prior nested-inversion/query/cache gaps
 remain explicit. This is not a claim that every original GROUP combination is done.
+
+## Repeated NOT on authored ALL membership
+
+A direct NOT NOT ALL IS GROUP declaration exposed a separate raw-member issue
+from MIMIC's copied-subject fix. Membership/transfer logic correctly cancelled
+the NOT prefixes, but the final consumer emitter checked only an unwrapped
+special-ALL table shape. The retained raw member was consequently lowered as a
+fresh ordinary ALL palette, duplicating GROUP HAS products. The emitter now
+checks the term's effective parity/name and preserves its literal ALL source.
+This leaves ordinary members, negative membership/exclusions and the existing
+RHS-ALL authored product contract unchanged. No new persisted state is added.
+
+Primary evidence: installed rules.lua's physical parser NOT-prefix toggle,
+addoption/subrules and grouprules literal member emission. The expanded
+reference_group_all.lua executes those passes across23,040 cases:0-4 source NOTs,
+0-3 target NOTs, three channels, ordinary/GROUP consumers with even NOT wrappers,
+conditions, duplicate memberships, exclusions, transfers and optional MIMIC.
+It compares generated HAS products using the matrix's existing authored-palette
+RHS-ALL contract; it is not a new native inside()/creation oracle. Physical
+fixtures check0-4 source NOTs, all channels, one/two copies, activation,
+post-destruction HAS counts, transient group frames and whole-turn Undo. In
+particular two NOT NOT ALL membership clauses produce two Flags, not four, when
+Avatar dies under GROUP HAS FLAG.
+
+Full tests/run.lua and the official layout/catalog audits passed. Startup remains
+1,440,000 offline Lua instructions; actual native behavior is not inferred from
+those checks.

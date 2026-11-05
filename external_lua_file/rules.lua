@@ -2478,7 +2478,8 @@ local function expand_groups(ast_rules,registry,world,normalized)
     local function emit(rule,subject,object,condition)
         local copy=query_clone(rule);copy.subject=query_clone(subject);copy.object=query_clone(object)
         -- A raw ALL group member is a literal source, not a second ALL expansion.
-        if group(rule.subject) and subject.tag=="special" and subject.name=="all" then copy.subject=noun_term("all") end
+        local raw,negative=unwrap(subject)
+        if group(rule.subject) and not negative and raw and raw.tag=="special" and raw.name=="all" then copy.subject=noun_term("all") end
         copy.when=combine(rule.when,condition);expanded[#expanded+1]=copy
         if #expanded>5000 then return nil,"rule_complexity_limit" end
         return true

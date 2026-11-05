@@ -290,12 +290,12 @@ end
 function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
-        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true,boom=true}
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true,boom=true,open=true,shut=true}
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
             if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.trait=="boom" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
+                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.trait=="boom" or d.trait=="open" or d.trait=="shut" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -435,7 +435,7 @@ function RW_LevelHotDeclarations(world,rules)
     end
     return result
 end
-function RW_LevelHotTargets(world,rules,declaration)
+local function level_property_targets(world,rules,declaration,trait)
     local context=condition_context(world,rules)
     local selected={};for _,id in ipairs(RW_SelectEntities(world,declaration.target)) do selected[id]=true end
     local ids,seen,rest={},{},{}
@@ -450,13 +450,78 @@ function RW_LevelHotTargets(world,rules,declaration)
             if active then
                 -- findall has established this particular positive clause.
                 -- Only denials may veto it; other grants execute in later groups.
-                active,why=query_trait(context,e,"melt",true)
+                active,why=query_trait(context,e,trait,true)
                 if active==nil then return nil,why end
                 if active then result[#result+1]=id end
             end
         end
     end
     return result
+end
+function RW_LevelHotTargets(world,rules,declaration)
+    return level_property_targets(world,rules,declaration,"melt")
+end
+
+-- OPEN/SHUT queue every declaration before deleting. SAFE queries must finish
+-- even on the declaration that will destroy an unsafe map. Repeated IDs are
+-- queried again but delete()'s native deleted guard permits only one HAS birth.
+function RW_ResolveScopedUnlockTargets(world,rules,trait,level_safe)
+    local opposite=trait=="open" and "shut" or "open"
+    local context=condition_context(world,rules)
+    local result={ids={},cells={}};local seen={}
+    for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+        -- Lowering publishes physical LEVEL grants in declaration order and
+        -- mirrors their scoped queries in a trailing carrier. Execute them here
+        -- as synthetic declarations once, retaining standalone scoped hosts.
+        local represented=0
+        for _,rule in ipairs(frame) do for _,effect in ipairs(rule.effects or {}) do
+            if effect.op=="grant_trait" and effect.trait==opposite and effect.target.kind=="archetype" and effect.target.value=="level_block" then represented=represented+1 end
+        end end
+        for _,rule in ipairs(frame) do
+            for _,effect in ipairs(rule.effects or {}) do
+                if effect.op=="grant_trait" and effect.trait==opposite and effect.target.kind~="empty" then
+                    if effect.target.kind=="archetype" and effect.target.value=="level_block" then
+                        local active,why=RW_LevelMotionDeclarationActive(world,rules,{trait=opposite,when=rule.when})
+                        if active==nil then return nil,why end
+                        if active and not level_safe then return {ids={},cells={},level_destroy=true} end
+                    else
+                        local ids,why=level_property_targets(world,rules,{target=effect.target,when=rule.when},opposite)
+                        if not ids then return nil,why end
+                        local witness=false
+                        for _,id in ipairs(ids) do
+                            local floating,why=query_level_trait(context,"float")
+                            if floating==nil then return nil,why end
+                            if ((world.entities[id].behaviors or {}).float==true)==floating then
+                                witness=true
+                                local safe,why=query_trait(context,world.entities[id],"safe")
+                                if safe==nil then return nil,why end
+                                if not safe and not seen[id] then seen[id]=true;result.ids[#result.ids+1]=id end
+                            end
+                        end
+                        if witness and not level_safe then return {ids={},cells={},level_destroy=true} end
+                    end
+                end
+            end
+            for _,d in ipairs(rule.scoped_conditions or {}) do
+                if d.op=="level_trait" and d.trait==opposite then
+                    if represented>0 then represented=represented-1
+                    else
+                        local active,why=RW_LevelMotionDeclarationActive(world,rules,d)
+                        if active==nil then return nil,why end
+                        if active and not level_safe then return {ids={},cells={},level_destroy=true} end
+                    end
+                end
+            end
+        end
+    end
+    return result
+end
+function RW_LevelUnlockEmptyDestroys(world,rules,trait,level_safe)
+    local opposite=trait=="open" and "shut" or "open"
+    if not world["empty_"..opposite.."_declared"] then return false end
+    local floating,why=query_level_trait(condition_context(world,rules),"float")
+    if floating==nil then return nil,why end
+    return (world.empty_float_declared==true)==floating and not level_safe
 end
 
 -- One outgoing LEVEL EAT declaration, before any of its selected deletions.

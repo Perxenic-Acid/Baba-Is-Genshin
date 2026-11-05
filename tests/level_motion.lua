@@ -103,11 +103,12 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
    weak=RW_LevelWeakDestroys,
    melt=RW_LevelMeltDestroys,
    outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}
-   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' or row.trait=='boom' then outgoing=true end end
+   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' or row.trait=='boom' or row.trait=='open' or row.trait=='shut' then outgoing=true end end
    if not outgoing then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,motion) end
    local contents={};for _,r in ipairs(relations or {}) do if r.op=='has' or r.op=='empty_has' then contents[#contents+1]=r end end
    return RW_PlanScopedLevelSequence(raw,w,traits,rules,rows,{motion=motion,preview=RW_PreviewPlan,select=RW_ResolveScopedEatTargets,
     area_select=RW_ResolveScopedAreaTargets,
+    unlock_select=RW_ResolveScopedUnlockTargets,unlock_empty=RW_LevelUnlockEmptyDestroys,
     hot_declarations=RW_LevelHotDeclarations,hot_targets=RW_LevelHotTargets,
     hot_destroy=function(world,ids,r,view)
      local layers={};for _,id in ipairs(ids) do layers[id]=(view.entities[id].behaviors or {}).float==true end
@@ -180,6 +181,34 @@ do
  local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','MOVE'},{'ROCK','HAS','FLAG'}})
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1,'WEAK must retire map without suppressing later motion or triggering HAS')
  assert(n.world.next_entity_id==s.world.next_entity_id)
+ do
+ for _,pair in ipairs({{'OPEN','SHUT'},{'SHUT','OPEN'}}) do
+  local s,id=outgoing({{'LEVEL','IS',pair[1]},{'LEVEL','IS','FLOAT'},{'ROCK','IS',pair[2]},{'ROCK','IS','FLOAT'},{'ROCK','IS','SAFE'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','CHILL'}})
+  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.random_state and n.world.next_entity_id==s.world.next_entity_id,'unsafe scoped unlock retires before HAS and suffix RNG')
+  local s,id=outgoing({{'LEVEL','IS',pair[1]},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS',pair[2],'AND',pair[2]},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','MOVE'}})
+  local n,p=turn(s);assert(not n.world.entities[id] and n.world.entities[id+1].archetype=='flag' and n.world.next_entity_id==id+2 and n.world.board_offset.y==1 and not p.level_destroy,'duplicate complementary grants trigger HAS once and preserve suffix motion')
+  local s,id=outgoing({{'LEVEL','IS',pair[1]},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS',pair[2],'AND',pair[2]},{'ROCK','IS','FLOAT'},{'ROCK','HAS','ROCK'}})
+  local n,p=turn(s);assert(not n.world.entities[id] and n.world.entities[id+1].archetype=='rock' and n.world.next_entity_id==id+2,'all complementary declarations collect before HAS newborns exist')
+  local s,id=outgoing({{'LEVEL','IS',pair[1]},{'LEVEL','IS','FLOAT'},{'ROCK','IS',pair[2]},{'LEVEL','IS','MOVE'}})
+  local n,p=turn(s);assert(n.world.entities[id] and not p.level_destroy and n.world.board_offset.y==1,'scoped unlock real target FLOAT mismatch')
+  local s,id=outgoing({{'LEVEL','IS',pair[1]},{'LEVEL','IS',pair[2]},{'LEVEL','IS','FLOAT'},{'LEVEL','IS','CHILL'}})
+  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.random_state,'scoped complementary LEVEL ignores real witness layers')
+  local s,id=outgoing({{'LEVEL','IS',pair[1]},{'EMPTY','IS',pair[2]},{'LEVEL','IS','CHILL'}})
+  local n,p=turn(s);assert(p.level_destroy and not n.world.random_state,'EMPTY complementary placeholder retires map')
+ end
+ local saved=RW_ResolveScopedUnlockTargets
+ for _,reason in ipairs({'word_rule_limit','rule_complexity_limit','invalid_unlock_selection'}) do
+  local s,id=outgoing({{'LEVEL','IS','MOVE'},{'LEVEL','IS','OPEN'},{'LEVEL','IS','CHILL'}})
+  RW_ResolveScopedUnlockTargets=function()return nil,reason end
+  local p,e=RW_PlanTurn(s.world,{type='wait'},services)
+  if reason=='invalid_unlock_selection' then assert(not p and e.reason==reason and not s.world.board_offset and not s.world.random_state)
+  else
+   assert(p and (p.infinite_loop or p.too_complex));local n,r=RW_Commit(s,p);assert(r.accepted)
+   assert(n.world.board_offset.y==1 and n.world.entities[id] and not n.world.random_state and RW_Undo(n).world==s.world,'unlock query limit retains only completed motion prefix')
+  end
+ end
+ RW_ResolveScopedUnlockTargets=saved
+ end
  do
  local s,id=outgoing({{'LEVEL','IS','BOOM'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','IS','SAFE'},{'LEVEL','IS','CHILL'}})
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.random_state,'BOOM unsafe map must retire before later CHILL')
@@ -640,6 +669,13 @@ do
  w.entities[boom_victim]={id=boom_victim,kind='object',class='object',archetype='rock',x=31,y=31,direction='Right'}
  OnStart();listeners.wait();assert(not display.entities[boom_victim] and display.entities[boom_victim+1].archetype=='flag' and depth==1)
  listeners.undo();assert(display.entities[boom_victim] and not display.entities[boom_victim+1] and depth==0)
+ for _,pair in ipairs({{'OPEN','SHUT'},{'SHUT','OPEN'}}) do
+  w=fixture({{'LEVEL','IS',pair[1]},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS',pair[2]},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'}}).world
+  local victim=w.next_entity_id;w.next_entity_id=victim+1
+  w.entities[victim]={id=victim,kind='object',class='object',archetype='rock',x=31,y=31,direction='Right'}
+  OnStart();listeners.wait();assert(not display.entities[victim] and display.entities[victim+1].archetype=='flag' and depth==1)
+  listeners.undo();assert(display.entities[victim] and not display.entities[victim+1] and depth==0)
+ end
  w=fixture({{'LEVEL','IS','MELT'},{'EMPTY','IS','HOT'},{'LEVEL','IS','CHILL'}}).world
  OnStart();listeners.wait();assert(not next(display.entities) and not display.random_state and depth==1)
  listeners.undo();assert(next(display.entities) and depth==0)

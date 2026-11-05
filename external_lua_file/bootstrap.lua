@@ -1399,6 +1399,25 @@ function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,b
                     end
                 end
             end
+        elseif row.trait=="open" or row.trait=="shut" then
+            local ok,why=flush();if ok==nil then return failed(why) elseif not ok then return result end
+            local active,why=services.motion.active(view,rules,row)
+            if active==nil then return failed(why) end
+            if active then
+                local safe=projected.level_behaviors and projected.level_behaviors.safe==true
+                local selected,why=services.unlock_select(view,rules,row.trait,safe)
+                if not selected then return failed(why) end
+                if selected.level_destroy then result.level_destroy=true;return result end
+                if #selected.ids>0 then
+                    local phase,why=services.destroy(current,selected.ids,rules,"level_"..row.trait)
+                    if not phase then return failed(why) end
+                    local ok,why=append(phase,row.trait);if ok==nil then return nil,why elseif not ok then return result end
+                    local ok,why=refresh_view();if not ok then return failed(why) end
+                end
+                local destroys,why=services.unlock_empty(view,rules,row.trait,safe)
+                if destroys==nil then return failed(why) end
+                if destroys then result.level_destroy=true;return result end
+            end
         elseif row.op=="level_eat" or row.trait=="sink" or row.trait=="boom" then
             local ok,why=flush();if ok==nil then return failed(why) elseif not ok then return result end
             local selected,why
@@ -2374,13 +2393,15 @@ local function start(run_self_tests)
                 outcome=function(...) return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",...) end,
                 resolve=function(...) return movement_api:Invoke("RW_ResolveLevelMotion",...) end,
                 layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end}
-            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" or row.trait=="sink" or row.trait=="boom" then outgoing=true;break end end
+            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" or row.trait=="sink" or row.trait=="boom" or row.trait=="open" or row.trait=="shut" then outgoing=true;break end end
             if not outgoing then return RW_PlanOrderedLevelMotion(world,traits,rules,rows,motion_services) end
             local contents={};for _,r in ipairs(relations or {}) do if r.op=="has" or r.op=="empty_has" then contents[#contents+1]=r end end
             return RW_PlanScopedLevelSequence(raw,world,traits,rules,rows,{
                 motion=motion_services,preview=function(...) return world_api:Invoke("RW_PreviewPlan",...) end,
                 select=function(...) return rules_api:Invoke("RW_ResolveScopedEatTargets",...) end,
                 area_select=function(...) return rules_api:Invoke("RW_ResolveScopedAreaTargets",...) end,
+                unlock_select=function(...) return rules_api:Invoke("RW_ResolveScopedUnlockTargets",...) end,
+                unlock_empty=function(...) return rules_api:Invoke("RW_LevelUnlockEmptyDestroys",...) end,
                 hot_declarations=function(...) return rules_api:Invoke("RW_LevelHotDeclarations",...) end,
                 hot_targets=function(...) return rules_api:Invoke("RW_LevelHotTargets",...) end,
                 hot_destroy=function(w,ids,r,view)

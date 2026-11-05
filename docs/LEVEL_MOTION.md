@@ -345,11 +345,11 @@ map scrolling, distinct event causes and actual mapped-input/whole-tree Undo.
 Ordinary BOOM radius/multiplicity is unchanged. Broader original levelblock and
 native host boundary timing gaps remain as previously documented.
 
-## Scoped OPEN/SHUT source contract (integration pending)
+## Scoped OPEN/SHUT source contract
 
 tests/reference_level_unlock.lua executes the installed blocks.lua2786-2893
-branches directly in 2048 cases. This is a native contract oracle, not evidence
-that scoped OPEN/SHUT is implemented. Ordinary real-unit unlocking is unchanged.
+branches directly in 2048 cases and compares production selection against them.
+Ordinary real-unit unlocking is unchanged.
 
 Each complementary property declaration runs findall in declaration order. The
 branch queries each matching-layer target's SAFE even when the map is unsafe,
@@ -359,5 +359,22 @@ unit witness or FLOAT comparison. Neither path reaches queued target deletion.
 On a safe map, all declaration groups collect before any serial delete/HAS;
 duplicate declarations retain duplicate queued IDs. The EMPTY complementary
 placeholder check follows these deletions and can immediately retire an unsafe
-map. Integration must preserve these query/deletion barriers and cannot reuse
+map. Integration preserves these query/deletion barriers and cannot reuse
 SINK's earlier map-destruction shortcut or HOT's per-group deletion timing.
+
+The scoped scheduler now flushes motion before each active OPEN/SHUT row, selects
+all groups with RW_ResolveScopedUnlockTargets, then performs one serial HAS/death
+stage before RW_LevelUnlockEmptyDestroys. Duplicate queued identities query again
+but produce one death/HAS, matching tools.lua509-568's deleted guard. Births wait
+until the next scoped row for selection. Physical LEVEL grant mirrors execute as
+synthetic complementary declarations in grant order; their trailing scoped query
+carrier is not executed a second time. Standalone scoped host declarations remain
+supported. EMPTY OPEN/SHUT placeholder flags are transient projection metadata.
+
+Turn tests cover both directions, independent SAFE/FLOAT, synthetic LEVEL and
+EMPTY witnesses, duplicates/newborns, suffix motion and RNG, query-limit prefixes,
+ordinary-error atomicity and mapped input with whole-tree Undo. The source oracle
+also checks negative protection and completion of SAFE queries before retirement.
+Broader raw condition dispatch/conditional synthetic surroundings and native host
+boundary timing remain the shared scoped limits described above. Native unlock
+sound/particles remain deferred frontend work.

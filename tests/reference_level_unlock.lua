@@ -1,4 +1,4 @@
--- Native contract oracle; production scoped OPEN/SHUT integration is pending.
+-- Native contract and production scoped OPEN/SHUT selection oracle.
 local base=[[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/]]
 local f=assert(io.open(base..'blocks.lua','rb'));local source=f:read('*a');f:close()
 local env=setmetatable({XPOS=1,YPOS=2,SHAKE=1,generaldata={values={}},
@@ -77,7 +77,44 @@ for _,kind in ipairs({'open','shut'}) do
    assert(empty_index)
    for i,event in ipairs(trace) do if event:sub(1,7)=='delete:' then assert(i<empty_index) end end
   end
+  if RW_ResolveScopedUnlockTargets then
+   local w=RW_CreateSession().world;w.entities={};w.unit_order={};w.rule_sources={}
+   for i=0,1 do if bit(mask,i) then
+    local id=10+i;w.unit_order[#w.unit_order+1]=id
+    w.entities[id]={id=id,kind='object',class='object',archetype='rock',x=i+1,y=1,direction='Right',behaviors={float=not bit(layers,i)}}
+    if bit(safe,i) then w.rule_sources[#w.rule_sources+1]={when={op='always'},effects={{op='grant_trait',trait='safe',target={kind='id',value=id}}}} end
+   end end
+   for i=1,copies do w.rule_sources[#w.rule_sources+1]={when={op='always'},effects={{op='grant_trait',trait=opposite,target={kind='archetype',value='rock'}}}} end
+   if scoped then w.rule_sources[#w.rule_sources+1]={when={op='always'},effects={{op='grant_trait',trait=opposite,target={kind='archetype',value='level_block'}}},scoped_conditions={{op='level_trait',trait=opposite,when={op='always'}}}} end
+   local selected=assert(RW_ResolveScopedUnlockTargets(w,{},kind,map_safe))
+   assert((selected.level_destroy==true)==early,'production early map retirement '..table.concat({kind,mask,layers,safe,copies,tostring(map_safe),tostring(scoped)},':'))
+   local unique,seen={},{};for _,id in ipairs(expected) do if not seen[id] then seen[id]=true;unique[#unique+1]=id end end
+   assert(#selected.ids==#unique,'production delete guard multiplicity')
+   for i,id in ipairs(unique) do assert(selected.ids[i]==id,'production grouped selection order') end
+   w['empty_'..opposite..'_declared']=empty
+   assert(RW_LevelUnlockEmptyDestroys(w,{},kind,map_safe)==(empty and not map_safe),'production EMPTY placeholder retirement')
+  end
   cases=cases+1
  end end end end end end end
 end
 print('PASS: installed LEVEL OPEN/SHUT contract, grouped duplicates, SAFE/FLOAT, scoped/EMPTY return and deletion order ('..cases..' cases)')
+
+if RW_ResolveScopedUnlockTargets then
+ local w=RW_CreateSession().world;w.entities={};w.unit_order={10,11};w.rule_sources={}
+ for _,id in ipairs(w.unit_order) do w.entities[id]={id=id,kind='object',class='object',archetype='rock',x=id-9,y=1,direction='Right'} end
+ local marker={op='spatial',clauses={},unlock_safe_marker=true}
+ local rules={{when={op='always'},effects={{op='grant_trait',trait='shut',target={kind='archetype',value='rock'}}}},
+  {when=marker,effects={{op='grant_trait',trait='safe',target={kind='id',value=11}}}}}
+ local original=RW_TestEntityCondition;local queried=false
+ RW_TestEntityCondition=function(world,c,e)if c.unlock_safe_marker then queried=true;return nil,'invalid_unlock_safe' end;return original(world,c,e) end
+ local result,why=RW_ResolveScopedUnlockTargets(w,rules,'open',false)
+ RW_TestEntityCondition=original
+ assert(not result and why=='invalid_unlock_safe' and queried,'unsafe map must finish target SAFE queries before destruction')
+ rules[2]={when={op='always'},effects={{op='deny_trait',trait='shut',target={kind='archetype',value='rock'}}}}
+ assert(not RW_ResolveScopedUnlockTargets(w,rules,'open',false).level_destroy,'negative complementary property blocks witnesses')
+ w.entities[10].archetype='level_block';w.entities[11]=nil;w.unit_order={10}
+ rules={{when={op='always'},effects={{op='grant_trait',trait='shut',target={kind='archetype',value='level_block'}}}},
+  {when={op='always'},effects={},scoped_conditions={{op='level_trait',trait='shut',when={op='always'}}}}}
+ assert(#RW_ResolveScopedUnlockTargets(w,rules,'open',true).ids==0,'LEVEL complementary declaration is synthetic, not physical entrance selection')
+ print('PASS: scoped unlock SAFE error barrier, negative protection and synthetic LEVEL selection')
+end

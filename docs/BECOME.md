@@ -180,3 +180,24 @@ createall_single calls for each of 24 real/Text/Empty initial occupancy cases.
 Later calls observe births from the first and emit no duplicate concrete nouns.
 This establishes the serial-newborn occupancy contract for the pending scheduler
 correction; the current project implementation does not yet claim this parity.
+
+## Literal ALL birth occupancy
+
+RW_PlanConversions now keeps a plan-local cell/noun index of earlier literal ALL
+births. Subsequent literal choices, including those at later source identities,
+consult it together with original occupancy. Explicit conversion products remain
+queued and do not populate this index, matching the immediate createall_single
+versus queued convert distinction. No cache is stored on world/session/Undo.
+
+Two ROCK BECOME ALL declarations now produce three copies per palette noun on
+an initially unoccupied source cell: one original retained source, one literal
+fill for each other noun, and two complete concrete palettes. Focused physical
+transactions validate counts, allocator and whole-turn Undo. Existing MIMIC tests
+and installed 192+24 literal ALL cases pass; full regression passed (normal startup: 1,438,000 instructions). Broader
+cross-source conversion scheduling and terminal-prefix birth visibility remain
+subject to their existing explicit scope boundaries.
+
+Additional transaction coverage places two ROCK sources either on the same cell
+or on separate cells. Same-cell literal fills are shared across source IDs;
+separate cells each receive their full palette. Concrete duplicate products and
+retained ROCK identities remain distinct. Both routes exercise whole-turn Undo.

@@ -88,3 +88,27 @@ for _,verb in ipairs({'IS','BECOME'}) do
  assert(flags==1,'literal IS NOT and explicit BECOME NOT must each veto only their own ALL path')
 end
 print('PASS: literal BECOME ALL uses IS NOT while explicit derivatives use BECOME NOT, with Undo')
+s=fixture({{'ROCK','BECOME','ALL'},{'ROCK','BECOME','ALL'}})
+n=step(s);local counts={}
+for _,unit in pairs(n.world.entities) do if unit.class=='object' and unit.x==6 and unit.y==3 then counts[unit.archetype]=(counts[unit.archetype] or 0)+1 end end
+for _,name in ipairs(RW_NounPalette(s.world)) do assert(counts[name]==3,'repeated literal ALL must suppress only duplicate literal births: '..name) end
+assert(n.world.next_entity_id==s.world.next_entity_id+3*#RW_NounPalette(s.world)-1)
+print('PASS: repeated literal ALL observes prior literal births while explicit BECOME duplicates survive, allocator and Undo')
+for _,same_cell in ipairs({false,true}) do
+ s=fixture({{'ROCK','BECOME','ALL'}})
+ object(s.world,3,'rock',same_cell and 6 or 9,3)
+ n=step(s)
+ local function count_at(x)
+  local counts={}
+  for _,unit in pairs(n.world.entities) do if unit.class=='object' and unit.x==x and unit.y==3 then counts[unit.archetype]=(counts[unit.archetype] or 0)+1 end end
+  return counts
+ end
+ for _,x in ipairs(same_cell and {6} or {6,9}) do
+  local counts=count_at(x)
+  for _,name in ipairs(RW_NounPalette(s.world)) do
+   local expected=same_cell and (name=='rock' and 4 or 3) or 2
+   assert(counts[name]==expected,'literal birth occupancy must be shared only by matching cells: '..name)
+  end
+ end
+end
+print('PASS: literal ALL newborn occupancy crosses source identities within one cell and stays isolated between cells, with Undo')

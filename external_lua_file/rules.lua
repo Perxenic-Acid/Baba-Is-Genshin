@@ -1609,6 +1609,9 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
         ids={};for _,id in ipairs(world.unit_order) do ids[#ids+1]=id end
     else table.sort(ids) end
     local changes,next_id,created={},world.next_entity_id,0
+    -- createall_single creates immediately; ordinary conversion products are
+    -- queued. Only literal ALL births contribute this transient occupancy.
+    local literal_occupancy={}
     local random_state=world.random_state or 1
     local original_random_state=random_state
     local converted_ids={}
@@ -1723,11 +1726,14 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
                     if virtual then empty_all={};products[#products+1]={empty_all=empty_all} end
                     for _,name in ipairs(RW_NounPalette(world)) do
                         if name~=source and not literal_denied[name] then
-                            local exists=false
+                            local cell_key=entity.x..":"..entity.y
+                            local exists=literal_occupancy[cell_key] and literal_occupancy[cell_key][name] or false
                             for _,other in pairs(world.entities) do
                                 if other.x==entity.x and other.y==entity.y and other.class~="text" and other.archetype==name then exists=true end
                             end
                             if not exists then
+                                literal_occupancy[cell_key]=literal_occupancy[cell_key] or {}
+                                literal_occupancy[cell_key][name]=true
                                 if empty_all then empty_all[#empty_all+1]=name else products[#products+1]=name end
                             end
                         end

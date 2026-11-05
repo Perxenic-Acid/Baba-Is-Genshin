@@ -35,6 +35,9 @@ end
 local function paint(control,key,value)
     local previous=state(control)
     if key=="fontSize" then
+        -- Native range errors may only be logged: pcall can still succeed.
+        -- Keep scaled labels at the existing 12-point annotation size or above.
+        value=math.max(12,math.floor(value))
         local requested=value;value=font_aliases[requested] or requested
         if previous[key]~=value then
             local ok,err=pcall(function() control.fontSize=value end)

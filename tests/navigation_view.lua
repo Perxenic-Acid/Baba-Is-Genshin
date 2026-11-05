@@ -2,7 +2,7 @@
 local old_game, old_script, old_color, old_render = game, script, Color, RW_Render
 local controls = {}
 local calls={position=0,size=0,font=0,visible=0}
-local minimum_font=6
+local minimum_font=12
 local board, status = {alive=true}, {alive=true}
 local methods = setmetatable({}, {__index=function() return function() end end})
 methods.SetAnchoredPosition = function(control,x,y) calls.position=calls.position+1;control.px,control.py=x,y end
@@ -116,13 +116,13 @@ assert(first.bgColor[1]==82 and second.bgColor[1]==205)
 words.width=33;words.height=18;assert(RW_Render(words,0,0))
 local scaled
 for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then scaled=c end end
-assert(scaled.width<24 and scaled.height<24 and scaled.fontSize>=7)
+assert(scaled.width<24 and scaled.fontSize>=12)
 assert(math.type(scaled.fontSize)=="integer")
 assert(not pcall(function() scaled.fontSize=7.5 end),"mock must reject native-invalid fractional font sizes")
 -- Check the 24-wide AUTO/WHERE scale as well as the 33-wide BIY scale.
 words.width=24;assert(RW_Render(words,0,0))
 for _,c in ipairs(controls) do if c.alive and c.name=="RW_Entity_1" then
- assert(c.fontSize==9 and math.type(c.fontSize)=="integer")
+ assert(c.fontSize==12 and math.type(c.fontSize)=="integer")
 end end
 words.width=33;assert(RW_Render(words,0,0))
 for _,c in ipairs(controls) do if c.alive and c.name and c.name:find("RW_Cell_") then
@@ -158,12 +158,12 @@ print("PASS: unchanged render makes zero repeated position/size/font/visibility 
 print("PASS: native inactive/active Text colours, same-view refresh and large-board scaling/reset")
 -- A stricter host must not abort drawing the rest of a large board. Rejected
 -- sizes are learned once; subsequent frames and movement remain cached.
-minimum_font=8;dofile('external_lua_file/renderer.lua')
+minimum_font=14;dofile('external_lua_file/renderer.lua')
 words.width=32;words.height=30;words.entities[1].text.name='LOCKEDRIGHT'
 assert(RW_Render(words,0,0))
 local fallback
 for _,c in ipairs(controls) do if c.alive and c.name=='RW_Entity_1' then fallback=c end end
-assert(fallback.fontSize>=8 and fallback.text:gsub('\n','')=='LOCKEDRIGHT')
+assert(fallback.fontSize>=14 and fallback.text:gsub('\n','')=='LOCKEDRIGHT')
 local frozen={};for k,v in pairs(calls) do frozen[k]=v end
 assert(RW_Render(words,0,0))
 for k,v in pairs(calls) do assert(v==frozen[k],'fallback frame repeated native '..k) end

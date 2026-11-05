@@ -1622,9 +1622,8 @@ function RW_WordTokenMap(world, effective)
     end
     return tokens
 end
-function RW_RelationApplies(world,relation,entity)
+local function relation_applies_in_frame(world,relation,entity)
     if entity.broken==1 then return false end
-    if relation.condition_rules then world=condition_context(world,relation.condition_rules) end
     local disabled,err=virtual_broken(world,entity)
     if disabled==nil then return nil,err end
     if disabled then return false end
@@ -1640,6 +1639,10 @@ function RW_RelationApplies(world,relation,entity)
         if disabled then return false end
     end
     return true
+end
+function RW_RelationApplies(world,relation,entity)
+    if relation.condition_rules then world=condition_context(world,relation.condition_rules) end
+    return relation_applies_in_frame(world,relation,entity)
 end
 function RW_PlanConversions(world, conversions, generated_rules,back_count)
     if type(world) ~= "table" or type(world.entities) ~= "table"
@@ -3411,6 +3414,9 @@ end
 function RW_ResolveMovementEatTargets(world,relations)
     local sources={};local cells
     for _,relation in ipairs(relations or {}) do
+        -- Every coordinate in this batch observes the same immutable phase.
+        -- Build declaration/occupancy query indexes once, not once per cell.
+        local context=relation.condition_rules and condition_context(world,relation.condition_rules) or world
         if relation.op=="eat" and relation.source_type=="@empty" then
             if not cells then
                 cells={};sources.empty_cells={}
@@ -3423,7 +3429,7 @@ function RW_ResolveMovementEatTargets(world,relations)
             for _,cell in ipairs(cells) do
                 local key=cell.x..":"..cell.y;local targets=sources.empty_cells[key]
                 if not targets or not targets[relation.target_type] then
-                    local enabled,why=RW_RelationApplies(world,relation,cell)
+                    local enabled,why=relation_applies_in_frame(context,relation,cell)
                     if enabled==nil then return nil,why end
                     if enabled then targets=targets or {};targets[relation.target_type]=true;sources.empty_cells[key]=targets end
                 end
@@ -3434,7 +3440,7 @@ function RW_ResolveMovementEatTargets(world,relations)
             for _,id in ipairs(RW_SelectEntities(world,selector)) do
                 local targets=sources[id]
                 if not targets or not targets[relation.target_type] then
-                    local enabled,why=RW_RelationApplies(world,relation,world.entities[id])
+                    local enabled,why=relation_applies_in_frame(context,relation,world.entities[id])
                     if enabled==nil then return nil,why end
                     if enabled then
                         targets=targets or {};targets[relation.target_type]=true;sources[id]=targets

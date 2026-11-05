@@ -74,3 +74,25 @@ instructions, down from its former32M guard, and checks that the moved Avatar
 reaches the display. Sampled first input: 4,271,000 versus29,822,000 before this
 fix; startup remains below2M. Native watchdog involvement is an inference from
 workload and symptoms; no new exported device log was available for this report.
+
+2026-11-05 native follow-up: the user could not reproduce the stale board on a
+fresh run. The newly exported 11:35 log still reports `renderer:40: 字号超出限制`.
+Native range rejection can log without throwing a Lua error, so pcall-based
+font probing alone cannot detect it. Scaled setter requests now use at least
+the existing 12-point annotation size; full Text reflows at the actual font.
+The stricter renderer mock rejects sizes below12 and separately tests a
+throwing minimum14 fallback. This removes sub12 requests; exact device range
+and elimination of the intermittent stale-board symptom remain unconfirmed.
+
+Movement EAT batches now build the immutable declaration query context once per
+relation rather than once per cell. Each source/destination still independently
+evaluates conditions and virtual BROKEN, including occupied destination cells
+as in installed movement.lua check() around980/1033/1123. Batch/full-query parity
+covers changed positions and per-cell BROKEN. No query context enters world/Undo.
+
+`luatex --luaonly tests/native_empty_room.lua` exercises production navigation
+and the actual renderer with host controls mocked, then repeated input/Undo.
+It checks native avatar-control positions and a 5M instruction guard including
+first grid construction; measured3,969,000 instructions. Backend-only profiling
+fell from4,714,000 to3,848,000 instructions on the same route (about18%). This
+is offline evidence, not a native frame-time measurement.

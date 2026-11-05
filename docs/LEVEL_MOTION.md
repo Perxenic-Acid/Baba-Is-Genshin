@@ -218,3 +218,25 @@ barriers; per-unit phase FLOAT is retained for survivors and initialized for bir
 The scheduler flattens these children into its existing transaction and rebuilds
 code/status once afterward, without rerunning contacts. See EAT.md for native
 selection/serial deletion references, 9216 source cases, budget and remaining gaps.
+
+## Scoped LEVEL WEAK
+
+Installed blocks.lua2724-2734 marks destroylevel for any real unit on the map's
+FLOAT layer when captured map SAFE is false. A witness may be Text, SAFE or BROKEN;
+virtual EMPTY alone is not a witness. floating_level (tools.lua1294+) queries raw
+map FLOAT at the current ordered row, using stored real-unit FLOAT. The check is
+not an ordinary overlap or a WEAK contact on a physical entrance.
+
+Unlike incoming/outgoing EAT map retirement, this native branch does not return:
+tools.lua1533 only sets the delayed destruction flag. Preserve subsequent map
+motion, RNG and EAT/HAS stages before final no-HAS map erasure. A transient
+level_weak_destroy flag carries this fact across motion chunks; the scheduler
+consumes it after the entire ordered loop. Nothing is saved on world or Undo.
+Compile-limit prefixes retain the existing only-Undo policy; ordinary errors
+reject the complete transaction. Earlier terminal returns retain their order.
+
+reference_level_weak.lua executes installed WEAK/floating_level in1024 cases,
+plus late query failure prefixes. level_motion.lua covers SAFE/FLOAT, subsequent
+motion and EAT/HAS/CHILL, allocator/no-HAS erasure, local Undo and actual mapped
+OnStart/input/whole-tree Undo. These are offline checks. Other scoped destruction
+actions and complete original levelblock scheduling remain pending.

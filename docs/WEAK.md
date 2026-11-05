@@ -50,3 +50,9 @@ FLOAT layers, virtual EMPTY/scoped LEVEL WEAK lifecycle, PULL/MOVE and original
 multi-pass movement ordering are not implemented in this milestone. Normal
 startup remains regression-free and under the existing 2M instruction budget.
 Real-device acceptance is pending.
+
+Scoped LEVEL WEAK is now handled by the ordered late LEVEL phase, including its
+nonreturning destruction flag; see LEVEL_MOTION.md. Physical Level blocks retain
+ordinary per-entity WEAK behavior. Native host win/scene dispatch versus a pending
+map-destruction flag remains subject to the existing boundary timing gap; the
+backend retains its established map-retirement outcome priority.

@@ -100,6 +100,7 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
   if rows then
    local motion={active=RW_LevelMotionDeclarationActive,
    reverse=RW_LevelMotionReverse,
+   weak=RW_LevelWeakDestroys,
    outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}
    local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' then outgoing=true end end
    if not outgoing then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,motion) end
@@ -167,6 +168,15 @@ do
  local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'ROCK','IS','SAFE'}});local n=turn(s);assert(n.world.entities[id])
  local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'LEVEL','IS','SAFE'}});local n=turn(s);assert(not n.world.entities[id])
  local s,id=outgoing({{'LEVEL','EAT','ALL'}});local n=turn(s);assert(not n.world.entities[id],'subrules expands authored scoped ALL into ordinary nouns')
+ local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','MOVE'},{'ROCK','HAS','FLAG'}})
+ local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1,'WEAK must retire map without suppressing later motion or triggering HAS')
+ assert(n.world.next_entity_id==s.world.next_entity_id)
+ local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(not p.level_destroy and n.world.entities[id] and n.world.board_offset.y==1)
+ local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','FLOAT'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(not p.level_destroy and n.world.entities[id],'different FLOAT layers must not break map')
+ local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','CHILL'}})
+ local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.next_entity_id==s.world.next_entity_id+1 and n.world.random_state~=s.world.random_state,'pending WEAK must survive EAT/HAS barriers while suffix still consumes RNG')
  local s,id=outgoing({{'LEVEL','EAT','ALL'},{'LEVEL','EAT','NOT','ALL'}});local n=turn(s);assert(n.world.entities[id],'NOT ALL must protect derived scoped targets')
  local s,id=outgoing({{'ROCK','IS','GROUP'},{'ROCK','IS','GROUP'},{'LEVEL','EAT','GROUP'},{'ROCK','HAS','ROCK'}})
  local n=turn(s);assert(not n.world.entities[id]);local rocks=0
@@ -553,6 +563,10 @@ do
  OnStart();assert(display and not display.board_offset and depth==0)
  listeners.wait();assert(display.random_state==48271 and display.board_offset.y==2 and depth==1)
  listeners.undo();assert(not display.random_state and not display.board_offset and depth==0)
+ w=fixture({{'LEVEL','IS','WEAK'},{'LEVEL','IS','MOVE'}}).world
+ OnStart();assert(next(display.entities) and depth==0)
+ listeners.wait();assert(not next(display.entities) and display.board_offset.y==1 and depth==1)
+ listeners.undo();assert(next(display.entities) and not display.board_offset and depth==0)
  w=fixture({{'LEVEL','IS','RIGHT'},{'LEVEL','IS','MOVE'}}).world
  OnStart();assert(display.board_offset.direction=='Right' and display.board_offset.rotation==90 and depth==0)
  listeners.wait();assert(display.board_offset.x==1 and display.board_offset.y==0 and display.board_offset.rotation==90)

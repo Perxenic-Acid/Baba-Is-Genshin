@@ -290,12 +290,12 @@ end
 function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
-        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true}
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true}
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
             if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
+                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -350,6 +350,19 @@ function RW_LevelMotionReverse(world,rules)
         end end
     end
     return count%2==1
+end
+
+-- Native LEVEL WEAK sees every real unit, including safe/broken/Text units.
+-- Map SAFE is captured at levelblock entry; map FLOAT is queried at this row.
+function RW_LevelWeakDestroys(world,rules)
+    if not next(world.entities) then return false end
+    local floating,why=query_level_trait(condition_context(world,rules),"float")
+    if floating==nil then return nil,why end
+    if world.level_behaviors and world.level_behaviors.safe then return false end
+    for _,entity in pairs(world.entities) do
+        if ((entity.behaviors or {}).float==true)==floating then return true end
+    end
+    return false
 end
 
 -- One outgoing LEVEL EAT declaration, before any of its selected deletions.

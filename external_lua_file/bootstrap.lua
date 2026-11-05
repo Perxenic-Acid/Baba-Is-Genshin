@@ -1177,6 +1177,10 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         projected.empty_deleted=empty_deleted
         local motion,why=services.level_motion(projected,traits,rules,32-#plan.stages-2,final,relations,back_count)
         if not motion then return fail("level_motion",why) end
+        -- WEAK marks destruction without returning from native levelblock.
+        -- Finish its ordered suffix before the ordinary final erase stage.
+        motion.level_destroy=motion.level_destroy or motion.level_weak_destroy
+        motion.level_weak_destroy=nil
         plan.level_motion_outcome=motion.level_motion_outcome
         if motion.level_destroy then level_destroy=true end
         if motion.level_stages or motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 or motion.infinite_loop or motion.too_complex then
@@ -1251,9 +1255,11 @@ end
 -- Keep native raw-row order while composing one atomic late motion stage.
 function RW_PlanOrderedLevelMotion(world,traits,rules,rows,services)
     local actions={}
+    local weak_destroy=false
     local motion={consumes_turn=true,changes={},reason="level_motion"}
     local current=world
     local function failed(reason)
+        motion.level_weak_destroy=weak_destroy or nil
         if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then
             lock_compile_failure(motion,reason);return motion
         end
@@ -1264,6 +1270,11 @@ function RW_PlanOrderedLevelMotion(world,traits,rules,rows,services)
         if active==nil then return failed(why) end
         if active then
             if row.op=="eat_level" then motion.level_destroy=true;return motion
+            elseif row.trait=="weak" then
+                local destroys,why=services.weak(current,rules)
+                if destroys==nil then return failed(why) end
+                weak_destroy=weak_destroy or destroys
+                motion.level_weak_destroy=weak_destroy or nil
             elseif row.trait=="win" or row.trait=="defeat" or row.trait=="end" then
                 local outcome,why=services.outcome(current,{row.trait})
                 if why then return failed(why) end
@@ -1285,7 +1296,7 @@ function RW_PlanOrderedLevelMotion(world,traits,rules,rows,services)
                     planned.tele_attempts=nil
                     if reason then motion=planned;return failed(reason) end
                 end
-                motion=planned
+                motion=planned;motion.level_weak_destroy=weak_destroy or nil
                 -- Query-only positions; stored unit capabilities and captured map
                 -- sleep/locks remain those of the phase's projected snapshot.
                 current={};for k,v in pairs(world) do current[k]=v end
@@ -1319,6 +1330,7 @@ function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,b
         return nil,reason
     end
     local function append(phase,name)
+        if phase.level_weak_destroy then result.level_weak_destroy=true end
         if #phase.changes>0 or phase.board_shift or phase.random_state or #(phase.motion_history or {})>0 then
             if #result.level_stages>=(budget or 30) then lock_compile_failure(result,"rule_complexity_limit");return false end
             result.level_stages[#result.level_stages+1]={name=name,plan=phase}
@@ -2325,6 +2337,7 @@ local function start(run_self_tests)
             local motion_services={
                 active=function(...) return rules_api:Invoke("RW_LevelMotionDeclarationActive",...) end,
                 reverse=function(...) return rules_api:Invoke("RW_LevelMotionReverse",...) end,
+                weak=function(...) return rules_api:Invoke("RW_LevelWeakDestroys",...) end,
                 outcome=function(...) return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",...) end,
                 resolve=function(...) return movement_api:Invoke("RW_ResolveLevelMotion",...) end,
                 layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end}

@@ -373,7 +373,7 @@ assert(n.active_id==parent and w.entities[1].archetype=='flag' and w.entities[10
 local tree,parent=fixture({{'LEVEL','WRITE','ALL'},{'LEVEL','WRITE','NOT','ROCK'}})
 local f=assert(RW_CompileWorld(RW_GetActiveLevel(tree).world,cs));local count=0
 for _,r in ipairs(f.relations) do if r.op=='transform_level' then assert(r.target_type~='text_rock');count=count+1 end end
-assert(count==#RW_NounPalette(RW_GetActiveLevel(tree).world)-1)
+assert(count==#RW_NounPalette(RW_GetActiveLevel(tree).world))
 local tree,parent=fixture({{'LEVEL','WRITE','ALL'},{'LEVEL','WRITE','NOT','ALL'}})
 local n=act(tree,wait);assert(n.active_id==tree.active_id)
 local tree,parent=fixture({{'LEVEL','IS','TEXT'},{'LEVEL','IS','NOT','TEXT'}})

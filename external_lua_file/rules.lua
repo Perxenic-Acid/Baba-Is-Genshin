@@ -2033,7 +2033,7 @@ local function expand_mimic(ast_rules,world)
     local copy_lookup,all_queue={},{}
     local literal_products={}
     local function expanded_product_verb(verb)
-        return verb=="has" or verb=="make" or verb=="eat" or verb=="fear" or verb=="follow"
+        return verb=="has" or verb=="make" or verb=="eat" or verb=="fear" or verb=="follow" or verb=="write"
     end
     local function add_lookup(entry)
         copy_lookup[#copy_lookup+1]=entry
@@ -2132,7 +2132,10 @@ local function expand_mimic(ast_rules,world)
                         copy.when=#combined.requirements>0 and combined or {op="always"}
                         -- A literal non-IS RHS ALL remains a counted native
                         -- declaration, not another runtime palette expansion.
-                        if not literal_products[copied] then result[#result+1]=copy end
+                        if literal_products[copied] and copied.verb=="write" then
+                            copy.object={tag="literal",token=written_token(world,copied.object)}
+                            result[#result+1]=copy
+                        elseif not literal_products[copied] then result[#result+1]=copy end
                         count=count+1
                         if count>250 then return nil,"rule_complexity_limit" end
                     end
@@ -2557,15 +2560,14 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                     else
                         local products={token}
                         if obj.tag == "special" and obj.name == "all" then
-                            products={}
                             for _,name in ipairs(RW_NounPalette(world)) do products[#products+1]=written_token(world,noun_term(name)) end
                         end
                         for _,name in ipairs(products) do
                             if level_subject then relations[#relations+1]={op="write_level",target_text=name,origin=token,scoped_when=query_clone(ast.when)} end
                             relations[#relations+1]={op="write_text",source_type=key,target_text=name,source=ast.source}
                             write_origins[#relations]=token;write_verbs[#relations]=ast.verb
-                            if subj.tag == "special" and subj.name == "all" and not subnot
-                                and obj.tag == "special" and obj.name == "all" then
+                            if (subnot or subj.tag == "special" and subj.name == "all")
+                                and obj.tag == "special" and obj.name == "all" and name~=token then
                                 relations[#relations+1]=query_clone(relations[#relations])
                                 write_origins[#relations]=token;write_verbs[#relations]=ast.verb
                             end

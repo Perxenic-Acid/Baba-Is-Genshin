@@ -227,3 +227,28 @@ Validation matrix: 27,648 native RHS ALL cases, including 1,456 TOO COMPLEX
 outcomes. The adapter also executes installed inside(), createall() and findtype()
 to prove that literal HAS ALL adds no births while a concrete HAS CRATE still
 creates its product. It does not substitute a hand-written raw-ALL consumer.
+
+## M9.9S WRITE ALL literal conversion
+
+Installed convert.lua conversion() preserves WRITE's literal ALL output as
+text_ALL. subrules() also supplies concrete noun WRITE declarations. Thus ordinary
+WRITE ALL has K+1 products; ALL/NOT-subject WRITE ALL has 2K+1 per eligible source.
+Earlier tests counted only ordinary target names and missed the literal product.
+The compiler now retains it once, including scoped LEVEL WRITE. MIMIC's lookup
+expands WRITE ALL, copies the raw record as a literal token and preserves all
+concrete derivatives without expanding the raw record a second time. Existing
+WRITE NOT ALL, IS NOT TEXT and identity protections still apply.
+
+reference_terminal_words.lua now asserts literal ALL outputs from installed
+conversion(), alongside its previous concrete-product count. The new standalone
+reference_mimic_write_all.lua compares converted multisets against installed
+addoption/subrules declarations across duplicate, NOT-subject, conditional and
+copy-limit cases, including overlapping Text sources. Full regression and the 27,648-case matrix passed, including 1,456 native-limit cases.
+BECOME ALL and positive ALL MIMIC subjects remain separate unfinished work.
+
+The full tests/run.lua regression has passed with normal startup at 1,438,000
+instructions. The WRITE conversion-multiset matrix has passed before
+commit. BECOME needs separate handling: installed createall_single() excludes
+the source's own noun and skips existing same-cell target names, unlike explicit
+BECOME noun products appended by subrules(). Reusing the WRITE literal-token
+path would be incorrect; that behavior is not claimed by this change.

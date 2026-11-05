@@ -28,4 +28,11 @@ p=run({{'rock','write','crate'},{'rock','write','not crate'}});assert(#p==0)
 p=run({{'all','write','all'}});local n=0
 for _,v in ipairs(p) do if not findnoun(v[1]) and not findnoun(v[2]) then n=n+1 end end
 assert(n==18)
+local literal=0
+for _,v in ipairs(p) do if not findnoun(v[1]) and v[2]=='all' and v[3]=='write' then literal=literal+1 end end
+assert(literal==3,'ALL WRITE ALL also retains one literal text_ALL per ordinary subject')
+p=run({{'rock','write','all'}})
+literal=0
+for _,v in ipairs(p) do if v[1]=='rock' and v[2]=='all' and v[3]=='write' then literal=literal+1 end end
+assert(literal==1,'WRITE ALL must preserve the literal ALL conversion')
 print('PASS: original WRITE property targets, identity/NOT TEXT/NOT target vetoes and ALL multiplicity')

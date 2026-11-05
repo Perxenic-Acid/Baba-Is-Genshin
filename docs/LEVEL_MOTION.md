@@ -306,3 +306,22 @@ findall confirms that deleting the first group's units can leave a later failing
 condition entirely unqueried. A regression reproduces premature WORD-limit
 propagation before the fix; another requires exactly one own-condition query.
 This does not close broader cross-declaration MELT source dispatch gaps above.
+
+## Scoped LEVEL SINK
+
+Installed blocks.lua2894-2931 first scans real units in list order. For each,
+floating_level precedes both SAFE checks. Any matching-layer witness immediately
+retires an unsafe map and returns, without querying that unit's SAFE or triggering
+HAS. SAFE on the witness cannot protect the map; virtual EMPTY is not a witness.
+With captured map SAFE, gather unsafe matching-layer identities before any
+removal, then delete/HAS serially. Unlike HOT, later births cannot change the
+current group's selected SAFE/layer results. Repeated SINK clauses select again.
+
+RW_ResolveScopedSinkTargets feeds the existing flat ordered deletion/birth stages;
+level_sink uses serial initialized HAS and frozen rules. Preserve prior motion,
+RNG, links/status, late terminal prefixes, ordinary atomic errors and whole-tree
+Undo. Native query dispatch and other scoped destruction gaps remain separate.
+reference_level_sink.lua executes installed SINK/floating_level in8192 cases,
+including Text/BROKEN, independent SAFE, FLOAT, return and noncanonical unit order.
+Turn/mapped adapter tests cover immediate map retirement/no HAS, motion suffixes,
+serial HAS after fixed SAFE selection, repeated clauses and whole-tree Undo.

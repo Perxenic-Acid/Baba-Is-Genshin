@@ -290,12 +290,12 @@ end
 function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
-        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true}
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true}
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
             if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
+                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -397,6 +397,27 @@ function RW_LevelMeltDestroys(world,rules)
         if (world.empty_float_declared==true)==floating and not safe then return true,nil,true end
     end
     return pending,nil,false
+end
+
+-- Native SINK selects the complete victim list before any deletion/HAS.
+function RW_ResolveScopedSinkTargets(world,rules,level_safe)
+    local context=condition_context(world,rules)
+    local ids,seen,rest={},{},{}
+    for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not seen[id] then ids[#ids+1]=id;seen[id]=true end end
+    for id in pairs(world.entities) do if not seen[id] then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do ids[#ids+1]=id end
+    local result={ids={},cells={}}
+    for _,id in ipairs(ids) do
+        local floating,why=query_level_trait(context,"float")
+        if floating==nil then return nil,why end
+        if ((world.entities[id].behaviors or {}).float==true)==floating then
+            if not level_safe then return {ids={},cells={},level_destroy=true} end
+            local safe,why=query_trait(context,world.entities[id],"safe")
+            if safe==nil then return nil,why end
+            if not safe then result.ids[#result.ids+1]=id end
+        end
+    end
+    return result
 end
 
 -- Preserve one native findall group per concrete MELT declaration.

@@ -1399,13 +1399,19 @@ function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,b
                     end
                 end
             end
-        elseif row.op=="level_eat" then
+        elseif row.op=="level_eat" or row.trait=="sink" then
             local ok,why=flush();if ok==nil then return failed(why) elseif not ok then return result end
-            local selected,why=services.select(view,rules,row.relation,projected.level_behaviors and projected.level_behaviors.safe==true)
+            local selected,why
+            if row.trait=="sink" then
+                local active;active,why=services.motion.active(view,rules,row)
+                if active==nil then return failed(why) end
+                if active then selected,why=services.sink_select(view,rules,projected.level_behaviors and projected.level_behaviors.safe==true)
+                else selected={ids={},cells={}} end
+            else selected,why=services.select(view,rules,row.relation,projected.level_behaviors and projected.level_behaviors.safe==true) end
             if not selected then return failed(why) end
             if selected.level_destroy then result.level_destroy=true;return result end
             local phase,why
-            if #selected.ids>0 then phase,why=services.destroy(current,selected.ids,rules)
+            if #selected.ids>0 then phase,why=services.destroy(current,selected.ids,rules,row.trait=="sink" and "level_sink" or nil)
             elseif #selected.cells>0 then
                 local cells={};for _,cell in ipairs(selected.cells) do
                     if not deleted[cell.x..":"..cell.y] then cells[#cells+1]=cell end
@@ -1415,7 +1421,7 @@ function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,b
             end
             if not phase and why then return failed(why) end
             if phase then
-                local ok,why=append(phase,"eat");if ok==nil then return nil,why elseif not ok then return result end
+                local ok,why=append(phase,row.trait=="sink" and "sink" or "eat");if ok==nil then return nil,why elseif not ok then return result end
                 local ok,why=refresh_view();if not ok then return failed(why) end
             end
         else chunk[#chunk+1]=row end
@@ -2367,12 +2373,13 @@ local function start(run_self_tests)
                 outcome=function(...) return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",...) end,
                 resolve=function(...) return movement_api:Invoke("RW_ResolveLevelMotion",...) end,
                 layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end}
-            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" then outgoing=true;break end end
+            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" or row.trait=="sink" then outgoing=true;break end end
             if not outgoing then return RW_PlanOrderedLevelMotion(world,traits,rules,rows,motion_services) end
             local contents={};for _,r in ipairs(relations or {}) do if r.op=="has" or r.op=="empty_has" then contents[#contents+1]=r end end
             return RW_PlanScopedLevelSequence(raw,world,traits,rules,rows,{
                 motion=motion_services,preview=function(...) return world_api:Invoke("RW_PreviewPlan",...) end,
                 select=function(...) return rules_api:Invoke("RW_ResolveScopedEatTargets",...) end,
+                sink_select=function(...) return rules_api:Invoke("RW_ResolveScopedSinkTargets",...) end,
                 hot_declarations=function(...) return rules_api:Invoke("RW_LevelHotDeclarations",...) end,
                 hot_targets=function(...) return rules_api:Invoke("RW_LevelHotTargets",...) end,
                 hot_destroy=function(w,ids,r,view)
@@ -2386,7 +2393,7 @@ local function start(run_self_tests)
                     local effects,why=rules_api:Invoke("RW_EvaluateRules",w,r);if not effects then return nil,why end
                     return properties_api:Invoke("RW_ProjectWorld",w,effects,t)
                 end,
-                destroy=function(w,ids,r) return RW_PlanDestructionPhase(w,ids,contents,"level_eat",contact_services,nil,r,count) end,
+                destroy=function(w,ids,r,kind) return RW_PlanDestructionPhase(w,ids,contents,kind or "level_eat",contact_services,nil,r,count) end,
                 empty=function(w,cells,r) return RW_PlanEmptyContactPhase(w,cells,contents,r,{
                     births=contact_services.empty_births,create=contact_services.create},count) end},budget)
         end

@@ -623,3 +623,5 @@ dofile('tests/reference_level_weak.lua')
 dofile('tests/reference_level_melt.lua')
 
 dofile('tests/reference_level_hot.lua')
+
+dofile('tests/reference_level_sink.lua')

@@ -103,10 +103,11 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
    weak=RW_LevelWeakDestroys,
    melt=RW_LevelMeltDestroys,
    outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}
-   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' then outgoing=true end end
+   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' then outgoing=true end end
    if not outgoing then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,motion) end
    local contents={};for _,r in ipairs(relations or {}) do if r.op=='has' or r.op=='empty_has' then contents[#contents+1]=r end end
    return RW_PlanScopedLevelSequence(raw,w,traits,rules,rows,{motion=motion,preview=RW_PreviewPlan,select=RW_ResolveScopedEatTargets,
+    sink_select=RW_ResolveScopedSinkTargets,
     hot_declarations=RW_LevelHotDeclarations,hot_targets=RW_LevelHotTargets,
     hot_destroy=function(world,ids,r,view)
      local layers={};for _,id in ipairs(ids) do layers[id]=(view.entities[id].behaviors or {}).float==true end
@@ -115,7 +116,7 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
       create=RW_PlanCreate,delete=RW_PlanDelete},nil,r,count)
     end,
     project=function(world,r,t) local e,why=RW_EvaluateRules(world,r);if not e then return nil,why end;return RW_ProjectWorld(world,e,t) end,
-    destroy=function(world,ids,r) return RW_PlanDestructionPhase(world,ids,contents,'level_eat',{
+    destroy=function(world,ids,r,kind) return RW_PlanDestructionPhase(world,ids,contents,kind or 'level_eat',{
      initialized_births=function(a,b,c,d,n) return RW_InitializeHasBirths(a,b,c,d,n,false) end,
      create=RW_PlanCreate,delete=RW_PlanDelete},nil,r,count) end,
     empty=function(world,cells,r) return RW_PlanEmptyContactPhase(world,cells,contents,r,{
@@ -179,6 +180,17 @@ do
  local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','MOVE'},{'ROCK','HAS','FLAG'}})
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1,'WEAK must retire map without suppressing later motion or triggering HAS')
  assert(n.world.next_entity_id==s.world.next_entity_id)
+ local s,id=outgoing({{'LEVEL','IS','SINK'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','IS','SAFE'},{'LEVEL','IS','CHILL'},{'ROCK','HAS','FLAG'}})
+ local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.random_state and n.world.next_entity_id==s.world.next_entity_id,'unsafe SINK map retires before suffix, even with SAFE witness, without HAS')
+ local s,id=outgoing({{'LEVEL','IS','SINK'},{'LEVEL','IS','FLOAT'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(not p.level_destroy and n.world.entities[id] and n.world.board_offset.y==1)
+ local s,id=outgoing({{'LEVEL','IS','SINK'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(not p.level_destroy and not n.world.entities[id] and n.world.entities[s.world.next_entity_id].archetype=='flag' and n.world.board_offset.y==1)
+ local s,id=outgoing({{'LEVEL','IS','SINK','AND','SINK'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','ROCK'}})
+ local n=turn(s);assert(not n.world.entities[id] and n.world.next_entity_id==s.world.next_entity_id+2,'duplicate SINK clauses consume successive HAS newborns')
+ local s,id=outgoing({{'LEVEL','IS','SINK'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'},{'ROCK','NEAR','FLAG','IS','SAFE'}})
+ s.world.entities[id+1]={id=id+1,kind='object',class='object',archetype='rock',x=19,y=18,direction='Right'};s.world.next_entity_id=id+2
+ local n=turn(s);assert(not n.world.entities[id] and not n.world.entities[id+1],'SINK selects target SAFE before any serial HAS births')
  local s,id=outgoing({{'LEVEL','IS','HOT'},{'ROCK','IS','MELT'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','MOVE'}})
  local n,p=turn(s);assert(not p.level_destroy and not n.world.entities[id] and n.world.entities[s.world.next_entity_id].archetype=='flag' and n.world.board_offset.y==1)
  local s,id=outgoing({{'LEVEL','IS','HOT'},{'ROCK','IS','MELT'},{'ROCK','IS','SAFE'}})
@@ -608,6 +620,11 @@ do
  w.entities[hot_victim]={id=hot_victim,kind='object',class='object',archetype='rock',x=18,y=18,direction='Right'}
  OnStart();listeners.wait();assert(not display.entities[hot_victim] and display.entities[hot_victim+1].archetype=='flag' and depth==1)
  listeners.undo();assert(display.entities[hot_victim] and not display.entities[hot_victim+1] and depth==0)
+ w=fixture({{'LEVEL','IS','SINK'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'}}).world
+ local sink_victim=w.next_entity_id;w.next_entity_id=sink_victim+1
+ w.entities[sink_victim]={id=sink_victim,kind='object',class='object',archetype='rock',x=18,y=18,direction='Right'}
+ OnStart();listeners.wait();assert(not display.entities[sink_victim] and display.entities[sink_victim+1].archetype=='flag' and depth==1)
+ listeners.undo();assert(display.entities[sink_victim] and not display.entities[sink_victim+1] and depth==0)
  w=fixture({{'LEVEL','IS','MELT'},{'EMPTY','IS','HOT'},{'LEVEL','IS','CHILL'}}).world
  OnStart();listeners.wait();assert(not next(display.entities) and not display.random_state and depth==1)
  listeners.undo();assert(next(display.entities) and depth==0)

@@ -386,7 +386,8 @@ local function validate_plan(world, plan)
         for _,row in ipairs(plan.motion_history) do
             if type(row)~="table" or row.kind~="move" or not valid_id(row.entity_id)
                 or not world.entities[row.entity_id] or type(row.from)~="table" or type(row.to)~="table"
-                or (row.retain~=nil and type(row.retain)~="boolean") then return false,"invalid_motion_history" end
+                or (row.retain~=nil and type(row.retain)~="boolean")
+                or (row.map_update~=nil and type(row.map_update)~="boolean") then return false,"invalid_motion_history" end
             local at=row.before_change;if at==nil then at=1 end
             if not is_integer(at) or at<anchor or at>#plan.changes+1 then return false,"invalid_motion_history_anchor" end
             anchor=at
@@ -400,6 +401,7 @@ local function validate_plan(world, plan)
             end
             local old=actual[row.entity_id] or position(world.entities[row.entity_id])
             if not same_state(old,row.from) then return false,"stale_motion_history" end
+            if row.map_update==false and (row.from.x~=row.to.x or row.from.y~=row.to.y) then return false,"invalid_motion_history" end
             actual[row.entity_id]=clone(row.to)
         end
         for id,point in pairs(expected) do
@@ -585,7 +587,8 @@ local function apply_plan(world, plan)
         end
         local function history(at)
             for _,row in ipairs(history_at[at] or {}) do
-                if row.from.x~=row.to.x or row.from.y~=row.to.y then arrive(row.entity_id,row.to) end
+                if row.from.x~=row.to.x or row.from.y~=row.to.y
+                    or row.map_update==true and row.from.direction~=row.to.direction then arrive(row.entity_id,row.to) end
             end
         end
         for i,op in ipairs(plan.changes) do

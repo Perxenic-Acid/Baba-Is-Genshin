@@ -1166,14 +1166,15 @@ function RW_ResolveShift(world)
         end
     end
     -- Ordered history is separate from the final atomic displacement summary.
-    -- In particular, native alignment emits an update even for identical facing.
+    -- Native alignment records an undo row even for identical facing, but does
+    -- not call updateunitmap. Keep that separate from queued displacement.
     local history,history_state={},{}
-    local function remember(id,entity,force)
+    local function remember(id,entity,force,map_update)
         local old=history_state[id] or world.entities[id]
         local from={x=old.x,y=old.y,direction=old.direction or "None"}
         local to={x=entity.x,y=entity.y,direction=entity.direction or "None"}
         if force or from.x~=to.x or from.y~=to.y or from.direction~=to.direction then
-            history[#history+1]={kind="move",entity_id=id,from=from,to=to,retain=not force}
+            history[#history+1]={kind="move",entity_id=id,from=from,to=to,retain=not force,map_update=map_update}
             history_state[id]=to
         end
     end
@@ -1189,7 +1190,7 @@ function RW_ResolveShift(world)
                 local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
                 if not part.consumes_turn then return nil,part.reason end
                 working.entities[id].direction=task.direction
-                remember(id,working.entities[id])
+                remember(id,working.entities[id],false,false)
                 for _,change in ipairs(part.changes) do queued[#queued+1]=change end
                 for _,death in ipairs(part.destructions or {}) do
                     deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
@@ -1202,7 +1203,7 @@ function RW_ResolveShift(world)
             if e then
                 if change.kind=="move" then e.x=change.to.x;e.y=change.to.y;e.direction=change.to.direction
                 elseif change.kind=="direction" then e.direction=change.to end
-                remember(change.entity_id,e)
+                remember(change.entity_id,e,false,change.kind=="move")
             end
         end
     end
@@ -1215,7 +1216,7 @@ function RW_ResolveShift(world)
                 local rider=working.entities[other_id]
                 if rider and other_id~=id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider) then
                     rider.direction=belt.direction
-                    remember(other_id,rider,true)
+                    remember(other_id,rider,true,false)
                 end
             end
         end
@@ -1355,7 +1356,7 @@ function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit,ac
                     local at=positions[id]
                     if at.x~=tx or at.y~=ty then
                         local to={x=tx,y=ty,direction=at.direction}
-                        history[#history+1]={kind="move",entity_id=id,from=at,to=to}
+                        history[#history+1]={kind="move",entity_id=id,from=at,to=to,map_update=true}
                         positions[id]=to
                     end
                 end
@@ -2180,7 +2181,7 @@ function RW_PlanBackMotion(world,selections,paradox)
                 if row.moved then x,y=row.x,row.y end
                 d=row.direction;suppressed[id]=true
                 if from.x~=x or from.y~=y or from.direction~=d then
-                    history[#history+1]={kind="move",entity_id=id,from=from,to={x=x,y=y,direction=d}}
+                    history[#history+1]={kind="move",entity_id=id,from=from,to={x=x,y=y,direction=d},map_update=row.moved}
                 end
             end
         end
@@ -2419,7 +2420,7 @@ function RW_PlanBackFramePlayback(world,selections,paradox,services,instances)
                     if row.moved then x,y=row.x,row.y end
                     d=row.direction;suppressed[id]=true
                     if from.x~=x or from.y~=y or from.direction~=d then
-                        path[#path+1]={kind="move",entity_id=id,from=from,to={x=x,y=y,direction=d}}
+                        path[#path+1]={kind="move",entity_id=id,from=from,to={x=x,y=y,direction=d},map_update=row.moved}
                     end
                 elseif row.kind=="create" and paradox[row.base]==nil then
                     retired=true

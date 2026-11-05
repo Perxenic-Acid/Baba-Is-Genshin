@@ -182,7 +182,12 @@ Boundary tests validate the reloaded world and selector arrival stacks.
 Tile keys normalize integral floats and integers to the same coordinates,
 including collector lookups; numeric representation cannot split one stack.
 
-Scope: history rows currently do not distinguish native update from updatedir for
-orientation-only intermediate events; those rows do not reorder a tile. Other
-contact consumers still retain their prior ordering. Raw condition query timing
+History map_update distinguishes native update from updatedir/direct alignment.
+SHIFT tags impulse turns, queued movement and final alignment separately; TELE
+tags displacement, and BACK follows the original moved-versus-updatedir branch.
+Validation rejects nonboolean tags and direction-only tags with displacement.
+Legacy untagged rows retain spatial-arrival behavior. Installed update/updatedir
+functions verify both same-cell direction paths and Undo in tests/cell_order.lua.
+
+Scope: other contact consumers still retain their prior ordering. Raw condition query timing
 remains projected rather than repeated per collector; no full parity is claimed.

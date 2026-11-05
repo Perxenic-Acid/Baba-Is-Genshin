@@ -72,4 +72,22 @@ local float_victims=RW_ResolveBonusContacts(p)
 assert(float_victims[1]==3 and float_victims[2]==2,'float collector coordinates must preserve tile order')
 local bad=RW_CreateSession();bad.world.cell_order={['1:1']={1,1}}
 local _,r=RW_Commit(bad,{consumes_turn=true,changes={}});assert(not r.accepted,'duplicate tile identities must reject')
-print('PASS: installed tile arrival order, independent global order, BONUS dispatch, sparse normalization, boundary reload/selector arrivals and Undo')
+-- Same-cell update() reorders; updatedir() and SHIFT alignment do not.
+a=assert(source:find('function update(',1,true));b=assert(source:find('function findtext(',a,true))
+assert(load(source:sub(a,b-1),'@installed_update_direction','t',env))()
+for _,name in ipairs({'UNITNAME','UNITTYPE','DIR','TILING','XPOS','YPOS','MOVED','POSITIONING','ID'}) do env[name]=name end
+env.addundo=function()end;env.featureindex={}
+local unit={values={XPOS=1,YPOS=1,DIR=0,TILING=0,MOVED=1,ID=1},strings={UNITNAME='avatar',UNITTYPE='object'}}
+env.mmf={newObject=function()return unit end}
+for _,update in ipairs({false,true}) do
+ env.unitmap={[21]={1,3,2}};env.unittypeshere={[21]={avatar=1,flag=2}};unit.values.DIR=0
+ if update then env.update(1,1,1,2) else env.updatedir(1,2) end
+ local plan={consumes_turn=true,changes={{kind='direction',entity_id=1,from='Right',to='Left'}},motion_history={
+  {kind='move',entity_id=1,from={x=1,y=1,direction='Right'},to={x=1,y=1,direction='Left'},map_update=update}}}
+ local changed,result=RW_Commit(n,plan);assert(result.accepted,result.reason)
+ for i,id in ipairs(env.unitmap[21]) do assert(changed.world.cell_order['1:1'][i]==id,'history update dispatch must match installed tile mutation') end
+ assert(RW_Undo(changed).world==n.world)
+ plan.motion_history[1].map_update='update'
+ assert(not select(2,RW_Commit(n,plan)).accepted,'invalid dispatch tag must reject')
+end
+print('PASS: installed tile arrival/update/updatedir order, BONUS, sparse normalization, boundaries, validated history and Undo')

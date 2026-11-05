@@ -423,17 +423,20 @@ function RW_ResolveScopedSinkTargets(world,rules,level_safe)
     return RW_ResolveScopedAreaTargets(world,rules,level_safe)
 end
 
--- Preserve one native findall group per concrete MELT declaration.
-function RW_LevelHotDeclarations(world,rules)
+-- Preserve one native findall group per concrete property declaration.
+function RW_LevelContactDeclarations(world,rules,trait)
     local result={}
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,effect in ipairs(rule.effects or {}) do
-            if effect.op=="grant_trait" and effect.trait=="melt" and effect.target.kind~="empty" then
+            if effect.op=="grant_trait" and effect.trait==trait and effect.target.kind~="empty" then
                 result[#result+1]={target=query_clone(effect.target),when=query_clone(rule.when)}
             end
         end end
     end
     return result
+end
+function RW_LevelHotDeclarations(world,rules)
+    return RW_LevelContactDeclarations(world,rules,"melt")
 end
 local function level_property_targets(world,rules,declaration,trait)
     local context=condition_context(world,rules)
@@ -460,6 +463,9 @@ local function level_property_targets(world,rules,declaration,trait)
 end
 function RW_LevelHotTargets(world,rules,declaration)
     return level_property_targets(world,rules,declaration,"melt")
+end
+function RW_LevelContactTargets(world,rules,declaration,trait)
+    return level_property_targets(world,rules,declaration,trait)
 end
 local function scoped_level_target(world,target)
     if target.kind~="archetype" then return false end
@@ -3837,7 +3843,7 @@ function RW_InitializeHasBirths(world,victims,relations,rules,back_count,simulta
     end
     for _,id in ipairs(victims) do
         local eligible=true
-        if options and options.kind=="level_hot" then
+        if options and (options.kind=="level_hot" or options.kind=="level_you_bonus") then
             local frame=condition_context(context,rules)
             local safe,why=query_trait(frame,context.entities[id],"safe")
             if safe==nil then return failure(why) end

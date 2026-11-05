@@ -88,3 +88,26 @@ stage budget and whole-tree Undo. Native saving/AV and broader scoped condition/
 host-boundary timing gaps remain deferred; synthetic LEVEL BONUS is now supported.
 Custom typed LEVEL block archetypes are recognized as synthetic collectors and
 complementary OPEN/SHUT declarations even with no physical entrance present.
+
+## LEVEL YOU collecting real BONUS: serial phase infrastructure
+
+Installed blocks.lua2626-2666 differs from both ordinary pickup and LEVEL BONUS:
+each BONUS declaration selects its current group, then queries victim SAFE before
+map FLOAT for each identity, deleting immediately with HAS. Later victims see
+earlier deaths/births, and later declarations may select newborns. A SAFE target
+does not count as a pickup. The entire active LEVEL YOU/YOU2 row awards at most
+one bonus, after all declaration groups complete, rather than one per victim.
+Pre-delete WIN/END evidence is captured earlier in that original row.
+
+RW_LevelContactDeclarations/Targets expose the same per-declaration selection
+previously used by HOT, whose wrappers retain their behavior. The distinct
+level_you_bonus destruction kind enables the existing serial SAFE/FLOAT/HAS
+initializer and completed-victim filtering without mislabeling events as HOT.
+tests/reference_level_you_bonus.lua executes the unchanged installed BONUS scan
+and compares these production building blocks in3072 cases: duplicate clauses,
+HAS newborns, independent SAFE/FLOAT and allocators/survivors.
+
+This prepares the phase only; LEVEL YOU's real BONUS scan is not yet wired into
+the scheduled whole-row execution. Integration must preserve its preceding DEFEAT
+and WIN/END queries, one reward after all groups, and only completed prefixes on
+creation/query limits. It must not silently substitute an ordinary batch pickup.

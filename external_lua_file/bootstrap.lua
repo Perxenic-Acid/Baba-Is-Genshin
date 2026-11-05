@@ -139,7 +139,7 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
         local prefix,completed,random
         specifications,err,prefix,completed,random=services.initialized_births(world,ids,real_contents,rules,back_count,kind)
         if random then state=random.to end
-        if specifications and kind=="level_hot" then removed_ids=completed end
+        if specifications and (kind=="level_hot" or kind=="level_you_bonus") then removed_ids=completed end
         if not specifications then
             if not prefix or not completed or not is_limit(err) then return nil,err end
             specifications=prefix;removed_ids=completed;terminal=err

@@ -1174,7 +1174,7 @@ function RW_ResolveShift(world)
                 if other_id ~= id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider)
                     and not intent_immobile(world,rider,vectors[belt.direction][1],vectors[belt.direction][2]) then
                     if not tasks[other_id] then
-                        tasks[other_id]={direction=belt.direction,count=0};order[#order+1]=other_id
+                        tasks[other_id]={entity_id=other_id,direction=belt.direction,count=0};order[#order+1]=tasks[other_id]
                     end
                     tasks[other_id].count=tasks[other_id].count+1
                 end
@@ -1194,14 +1194,32 @@ function RW_ResolveShift(world)
             history_state[id]=to
         end
     end
+    -- The map collector appends independent tasks after ordinary belts, rather
+    -- than merging into their been_seen entries. Turning precedes locks/SLEEP.
+    local level_shift,level_float=false,false
+    for _,trait in ipairs(world.level_traits or {}) do
+        if trait=="shift" then level_shift=true elseif trait=="float" then level_float=true end
+    end
+    if level_shift then
+        local direction=world.board_offset and world.board_offset.direction or "Down"
+        local vector=vectors[direction]
+        for _,id in ipairs(ids) do local e=working.entities[id]
+            if has_capability(world,e,"float")==level_float then
+                e.direction=direction;remember(id,e,false,false)
+                if vector and not immobile(world,e,vector[1],vector[2]) and not has_capability(world,e,"sleep") then
+                    order[#order+1]={entity_id=id,direction=direction,count=1}
+                end
+            end
+        end
+    end
     local deaths,records={},{}
-    local rounds=0;for _,task in pairs(tasks) do rounds=math.max(rounds,task.count) end
+    local rounds=0;for _,task in ipairs(order) do rounds=math.max(rounds,task.count) end
     for impulse=1,rounds do
         -- Resolve one impulse for every rider before applying queued updates.
         -- Converging Text must be allowed to land on the same formerly empty cell.
         local queued={}
-        for _,id in ipairs(order) do
-            local task=tasks[id];local vector=vectors[task.direction]
+        for _,task in ipairs(order) do
+            local id=task.entity_id;local vector=vectors[task.direction]
             if impulse<=task.count and working.entities[id] then
                 local part=RW_ResolveMovement(working,{type="move",entity_id=id,dx=vector[1],dy=vector[2]})
                 if not part.consumes_turn then return nil,part.reason end
@@ -1251,7 +1269,7 @@ function RW_ResolveShift(world)
             changes[#changes+1]={kind="direction",entity_id=id,from=before.direction or "None",to=after.direction or "None"}
         end
     end
-    return {consumes_turn=true,changes=changes,destructions=deaths,reason="shift",motion_history=#history>0 and history or nil}
+    return {consumes_turn=true,changes=changes,destructions=deaths,reason="shift",shift_tasks=order,motion_history=#history>0 and history or nil}
 end
 
 -- Direction grants use physical rule multiplicity (statusblock in blocks.lua).

@@ -142,6 +142,25 @@ Four independent global/tile order cases compare task and arrival dispatch,
 alignment records, final committed destination stacks and Undo. Existing SHIFT
 convergence/PUSH/destruction/reading tests remain active. This does not replace
 the shared collision solver with the full native mutable movement scheduler.
-Scoped LEVEL SHIFT remains separate: installed movement.lua's take-8 branch
-turns same-map-layer units before testing their locks/SLEEP and queues one map
-impulse independently of ordinary belts. This branch is not yet implemented.
+
+## Scoped LEVEL SHIFT
+
+The early take-8 map collector now follows installed movement.lua: one eligible
+SHIFT declaration enables one map pulse, irrespective of duplicates. It traverses
+global unit order, turns same-map-FLOAT real units before testing cantmove/SLEEP,
+and appends independent one-step tasks after ordinary belt tasks. Locked/sleeping
+units retain the map-facing update. Ordinary belts still collect from their old
+facing before map turns them. Direction history, displacements, destruction/HAS
+and allocator effects stay inside the existing atomic SHIFT transaction.
+
+RW_ResolveShift exposes transient shift_tasks for collection diagnostics; the
+scheduler never persists them. tests/reference_level_shift.lua executes the
+installed map collector, floating_level, cantmove and reverse helpers in 2048
+cases. It covers FLOAT, SLEEP/STILL, both directional-lock axes/REVERSE, HOLD,
+duplicates, facing and Undo. Separate tests cover independent belt/map tasks and
+physical LEVEL IS SHIFT moving Object/Text through a scheduled wait.
+
+Conditional scoped LEVEL surroundings retain the shared deferred boundary.
+The full native mutable collision scheduler is still separate; map and ordinary
+tasks use this project's queued round solver. Mid/None map orientation has no
+cardinal impulse and is outside the installed cardinal-direction oracle.

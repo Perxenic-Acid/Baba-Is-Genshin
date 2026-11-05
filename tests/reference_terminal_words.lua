@@ -35,4 +35,18 @@ p=run({{'rock','write','all'}})
 literal=0
 for _,v in ipairs(p) do if v[1]=='rock' and v[2]=='all' and v[3]=='write' then literal=literal+1 end end
 assert(literal==1,'WRITE ALL must preserve the literal ALL conversion')
+nlist={brief={}}
+for _,case in ipairs({{'rock','rock',1},{'all','rock',2},{'not crate','rock',2}}) do
+ p=run({{case[1],'become','all'}})
+ local raw,concrete=0,{}
+ for _,v in ipairs(p) do if v[1]==case[2] then
+  if v[2]=='createall' then raw=raw+1
+  elseif not findnoun(v[2]) then concrete[v[2]]=(concrete[v[2]] or 0)+1 end
+ end end
+ assert(raw==1,'BECOME ALL retains one literal createall per concrete source')
+ for _,name in ipairs({'rock','crate','avatar'}) do
+  assert(concrete[name]==case[3],'BECOME ALL concrete expansion multiplicity: '..name)
+ end
+end
+print('PASS: original BECOME ALL literal createall plus concrete/self products and ALL/NOT source paths')
 print('PASS: original WRITE property targets, identity/NOT TEXT/NOT target vetoes and ALL multiplicity')

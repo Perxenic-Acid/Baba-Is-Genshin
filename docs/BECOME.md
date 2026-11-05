@@ -127,3 +127,15 @@ original error/product selection together, plus an original error-queue assertio
 The portable adapter chooses an explicit end-of-turn deletion barrier: exact
 native MF callback/win-timer timing and audiovisual effects remain unclaimed.
 Earlier synthetic self-negative deferral notes are superseded here.
+
+## BECOME ALL preprocessing oracle
+
+reference_terminal_words.lua now executes installed addoption/subrules/postrules
+and conversion() for ROCK BECOME ALL, ALL BECOME ALL and NOT CRATE BECOME ALL.
+Each concrete source retains one literal createall record. Ordinary subjects add
+one complete concrete target palette, including self; ALL/negative subjects add
+two such palettes. This combines with the separate 192-case createall_single
+oracle for occupancy/IS NOT behavior. Current project BECOME ALL still lacks the
+concrete pre-expanded products; this is verified unfinished implementation, not
+parity established by the reference-only tests. Native conversion scheduling and
+literal-versus-explicit product ordering require their own comparison.

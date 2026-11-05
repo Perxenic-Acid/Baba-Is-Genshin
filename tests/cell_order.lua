@@ -42,6 +42,34 @@ assert(born.world.cell_order['1:1'][4]==10,'birth must append after existing arr
 local deleted,dr=RW_Commit(born,assert(RW_PlanDelete(born.world,{3})));assert(dr.accepted,dr.reason)
 assert(deleted.world.cell_order==nil,'deleting the displaced ordering witness must normalize')
 assert(RW_Undo(deleted).world==born.world,'deletion must restore prior tile order')
+local def=assert(RW_CreateLevelDefinition('cell.order',n.world))
+local tree=assert(RW_CreateLevelTree({[def.id]=def},def.id))
+local placed=assert(RW_PlaceLevelSelectors(tree,{1},2))
+-- Returning to the same tile is not an arrival when coordinates/facing agree.
+assert(RW_GetActiveLevel(placed).world.cell_order['1:1'][1]==1)
+local initial=RW_GetActiveLevel(tree).world
+tree.level_transforms[tree.active_id]={[3]={deleted=true}}
+local reloaded=assert(RW_ReloadLevel(tree,tree.active_id))
+assert(RW_GetActiveLevel(reloaded).world.cell_order==nil,'persistent retirement must remove obsolete stack IDs')
+local session=RW_GetActiveLevel(reloaded)
+assert(RW_CreateLevelDefinition('cell.reloaded',session.world),'boundary must leave valid tile metadata')
+assert(initial.entities[3] and initial.cell_order['1:1'][2]==3,'reload must preserve source snapshot')
+tree.level_transforms[tree.active_id]={[10]={entity={id=10,kind='object',class='object',archetype='rock',x=1,y=1,direction='Left'}}}
+local restored=RW_GetActiveLevel(assert(RW_ReloadLevel(tree,tree.active_id))).world
+assert(restored.cell_order['1:1'][4]==10 and restored.cell_order['1:1'][2]==3,'persistent new products append after surviving authored stack')
+assert(restored.next_entity_id==11 and RW_CreateLevelDefinition('cell.restored',restored),'restored tile IDs must match allocator and validated contents')
+local separated=assert(RW_CreateLevelDefinition('cell.separate',w))
+local other=assert(RW_CreateLevelTree({[separated.id]=separated},separated.id))
+local arrived=assert(RW_PlaceLevelSelectors(other,{2},1))
+assert(RW_GetActiveLevel(arrived).world.cell_order['1:1'][3]==2,'boundary selector arrival must append to tile')
+local committed,cr=RW_CommitLevelTree(other,{before=other,after=arrived});assert(cr.accepted)
+assert(RW_GetActiveLevel(RW_UndoLevelTree(committed)).world==RW_GetActiveLevel(other).world,'selector placement tile order must join whole-tree Undo')
+local floats=move(s,2,1.0)
+assert(floats.world.cell_order['1:1'][3]==2 and not floats.world.cell_order['1.0:1'],'equal numeric coordinates must share one tile')
+assert(RW_CreateLevelDefinition('cell.float',floats.world),'integral float coordinates must validate against canonical tile keys')
+p.cell_order=floats.world.cell_order;p.entities[1].x=1.0
+local float_victims=RW_ResolveBonusContacts(p)
+assert(float_victims[1]==3 and float_victims[2]==2,'float collector coordinates must preserve tile order')
 local bad=RW_CreateSession();bad.world.cell_order={['1:1']={1,1}}
 local _,r=RW_Commit(bad,{consumes_turn=true,changes={}});assert(not r.accepted,'duplicate tile identities must reject')
-print('PASS: installed tile arrival order, independent global order, BONUS dispatch, sparse normalization and Undo')
+print('PASS: installed tile arrival order, independent global order, BONUS dispatch, sparse normalization, boundary reload/selector arrivals and Undo')

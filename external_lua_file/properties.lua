@@ -517,7 +517,7 @@ function RW_ResolveBonusContacts(world)
             for _,actors in ipairs(groups[capability] or {}) do for _,id in ipairs(actors) do
                 local actor=world.entities[id]
                 for _,targets in ipairs(groups.bonus or {}) do
-                    local tile=(world.cell_order or {})[actor.x..":"..actor.y]
+                    local tile=world.cell_order and world.cell_order[string.format("%.0f:%.0f",actor.x,actor.y)]
                     local ordered=targets
                     if tile then
                         local eligible={};for _,target_id in ipairs(targets) do eligible[target_id]=true end

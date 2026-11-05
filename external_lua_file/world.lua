@@ -84,19 +84,21 @@ function RW_UnitIds(world)
     return unit_ids(world)
 end
 
+local function cell_key(e) return string.format("%.0f:%.0f",e.x,e.y) end
+
 local function valid_cell_order(world)
     if world.cell_order==nil then return true end
     if type(world.cell_order)~="table" then return false end
     local counts={}
     for _,e in pairs(world.entities) do
         if type(e)~="table" or not is_integer(e.x) or not is_integer(e.y) then return false end
-        local key=e.x..":"..e.y;counts[key]=(counts[key] or 0)+1
+        local key=cell_key(e);counts[key]=(counts[key] or 0)+1
     end
     for key,ids in pairs(world.cell_order) do
         if type(key)~="string" or not is_list(ids) or #ids<2 or #ids~=counts[key] then return false end
         local seen={}
         for _,id in ipairs(ids) do local e=world.entities[id]
-            if not valid_id(id) or not e or seen[id] or e.x..":"..e.y~=key then return false end
+            if not valid_id(id) or not e or seen[id] or cell_key(e)~=key then return false end
             seen[id]=true
         end
     end
@@ -561,7 +563,7 @@ local function apply_plan(world, plan)
     for _,op in ipairs(plan.changes) do if op.kind=="move" then touched=true;break end end
     if touched then
         local cells,locations={},{}
-        local function key(e) return e.x..":"..e.y end
+        local key=cell_key
         for _,id in ipairs(unit_ids(world)) do local k=key(world.entities[id])
             cells[k]=cells[k] or {};cells[k][#cells[k]+1]=id;locations[id]=k
         end
@@ -1611,6 +1613,27 @@ function RW_ReloadLevel(tree,id)
         for _,entity_id in ipairs(extra) do order[#order+1]=entity_id end
         session.world.unit_order=order
     end
+    -- Persistent entrance products may remove/replace authored stack members.
+    -- Keep surviving authored tile order, then append restored identities.
+    if session.world.cell_order then
+        local canonical,cells,seen={},{},{}
+        for _,entity_id in ipairs(unit_ids(session.world)) do local e=session.world.entities[entity_id]
+            local k=cell_key(e);canonical[k]=canonical[k] or {};canonical[k][#canonical[k]+1]=entity_id
+        end
+        for k,ids in pairs(session.world.cell_order) do
+            for _,entity_id in ipairs(ids) do local e=session.world.entities[entity_id]
+                if e and cell_key(e)==k then
+                    cells[k]=cells[k] or {};cells[k][#cells[k]+1]=entity_id;seen[entity_id]=true
+                end
+            end
+        end
+        for k,ids in pairs(canonical) do for _,entity_id in ipairs(ids) do if not seen[entity_id] then
+            cells[k]=cells[k] or {};cells[k][#cells[k]+1]=entity_id
+        end end end
+        local sparse={}
+        for k,ids in pairs(cells) do if #ids>1 and not same_state(ids,canonical[k]) then sparse[k]=ids end end
+        session.world.cell_order=next(sparse) and sparse or nil
+    end
     local result = copy_map(tree)
     result.instances = copy_map(tree.instances)
     result.instances[id] = session
@@ -1621,11 +1644,13 @@ function RW_PlaceLevelSelectors(tree,ids,block_id)
     local session = RW_GetActiveLevel(tree)
     local block = session.world.entities[block_id]
     if not block or not is_list(ids) then return nil,"invalid_selector_spawn" end
-    local world = clone(session.world)
+    local changes={}
     for _, id in ipairs(ids) do
-        if not world.entities[id] then return nil,"invalid_selector_spawn" end
-        world.entities[id].x,world.entities[id].y = block.x,block.y
+        local entity=session.world.entities[id]
+        if not entity then return nil,"invalid_selector_spawn" end
+        changes[#changes+1]={kind="move",entity_id=id,to={x=block.x,y=block.y,direction=entity.direction}}
     end
+    local world=apply_plan(session.world,{changes=changes})
     return RW_UpdateActiveLevel(tree,{definition_id=session.definition_id,instance_id=session.instance_id,
         world=world,history={}})
 end

@@ -175,6 +175,12 @@ target declaration through the collector's tile order. Direction-only operations
 do not reorder; explicit changed move updates do. tests/cell_order.lua executes
 the installed tools.lua addunitmap/updateunitmap and checks arrival order, BONUS,
 zero-net round trips, sparse normalization, validation and Undo.
+Boundary selector placement uses that same arrival application path. Reload
+filters authored tile lists against persistent entrance retirements/replacements
+and appends restored identities in global order, retaining immutable snapshots.
+Boundary tests validate the reloaded world and selector arrival stacks.
+Tile keys normalize integral floats and integers to the same coordinates,
+including collector lookups; numeric representation cannot split one stack.
 
 Scope: history rows currently do not distinguish native update from updatedir for
 orientation-only intermediate events; those rows do not reorder a tile. Other

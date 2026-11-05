@@ -25,7 +25,7 @@ end
 assert(load(source:sub(assert(source:find('function copyrule(',1,true)),assert(source:find('function comparerules(',1,true))-1),'@original_copyrule','t',env))()
 env.getmat=function(name) return env.objectlist[name] and name or nil end
 local checked=0
-for channel=1,3 do for membership=0,3 do for scenario=1,5 do for copies=1,2 do
+for channel=1,3 do for membership=0,3 do for scenario=1,8 do for copies=1,2 do
 for ban=0,2 do for _,conditional in ipairs({false,true}) do for _,target_cond in ipairs({false,true}) do
  local name=channel==1 and 'group' or 'group'..channel
  local other=channel==3 and 'group' or 'group'..(channel+1)
@@ -52,7 +52,10 @@ for ban=0,2 do for _,conditional in ipairs({false,true}) do for _,target_cond in
  elseif scenario==2 then source_name,target_name=name,'avatar'
  elseif scenario==3 then source_name,target_name=name,other
  elseif scenario==4 then source_name,target_name=other,name
- else source_name,target_name=name,'all' end
+ elseif scenario==5 then source_name,target_name=name,'all'
+ elseif scenario==6 then source_name,target_name='all',name
+ elseif scenario==7 then source_name,target_name='all','avatar';add('avatar','is',name,false);add(name,'has','flag',false)
+ else source_name,target_name='all','all' end
  add(target_name,'has','flag',target_cond)
  for i=1,copies do add(source_name,'mimic',target_name,conditional) end
  if ban>0 then add(source_name,'mimic','not '..target_name,ban==2) end
@@ -77,5 +80,5 @@ for ban=0,2 do for _,conditional in ipairs({false,true}) do for _,target_cond in
  end
  checked=checked+1
 end end end end end end end
-assert(checked==1440)
+assert(checked==2304)
 print('PASS: installed addoption/subrules/grouprules GROUP MIMIC raw-copy order, ALL/NOT ALL, empty groups, channels, conditions, duplicate and negative copies ('..checked..' cases)')

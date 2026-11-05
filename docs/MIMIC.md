@@ -1,5 +1,10 @@
 # MIMIC (M9.4L)
 
+Current scope includes positive ALL MIMIC sources and GROUP targets through the
+existing endpoint rules; see the final implementation section. Earlier milestone
+scope/deferred notes below describe historical states. NOT GROUP subjects and
+conditional scoped LEVEL consumers retain their documented limitations.
+
 Primary reference: installed Baba Is You Data/rules.lua, subrules(), MIMIC
 protection collection and copy loop (lines 1209-1342). No mod source is used.
 
@@ -264,3 +269,41 @@ again as an ordinary ALL-subject palette, which would double runtime products.
 The current project positive-ALL MIMIC subject remains deferred. The new baseline
 establishes raw/concrete multiplicity, self-copy and unconditional protection;
 conditional bans, GROUP consumers and both-ALL axis ordering still require tests.
+
+## Positive ALL MIMIC subjects: implementation
+
+The baseline above is now implemented, including ordinary, Text, Empty, LEVEL
+and GROUP target declarations through the existing endpoint scopes. MIMIC's ALL
+preprocessing follows a growing queue: original declarations stay first, RHS ALL
+expands before the subject, and generated declarations containing ALL are visited
+later. Thus ALL MIMIC ALL keeps both paths, duplicate products and native copy
+counts. Palette traversal uses authored order rather than the native hash order.
+Raw ALL-source copies count toward the250 limit without receiving a second
+ordinary-subject expansion. Literal IS GROUP/IS NOT GROUP copies are retained for
+post-MIMIC membership processing. Already normalized ALL/NOT ALL memberships must
+not be expanded again in the copy lookup. Other documented conditional/scoped
+endpoint gaps are unchanged; this does not implement NOT GROUP subjects.
+
+Validation includes:
+- reference_all_mimic.lua:51,840 installed addoption/subrules cases, including72
+  native TOO COMPLEX outcomes, per-imitator conditions and NOT protections.
+- reference_all_mimic_order.lua:240 mixed original/derived declaration cases,
+  including36 limits, plus exact249/250/251 raw/concrete copy thresholds.
+- reference_group_mimic.lua:2,304 installed addoption/subrules/grouprules cases,
+  including ALL source targets, copied membership and conditional protection.
+- Physical rule compilation, scheduled movement/destruction/HAS, allocated
+  product order and whole-session Undo in tests/mimic.lua.
+
+HAS ALL and WRITE ALL source-ALL matrices each passed41,472 cases, including
+3,184 native-limit outcomes each. Full tests/run.lua passed with normal startup
+at1,440,000 instructions; the added typed LEVEL target movement/Undo probe also
+passed. These checks establish source/simulation parity within the described
+matrix; they do not claim native-device acceptance.
+
+Next endpoint baseline: reference_negative_group_mimic.lua executes the installed
+subrules/grouprules passes over288 cases, with positive GROUP controls. NOT GROUP
+MIMIC produces no tagged copies before or after membership expansion, even for
+ALL targets and duplicate/conditional declarations. This baseline does not yet
+remove the project's deferred diagnostic for those subjects; the next change
+must preserve the one-pass copy timing instead of treating NOT GROUP as an
+ordinary-noun complement at MIMIC time.

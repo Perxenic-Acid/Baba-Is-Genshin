@@ -229,3 +229,33 @@ end
 s=fixture({{'CRATE','BECOME','ALL'},{'CRATE','BECOME','NOT','ALL'},{'CRATE','BECOME','FLAG'},{'ROCK','MIMIC','CRATE'}})
 n=step(s);assert(n.world.entities[2].archetype=='flag','copied NOT ALL must preserve an explicit BECOME FLAG')
 print('PASS: MIMIC BECOME ALL literal/concrete paths, NOT subjects, own NOT ALL, explicit products and Undo')
+for copies=1,2 do for _,blocked in ipairs({false,true}) do
+ local rows={{'CRATE','HAS','FLAG'},{'ROCK','IS','YOU','AND','DEFEAT'}}
+ for i=1,copies do rows[#rows+1]={'ALL','MIMIC','CRATE'} end
+ if blocked then rows[#rows+1]={'ALL','MIMIC','NOT','CRATE'} end
+ s=fixture(rows);n=step(s);local flags=0
+ for _,unit in pairs(n.world.entities) do if unit.archetype=='flag' and unit.x==6 and unit.y==3 then flags=flags+1 end end
+ assert(flags==(blocked and 0 or copies),'ALL MIMIC must execute only concrete source copies')
+end end
+print('PASS: ALL MIMIC ordinary targets, duplicates, NOT protection and HAS Undo')
+for _,rows in ipairs({
+ {{'GROUP','IS','YOU'},{'ALL','MIMIC','GROUP'}},
+ {{'AVATAR','IS','GROUP'},{'GROUP','IS','YOU'},{'ALL','MIMIC','AVATAR'}}
+}) do
+ s=fixture(rows);frame=assert(RW_CompileWorld(s.world,cs));assert(#frame.deferred==0)
+ n=step(s,{type='move',dx=1,dy=0})
+ assert(n.world.entities[1].x==3 and n.world.entities[2].x==7,'ALL MIMIC GROUP membership/control must reach Commit and Undo')
+end
+s=fixture({{'CRATE','HAS','FLAG'},{'FLAG','HAS','CRATE'},{'ALL','MIMIC','CRATE'},
+ {'ROCK','MIMIC','FLAG'},{'ROCK','IS','YOU','AND','DEFEAT'}})
+n=step(s);local products={}
+for _,e in pairs(n.world.entities) do if e.class=='object' and e.x==6 and e.y==3 then products[e.id]=e.archetype end end
+assert(products[s.world.next_entity_id]=='crate' and products[s.world.next_entity_id+1]=='flag',
+ 'original ROCK MIMIC must copy before ALL-generated ROCK MIMIC regardless of authored row order')
+print('PASS: ALL MIMIC GROUP targets/memberships and original-before-derived HAS product IDs with Undo')
+s=fixture({{'LEVEL','IS','YOU'},{'ALL','MIMIC','LEVEL'}})
+s.world.language.nouns.LEVEL={tag='level',block_type='level_block'}
+frame=assert(RW_CompileWorld(s.world,cs));assert(#frame.deferred==0)
+n=step(s,{type='move',dx=1,dy=0})
+assert(n.world.entities[1].x==3 and n.world.entities[2].x==7,'ALL MIMIC must preserve typed LEVEL target declarations')
+print('PASS: typed LEVEL target supplies ALL MIMIC ordinary control and Undo')

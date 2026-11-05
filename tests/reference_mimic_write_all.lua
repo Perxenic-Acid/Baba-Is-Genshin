@@ -25,7 +25,7 @@ end
 local checked,limited=0,0
 for _,declaration_source in ipairs({'crate','all','not rock','not all'}) do
 for _,mimic_target in ipairs({'crate','empty','text','all'}) do
-for _,mimic_source in ipairs({'rock','not rock'}) do for mimic_ban=0,2 do
+for _,mimic_source in ipairs({'all','rock','not rock'}) do for mimic_ban=0,2 do
 for declarations=1,2 do for copies=1,2 do for ban=0,2 do
 for declaration_condition=0,1 do for mimic_condition=0,1 do for overlap=0,1 do for all_ban=0,2 do
  local w=RW_CreateSession().world;w.language.nouns.ROCK='rock';w.language.nouns.FLAG='flag'

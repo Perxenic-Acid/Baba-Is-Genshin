@@ -22,10 +22,10 @@ end
 local function cond(mode)
  return mode==0 and {op='always'} or {op='spatial',clauses={{relation='lonely',negated=mode==2,parameters={}}}}
 end
-local checked=0
+local checked,limited=0,0
 for _,declaration_source in ipairs({'all','not rock','not crate','not all'}) do
 for _,mimic_target in ipairs({'crate','empty','text','all'}) do
-for _,mimic_source in ipairs({'rock','not rock','not crate','not all'}) do for mimic_ban=0,2 do
+for _,mimic_source in ipairs({'all','rock','not rock','not crate','not all'}) do for mimic_ban=0,2 do
 for declarations=1,2 do for copies=1,2 do for ban=0,2 do
 for declaration_condition=0,2 do for mimic_condition=0,2 do for overlap=0,1 do
  local w=RW_CreateSession().world;w.language.nouns.ROCK='rock';w.language.nouns.FLAG='flag'
@@ -44,8 +44,14 @@ for declaration_condition=0,2 do for mimic_condition=0,2 do for overlap=0,1 do
  add('crate','has','rock',0)
  for i=1,copies do add(mimic_source,'mimic',mimic_target,mimic_condition) end
  if mimic_ban>0 then add(mimic_source,'mimic','not '..mimic_target,mimic_ban-1) end
- env.subrules()
- local _,deferred,relations=RW_LowerRuleAST(ast,nil,w);assert(#deferred==0)
+ local native_ok,native_error=pcall(env.subrules)
+ local generated,deferred,relations=RW_LowerRuleAST(ast,nil,w)
+ if not native_ok then
+  assert(tostring(native_error):find('toocomplex',1,true),native_error)
+  assert(not generated and deferred=='rule_complexity_limit','native copy limit mismatch '..checked)
+  limited=limited+1
+ else
+ assert(generated and #deferred==0,'unexpected project copy limit '..checked)
  local has={};for _,relation in ipairs(relations) do if relation.op=='has' then has[#has+1]=relation end end
  local function active(conditions,id)
   local unit=w.entities[id];local lonely=true
@@ -77,6 +83,7 @@ for declaration_condition=0,2 do for mimic_condition=0,2 do for overlap=0,1 do
    for _,count in pairs(counts) do assert(count==0,'ALL MIMIC product multiplicity mismatch '..checked) end
   end
  end
+ end
  checked=checked+1
 end end end end end end end end end end
-print('PASS: installed ALL/NOT noun/NOT ALL declarations and MIMIC subjects, ordinary/EMPTY/Text targets, HAS/MIMIC bans, per-imitator LONELY and ordered copy products ('..checked..' cases)')
+print('PASS: installed ALL/NOT noun/NOT ALL declarations and MIMIC subjects, ordinary/EMPTY/Text targets, HAS/MIMIC bans, per-imitator LONELY and ordered copy products ('..checked..' cases, '..limited..' native-limit cases)')

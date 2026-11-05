@@ -2361,7 +2361,12 @@ local function expand_mimic(ast_rules,world)
         return true
     end
     for _,entry in ipairs(ast_rules) do
-        local ok,err=add_lookup(entry);if not ok then return nil,err end
+        -- Scoped EAT keeps concrete ALL copies for its ordered runtime loop.
+        -- The lookup expands the original ALL itself, including inverted bans;
+        -- inserting those runtime copies here would copy the palette twice.
+        if not entry.scoped_eat_origin then
+            local ok,err=add_lookup(entry);if not ok then return nil,err end
+        end
     end
     -- Native subrules walks a growing featureindex[all]. Each generated
     -- declaration still containing literal ALL is visited later in the pass.

@@ -192,3 +192,11 @@ Other synthetic LEVEL effects still do not share this whole ordered loop.
 Conditional synthetic surroundings and host audiovisual bindings remain deferred.
 Ordinary earlier EAT/contact phase order is preserved, rather than claimed to be
 complete original levelblock scheduling.
+
+Scoped ALL/MIMIC follow-up: runtime LEVEL EAT ALL copies must not enter MIMIC's
+copy lookup a second time. That lookup already expands the original literal ALL
+and incorporates inverted NOT ALL conditions. Runtime copies remain available to
+the ordered LEVEL loop, while copied declarations use the existing one-generation
+lookup path. A failing installed-subrules comparison reproduced two copied noun
+clauses instead of one; the fix passes12 source cases covering both LEVEL-to-unit
+and unit-to-LEVEL copying, repeated original clauses and NOT ALL protection.

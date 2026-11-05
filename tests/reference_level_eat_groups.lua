@@ -97,3 +97,36 @@ for _,mapsafe in ipairs({false,true}) do for _,safe in ipairs({false,true}) do f
  selection_cases=selection_cases+1
 end end end end end end
 print('PASS: installed findgroup and LEVEL EAT aggregation/conditional promotion/SAFE/LEVEL ('..selection_cases..' cases)')
+
+-- MIMIC must copy the native pre-expanded ALL palette once, rather than
+-- re-expanding the additional runtime-only scoped copies in its lookup.
+local mimic_cases=0
+for _,outgoing in ipairs({false,true}) do for copies=1,3 do for _,ban in ipairs({false,true}) do
+ local w=RW_CreateSession().world;w.language.nouns.ROCK='rock';w.language.nouns.FLAG='flag';w.entities={}
+ env.features={};env.featureindex={};env.visualfeatures={};env.notfeatures={};env.condfeatureindex={};env.groupfeatures={}
+ env.objectlist={all=true,text=true,empty=true,level=true,group=true};for _,n in ipairs(RW_NounPalette(w)) do env.objectlist[n]=true end
+ local ast={};local owner=outgoing and level or noun('rock');local receiver=outgoing and noun('rock') or level
+ local ownername=outgoing and 'level' or 'rock';local receivername=outgoing and 'rock' or 'level'
+ local function add(s,v,o,rs,ro)
+  ast[#ast+1]={subject=s,verb=v,object=o,when={op='always'}};env.addoption({rs,v,ro},{},{},false,nil,{})
+ end
+ for i=1,copies do add(owner,'eat',{tag='special',name='all'},ownername,'all') end
+ if ban then add(owner,'eat',{tag='not',operand={tag='special',name='all'}},ownername,'not all') end
+ add(receiver,'mimic',owner,receivername,ownername)
+ env.subrules();env.grouprules()
+ local g,d,r=RW_LowerRuleAST(ast,nil,w);assert(g,d);assert(#d==0)
+ local actual={}
+ if outgoing then for _,row in ipairs(r) do if row.op=='eat' and row.source_type=='rock' and RW_RelationApplies(w,row,{id=10,class='object',archetype='rock',x=1,y=1,direction='Right'}) then actual[row.target_type]=(actual[row.target_type] or 0)+1 end end
+ else for _,row in ipairs(RW_LevelMotionDeclarations(w,g) or {}) do if row.op=='level_eat' and row.relation.target_type~='@all' and RW_RelationApplies(w,row.relation,{id=0,class='level',x=0,y=0,direction='None'}) then local n=row.relation.target_type;actual[n]=(actual[n] or 0)+1 end end end
+ local expected={}
+ for _,entry in ipairs(env.features) do local rule=entry[1]
+  if rule[1]==receivername and rule[2]=='eat' and rule[3]:sub(1,4)~='not ' and not env.findnoun(rule[3]) then
+   local active=true;for _,c in ipairs(entry[2]) do if c[1]=='never' then active=false end end
+   if active then expected[rule[3]]=(expected[rule[3]] or 0)+1 end
+  end
+ end
+ for n,count in pairs(expected) do assert(actual[n]==count,'scoped ALL MIMIC multiplicity '..n..':'..count..'/'..tostring(actual[n])) end
+ for n,count in pairs(actual) do assert(expected[n]==count,'unexpected scoped ALL MIMIC target '..n..':'..tostring(outgoing)..':'..tostring(ban)..':'..count) end
+ mimic_cases=mimic_cases+1
+end end end
+print('PASS: installed subrules scoped ALL EAT MIMIC in both directions, duplicates and NOT ALL ('..mimic_cases..' cases)')

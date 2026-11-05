@@ -344,3 +344,20 @@ cover distant victims, no-HAS map retirement, skipped suffix RNG, repeated birth
 map scrolling, distinct event causes and actual mapped-input/whole-tree Undo.
 Ordinary BOOM radius/multiplicity is unchanged. Broader original levelblock and
 native host boundary timing gaps remain as previously documented.
+
+## Scoped OPEN/SHUT source contract (integration pending)
+
+tests/reference_level_unlock.lua executes the installed blocks.lua2786-2893
+branches directly in 2048 cases. This is a native contract oracle, not evidence
+that scoped OPEN/SHUT is implemented. Ordinary real-unit unlocking is unchanged.
+
+Each complementary property declaration runs findall in declaration order. The
+branch queries each matching-layer target's SAFE even when the map is unsafe,
+then immediately retires an unsafe map after that declaration's scan. A matching
+scoped complementary LEVEL declaration can also retire the map, without a real
+unit witness or FLOAT comparison. Neither path reaches queued target deletion.
+On a safe map, all declaration groups collect before any serial delete/HAS;
+duplicate declarations retain duplicate queued IDs. The EMPTY complementary
+placeholder check follows these deletions and can immediately retire an unsafe
+map. Integration must preserve these query/deletion barriers and cannot reuse
+SINK's earlier map-destruction shortcut or HOT's per-group deletion timing.

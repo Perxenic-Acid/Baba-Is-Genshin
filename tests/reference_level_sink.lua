@@ -1,13 +1,18 @@
--- Installed LEVEL SINK and floating_level with native selection/deletion order.
+-- Installed LEVEL SINK/BOOM and floating_level selection/deletion order.
 local base=[[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/]]
 local function read(n)local f=assert(io.open(base..n,'rb'));local s=f:read('*a');f:close();return s end
 local env=setmetatable({XPOS=1,YPOS=2,FLOAT=3,UNITNAME=1,UNITTYPE=2,SHAKE=1,generaldata={values={}},
  checkeffecthistory=function()return 1,0 end,setsoundname=function()end,MF_particles=function()end,getcolour=function()return 0,0 end},{__index=_G})
 local source=read('tools.lua');local a=assert(source:find('function floating_level(',1,true));local b=assert(source:find('function emptydir(',a,true))
 assert(load(source:sub(a,b-1),'@installed_sink_floating','t',env))()
-source=read('blocks.lua');a=assert(source:find('elseif (action == "sink") then',1,true));b=assert(source:find('elseif (action == "boom") then',a,true))
-local native=assert(load('return function(lsafe)local action="sink"; if false then '..source:sub(a,b-1)..' end; suffix=true end','@installed_level_sink','t',env))()
+source=read('blocks.lua');local natives={}
+for _,kind in ipairs({'sink','boom'}) do
+ a=assert(source:find('elseif (action == "'..kind..'") then',1,true))
+ b=assert(source:find('elseif (action == "'..(kind=='sink' and 'boom' or 'done')..'") then',a,true))
+ natives[kind]=assert(load('return function(lsafe)local action="'..kind..'"; if false then '..source:sub(a,b-1)..' end; suffix=true end','@installed_level_'..kind,'t',env))()
+end
 local cases=0
+for _,kind in ipairs({'sink','boom'}) do
 for mask=0,15 do for floats=0,15 do for safes=0,3 do for _,mapsafe in ipairs({false,true}) do for _,mapfloat in ipairs({false,true}) do for order=1,2 do
  local w=RW_CreateSession().world;w.entities={};w.unit_order=order==1 and {10,11,12,13} or {13,12,11,10};w.rule_sources={}
  local objects,safe={},{};env.units={};env.deleted={}
@@ -26,13 +31,13 @@ for mask=0,15 do for floats=0,15 do for safes=0,3 do for _,mapsafe in ipairs({fa
  env.testcond=function()return true end;env.issafe=function(id)return safe[id] end
  env.mmf={newObject=function(id)return objects[id] end}
  local destroyed,deleted=false,{};env.destroylevel=function()destroyed=true end;env.delete=function(id)deleted[#deleted+1]=id end;env.suffix=false
- native(mapsafe)
- local actual,why=RW_ResolveScopedSinkTargets(w,{},mapsafe);assert(actual,why)
+ natives[kind](mapsafe)
+ local actual,why=RW_ResolveScopedAreaTargets(w,{},mapsafe);assert(actual,why)
  assert((actual.level_destroy==true)==destroyed and env.suffix==not destroyed and #actual.ids==#deleted,'LEVEL SINK layer/SAFE/early return mismatch')
  for i,id in ipairs(deleted) do assert(actual.ids[i]==id,'LEVEL SINK unit-list selection order mismatch') end
  cases=cases+1
-end end end end end end
-print('PASS: installed LEVEL SINK/floating_level, real/Text/BROKEN witnesses, independent SAFE/FLOAT, return and unit order ('..cases..' cases)')
+end end end end end end end
+print('PASS: installed LEVEL SINK/BOOM floating_level, real/Text/BROKEN witnesses, independent SAFE/FLOAT, return and unit order ('..cases..' cases)')
 
 -- Unsafe map retirement precedes any target SAFE query. A protected map must
 -- propagate that query's diagnostics instead of treating the victim as absent.

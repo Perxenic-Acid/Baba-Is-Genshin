@@ -103,11 +103,11 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
    weak=RW_LevelWeakDestroys,
    melt=RW_LevelMeltDestroys,
    outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}
-   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' then outgoing=true end end
+   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' or row.trait=='boom' then outgoing=true end end
    if not outgoing then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,motion) end
    local contents={};for _,r in ipairs(relations or {}) do if r.op=='has' or r.op=='empty_has' then contents[#contents+1]=r end end
    return RW_PlanScopedLevelSequence(raw,w,traits,rules,rows,{motion=motion,preview=RW_PreviewPlan,select=RW_ResolveScopedEatTargets,
-    sink_select=RW_ResolveScopedSinkTargets,
+    area_select=RW_ResolveScopedAreaTargets,
     hot_declarations=RW_LevelHotDeclarations,hot_targets=RW_LevelHotTargets,
     hot_destroy=function(world,ids,r,view)
      local layers={};for _,id in ipairs(ids) do layers[id]=(view.entities[id].behaviors or {}).float==true end
@@ -180,6 +180,16 @@ do
  local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','MOVE'},{'ROCK','HAS','FLAG'}})
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1,'WEAK must retire map without suppressing later motion or triggering HAS')
  assert(n.world.next_entity_id==s.world.next_entity_id)
+ do
+ local s,id=outgoing({{'LEVEL','IS','BOOM'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','IS','SAFE'},{'LEVEL','IS','CHILL'}})
+ local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.random_state,'BOOM unsafe map must retire before later CHILL')
+ local s,id=outgoing({{'LEVEL','IS','BOOM'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','MOVE'}})
+ s.world.entities[id+1]={id=id+1,kind='object',class='object',archetype='rock',x=31,y=31,direction='Right'};s.world.next_entity_id=id+2
+ local n,p=turn(s);assert(not p.level_destroy and not n.world.entities[id] and not n.world.entities[id+1] and n.world.next_entity_id==id+4 and n.world.board_offset.y==1,'scoped BOOM is whole-map, not an ordinary local blast radius')
+ local causes=0;for _,event in ipairs(p.events or {}) do if event.cause=='level_boom' then causes=causes+1 end end;assert(causes==2)
+ local s,id=outgoing({{'LEVEL','IS','BOOM','AND','BOOM'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','ROCK'}})
+ local n=turn(s);assert(n.world.next_entity_id==s.world.next_entity_id+2 and not n.world.entities[id])
+ end
  local s,id=outgoing({{'LEVEL','IS','SINK'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','IS','SAFE'},{'LEVEL','IS','CHILL'},{'ROCK','HAS','FLAG'}})
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.random_state and n.world.next_entity_id==s.world.next_entity_id,'unsafe SINK map retires before suffix, even with SAFE witness, without HAS')
  local s,id=outgoing({{'LEVEL','IS','SINK'},{'LEVEL','IS','FLOAT'},{'LEVEL','IS','MOVE'}})
@@ -625,6 +635,11 @@ do
  w.entities[sink_victim]={id=sink_victim,kind='object',class='object',archetype='rock',x=18,y=18,direction='Right'}
  OnStart();listeners.wait();assert(not display.entities[sink_victim] and display.entities[sink_victim+1].archetype=='flag' and depth==1)
  listeners.undo();assert(display.entities[sink_victim] and not display.entities[sink_victim+1] and depth==0)
+ w=fixture({{'LEVEL','IS','BOOM'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'}}).world
+ local boom_victim=w.next_entity_id;w.next_entity_id=boom_victim+1
+ w.entities[boom_victim]={id=boom_victim,kind='object',class='object',archetype='rock',x=31,y=31,direction='Right'}
+ OnStart();listeners.wait();assert(not display.entities[boom_victim] and display.entities[boom_victim+1].archetype=='flag' and depth==1)
+ listeners.undo();assert(display.entities[boom_victim] and not display.entities[boom_victim+1] and depth==0)
  w=fixture({{'LEVEL','IS','MELT'},{'EMPTY','IS','HOT'},{'LEVEL','IS','CHILL'}}).world
  OnStart();listeners.wait();assert(not next(display.entities) and not display.random_state and depth==1)
  listeners.undo();assert(next(display.entities) and depth==0)

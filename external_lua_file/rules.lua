@@ -290,12 +290,12 @@ end
 function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
-        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true}
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true,boom=true}
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
             if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
+                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.trait=="boom" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -399,8 +399,8 @@ function RW_LevelMeltDestroys(world,rules)
     return pending,nil,false
 end
 
--- Native SINK selects the complete victim list before any deletion/HAS.
-function RW_ResolveScopedSinkTargets(world,rules,level_safe)
+-- Native scoped SINK/BOOM share whole-map selection before any deletion/HAS.
+function RW_ResolveScopedAreaTargets(world,rules,level_safe)
     local context=condition_context(world,rules)
     local ids,seen,rest={},{},{}
     for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not seen[id] then ids[#ids+1]=id;seen[id]=true end end
@@ -418,6 +418,9 @@ function RW_ResolveScopedSinkTargets(world,rules,level_safe)
         end
     end
     return result
+end
+function RW_ResolveScopedSinkTargets(world,rules,level_safe)
+    return RW_ResolveScopedAreaTargets(world,rules,level_safe)
 end
 
 -- Preserve one native findall group per concrete MELT declaration.

@@ -325,3 +325,22 @@ reference_level_sink.lua executes installed SINK/floating_level in8192 cases,
 including Text/BROKEN, independent SAFE, FLOAT, return and noncanonical unit order.
 Turn/mapped adapter tests cover immediate map retirement/no HAS, motion suffixes,
 serial HAS after fixed SAFE selection, repeated clauses and whole-tree Undo.
+
+## Scoped LEVEL BOOM
+
+Installed blocks.lua2932-2968 uses the same simulation as scoped SINK: inspect
+all real units, compare stored unit FLOAT with current map FLOAT, retire an unsafe
+map immediately on any matching witness, otherwise gather unsafe targets before
+serial HAS/deletion. This is whole-map behavior, independent of an ordinary
+unit's multiplicity-scaled local blast radius. Each physical scoped BOOM clause
+executes again and may select earlier HAS newborns. Native audiovisual differences
+remain in the deferred frontend workstream.
+
+RW_ResolveScopedAreaTargets shares that selection with SINK; the existing SINK
+entry point remains a compatibility wrapper. Ordered stages/events retain BOOM's
+own name/cause. The source matrix in reference_level_sink.lua now executes both
+unchanged installed branches in16384 cases. Added production transaction tests
+cover distant victims, no-HAS map retirement, skipped suffix RNG, repeated births,
+map scrolling, distinct event causes and actual mapped-input/whole-tree Undo.
+Ordinary BOOM radius/multiplicity is unchanged. Broader original levelblock and
+native host boundary timing gaps remain as previously documented.

@@ -621,3 +621,5 @@ dofile('tests/reference_level_eat_groups.lua')
 dofile('tests/reference_level_weak.lua')
 
 dofile('tests/reference_level_melt.lua')
+
+dofile('tests/reference_level_hot.lua')

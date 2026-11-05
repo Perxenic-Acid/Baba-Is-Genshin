@@ -290,12 +290,12 @@ end
 function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
-        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true}
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true}
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
             if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
+                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -397,6 +397,40 @@ function RW_LevelMeltDestroys(world,rules)
         if (world.empty_float_declared==true)==floating and not safe then return true,nil,true end
     end
     return pending,nil,false
+end
+
+-- Preserve one native findall group per concrete MELT declaration.
+function RW_LevelHotDeclarations(world,rules)
+    local result={}
+    for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+        for _,rule in ipairs(frame) do for _,effect in ipairs(rule.effects or {}) do
+            if effect.op=="grant_trait" and effect.trait=="melt" and effect.target.kind~="empty" then
+                result[#result+1]={target=query_clone(effect.target),when=query_clone(rule.when)}
+            end
+        end end
+    end
+    return result
+end
+function RW_LevelHotTargets(world,rules,declaration)
+    local context=condition_context(world,rules)
+    local selected={};for _,id in ipairs(RW_SelectEntities(world,declaration.target)) do selected[id]=true end
+    local ids,seen,rest={},{},{}
+    for _,id in ipairs(world.unit_order or {}) do if selected[id] and not seen[id] then ids[#ids+1]=id;seen[id]=true end end
+    for id in pairs(selected) do if not seen[id] then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do ids[#ids+1]=id end
+    local result={}
+    for _,id in ipairs(ids) do local e=world.entities[id]
+        if e.broken~=1 then
+            local active,why=RW_TestEntityCondition(context,declaration.when,e)
+            if active==nil then return nil,why end
+            if active then
+                active,why=query_trait(context,e,"melt")
+                if active==nil then return nil,why end
+                if active then result[#result+1]=id end
+            end
+        end
+    end
+    return result
 end
 
 -- One outgoing LEVEL EAT declaration, before any of its selected deletions.
@@ -3625,7 +3659,7 @@ end
 
 -- Each parent remains present during inside(); remove it from the query frame
 -- only after its last clause. Completed parent IDs locate terminal prefixes.
-function RW_InitializeHasBirths(world,victims,relations,rules,back_count,simultaneous)
+function RW_InitializeHasBirths(world,victims,relations,rules,back_count,simultaneous,options)
     local valid,why=RW_PlanHasBirths(world,{},relations)
     if not valid or not dense_list(victims) then return nil,why or "invalid_has_input" end
     valid,why=RW_InitializeBirthSpecifications(world,{},rules,back_count)
@@ -3645,6 +3679,19 @@ function RW_InitializeHasBirths(world,victims,relations,rules,back_count,simulta
         return nil,reason
     end
     for _,id in ipairs(victims) do
+        local eligible=true
+        if options and options.kind=="level_hot" then
+            local frame=condition_context(context,rules)
+            local safe,why=query_trait(frame,context.entities[id],"safe")
+            if safe==nil then return failure(why) end
+            eligible=not safe
+            if eligible then
+                local floating,why=query_level_trait(frame,"float")
+                if floating==nil then return failure(why) end
+                eligible=((options.layers or {})[id]==true)==floating
+            end
+        end
+        if eligible then
         local direction=context.entities[id].direction or "None"
         if direction=="None" then state=state*48271%2147483647;direction=({"Right","Up","Left","Down"})[state%4+1] end
         context.random_state=state
@@ -3663,6 +3710,7 @@ function RW_InitializeHasBirths(world,victims,relations,rules,back_count,simulta
             if not initialized then return failure(why) end
         end
         if not simultaneous then context.entities[id]=nil;completed[#completed+1]=id end
+        end
     end
     return products,nil,nil,completed,random_metadata()
 end

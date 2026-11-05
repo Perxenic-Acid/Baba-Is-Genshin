@@ -139,6 +139,7 @@ function RW_PlanDestructionPhase(world, ids, contents, kind, services, deaths, r
         local prefix,completed,random
         specifications,err,prefix,completed,random=services.initialized_births(world,ids,real_contents,rules,back_count,kind)
         if random then state=random.to end
+        if specifications and kind=="level_hot" then removed_ids=completed end
         if not specifications then
             if not prefix or not completed or not is_limit(err) then return nil,err end
             specifications=prefix;removed_ids=completed;terminal=err
@@ -1380,7 +1381,25 @@ function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,b
         chunk={};return refresh_view()
     end
     for _,row in ipairs(rows) do
-        if row.op=="level_eat" then
+        if row.trait=="hot" then
+            local ok,why=flush();if ok==nil then return failed(why) elseif not ok then return result end
+            local active,why=services.motion.active(view,rules,row)
+            if active==nil then return failed(why) end
+            if active then
+                local declarations,why=services.hot_declarations(view,rules)
+                if not declarations then return failed(why) end
+                for _,declaration in ipairs(declarations) do
+                    local ids,why=services.hot_targets(view,rules,declaration)
+                    if not ids then return failed(why) end
+                    if #ids>0 then
+                        local phase,why=services.hot_destroy(current,ids,rules,view)
+                        if not phase then return failed(why) end
+                        local ok,why=append(phase,"hot");if ok==nil then return nil,why elseif not ok then return result end
+                        local ok,why=refresh_view();if not ok then return failed(why) end
+                    end
+                end
+            end
+        elseif row.op=="level_eat" then
             local ok,why=flush();if ok==nil then return failed(why) elseif not ok then return result end
             local selected,why=services.select(view,rules,row.relation,projected.level_behaviors and projected.level_behaviors.safe==true)
             if not selected then return failed(why) end
@@ -2348,12 +2367,21 @@ local function start(run_self_tests)
                 outcome=function(...) return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",...) end,
                 resolve=function(...) return movement_api:Invoke("RW_ResolveLevelMotion",...) end,
                 layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end}
-            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" then outgoing=true;break end end
+            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" then outgoing=true;break end end
             if not outgoing then return RW_PlanOrderedLevelMotion(world,traits,rules,rows,motion_services) end
             local contents={};for _,r in ipairs(relations or {}) do if r.op=="has" or r.op=="empty_has" then contents[#contents+1]=r end end
             return RW_PlanScopedLevelSequence(raw,world,traits,rules,rows,{
                 motion=motion_services,preview=function(...) return world_api:Invoke("RW_PreviewPlan",...) end,
                 select=function(...) return rules_api:Invoke("RW_ResolveScopedEatTargets",...) end,
+                hot_declarations=function(...) return rules_api:Invoke("RW_LevelHotDeclarations",...) end,
+                hot_targets=function(...) return rules_api:Invoke("RW_LevelHotTargets",...) end,
+                hot_destroy=function(w,ids,r,view)
+                    local layers={};for _,id in ipairs(ids) do layers[id]=(view.entities[id].behaviors or {}).float==true end
+                    return RW_PlanDestructionPhase(w,ids,contents,"level_hot",{
+                        initialized_births=function(a,b,c,d,n)
+                            return rules_api:Invoke("RW_InitializeHasBirths",a,b,c,d,n,false,{kind="level_hot",layers=layers})
+                        end,create=contact_services.create,delete=contact_services.delete},nil,r,count)
+                end,
                 project=function(w,r,t)
                     local effects,why=rules_api:Invoke("RW_EvaluateRules",w,r);if not effects then return nil,why end
                     return properties_api:Invoke("RW_ProjectWorld",w,effects,t)

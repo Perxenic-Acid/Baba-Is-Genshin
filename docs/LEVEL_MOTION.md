@@ -274,3 +274,26 @@ an earlier WORD limit commits its RNG/motion prefix into Infinite Loop. Both
 orders leave the source world untouched. This closes real-unit ordering within
 one target declaration; cross-declaration and scoped-versus-real dispatch order
 remain the documented broader limitation.
+
+## Scoped LEVEL HOT
+
+Installed blocks.lua2735-2756 freezes findfeature(MELT), then runs findall once
+per declaration against current units. Snapshot that group's conditional MELT
+membership before deletion. Each candidate's SAFE and map FLOAT are queried
+immediately before its own delete; earlier serial HAS/deletions can change these
+queries. Target SAFE protects it; map SAFE does not. Duplicate MELT declarations
+can consume earlier groups' newborns, without recompiling physical Text.
+
+The ordered LEVEL sequence adds a flat destruction/HAS stage per MELT declaration,
+not per victim. RW_InitializeHasBirths accepts an internal level_hot eligibility
+mode with stored unit layers, returning actual completed victims even on success.
+Skipped victims do not consume inside() direction RNG. Keep source conditions,
+unit_order, sequential newborn status, late failure prefixes and whole-tree Undo.
+The existing 32-stage bound applies to declaration groups; a large ordinary group
+does not spend one stage per victim. Existing native query-order/host boundaries
+remain documented; this is not a full levelblock scheduling claim.
+
+reference_level_hot.lua executes the installed HOT branch in3072 cases covering
+repeated MELT/HAS, SAFE, FLOAT, survivors, newborn identities and allocation.
+Production turn tests additionally cover serial SAFE births, frozen conditional
+membership and mapped OnStart/input/whole-tree Undo.

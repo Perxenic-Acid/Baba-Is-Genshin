@@ -1172,7 +1172,7 @@ function RW_ResolveShift(world)
             for _,other_id in ipairs(cells[cell(belt)] or {}) do
                 local rider=world.entities[other_id]
                 if other_id ~= id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider)
-                    and not intent_immobile(world,rider,vectors[belt.direction][1],vectors[belt.direction][2]) then
+                    and not immobile(world,rider,vectors[belt.direction][1],vectors[belt.direction][2]) then
                     if not tasks[other_id] then
                         tasks[other_id]={entity_id=other_id,direction=belt.direction,count=0};order[#order+1]=tasks[other_id]
                     end

@@ -164,3 +164,13 @@ Conditional scoped LEVEL surroundings retain the shared deferred boundary.
 The full native mutable collision scheduler is still separate; map and ordinary
 tasks use this project's queued round solver. Mid/None map orientation has no
 cardinal impulse and is outside the installed cardinal-direction oracle.
+
+Ordinary belt collection now calls the cantmove-equivalent lock query directly
+with the belt's direction. Applying intention remapping before that query had
+cancelled its REVERSE mapping and admitted riders blocked by the opposite lock.
+This is a collection check; later displacement still applies its own normal
+REVERSE/lock rules. Sleeping belts still impart impulses, and sleeping riders
+remain passive candidates. tests/reference_shift_locks.lua executes installed
+take-8 collection, cantmove, floating_level and reverse helpers in5120 cases:
+four belt directions, all lock directions, zero through three REVERSE instances,
+STILL, rider/source SLEEP, FLOAT and LEVEL HOLD, plus atomic Undo.

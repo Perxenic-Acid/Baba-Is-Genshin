@@ -82,3 +82,19 @@ M9.8F types EMPTY YOU proxies as virtual Empty, making the existing real-unit-on
 scoped HOLD exemption effective. Real pushed targets still use their own layer.
 Native floating_level can query EMPTY; our exemption is an explicit project scope
 contract, not a claim that native cantmove excludes it. See EMPTY_MOTION.md.
+
+HOLD acquisition now retains physical declaration order separately from global
+unit order. RW_ProjectWorld publishes transient hold_source_groups in grant
+order, with each group using the current per-name unit order and filtering denied
+effects. Duplicate declarations remain separate: ROCK HOLD, FLAG HOLD, ROCK HOLD
+can assign the rider back to ROCK. RW_ResolveHold uses those groups for acquisition;
+following and first-logical-ID lookup still traverse global unit order. Legacy
+diagnostic worlds without projection metadata keep their capability-list fallback.
+The groups never enter raw worlds, allocators, boundaries or Undo.
+
+tests/reference_hold_declarations.lua executes installed getunitswitheffect,
+findallhere and the full HOLD loop in4096 cases. It independently varies physical
+declaration order/duplicates, global/tile order, initial overlap/holder memory and
+per-identity FLOAT, comparing final positions/memory and atomic Undo. Shared
+conditional-query timing, intermediate native holder undo rows and the full mutable
+collision scheduler retain their existing scope limits.

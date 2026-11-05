@@ -194,14 +194,15 @@ function RW_ProjectWorld(world, effects, level_traits)
         end
     end
     -- Ordered physical declaration groups are transient projection data. Counts
-    -- alone cannot reconstruct YOU-before-YOU2 or BONUS declaration dispatch.
+    -- alone cannot reconstruct YOU-before-YOU2, BONUS or HOLD declaration dispatch.
     projected.bonus_contact_groups={control={},control2={},bonus={}}
+    projected.hold_source_groups={}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -212,7 +213,8 @@ function RW_ProjectWorld(world, effects, level_traits)
                     if ra then return true elseif rb then return false end
                     return a<b
                 end)
-                projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group
+                if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
+                else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
             -- Retain holes even when this declaration has no eligible vacancy.

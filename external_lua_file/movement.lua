@@ -2111,13 +2111,17 @@ end
 
 function RW_ResolveHold(world)
     local ids,holders,positions,held,first=unit_ids(world),{},{},{},{}
+    local sources={}
+    if world.hold_source_groups then
+        for _,group in ipairs(world.hold_source_groups) do for _,id in ipairs(group) do sources[#sources+1]=id end end
+    else for _,id in ipairs(ids) do if has_capability(world,world.entities[id],"hold") then sources[#sources+1]=id end end end
     for _,id in ipairs(ids) do local e=world.entities[id]
         local identity=e.back_identity or id
         first[identity]=first[identity] or id
         positions[id]={x=e.x,y=e.y};held[id]=e.holder or 0
         if has_capability(world,e,"hold") then holders[identity]=true end
     end
-    for _,id in ipairs(ids) do local source=world.entities[id]
+    for _,id in ipairs(sources) do local source=world.entities[id]
         if has_capability(world,source,"hold") then
             local identity=source.back_identity or id
             for _,other in ipairs(ids) do local e=world.entities[other]

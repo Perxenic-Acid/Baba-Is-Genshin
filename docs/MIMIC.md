@@ -252,3 +252,15 @@ commit. BECOME needs separate handling: installed createall_single() excludes
 the source's own noun and skips existing same-cell target names, unlike explicit
 BECOME noun products appended by subrules(). Reusing the WRITE literal-token
 path would be incorrect; that behavior is not claimed by this change.
+
+## Positive ALL MIMIC subject: installed baseline
+
+reference_terminal_words.lua now executes addoption/subrules/postrules/conversion
+for one/two ALL MIMIC CRATE declarations plus CRATE WRITE ROCK, with and without
+ALL MIMIC NOT CRATE. Every ordinary source receives each copied declaration;
+CRATE also retains its original declaration. A separate raw ALL-source copied
+record survives. It must contribute to native copy limits without being lowered
+again as an ordinary ALL-subject palette, which would double runtime products.
+The current project positive-ALL MIMIC subject remains deferred. The new baseline
+establishes raw/concrete multiplicity, self-copy and unconditional protection;
+conditional bans, GROUP consumers and both-ALL axis ordering still require tests.

@@ -49,4 +49,18 @@ for _,case in ipairs({{'rock','rock',1},{'all','rock',2},{'not crate','rock',2}}
  end
 end
 print('PASS: original BECOME ALL literal createall plus concrete/self products and ALL/NOT source paths')
+for copies=1,2 do for _,blocked in ipairs({false,true}) do
+ local input={{'crate','write','rock'}}
+ for i=1,copies do input[#input+1]={'all','mimic','crate'} end
+ if blocked then input[#input+1]={'all','mimic','not crate'} end
+ p=run(input)
+ local counts={}
+ for _,v in ipairs(p) do if v[2]=='rock' and v[3]=='write' then counts[v[1]]=(counts[v[1]] or 0)+1 end end
+ for _,name in ipairs({'rock','crate','avatar'}) do
+  local expected=(blocked and 0 or copies)+(name=='crate' and 1 or 0)
+  assert((counts[name] or 0)==expected,'ALL MIMIC source expansion: '..name)
+ end
+ assert((counts.all or 0)==(blocked and 0 or copies),'native ALL MIMIC retains a raw ALL source record')
+end end
+print('PASS: original ALL MIMIC source raw/concrete declarations, duplicates, self-copy and NOT protection')
 print('PASS: original WRITE property targets, identity/NOT TEXT/NOT target vetoes and ALL multiplicity')

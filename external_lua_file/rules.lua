@@ -1715,11 +1715,14 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
                 and not (type(target)=="table" and denied["@text"])
                 and not (becoming and (target=="@all" or choice.all_product) and become_bans["@all"]) then
                 if target=="@all" then
+                    -- Native createall_single always queries IS NOT, including
+                    -- when the literal createall was selected by BECOME.
+                    local literal_denied=bans
                     if not virtual and entity.class~="text" then retain=true end
                     local empty_all
                     if virtual then empty_all={};products[#products+1]={empty_all=empty_all} end
                     for _,name in ipairs(RW_NounPalette(world)) do
-                        if name~=source and not denied[name] then
+                        if name~=source and not literal_denied[name] then
                             local exists=false
                             for _,other in pairs(world.entities) do
                                 if other.x==entity.x and other.y==entity.y and other.class~="text" and other.archetype==name then exists=true end

@@ -160,3 +160,23 @@ literal against its phase world, while original createall_single can observe
 products emitted earlier. The literal path's IS NOT filtering versus BECOME NOT
 filtering also needs separate parity work. This milestone does not claim those
 existing scheduler/negative-rule gaps are fixed.
+
+## Literal ALL negative lookup correction
+
+Installed syntax.lua createall_single() queries hasfeature(name,"is","not "..b)
+regardless of whether IS or BECOME selected the literal record. Literal BECOME
+ALL now uses current IS forbids for individual palette names. Explicit BECOME
+products continue to use BECOME forbids, including ALL provenance. BECOME NOT ALL
+still cancels the literal selection and its own concrete derivatives as before.
+
+New physical transactions assert one surviving FLAG for either ROCK IS NOT FLAG
+or ROCK BECOME NOT FLAG combined with ROCK BECOME ALL: each vetoes only one path.
+The installed 192-case oracle now asserts the actual queried verb is IS. Focused
+BECOME/MIMIC and the 432-case original conversion oracle pass; full regression passed (normal startup: 1,438,000 instructions). Serial birth occupancy among multiple literal ALL records remains
+unfinished and is not approximated by this correction.
+
+The reference literal-ALL oracle additionally executes three consecutive native
+createall_single calls for each of 24 real/Text/Empty initial occupancy cases.
+Later calls observe births from the first and emit no duplicate concrete nouns.
+This establishes the serial-newborn occupancy contract for the pending scheduler
+correction; the current project implementation does not yet claim this parity.

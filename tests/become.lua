@@ -81,3 +81,10 @@ n=step(s);assert(n.world.entities[2].archetype=='rock' and n.world.next_entity_i
 s=fixture({{'ROCK','BECOME','ALL'},{'ROCK','BECOME','NOT','ALL'},{'ROCK','BECOME','FLAG'}})
 n=step(s);assert(n.world.entities[2].archetype=='flag','NOT ALL cancels expanded products but preserves explicit BECOME FLAG')
 print('PASS: BECOME vs IS protection/NOT, self multiplicity, TEXT/EMPTY/ALL, conditions, links, MAKE converted tracking, no HAS and Undo')
+for _,verb in ipairs({'IS','BECOME'}) do
+ s=fixture({{'ROCK','BECOME','ALL'},{'ROCK',verb,'NOT','FLAG'}})
+ n=step(s);local flags=0
+ for _,unit in pairs(n.world.entities) do if unit.class=='object' and unit.archetype=='flag' and unit.x==6 and unit.y==3 then flags=flags+1 end end
+ assert(flags==1,'literal IS NOT and explicit BECOME NOT must each veto only their own ALL path')
+end
+print('PASS: literal BECOME ALL uses IS NOT while explicit derivatives use BECOME NOT, with Undo')

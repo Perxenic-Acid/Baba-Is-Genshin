@@ -32,7 +32,7 @@ The native RNG stream differs deliberately; the source oracle normalizes its RNG
 to verify choices and draw counts under the same supplied stream. Rejected plans,
 rendering and repeated planning do not consume authoritative randomness.
 
-The 6,144-case oracle executes the installed TELE loop with normalized host objects,
+The 12,288-case oracle executes the installed TELE loop with normalized host objects,
 covering Text names, layers, STILL/SLEEP, one/two/three sources, overlapping networks,
 mobile teleporters, reversed unit traversal, BACK suppression and RNG consumption.
 Separate sequential BACK/TELE tests cover motion, direction-only and unchanged
@@ -53,6 +53,19 @@ It does not use the ordinary teleporter network or its BACK rider-suppression
 set. Atomic RNG/motion journals, late code/status/CRASH/limit handling and Undo
 are covered by7680 installed cases plus production scheduler/adapter tests.
 Conditional intra-batch map-layer/declaration re-evaluation remains documented.
+
+Ordinary TELE now snapshots riders from the current per-cell arrival list,
+independently of global unit traversal. Successful relocations mutate that local
+list before later sources are processed. Each actual relocation enters ordered
+motion_history with map_update=true; final diagnostic changes remain in global
+order. Preview/Commit therefore preserve destination arrival order rather than
+reconstructing it from sorted summaries. Same-position teleports still consume
+their draw and suppression mark without changing tile order.
+
+The oracle executes installed findallhere/addunitmap/updateunitmap as well as the
+TELE loop, independently reverses global and initial cell order, and compares RNG,
+positions, the exact relocation journal and all final committed tile lists.
+Existing mutable feature-condition query timing remains outside this tile-order fix.
 
 Dynamic scoped map FLOAT is now rechecked per transported identity after preceding
 relocations; see LEVEL_MOTION.md and tests/level_tele_layers.lua. The remaining

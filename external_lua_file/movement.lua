@@ -2019,10 +2019,15 @@ function RW_ResolveTele(world,suppressed)
         end
     end
     local ids,sources=unit_ids(world),{}
-    local positions={}
+    local positions,cells,history={},{},{}
+    local function cell(x,y) return string.format("%.0f:%.0f",x,y) end
     for _,id in ipairs(ids) do local e=world.entities[id]
         positions[id]={x=e.x,y=e.y}
+        local k=cell(e.x,e.y);cells[k]=cells[k] or {};cells[k][#cells[k]+1]=id
         if has_capability(world,e,"tele") then sources[#sources+1]=id end
+    end
+    for k,stack in pairs(world.cell_order or {}) do
+        cells[k]={};for _,id in ipairs(stack) do cells[k][#cells[k]+1]=id end
     end
     local function name(e) return e.class=="text" and "@text" or e.archetype end
     local function same_layer(a,b) return has_capability(world,a,"float")==has_capability(world,b,"float") end
@@ -2031,9 +2036,7 @@ function RW_ResolveTele(world,suppressed)
     for _,source_id in ipairs(sources) do
         local source=world.entities[source_id];local at=positions[source_id]
         local targets={}
-        for _,id in ipairs(ids) do local p=positions[id]
-            if p.x==at.x and p.y==at.y then targets[#targets+1]=id end
-        end
+        for _,id in ipairs(cells[cell(at.x,at.y)] or {}) do targets[#targets+1]=id end
         for _,id in ipairs(targets) do local target=world.entities[id]
             if id~=source_id and not moved[id] and not (suppressed and suppressed[id]) and name(target)~=name(source)
                 and not has_capability(world,target,"still") and same_layer(source,target) then
@@ -2044,6 +2047,16 @@ function RW_ResolveTele(world,suppressed)
                 if #destinations>0 then
                     state=(state*48271)%2147483647
                     local destination=positions[destinations[state%#destinations+1]]
+                    local from=positions[id]
+                    if from.x~=destination.x or from.y~=destination.y then
+                        local stack=cells[cell(from.x,from.y)]
+                        for i=#stack,1,-1 do if stack[i]==id then table.remove(stack,i) end end
+                        local k=cell(destination.x,destination.y);cells[k]=cells[k] or {};cells[k][#cells[k]+1]=id
+                        local direction=target.direction or "None"
+                        history[#history+1]={kind="move",entity_id=id,map_update=true,
+                            from={x=from.x,y=from.y,direction=direction},
+                            to={x=destination.x,y=destination.y,direction=direction}}
+                    end
                     positions[id]={x=destination.x,y=destination.y};moved[id]=true
                 end
             end
@@ -2056,6 +2069,7 @@ function RW_ResolveTele(world,suppressed)
             to={x=p.x,y=p.y,direction=e.direction or "None"}} end
     end
     return {consumes_turn=true,changes=changes,reason="tele",
+        motion_history=#history>0 and history or nil,
         random_state=state~=original_state and {from=original_state,to=state} or nil}
 end
 

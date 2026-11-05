@@ -1144,6 +1144,22 @@ function RW_ResolveShift(world)
     local working={};for k,v in pairs(world) do working[k]=v end
     working.entities={}
     local ids=unit_ids(world)
+    local cells,locations={},{}
+    local function cell(e) return string.format("%.0f:%.0f",e.x,e.y) end
+    for _,id in ipairs(ids) do local k=cell(world.entities[id])
+        cells[k]=cells[k] or {};cells[k][#cells[k]+1]=id;locations[id]=k
+    end
+    for k,stack in pairs(world.cell_order or {}) do
+        cells[k]={};for _,id in ipairs(stack) do cells[k][#cells[k]+1]=id end
+    end
+    local function remove(id)
+        local k=locations[id]
+        if k then for i=#cells[k],1,-1 do if cells[k][i]==id then table.remove(cells[k],i) end end end
+        locations[id]=nil
+    end
+    local function arrive(id,e)
+        remove(id);local k=cell(e);cells[k]=cells[k] or {};cells[k][#cells[k]+1]=id;locations[id]=k
+    end
     for id,e in pairs(world.entities) do
         local copy={};for k,v in pairs(e) do copy[k]=v end
         working.entities[id]=copy
@@ -1153,7 +1169,7 @@ function RW_ResolveShift(world)
     for _,id in ipairs(ids) do
         local belt=world.entities[id]
         if has_capability(world,belt,"shift") and vectors[belt.direction] then
-            for _,other_id in ipairs(ids) do
+            for _,other_id in ipairs(cells[cell(belt)] or {}) do
                 local rider=world.entities[other_id]
                 if other_id ~= id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider)
                     and not intent_immobile(world,rider,vectors[belt.direction][1],vectors[belt.direction][2]) then
@@ -1193,7 +1209,7 @@ function RW_ResolveShift(world)
                 remember(id,working.entities[id],false,false)
                 for _,change in ipairs(part.changes) do queued[#queued+1]=change end
                 for _,death in ipairs(part.destructions or {}) do
-                    deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil
+                    deaths[#deaths+1]=death;records[death.entity_id]=death;working.entities[death.entity_id]=nil;remove(death.entity_id)
                     remember_empty_death(working,death)
                 end
             end
@@ -1201,7 +1217,9 @@ function RW_ResolveShift(world)
         for _,change in ipairs(queued) do
             local e=working.entities[change.entity_id]
             if e then
-                if change.kind=="move" then e.x=change.to.x;e.y=change.to.y;e.direction=change.to.direction
+                if change.kind=="move" then
+                    if e.x~=change.to.x or e.y~=change.to.y or e.direction~=change.to.direction then arrive(change.entity_id,change.to) end
+                    e.x=change.to.x;e.y=change.to.y;e.direction=change.to.direction
                 elseif change.kind=="direction" then e.direction=change.to end
                 remember(change.entity_id,e,false,change.kind=="move")
             end
@@ -1212,7 +1230,7 @@ function RW_ResolveShift(world)
     for _,id in ipairs(ids) do
         local belt=working.entities[id]
         if belt and has_capability(world,belt,"shift") and not has_capability(world,belt,"sleep") and vectors[belt.direction] then
-            for _,other_id in ipairs(ids) do
+            for _,other_id in ipairs(cells[cell(belt)] or {}) do
                 local rider=working.entities[other_id]
                 if rider and other_id~=id and rider.x==belt.x and rider.y==belt.y and same_layer(world,belt,rider) then
                     rider.direction=belt.direction

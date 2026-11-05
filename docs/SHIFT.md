@@ -127,3 +127,21 @@ write/refresh behavior. All 384 installed alignment oracle cases additionally
 assert that original code leaves updatecode at zero. Earlier M9.7F effective
 blocked-dispatch tests remain active. Exact WORD dependency and native phase
 ordering gaps remain documented separately.
+
+## Per-cell collection and alignment order
+
+SHIFT now collects riders from world.cell_order independently of global source
+traversal. A local tile list follows queued relocations and destruction; each
+round still resolves all impulses before applying arrivals. Final direct facing
+alignment scans those current tile lists without reordering them. The ordered
+motion journal carries actual arrival and alignment dispatch into Commit/Undo.
+
+tests/reference_shift_order.lua executes installed movement.lua's task collector,
+tools.lua tile mutation/findallhere, and blocks.lua's direct alignment loop.
+Four independent global/tile order cases compare task and arrival dispatch,
+alignment records, final committed destination stacks and Undo. Existing SHIFT
+convergence/PUSH/destruction/reading tests remain active. This does not replace
+the shared collision solver with the full native mutable movement scheduler.
+Scoped LEVEL SHIFT remains separate: installed movement.lua's take-8 branch
+turns same-map-layer units before testing their locks/SLEEP and queues one map
+impulse independently of ordinary belts. This branch is not yet implemented.

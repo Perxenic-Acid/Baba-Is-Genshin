@@ -160,3 +160,13 @@ eligibility/terminal ordering after TELE still uses the initial late trait list;
 that separate scoped scheduling gap remains. tests/level_tele_layers.lua compares
 1280 changing-occupancy cases with installed WITHOUT/floating_level, including
 repeated EMPTY quotas, negation, fixed unit layers, RNG prefixes and Undo.
+
+Scoped-query terminal follow-up: compile-limit diagnostics from the last pre-motion
+trait query and the post-TELE trait query now commit their completed turn prefix,
+using TOO COMPLEX for rule_complexity_limit and INFINITE LOOP for WORD limits or
+cycles. Pre-motion failure consumes no TELE/CHILL draws; post-TELE failure retains
+all completed transport/RNG/history. Ordinary query errors still reject atomically.
+The tests inject all three diagnostics at both barriers, check subsequent command
+lockout and local Undo, and exercise whole-tree Commit/Undo after late transport.
+This repairs error propagation only; the remaining ordered-declaration scheduling
+gap above is unchanged. No extra startup compilation or native bindings are added.

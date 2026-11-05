@@ -1166,7 +1166,12 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         end
         local traits=level_traits_from(relations)
         if services.level_traits then traits,why=services.level_traits(final,rules) end
-        if not traits then return fail("level_motion_traits",why) end
+        if not traits then
+            if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
+                lock_compile_failure(plan,why);return plan,nil,trace
+            end
+            return fail("level_motion_traits",why)
+        end
         local projected,why=services.project(final,effects,traits)
         if not projected then return fail("level_motion_project",why) end
         local motion,why=services.level_motion(projected,traits,rules)
@@ -1202,7 +1207,12 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                     -- Only late outcome queries use the new code. Contacts do not rerun.
                     plan.contact_frame=updated_rules;plan.level_traits=level_traits_from(updated_relations)
                     if services.level_traits then plan.level_traits,why=services.level_traits(checked,updated_rules) end
-                    if not plan.level_traits then return fail("level_motion_final_traits",why) end
+                    if not plan.level_traits then
+                        if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
+                            lock_compile_failure(plan,why);return plan,nil,trace
+                        end
+                        return fail("level_motion_final_traits",why)
+                    end
                     local projected,why=services.project(checked,verified,plan.level_traits)
                     if not projected then return fail("level_motion_final_project",why) end
                     for _,entity in pairs(projected.entities) do

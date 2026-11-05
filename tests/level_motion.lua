@@ -176,6 +176,36 @@ for count=1,4 do
  for _,stage in ipairs(p.stages) do if stage.name=='level_motion' then journal=stage.plan.motion_history end end
  assert(journal and #journal>0 and p.contact_frame,'late TELE must recompile moved Text before outcome queries')
 end
+-- Limits from scoped condition queries commit the triggering late-phase prefix.
+do
+ local saved=services.level_traits
+ local tele=fixture({{'LEVEL','IS','TELE'}})
+ for _,reason in ipairs({'rule_complexity_limit','word_rule_limit','word_rule_cycle'}) do
+  services.level_traits=function(w,rules) if w.random_state then return nil,reason end;return saved(w,rules) end
+  local n,p=turn(tele)
+  assert(n.world.random_state and n.world.last_input=='wait' and not tele.world.random_state)
+  assert((reason=='rule_complexity_limit' and n.world.too_complex) or (reason~='rule_complexity_limit' and n.world.infinite_loop))
+  assert(p.reason==(reason=='rule_complexity_limit' and 'too_complex' or 'infinite_loop') and not p.level_traits)
+  local rejected=RW_PlanTurn(n.world,{type='wait'},services);assert(not rejected)
+ end
+ services.level_traits=function(w,rules) if w.random_state then return nil,'invalid_scoped_query' end;return saved(w,rules) end
+ local p,e=RW_PlanTurn(tele.world,{type='wait'},services)
+ assert(not p and e.stage=='level_motion_final_traits' and e.reason=='invalid_scoped_query' and not tele.world.last_input)
+ -- Identify the final pre-motion query without depending on contact-phase count.
+ local calls=0
+ services.level_traits=function(w,rules) calls=calls+1;return saved(w,rules) end
+ local chill=fixture({{'LEVEL','IS','CHILL'}});turn(chill)
+ local before_motion=calls
+ for _,reason in ipairs({'rule_complexity_limit','word_rule_limit','word_rule_cycle'}) do
+  calls=0;services.level_traits=function(w,rules)
+   calls=calls+1;if calls==before_motion then return nil,reason end;return saved(w,rules)
+  end
+  local n=turn(chill)
+  assert(not n.world.random_state and n.world.last_input=='wait')
+  assert((reason=='rule_complexity_limit' and n.world.too_complex) or (reason~='rule_complexity_limit' and n.world.infinite_loop))
+ end
+ services.level_traits=saved
+end
 local tele=fixture({{'LEVEL','IS','TELE'},{'TEXT','IS','FLOAT'}})
 local moved,p=turn(tele);assert(moved.world.random_state and not moved.world.board_offset)
 for id,e in pairs(tele.world.entities) do assert(moved.world.entities[id].x==e.x and moved.world.entities[id].y==e.y) end
@@ -290,6 +320,25 @@ do
  local p,e=RW_PlanLevelAction(tree,{type='wait'},services);assert(p,e and e.reason)
  local n,r=RW_CommitLevelTree(tree,p);assert(r.accepted and n.active_id==parent and n.outcomes[tree.active_id].kind=='win')
  local undo=RW_UndoLevelTree(n);assert(undo.active_id==tree.active_id and RW_GetActiveLevel(undo).world==before)
+end
+-- A late scoped-query limit is also a whole-tree transaction, not rejection.
+do
+ local saved=services.level_traits
+ for _,reason in ipairs({'rule_complexity_limit','word_rule_cycle'}) do
+  local w=fixture({{'LEVEL','IS','TELE'}}).world
+  local tree=assert(RW_CreateLevelTree({root=assert(RW_CreateLevelDefinition('root',w))},'root'))
+  local before=RW_GetActiveLevel(tree).world
+  services.level_traits=function(world,rules)
+   if world.random_state then return nil,reason end;return saved(world,rules)
+  end
+  local p,e=RW_PlanLevelAction(tree,{type='wait'},services);assert(p,e and e.reason)
+  local n,r=RW_CommitLevelTree(tree,p);assert(r.accepted,r.reason)
+  local after=RW_GetActiveLevel(n).world
+  assert(after.random_state and (after.too_complex or after.infinite_loop) and n.active_id==tree.active_id)
+  local restored=RW_UndoLevelTree(n)
+  assert(RW_GetActiveLevel(restored).world==before and not before.random_state)
+ end
+ services.level_traits=saved
 end
 -- Exercise the actual mapped bootstrap adapter, not just injected services.
 do

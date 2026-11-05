@@ -10,8 +10,9 @@ name. All Text words share one network. Facing and identity metadata are preserv
 
 Each rider may teleport once per turn, including a rider that itself has TELE.
 Sources and destinations can be moved by another network before their own pass;
-process current positions immediately in physical unit-list order (authored ID
-order when no explicit runtime order exists). Overlapping
+process current positions immediately in physical declaration order, with
+unit-list order within each declaration (authored ID order without explicit
+runtime order). Overlapping
 same-name destinations remain separate random choices. A coincident destination
 still consumes its random draw and the rider's one-teleport allowance.
 
@@ -19,12 +20,28 @@ The scheduler adds a TELE atomic stage after conversion/FOLLOW/FALL/MORE and bef
 contact-frame compilation. Contacts use arrival positions; transported Text may
 change rules or trigger a terminal loop before destruction. The triggering TELE
 stage and RNG state still commit and Undo restores the entire prior tree snapshot.
-No per-entity transported flag is persisted. Empty/scoped map TELE is not simulated.
+No per-entity transported flag is persisted. Virtual EMPTY TELE remains outside
+this ordinary network; scoped map TELE is described separately below.
 TELE's projected traits use the phase-start rule frame, as other movement solvers
 do; native per-rider conditional STILL/FLOAT re-evaluation after earlier teleports
 is a remaining intra-phase parity gap. RW_ResolveTele accepts BACK's transient
-physical-ID suppression set; production BACK scheduling remains pending. The existing broader SHIFT timing boundary
+physical-ID suppression set from production BACK scheduling. The existing broader SHIFT timing boundary
 is unchanged; this does not claim the entire native moveblock phase graph.
+
+Source traversal now preserves physical TELE declaration order and duplicate
+matches, matching findallfeature rather than a unique capability list. The same
+list supplies destination candidates: conditional duplicate grants can weight
+one identity more heavily than another. RW_ProjectWorld publishes transient
+tele_source_groups; ordinary TELE flattens them without deduplication. Per-name
+members retain unit order, while riders retain tile order. The one-hop mark is
+still per physical identity: later duplicate source passes cannot transport the
+same rider again, but may still carry other eligible occupants.
+
+tests/reference_tele_declarations.lua executes installed findallfeature/findall,
+tile helpers and TELE loops in1280 cases, comparing source occurrences, positions,
+arrival dispatch, RNG and Undo across duplicate/conditional groups, mobile mixed
+networks, global/tile order and FLOAT. A physical ROCK ON FLAG IS TELE rule test
+verifies compiler-to-projection weighting. These records never enter raw worlds.
 
 Destination selection uses the existing snapshot-owned Park-Miller random_state,
 shared sequentially with MAKE, one draw per eligible rider even for one destination.

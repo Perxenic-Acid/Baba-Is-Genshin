@@ -2060,7 +2060,10 @@ function RW_ResolveTele(world,suppressed)
     for _,id in ipairs(ids) do local e=world.entities[id]
         positions[id]={x=e.x,y=e.y}
         local k=cell(e.x,e.y);cells[k]=cells[k] or {};cells[k][#cells[k]+1]=id
-        if has_capability(world,e,"tele") then sources[#sources+1]=id end
+        if not world.tele_source_groups and has_capability(world,e,"tele") then sources[#sources+1]=id end
+    end
+    for _,group in ipairs(world.tele_source_groups or {}) do
+        for _,id in ipairs(group) do sources[#sources+1]=id end
     end
     for k,stack in pairs(world.cell_order or {}) do
         cells[k]={};for _,id in ipairs(stack) do cells[k][#cells[k]+1]=id end

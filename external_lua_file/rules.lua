@@ -290,12 +290,12 @@ end
 function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
-        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true,boom=true,open=true,shut=true,bonus=true}
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true,boom=true,open=true,shut=true,bonus=true,you=true,you2=true}
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
             if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.trait=="boom" or d.trait=="open" or d.trait=="shut" or d.trait=="bonus" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
+                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.trait=="boom" or d.trait=="open" or d.trait=="shut" or d.trait=="bonus" or d.trait=="you" or d.trait=="you2" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -474,6 +474,64 @@ local function scoped_level_target(world,target)
         if type(noun)=="table" and noun.tag=="level" and noun.block_type==target.value then return true end
     end
     return false
+end
+
+-- Real declarations for the synthetic YOU row. Explicit scoped terminal traits
+-- retain the user's ordered WIN/DEFEAT/END contract, rather than being pulled
+-- forward by a preceding YOU declaration.
+local function level_you_witness(world,rules,trait)
+    local context=condition_context(world,rules);local found=false;local witness
+    for _,declaration in ipairs(RW_LevelContactDeclarations(world,rules,trait)) do
+        if not scoped_level_target(world,declaration.target) then
+            local ids,why=level_property_targets(world,rules,declaration,trait)
+            if not ids then return nil,why end
+            for _,id in ipairs(ids) do
+                local safe=false
+                if trait=="defeat" then
+                    safe,why=query_level_trait(context,"safe")
+                    if safe==nil then return nil,why end
+                end
+                if not safe then
+                    local floating,why=query_level_trait(context,"float")
+                    if floating==nil then return nil,why end
+                    if ((world.entities[id].behaviors or {}).float==true)==floating then
+                        found=true
+                        local e=world.entities[id]
+                        witness=witness or {kind="unit",entity_id=id,x=e.x,y=e.y}
+                        if trait=="defeat" then return true end
+                    end
+                end
+            end
+        end
+    end
+    return found,nil,witness
+end
+function RW_LevelYouPreflight(world,rules)
+    local defeated,why=level_you_witness(world,rules,"defeat")
+    if defeated==nil then return nil,why end
+    if defeated then return {level_destroy=true} end
+    if world.empty_defeat_declared then
+        local floating,why=query_level_trait(condition_context(world,rules),"float")
+        if floating==nil then return nil,why end
+        if (world.empty_float_declared==true)==floating and not (world.level_behaviors or {}).safe then return {level_destroy=true} end
+    end
+    local win,why=level_you_witness(world,rules,"win")
+    if win==nil then return nil,why end
+    local ending,why,witness=level_you_witness(world,rules,"end")
+    if ending==nil then return nil,why end
+    return {win=win,ending=ending,end_contact=ending and {source={kind="level"},target=witness} or nil}
+end
+function RW_LevelYouEmptyOutcome(world,rules)
+    local result={}
+    for _,trait in ipairs({"win","end"}) do
+        if world["empty_"..trait.."_declared"] then
+            local floating,why=query_level_trait(condition_context(world,rules),"float")
+            if floating==nil then return nil,why end
+            result[trait]=(world.empty_float_declared==true)==floating
+            if trait=="end" and result[trait] then result.end_contact={source={kind="level"},target={kind="empty"}} end
+        end
+    end
+    return result
 end
 
 -- OPEN/SHUT queue every declaration before deleting. SAFE queries must finish

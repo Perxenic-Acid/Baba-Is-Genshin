@@ -107,7 +107,39 @@ tests/reference_level_you_bonus.lua executes the unchanged installed BONUS scan
 and compares these production building blocks in3072 cases: duplicate clauses,
 HAS newborns, independent SAFE/FLOAT and allocators/survivors.
 
-This prepares the phase only; LEVEL YOU's real BONUS scan is not yet wired into
-the scheduled whole-row execution. Integration must preserve its preceding DEFEAT
-and WIN/END queries, one reward after all groups, and only completed prefixes on
-creation/query limits. It must not silently substitute an ordinary batch pickup.
+## Ordered LEVEL YOU/YOU2 row integration
+
+The phase above is now wired into RW_PlanScopedLevelSequence for each active
+YOU/YOU2 declaration. Motion is flushed first. RW_LevelYouPreflight checks real
+DEFEAT declarations with current raw map SAFE before FLOAT; victim SAFE is
+irrelevant. EMPTY DEFEAT uses its placeholder/global FLOAT and captured map SAFE.
+An eligible unsafe map is retired immediately, without pickup/HAS or later RNG.
+Preflight then captures real WIN and END witnesses before BONUS deletion.
+
+Each BONUS declaration is selected at the current child snapshot, then deleted
+serially using level_you_bonus. Survivors retain the phase's stored FLOAT, while
+newborns receive projected status before later groups. After all groups, EMPTY
+WIN/END placeholders are queried at the post-delete snapshot. Only then does a
+completed scan with an actual death emit one atomic bonus_state reward/event.
+Remembered real WIN/END evidence and the late EMPTY result resolve WIN before
+END, stopping suffix motion. SAFE victims never issue rewards. A compile limit
+before the reward retains completed deaths/births but issues no reward; ordinary
+errors reject the whole transaction. Stage-budget failure follows the same rule.
+END retains the source/target identity evidence, not just a Boolean, so a deleted
+END+BONUS target still creates the campaign ending record/event after Commit.
+Mapped production tests inspect that committed record and campaign bonus total.
+
+Deliberate user precedence: synthetic scoped LEVEL WIN/DEFEAT/END declarations
+continue at their own ordered rows, rather than being pulled forward as self
+contacts of YOU. This preserves LEVEL IS DEFEAT AND WIN failure/frozen-YOU and
+SELECT behavior. Real/EMPTY external DEFEAT witnesses keep the native retirement
+path above. Conversion-before-terminal priority is unchanged.
+
+tests/reference_level_you_preflight.lua compares the unchanged installed pre-BONUS
+branch in512 real/EMPTY DEFEAT, WIN/END and layer/SAFE combinations, excluding the
+deliberate synthetic terminal override. Transaction tests cover both control
+channels, duplicate groups/HAS newborns, single rewards, pre-delete WIN/END,
+SAFE protection, defeat priority, suffix RNG, late-query terminal/error prefixes
+and mapped production wait/whole-tree Undo. Existing scoped condition dispatch,
+saved surroundings, grouped earlier contacts and native host-boundary timing
+remain shared limits; no complete native scheduler parity is claimed.

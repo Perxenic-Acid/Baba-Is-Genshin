@@ -163,12 +163,12 @@ function RW_ProjectWorld(world, effects, level_traits)
     end
     for _,effect in ipairs(empty_grants) do if not empty_banned[effect.trait] then
         for capability,enabled in pairs(registry[effect.trait] or {}) do
-            if enabled and (capability=="control" or capability=="control2" or capability=="end" or capability=="float" or capability=="win" or capability=="hot" or capability=="open" or capability=="shut") then
+            if enabled and (capability=="control" or capability=="control2" or capability=="end" or capability=="float" or capability=="win" or capability=="hot" or capability=="open" or capability=="shut" or capability=="defeat") then
                 empty_declared[capability]=true
             end
         end
     end end
-    for _,capability in ipairs({"control","control2","end","float","win","hot","open","shut"}) do
+    for _,capability in ipairs({"control","control2","end","float","win","hot","open","shut","defeat"}) do
         projected["empty_"..capability.."_declared"]=empty_declared[capability]==true
     end
     projected.empty_cells={}

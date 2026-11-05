@@ -1183,6 +1183,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         motion.level_destroy=motion.level_destroy or motion.level_pending_destroy
         motion.level_pending_destroy=nil
         plan.level_motion_outcome=motion.level_motion_outcome
+        if motion.end_contact then plan.end_contact=motion.end_contact end
         if motion.level_destroy then level_destroy=true end
         if motion.level_stages or motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 or motion.infinite_loop or motion.too_complex then
             if motion.level_stages then
@@ -1397,6 +1398,41 @@ function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,b
                         local ok,why=append(phase,"hot");if ok==nil then return nil,why elseif not ok then return result end
                         local ok,why=refresh_view();if not ok then return failed(why) end
                     end
+                end
+            end
+        elseif row.trait=="you" or row.trait=="you2" then
+            local ok,why=flush();if ok==nil then return failed(why) elseif not ok then return result end
+            local active,why=services.motion.active(view,rules,row)
+            if active==nil then return failed(why) end
+            if active then
+                local evidence,why=services.you_preflight(view,rules)
+                if not evidence then return failed(why) end
+                if evidence.level_destroy then result.level_destroy=true;return result end
+                local declarations,why=services.you_bonus_declarations(view,rules)
+                if not declarations then return failed(why) end
+                local picked=false
+                for _,declaration in ipairs(declarations) do
+                    local ids,why=services.you_bonus_targets(view,rules,declaration)
+                    if not ids then return failed(why) end
+                    if #ids>0 then
+                        local phase,why=services.you_bonus_destroy(current,ids,rules,view)
+                        if not phase then return failed(why) end
+                        for _,event in ipairs(phase.events or {}) do if event.kind=="destroy" then picked=true end end
+                        local ok,why=append(phase,"you_bonus");if ok==nil then return nil,why elseif not ok then return result end
+                        local ok,why=refresh_view();if not ok then return failed(why) end
+                    end
+                end
+                local empty,why=services.you_empty(view,rules)
+                if not empty then return failed(why) end
+                if picked then
+                    local count=current.bonus_count or 0
+                    local phase={consumes_turn=true,changes={},bonus_state={from=count,to=count+1},events={{kind="bonus",source="level",cause="level_you_bonus",amount=1}}}
+                    local ok,why=append(phase,"you_reward");if ok==nil then return nil,why elseif not ok then return result end
+                    local ok,why=refresh_view();if not ok then return failed(why) end
+                end
+                if evidence.win or empty.win then result.level_motion_outcome="win";return result end
+                if evidence.ending or empty["end"] then
+                    result.level_motion_outcome="end";result.end_contact=evidence.end_contact or empty.end_contact;return result
                 end
             end
         elseif row.trait=="bonus" then
@@ -2408,7 +2444,7 @@ local function start(run_self_tests)
                 outcome=function(...) return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",...) end,
                 resolve=function(...) return movement_api:Invoke("RW_ResolveLevelMotion",...) end,
                 layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end}
-            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" or row.trait=="sink" or row.trait=="boom" or row.trait=="open" or row.trait=="shut" or row.trait=="bonus" then outgoing=true;break end end
+            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" or row.trait=="sink" or row.trait=="boom" or row.trait=="open" or row.trait=="shut" or row.trait=="bonus" or row.trait=="you" or row.trait=="you2" then outgoing=true;break end end
             if not outgoing then return RW_PlanOrderedLevelMotion(world,traits,rules,rows,motion_services) end
             local contents={};for _,r in ipairs(relations or {}) do if r.op=="has" or r.op=="empty_has" then contents[#contents+1]=r end end
             return RW_PlanScopedLevelSequence(raw,world,traits,rules,rows,{
@@ -2418,6 +2454,17 @@ local function start(run_self_tests)
                 unlock_select=function(...) return rules_api:Invoke("RW_ResolveScopedUnlockTargets",...) end,
                 unlock_empty=function(...) return rules_api:Invoke("RW_LevelUnlockEmptyDestroys",...) end,
                 bonus_select=function(...) return rules_api:Invoke("RW_ResolveScopedBonus",...) end,
+                you_preflight=function(...) return rules_api:Invoke("RW_LevelYouPreflight",...) end,
+                you_empty=function(...) return rules_api:Invoke("RW_LevelYouEmptyOutcome",...) end,
+                you_bonus_declarations=function(w,r) return rules_api:Invoke("RW_LevelContactDeclarations",w,r,"bonus") end,
+                you_bonus_targets=function(w,r,d) return rules_api:Invoke("RW_LevelContactTargets",w,r,d,"bonus") end,
+                you_bonus_destroy=function(w,ids,r,view)
+                    local layers={};for _,id in ipairs(ids) do layers[id]=(view.entities[id].behaviors or {}).float==true end
+                    return RW_PlanDestructionPhase(w,ids,contents,"level_you_bonus",{
+                        initialized_births=function(a,b,c,d,n)
+                            return rules_api:Invoke("RW_InitializeHasBirths",a,b,c,d,n,false,{kind="level_you_bonus",layers=layers})
+                        end,create=contact_services.create,delete=contact_services.delete},nil,r,count)
+                end,
                 hot_declarations=function(...) return rules_api:Invoke("RW_LevelHotDeclarations",...) end,
                 hot_targets=function(...) return rules_api:Invoke("RW_LevelHotTargets",...) end,
                 hot_destroy=function(w,ids,r,view)

@@ -103,13 +103,22 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
    weak=RW_LevelWeakDestroys,
    melt=RW_LevelMeltDestroys,
    outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}
-   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' or row.trait=='boom' or row.trait=='open' or row.trait=='shut' or row.trait=='bonus' then outgoing=true end end
+   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' or row.trait=='boom' or row.trait=='open' or row.trait=='shut' or row.trait=='bonus' or row.trait=='you' or row.trait=='you2' then outgoing=true end end
    if not outgoing then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,motion) end
    local contents={};for _,r in ipairs(relations or {}) do if r.op=='has' or r.op=='empty_has' then contents[#contents+1]=r end end
    return RW_PlanScopedLevelSequence(raw,w,traits,rules,rows,{motion=motion,preview=RW_PreviewPlan,select=RW_ResolveScopedEatTargets,
     area_select=RW_ResolveScopedAreaTargets,
     unlock_select=RW_ResolveScopedUnlockTargets,unlock_empty=RW_LevelUnlockEmptyDestroys,
     bonus_select=RW_ResolveScopedBonus,
+    you_preflight=RW_LevelYouPreflight,you_empty=RW_LevelYouEmptyOutcome,
+    you_bonus_declarations=function(w,r)return RW_LevelContactDeclarations(w,r,'bonus') end,
+    you_bonus_targets=function(w,r,d)return RW_LevelContactTargets(w,r,d,'bonus') end,
+    you_bonus_destroy=function(world,ids,r,view)
+     local layers={};for _,id in ipairs(ids) do layers[id]=(view.entities[id].behaviors or {}).float==true end
+     return RW_PlanDestructionPhase(world,ids,contents,'level_you_bonus',{
+      initialized_births=function(a,b,c,d,n)return RW_InitializeHasBirths(a,b,c,d,n,false,{kind='level_you_bonus',layers=layers}) end,
+      create=RW_PlanCreate,delete=RW_PlanDelete},nil,r,count)
+    end,
     hot_declarations=RW_LevelHotDeclarations,hot_targets=RW_LevelHotTargets,
     hot_destroy=function(world,ids,r,view)
      local layers={};for _,id in ipairs(ids) do layers[id]=(view.entities[id].behaviors or {}).float==true end
@@ -182,6 +191,34 @@ do
  local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','MOVE'},{'ROCK','HAS','FLAG'}})
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1,'WEAK must retire map without suppressing later motion or triggering HAS')
  assert(n.world.next_entity_id==s.world.next_entity_id)
+ do
+ for _,you in ipairs({'YOU','YOU2'}) do
+  local s,id=outgoing({{'LEVEL','IS',you},{'LEVEL','IS','FLOAT'},{'ROCK','IS','BONUS','AND','BONUS'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','ROCK'},{'LEVEL','IS','MOVE'}})
+  s.world.entities[id+1]={id=id+1,kind='object',class='object',archetype='rock',x=20,y=18,direction='Right'};s.world.next_entity_id=id+2
+  local n,p=turn(s);assert(not n.world.entities[id] and not n.world.entities[id+1] and n.world.next_entity_id==id+6 and n.world.bonus_count==1 and n.world.board_offset.y==1,'LEVEL YOU serial groups reselect HAS newborns but reward once')
+  local s,id=outgoing({{'LEVEL','IS',you},{'LEVEL','IS','FLOAT'},{'ROCK','IS','BONUS'},{'ROCK','IS','FLOAT'},{'ROCK','IS','SAFE'}})
+  local n=turn(s);assert(n.world.entities[id] and not n.world.bonus_count,'SAFE target is not collected by LEVEL YOU')
+  for _,terminal in ipairs({'WIN','END'}) do
+   local s,id=outgoing({{'LEVEL','IS',you},{'LEVEL','IS','FLOAT'},{'ROCK','IS','BONUS','AND',terminal},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','CHILL'}})
+   local n,p=turn(s);assert(not n.world.entities[id] and n.world.entities[id+1].archetype=='flag' and n.world.bonus_count==1 and p.level_motion_outcome==terminal:lower() and not n.world.random_state,'LEVEL YOU retains pre-delete WIN/END and rewards before returning')
+  end
+  local s,id=outgoing({{'LEVEL','IS',you},{'LEVEL','IS','FLOAT'},{'ROCK','IS','DEFEAT','AND','BONUS'},{'ROCK','IS','FLOAT'},{'ROCK','IS','SAFE'},{'LEVEL','IS','CHILL'}})
+  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.bonus_count and not n.world.random_state,'DEFEAT wins before map pickup; victim SAFE is irrelevant')
+ end
+ local s,id=outgoing({{'LEVEL','IS','YOU'},{'LEVEL','IS','DEFEAT','AND','WIN'},{'LEVEL','IS','CHILL'}})
+ local n,p=turn(s);assert(p.level_motion_outcome=='defeat' and not p.level_destroy and n.world.entities[id] and not n.world.random_state,'user scoped terminal order overrides native synthetic self contact')
+ local saved=RW_LevelYouEmptyOutcome
+ for _,reason in ipairs({'word_rule_limit','rule_complexity_limit','invalid_you_empty'}) do
+  local s,id=outgoing({{'LEVEL','IS','MOVE'},{'LEVEL','IS','YOU'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','BONUS'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','CHILL'}})
+  RW_LevelYouEmptyOutcome=function()return nil,reason end
+  local p,e=RW_PlanTurn(s.world,{type='wait'},services)
+  if reason=='invalid_you_empty' then assert(not p and e.reason==reason and s.world.entities[id] and not s.world.bonus_count)
+  else
+   local n,r=RW_Commit(s,p);assert(r.accepted and not n.world.entities[id] and n.world.entities[id+1].archetype=='flag' and not n.world.bonus_count and n.world.board_offset.y==1 and not n.world.random_state and RW_Undo(n).world==s.world,'late EMPTY query limit retains deaths/HAS without premature reward or suffix')
+  end
+ end
+ RW_LevelYouEmptyOutcome=saved
+ end
  do
  for _,you in ipairs({'YOU','YOU2'}) do
   local s,id=outgoing({{'LEVEL','IS','BONUS'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS',you,'AND',you},{'ROCK','IS','FLOAT'},{'LEVEL','IS','MOVE'}})
@@ -713,6 +750,24 @@ do
  w=fixture({{'LEVEL','IS','BONUS','AND','BONUS'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','YOU2'}}).world
  OnStart();listeners.wait();assert(display.bonus_count==2 and depth==1)
  listeners.undo();assert(not display.bonus_count and depth==0)
+ w=fixture({{'LEVEL','IS','YOU2'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','BONUS'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'}}).world
+ do
+  local victim=w.next_entity_id;w.next_entity_id=victim+1
+  w.entities[victim]={id=victim,kind='object',class='object',archetype='rock',x=31,y=31,direction='Right'}
+  OnStart();listeners.wait();assert(not display.entities[victim] and display.entities[victim+1].archetype=='flag' and display.bonus_count==1 and depth==1)
+  listeners.undo();assert(display.entities[victim] and not display.entities[victim+1] and not display.bonus_count and depth==0)
+ end
+ w=fixture({{'LEVEL','IS','YOU2'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','BONUS','AND','END'},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'}}).world
+ do
+  local victim=w.next_entity_id;w.next_entity_id=victim+1
+  w.entities[victim]={id=victim,kind='object',class='object',archetype='rock',x=31,y=31,direction='Right'}
+  local original=RW_CommitLevelTree;local committed
+  RW_CommitLevelTree=function(...)local n,r=original(...);if r.accepted then committed=n end;return n,r end
+  OnStart();listeners.wait()
+  RW_CommitLevelTree=original
+  assert(committed.ending and committed.ending.source.kind=='level' and committed.ending.target.entity_id==victim and committed.bonus_count==1,'END campaign evidence must survive BONUS deletion')
+  listeners.undo();assert(display.entities[victim] and not display.bonus_count and depth==0)
+ end
  w=fixture({{'LEVEL','IS','MELT'},{'EMPTY','IS','HOT'},{'LEVEL','IS','CHILL'}}).world
  OnStart();listeners.wait();assert(not next(display.entities) and not display.random_state and depth==1)
  listeners.undo();assert(next(display.entities) and depth==0)

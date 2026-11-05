@@ -205,3 +205,9 @@ current contact/conversion scheduling and conditional synthetic surroundings are
 unchanged. Real-unit stored capabilities and the existing synthetic outcome
 contact projection remain phase snapshots; this does not claim complete original
 levelblock() scheduling. Particles/host map rotation bindings remain deferred.
+
+Incoming Noun/Text/Empty EAT LEVEL rows now share this ordered loop, even without
+TELE. Eligible sources retire the map at their declaration position, using captured
+map SAFE and ignoring source SAFE/FLOAT. Preserve any earlier motion/RNG and stop
+later actions; skip post-motion code/CRASH on the doomed board. See EAT.md for the
+installed global-branch oracle, compiler/native-adapter tests and outgoing gaps.

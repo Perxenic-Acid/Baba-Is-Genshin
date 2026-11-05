@@ -89,6 +89,7 @@ end
 local cs={read=RW_ReadLines,parse=RW_ParseRuleAST,lower=RW_LowerRuleAST,evaluate=RW_EvaluateRules,
  project=RW_ProjectWorld,words=RW_WordTokenMap,code_status=RW_PlanCodeStatus}
 local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,convert=RW_PlanConversions,
+ erase=function(w) local ids={};for id in pairs(w.entities) do ids[#ids+1]=id end;return RW_PlanDelete(w,ids) end,
  refresh=RW_EvaluateRules,level_traits=RW_QueryLevelTraits,orient=RW_ResolveOrientation,
  contact=function(w,p,k,c,rules) return RW_PlanContactPhase(w,p,k,c,{victims=RW_ResolveContactVictims,
   births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},rules) end,
@@ -120,6 +121,7 @@ end
 local function fixture(rows)
  local s=RW_CreateSession();local w=s.world;w.entities={};w.width,w.height=32,32;w.next_entity_id=1
  w.language.nouns.LEVEL={tag='level',block_type='level_block'}
+ w.language.nouns.ROCK='rock';w.language.nouns.FLAG='flag'
  w.language.properties.CHILL='chill';w.language.properties.MOVE='move'
  w.language.properties.FALL='fall';w.language.properties.FALLRIGHT='fallright'
  w.language.properties.NUDGERIGHT='nudgeright';w.language.properties.LOCKEDDOWN='lockeddown'
@@ -136,6 +138,31 @@ local function turn(s,action)
  local n,r=RW_Commit(s,p);assert(r.accepted,r.reason)
  assert(RW_Undo(n).world==s.world,'scoped motion Undo lost earlier phases')
  return n,p
+end
+do
+ local function eater(rows)
+  local s=fixture(rows);local id=s.world.next_entity_id;s.world.next_entity_id=id+1
+  s.world.entities[id]={id=id,kind='object',class='object',archetype='rock',x=18,y=18,direction='Left'}
+  return s
+ end
+ for _,property in ipairs({'SAFE','FLOAT','YOU'}) do
+  local s=eater({{'ROCK','EAT','LEVEL'},{'ROCK','IS',property},{'ROCK','HAS','FLAG'}})
+  local n,p=turn(s);assert(not next(n.world.entities) and p.level_destroy,'global map eating must ignore eater SAFE/FLOAT and skip HAS')
+ end
+ for _,extra in ipairs({{'LEVEL','IS','SAFE'},{'ROCK','EAT','NOT','LEVEL'}}) do
+  local s=eater({{'ROCK','EAT','LEVEL'},extra});local n,p=turn(s)
+  assert(next(n.world.entities) and not p.level_destroy,'map SAFE / RHS exclusion must block map eating')
+ end
+ local s=fixture({{'TEXT','EAT','LEVEL'}});local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities))
+ local s=fixture({{'EMPTY','EAT','LEVEL'}});local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities))
+ for _,late in ipairs({false,true}) do
+  local eat={'ROCK','EAT','LEVEL'};local tele={'LEVEL','IS','TELE'}
+  local s=eater(late and {tele,eat,{'LEVEL','IS','CHILL'}} or {eat,tele,{'LEVEL','IS','CHILL'}})
+  local count=0;for _ in pairs(s.world.entities) do count=count+1 end
+  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities))
+  if late then local rng=1;for i=1,2*count do rng=rng*48271%2147483647 end;assert(n.world.random_state==rng)
+  else assert(not n.world.random_state) end
+ end
 end
 do
  local s=fixture({{'LEVEL','IS','RIGHT'},{'LEVEL','IS','LEFT'},{'LEVEL','IS','SLEEP'}})
@@ -432,6 +459,12 @@ do
  listeners.wait();assert(display.board_offset.y==1 and display.random_state and depth==1,
   'mapped adapter omitted newly enabled motion after TELE')
  listeners.undo();assert(not display.board_offset and not display.random_state and depth==0)
+ w=fixture({{'ROCK','EAT','LEVEL'},{'ROCK','HAS','FLAG'}}).world
+ local eater=w.next_entity_id;w.next_entity_id=eater+1
+ w.entities[eater]={id=eater,kind='object',class='object',archetype='rock',x=18,y=18,direction='Left'}
+ OnStart();assert(display.entities[eater])
+ listeners.wait();assert(not next(display.entities) and depth==1,'mapped global EAT LEVEL did not retire the board')
+ listeners.undo();assert(display.entities[eater] and depth==0,'whole-tree Undo did not restore eaten map')
  script,Enum,RW_Render,RW_GetNavigationDefinitions,printerr=old_script,old_enum,old_render,old_definitions,old_printerr
 end
 print('PASS: LEVEL start orientation/rotation and late MOVE/CHILL/nudges/FALL/TURN/DETURN, conditions/NOT/BROKEN, terminal order, RNG/rollback/Undo; '..cases..' installed motion/lock and '..start_cases..' startblock oracle cases')

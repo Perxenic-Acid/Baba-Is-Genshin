@@ -1177,6 +1177,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         local motion,why=services.level_motion(projected,traits,rules)
         if not motion then return fail("level_motion",why) end
         plan.level_motion_outcome=motion.level_motion_outcome
+        if motion.level_destroy then level_destroy=true end
         if motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 or motion.infinite_loop or motion.too_complex then
             plan.stages[#plan.stages+1]={name="level_motion",plan=motion}
             for _,change in ipairs(motion.changes) do plan.changes[#plan.changes+1]=change end
@@ -1187,7 +1188,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 plan.infinite_loop,plan.too_complex,plan.reason=motion.infinite_loop,motion.too_complex,motion.reason
                 return plan,nil,trace
             end
-            if #(motion.motion_history or {})>0 then
+            if #(motion.motion_history or {})>0 and not motion.level_destroy then
                 local verified,why,updated_relations,updated_rules,status=services.evaluate(checked)
                 if verified and status and #status.changes>0 then
                     local updates={}
@@ -1256,7 +1257,8 @@ function RW_PlanOrderedLevelMotion(world,traits,rules,rows,services)
         local active,why=services.active(current,rules,row)
         if active==nil then return failed(why) end
         if active then
-            if row.trait=="win" or row.trait=="defeat" or row.trait=="end" then
+            if row.op=="eat_level" then motion.level_destroy=true;return motion
+            elseif row.trait=="win" or row.trait=="defeat" or row.trait=="end" then
                 local outcome,why=services.outcome(current,{row.trait})
                 if why then return failed(why) end
                 if outcome then motion.level_motion_outcome=outcome;return motion end

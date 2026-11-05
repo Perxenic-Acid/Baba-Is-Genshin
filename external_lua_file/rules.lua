@@ -290,18 +290,46 @@ function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
         fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true}
-    local rows,has_tele={},false
+    local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
-            if d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" then has_tele=true end
+            if d.op=="eat_level" or d.op=="level_trait" and selected[d.trait] then
+                rows[#rows+1]=d;if d.trait=="tele" or d.op=="eat_level" then has_ordered=true end
             end
         end end
     end
-    return has_tele and rows or false
+    return has_ordered and rows or false
 end
 function RW_LevelMotionDeclarationActive(world,rules,declaration)
     local context=condition_context(world,rules)
+    if declaration.op=="eat_level" then
+        -- Native levelblock tests sources globally; neither FLOAT nor the
+        -- eater's own SAFE protects the synthetic map. lsafe is captured.
+        if world.level_behaviors and world.level_behaviors.safe then return false end
+        local relation=declaration.relation
+        if relation.source_type=="@empty" then
+            local occupied={}
+            for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
+            for x=1,world.width do for y=1,world.height do
+                if not occupied[x..":"..y] then
+                    local active,why=RW_RelationApplies(context,relation,{class="empty",x=x,y=y,direction="None"})
+                    if active==nil or active then return active,why end
+                end
+            end end
+        else
+            local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+            local seen,ordered={},{}
+            for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not seen[id] then seen[id]=true;ordered[#ordered+1]=id end end
+            for _,id in ipairs(ids) do if not seen[id] then ordered[#ordered+1]=id end end
+            for _,id in ipairs(ordered) do local e=world.entities[id]
+                if relation.source_type=="@text" and e.class=="text" or e.class~="text" and e.archetype==relation.source_type then
+                    local active,why=RW_RelationApplies(context,relation,e)
+                    if active==nil or active then return active,why end
+                end
+            end
+        end
+        return false
+    end
     local enabled,why=query_level_trait(context,declaration.trait)
     if enabled==nil or not enabled then return enabled,why end
     return RW_TestEntityCondition(context,declaration.when,{id=0,class="level",x=0,y=0,direction="None"})
@@ -2762,6 +2790,9 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                         for _,name in ipairs(targets) do
                             relations[#relations+1]={op=sem.noun,source_type=key,target_type=name,
                                 origin=target,verb=ast.verb,source=ast.source,when=query_clone(ast.when)}
+                            if sem.noun=="eat" and obj.tag=="noun" and obj.type and obj.type.tag=="level" then
+                                relations[#relations].eats_level=true
+                            end
                             if key=="@empty" and sem.noun=="follow" and target~="@all" and name~="@empty" and name~="level_block" then
                                 empty_directions[#empty_directions+1]={op="follow",relation=relations[#relations]}
                             end
@@ -2944,6 +2975,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         if relation.op=="level_trait" or relation.op=="deny_level_trait" then
             scoped_conditions[#scoped_conditions+1]={op=relation.op,trait=relation.trait,
                 when=query_clone(relation.scoped_when or {op="always"})}
+        elseif relation.op=="eat" and relation.eats_level then
+            scoped_conditions[#scoped_conditions+1]={op="eat_level",relation=query_clone(relation)}
         end
     end
     if #scoped_conditions>0 then

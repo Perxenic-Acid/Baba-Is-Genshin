@@ -90,3 +90,33 @@ oracle now includes virtual movers for 8192 combinations plus eight source-any/
 destination-specific coordinate-gate cases. Anonymous recursive
 EMPTY PUSH chains, lazy per-impulse condition changes and scoped LEVEL EAT
 sources remain deferred. Late overlap EAT has no occupied EMPTY source identity.
+
+2026-11-05: incoming Noun EAT LEVEL now participates in the ordered synthetic
+LEVEL stage. Installed blocks.lua2516-2534 calls findall(source,conditions) or
+findempty(conditions,true); any qualifying source destroys the map when captured
+lsafe is false. No overlap, FLOAT comparison or eater SAFE test is involved.
+This is separate from the existing ordinary EAT of physical level_block targets.
+
+Lowering marks only typed LEVEL targets, preserves source expansion and predicate
+exclusions, and retains a query-only eat_level row alongside scoped properties in
+the raw generated declaration order. Conditions and per-source BROKEN are checked
+at that row's execution position; EMPTY is queried only at actual vacant cells.
+Text and ordinary NOT/ALL/GROUP subject expansions use their existing lowering.
+Map SAFE is the phase's captured projection, as native lsafe is. A successful row
+stops later motion/terminals and reuses whole-map retirement: no HAS, no contacts
+or late CRASH/code work on the doomed units, no new persisted metadata. Completed
+preceding TELE/motion and RNG remain in the same transaction; Undo restores them.
+Normal physical EAT collisions/overlaps retain their earlier scheduling.
+
+Tests: reference_eat_level.lua executes the installed global branch plus original
+WITHOUT in3072 combinations of Noun/Text/Empty, occupancy, source BROKEN, map SAFE,
+conditions and source SAFE/FLOAT independence. Production compiler/scheduler tests
+cover typed word sentences, RHS NOT, HAS suppression, map SAFE, ordered TELE/EAT/
+CHILL draw prefixes and local Undo. A mapped OnStart/input/whole-tree Undo route
+checks the cleared board and restored eater. Startup still runs no self-tests.
+
+Outgoing LEVEL EAT noun/LEVEL/EMPTY, native interleaving of ordinary physical EAT
+with this late stage, and the remaining synthetic surroundings remain gaps. Older
+notes describing all scoped LEVEL EAT sources as deferred still apply to outgoing
+LEVEL, not the now implemented incoming Noun EAT LEVEL case. Native particles and
+sound remain frontend work.

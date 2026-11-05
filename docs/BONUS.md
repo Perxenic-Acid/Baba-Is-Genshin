@@ -167,7 +167,16 @@ unit/declaration order, both control channels, duplicates and SAFE/FLOAT. A prod
 bonus plan verifies resulting HAS allocation order, rewards and Undo. Existing
 72-case ordinary BONUS tests retain their multiplicity/self-contact coverage.
 
-Scope: current unit_order supplies the per-name and projected cell order. Exact
-original per-cell arrival-list mutation after movement is not represented separately;
-that belongs to the existing mutable scheduling gap. Raw condition query call timing
-also remains projected rather than repeated per collector; no full parity is claimed.
+Per-cell arrival order now lives in sparse world.cell_order, independently of the
+global unit_order. Preview/Commit replay displacement and intermediate motion
+history, retain ordered replacement/create dispatch, remove deleted IDs and omit
+canonical stacks. Whole-tree snapshots restore it with Undo. BONUS filters each
+target declaration through the collector's tile order. Direction-only operations
+do not reorder; explicit changed move updates do. tests/cell_order.lua executes
+the installed tools.lua addunitmap/updateunitmap and checks arrival order, BONUS,
+zero-net round trips, sparse normalization, validation and Undo.
+
+Scope: history rows currently do not distinguish native update from updatedir for
+orientation-only intermediate events; those rows do not reorder a tile. Other
+contact consumers still retain their prior ordering. Raw condition query timing
+remains projected rather than repeated per collector; no full parity is claimed.

@@ -84,6 +84,25 @@ function RW_UnitIds(world)
     return unit_ids(world)
 end
 
+local function valid_cell_order(world)
+    if world.cell_order==nil then return true end
+    if type(world.cell_order)~="table" then return false end
+    local counts={}
+    for _,e in pairs(world.entities) do
+        if type(e)~="table" or not is_integer(e.x) or not is_integer(e.y) then return false end
+        local key=e.x..":"..e.y;counts[key]=(counts[key] or 0)+1
+    end
+    for key,ids in pairs(world.cell_order) do
+        if type(key)~="string" or not is_list(ids) or #ids<2 or #ids~=counts[key] then return false end
+        local seen={}
+        for _,id in ipairs(ids) do local e=world.entities[id]
+            if not valid_id(id) or not e or seen[id] or e.x..":"..e.y~=key then return false end
+            seen[id]=true
+        end
+    end
+    return true
+end
+
 
 local function same_state(a, b, seen)
     if type(a) ~= type(b) then return false end
@@ -191,6 +210,7 @@ local function validate_plan(world, plan)
         return false, "invalid_plan"
     end
     if not valid_unit_order(world) then return false,"invalid_unit_order" end
+    if not valid_cell_order(world) then return false,"invalid_cell_order" end
     if plan.bonus_state~=nil then
         local b=plan.bonus_state
         if type(b)~="table" or not is_integer(b.from) or not is_integer(b.to)
@@ -535,6 +555,61 @@ local function apply_plan(world, plan)
     if plan.random_state then projected.random_state=plan.random_state.to end
     if plan.input_state then projected.last_input=plan.input_state.to end
     if plan.chance_state then projected.chance_seed=plan.chance_state.to end
+    -- Tile order is independent of global unit-list order. Replay arrivals,
+    -- including intermediate motion whose final displacement cancels out.
+    local touched=structural or plan.motion_history~=nil
+    for _,op in ipairs(plan.changes) do if op.kind=="move" then touched=true;break end end
+    if touched then
+        local cells,locations={},{}
+        local function key(e) return e.x..":"..e.y end
+        for _,id in ipairs(unit_ids(world)) do local k=key(world.entities[id])
+            cells[k]=cells[k] or {};cells[k][#cells[k]+1]=id;locations[id]=k
+        end
+        for k,ids in pairs(world.cell_order or {}) do cells[k]=clone(ids) end
+        local function remove(id)
+            local k=locations[id]
+            if k then for i=#cells[k],1,-1 do if cells[k][i]==id then table.remove(cells[k],i) end end end
+            locations[id]=nil
+        end
+        local function arrive(id,e)
+            remove(id);local k=key(e);cells[k]=cells[k] or {}
+            cells[k][#cells[k]+1]=id;locations[id]=k
+        end
+        local history_ids,history_at={},{}
+        for _,row in ipairs(plan.motion_history or {}) do
+            history_ids[row.entity_id]=true
+            local at=row.before_change or 1;history_at[at]=history_at[at] or {}
+            history_at[at][#history_at[at]+1]=row
+        end
+        local function history(at)
+            for _,row in ipairs(history_at[at] or {}) do
+                if row.from.x~=row.to.x or row.from.y~=row.to.y then arrive(row.entity_id,row.to) end
+            end
+        end
+        for i,op in ipairs(plan.changes) do
+            history(i)
+            if op.kind=="move" and not history_ids[op.entity_id] then
+                local e=world.entities[op.entity_id]
+                if e.x~=op.to.x or e.y~=op.to.y or (op.to.direction and e.direction~=op.to.direction) then arrive(op.entity_id,op.to) end
+            end
+        end
+        history(#plan.changes+1)
+        -- Lifetime dispatch uses the same explicit sequence as global ordering.
+        if structural then
+            local ids=plan.unit_sequence or unit_ids(projected)
+            local replacements={}
+            for _,op in ipairs(plan.changes) do
+                if op.kind=="create" or op.kind=="transform" or op.kind=="retype" or op.kind=="back_restore" then replacements[op.entity_id]=true end
+            end
+            for _,id in ipairs(ids) do if replacements[id] and projected.entities[id] then arrive(id,projected.entities[id]) end end
+            for id in pairs(locations) do if not projected.entities[id] then remove(id) end end
+        end
+        local canonical={}
+        for _,id in ipairs(unit_ids(projected)) do local k=key(projected.entities[id]);canonical[k]=canonical[k] or {};canonical[k][#canonical[k]+1]=id end
+        local sparse={}
+        for k,ids in pairs(cells) do if #ids>1 and not same_state(ids,canonical[k]) then sparse[k]=ids end end
+        projected.cell_order=next(sparse) and sparse or nil
+    end
     return projected
 end
 
@@ -767,7 +842,7 @@ end
 
 -- Level definitions are reusable data; sessions own independent runtime snapshots.
 -- No implicit instance allocator: the future parent/campaign owns instance IDs.
-local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, unit_order=true, infinite_loop=true, too_complex=true,
+local WORLD_FIELDS = {width=true, height=true, next_entity_id=true, entities=true, unit_order=true, cell_order=true, infinite_loop=true, too_complex=true,
     rule_sources=true, language=true, semantics=true, selectors=true,
     behavior_registry=true,level_surrounds=true,board_offset=true,random_state=true,last_input=true,chance_seed=true,bonus_count=true}
 
@@ -832,7 +907,7 @@ local function validate_definition(definition, already_plain)
     for key in pairs(world) do if not WORLD_FIELDS[key] then return false end end
     if not is_integer(world.width) or world.width < 1
         or not is_integer(world.height) or world.height < 1
-        or type(world.entities) ~= "table" or not valid_frontier(world) or not valid_unit_order(world) then return false end
+        or type(world.entities) ~= "table" or not valid_frontier(world) or not valid_unit_order(world) or not valid_cell_order(world) then return false end
     if world.level_surrounds~=nil and not valid_level_surrounds(world.level_surrounds) then return false end
     if world.bonus_count~=nil and (not is_integer(world.bonus_count) or world.bonus_count<0 or world.bonus_count>MAX_ID) then return false end
     if world.random_state~=nil and not valid_random_state(world.random_state) then return false end
@@ -918,7 +993,7 @@ local function preview_transaction(world, plan)
         local result=apply_plan(world,plan)
         if plan.infinite_loop then result.infinite_loop=true end
         if plan.too_complex then result.too_complex=true end
-        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.infinite_loop == true or plan.too_complex == true or not same_state(world.unit_order,result.unit_order)
+        return result,nil,#plan.changes > 0 or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.infinite_loop == true or plan.too_complex == true or not same_state(world.unit_order,result.unit_order) or not same_state(world.cell_order,result.cell_order)
     end
     if plan.consumes_turn ~= true or not is_list(plan.changes)
         or plan.id_allocation ~= nil or plan.board_shift ~= nil or plan.random_state~=nil or plan.input_state~=nil or plan.chance_state~=nil or plan.bonus_state~=nil or plan.back_conversions~=nil or plan.unit_sequence~=nil or plan.motion_history~=nil
@@ -937,7 +1012,7 @@ local function preview_transaction(world, plan)
         if not stage.plan.consumes_turn then return nil,"non_consuming_stage",nil,stage.name end
         for _, change in ipairs(stage.plan.changes) do summary[#summary+1]=change end
         local next_world = apply_plan(current,stage.plan)
-        changed = changed or not same_state(current.unit_order,next_world.unit_order)
+        changed = changed or not same_state(current.unit_order,next_world.unit_order) or not same_state(current.cell_order,next_world.cell_order)
         current = next_world
         changed = changed or #stage.plan.changes > 0 or stage.plan.board_shift ~= nil or stage.plan.random_state~=nil or stage.plan.input_state~=nil or stage.plan.chance_state~=nil or stage.plan.bonus_state~=nil
     end

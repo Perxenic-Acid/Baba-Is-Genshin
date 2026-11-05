@@ -170,3 +170,38 @@ The tests inject all three diagnostics at both barriers, check subsequent comman
 lockout and local Undo, and exercise whole-tree Commit/Undo after late transport.
 This repairs error propagation only; the remaining ordered-declaration scheduling
 gap above is unchanged. No extra startup compilation or native bindings are added.
+
+2026-11-05 ordered TELE/motion declarations: when the raw frame contains LEVEL
+TELE, retain positive motion and WIN/DEFEAT/END declarations in their original
+order, including initially false conditions. Recheck each declaration at its
+execution position against preceding TELE positions. Earlier skipped declarations
+are not revisited. Motion uses captured phase-start SLEEP/STILL/lock status;
+REVERSE parity is queried at each MOVE/nudge/FALL, matching native reversecheck.
+TELE's three-pass cap counts executed eligible clauses, not inactive declarations.
+A pure action prefix is replayed with initial capability counts and recorded
+per-action REVERSE; per-unit map FLOAT is replayed as described above. No closures
+cross mapped-script Invoke. Query limits retain the completed action prefix,
+ordinary errors reject, and no attempt tape enters the committed world.
+
+A transient level_motion_outcome records the ordered scoped terminal or false for
+no terminal. Tree outcome selection uses it without re-testing earlier skipped
+WIN/DEFEAT/END from the final board. Ordinary unit/Empty WIN contacts remain active;
+scoped YOU+WIN cannot bypass this ordered result through the generic WIN fallback.
+Conversions retain existing priority, contacts do not rerun, and saved state gains
+no new field. Non-TELE frames retain the previous fast path.
+
+Source: blocks.lua2471/2553 tests each raw row's conditions in the loop;
+TELE3178 precedes MOVE3195 and CHILL, with no in-loop sentence recompile.
+tests/level_motion_order.lua executes installed motion branches and WITHOUT /
+reversecheck in1440 cases, comparing RNG, scrolling/rotation, per-unit ordered
+motion history, final positions and Undo. Cases cover duplicate/inactive rows,
+repeated EMPTY quotas/NOT, conditional REVERSE multiplicity, and conditional
+SLEEP/STILL capture. Production scheduler tests cover physical and scoped YOU,
+early/late conditional WIN, whole-tree Undo and a mapped OnStart/input/Undo route.
+The intra-batch motion-declaration scheduling gap above is superseded for these
+supported actions. Interleaving other native LEVEL effects (EAT/destruction/etc.)
+with these actions remains part of the broader scoped-phase scheduling gap;
+current contact/conversion scheduling and conditional synthetic surroundings are
+unchanged. Real-unit stored capabilities and the existing synthetic outcome
+contact projection remain phase snapshots; this does not claim complete original
+levelblock() scheduling. Particles/host map rotation bindings remain deferred.

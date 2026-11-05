@@ -95,6 +95,10 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
  evaluate=function(w) local f,e=RW_CompileWorld(w,cs);if not f then return nil,e.reason end
   return f.effects,nil,f.relations,f.rules,f.code_status end,
  level_motion=function(w,traits,rules)
+  local rows=RW_LevelMotionDeclarations(w,rules)
+  if rows then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,{active=RW_LevelMotionDeclarationActive,
+   reverse=RW_LevelMotionReverse,
+   outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}) end
   local stop
   for index,trait in ipairs(traits) do if RW_ResolveLevelPropertyOutcome(w,{trait}) then stop=index;break end end
   local p,e=RW_ResolveLevelMotion(w,traits,stop);if not p then return nil,e end
@@ -323,6 +327,27 @@ do
 end
 -- A late scoped-query limit is also a whole-tree transaction, not rejection.
 do
+ for _,late in ipairs({false,true}) do for _,map_you in ipairs({false,true}) do
+  local w=RW_CreateSession().world;w.width,w.height=2,2;w.entities={};w.next_entity_id=5
+  for id=1,4 do w.entities[id]={id=id,kind='object',class='object',archetype='rock',
+   x=(id-1)%2+1,y=math.floor((id-1)/2)+1,direction='Right'} end
+  local when={op='spatial',clauses={{relation='without',negated=true,parameters={{tag='special',name='empty'}}}}}
+  local win={op='level_trait',trait='win',when=when}
+  local tele={op='level_trait',trait='tele',when={op='always'}}
+  w.rule_sources={{when={op='always'},effects={{op='grant_trait',trait='you',target={kind='id',value=1}}},
+   scoped_conditions=late and {tele,win} or {win,tele}}}
+  if map_you then w.rule_sources[1].scoped_conditions[#w.rule_sources[1].scoped_conditions+1]={op='level_trait',trait='you',when={op='always'}} end
+  local tree=assert(RW_CreateLevelTree({root=assert(RW_CreateLevelDefinition('root',w))},'root'))
+  local before=RW_GetActiveLevel(tree).world
+  local p,e=RW_PlanLevelAction(tree,{type='wait'},services);assert(p,e and e.reason)
+  local n,r=RW_CommitLevelTree(tree,p);assert(r.accepted,r.reason)
+  assert((n.outcomes[n.active_id] and n.outcomes[n.active_id].kind=='win' or false)==late,
+   'scoped WIN must execute only at its ordered declaration, never retroactively')
+  assert(RW_GetActiveLevel(n).world.random_state)
+  assert(RW_GetActiveLevel(RW_UndoLevelTree(n)).world==before)
+ end end
+end
+do
  local saved=services.level_traits
  for _,reason in ipairs({'rule_complexity_limit','word_rule_cycle'}) do
   local w=fixture({{'LEVEL','IS','TELE'}}).world
@@ -396,6 +421,17 @@ do
  local expected=1;for i=1,6 do expected=(expected*48271)%2147483647 end
  assert(display.random_state==expected and not display.board_offset and depth==1)
  listeners.undo();assert(not display.random_state and display.entities[1].x==1 and display.entities[1].y==2 and depth==0)
+ w=RW_CreateSession().world;w.width,w.height=2,2;w.entities={};w.next_entity_id=5
+ for id=1,4 do w.entities[id]={id=id,kind='object',class='object',archetype='rock',
+  x=(id-1)%2+1,y=math.floor((id-1)/2)+1,direction='Right'} end
+ w.rule_sources={{when={op='always'},effects={},scoped_conditions={
+  {op='level_trait',trait='tele',when={op='always'}},
+  {op='level_trait',trait='move',when={op='spatial',clauses={{relation='without',negated=true,
+   parameters={{tag='special',name='empty'}}}}}}}}}
+ OnStart();assert(not display.board_offset)
+ listeners.wait();assert(display.board_offset.y==1 and display.random_state and depth==1,
+  'mapped adapter omitted newly enabled motion after TELE')
+ listeners.undo();assert(not display.board_offset and not display.random_state and depth==0)
  script,Enum,RW_Render,RW_GetNavigationDefinitions,printerr=old_script,old_enum,old_render,old_definitions,old_printerr
 end
 print('PASS: LEVEL start orientation/rotation and late MOVE/CHILL/nudges/FALL/TURN/DETURN, conditions/NOT/BROKEN, terminal order, RNG/rollback/Undo; '..cases..' installed motion/lock and '..start_cases..' startblock oracle cases')

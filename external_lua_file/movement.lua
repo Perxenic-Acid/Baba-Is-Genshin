@@ -1298,7 +1298,7 @@ end
 
 -- Synthetic LEVEL motion belongs to late levelblock(), not unit collection.
 -- The caller supplies the surviving ordered declarations up to any terminal.
-function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit)
+function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit,actions)
     local old=world.board_offset or {x=0,y=0,direction="None"}
     local names={"Right","Up","Left","Down"}
     local indices={Right=0,Up=1,Left=2,Down=3,Mid=4,None=4}
@@ -1325,7 +1325,10 @@ function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit)
     local attempts={}
     local interrupted=false
     local positions,tele_ids,history
-    for index,trait in ipairs(traits or world.level_traits or {}) do
+    for index,entry in ipairs(actions or traits or world.level_traits or {}) do
+        local trait=type(entry)=="table" and entry.trait or entry
+        local step_reverse=reverse
+        if type(entry)=="table" then step_reverse=entry.reverse end
         if stop_index and index>=stop_index then break end
         local dx,dy=0,0
         if trait=="tele" and tele_count<3 and not still then
@@ -1364,11 +1367,11 @@ function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit)
             if not still and not sleep then dx,dy=table.unpack(vectors[dir+1]) end
         elseif trait=="move" or nudges[trait]~=nil then
             local travel=trait=="move" and dir or nudges[trait]
-            if reverse and travel<4 then travel=(travel+2)%4 end
+            if step_reverse and travel<4 then travel=(travel+2)%4 end
             if not still and not sleep then dx,dy=table.unpack(vectors[travel+1]) end
         elseif falls[trait] and not still then
             dx,dy=table.unpack(falls[trait])
-            if reverse then dx,dy=-dx,-dy end
+            if step_reverse then dx,dy=-dx,-dy end
         elseif trait=="turn" or trait=="deturn" then
             -- Keep the original rotation formula, even where it differs from
             -- the cardinal startblock mapping for the resulting direction.
@@ -1756,10 +1759,10 @@ function RW_LevelSelectionCandidates(world)
     return candidates
 end
 
-function RW_HasWinContact(world)
+function RW_HasWinContact(world,skip_scoped_win)
     local level=world.level_behaviors or {}
     if level.control or level.control2 then
-        if level.win then return true end
+        if level.win and not skip_scoped_win then return true end
         for _,target in pairs(world.entities) do
             if has_capability(world,target,"win") and (has_capability(world,target,"float")== (level.float==true)) then return true end
         end

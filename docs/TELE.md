@@ -57,3 +57,8 @@ Conditional intra-batch map-layer/declaration re-evaluation remains documented.
 Dynamic scoped map FLOAT is now rechecked per transported identity after preceding
 relocations; see LEVEL_MOTION.md and tests/level_tele_layers.lua. The remaining
 initial-trait-list declaration scheduling gap is distinct and remains deferred.
+
+Scoped TELE now re-tests ordered motion/terminal declaration conditions after
+preceding TELE updates, including initially inactive rows and current REVERSE
+parity. Earlier skipped terminals are not revisited; see LEVEL_MOTION.md for
+source oracles, transaction details and remaining non-motion LEVEL scheduling.

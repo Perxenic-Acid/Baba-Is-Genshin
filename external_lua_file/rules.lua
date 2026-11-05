@@ -285,6 +285,44 @@ function RW_LevelTeleLayers(world,rules,attempts)
     return layers
 end
 
+-- Retain inactive declarations too: an earlier TELE may enable them later.
+function RW_LevelMotionDeclarations(world,rules)
+    local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
+        nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true}
+    local rows,has_tele={},false
+    for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+        for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
+            if d.op=="level_trait" and selected[d.trait] then
+                rows[#rows+1]=d;if d.trait=="tele" then has_tele=true end
+            end
+        end end
+    end
+    return has_tele and rows or false
+end
+function RW_LevelMotionDeclarationActive(world,rules,declaration)
+    local context=condition_context(world,rules)
+    local enabled,why=query_level_trait(context,declaration.trait)
+    if enabled==nil or not enabled then return enabled,why end
+    return RW_TestEntityCondition(context,declaration.when,{id=0,class="level",x=0,y=0,direction="None"})
+end
+function RW_LevelMotionReverse(world,rules)
+    local context=condition_context(world,rules)
+    local enabled,why=query_level_trait(context,"reverse")
+    if enabled==nil or not enabled then return enabled,why end
+    local count=0
+    for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+        for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
+            if d.op=="level_trait" and d.trait=="reverse" then
+                local active,why=RW_TestEntityCondition(context,d.when,{id=0,class="level",x=0,y=0,direction="None"})
+                if active==nil then return nil,why end
+                if active then count=count+1 end
+            end
+        end end
+    end
+    return count%2==1
+end
+
 -- Ordered scoped property projection from one frozen declaration frame.
 function RW_QueryLevelTraits(world,rules)
     local context=condition_context(world,rules)

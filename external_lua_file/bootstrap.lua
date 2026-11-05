@@ -1176,6 +1176,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if not projected then return fail("level_motion_project",why) end
         local motion,why=services.level_motion(projected,traits,rules)
         if not motion then return fail("level_motion",why) end
+        plan.level_motion_outcome=motion.level_motion_outcome
         if motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 or motion.infinite_loop or motion.too_complex then
             plan.stages[#plan.stages+1]={name="level_motion",plan=motion}
             for _,change in ipairs(motion.changes) do plan.changes[#plan.changes+1]=change end
@@ -1238,6 +1239,60 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         trace[#trace+1]="level_destroy"
     end
     return plan, nil, trace
+end
+
+-- Keep native raw-row order while composing one atomic late motion stage.
+function RW_PlanOrderedLevelMotion(world,traits,rules,rows,services)
+    local actions={}
+    local motion={consumes_turn=true,changes={},reason="level_motion"}
+    local current=world
+    local function failed(reason)
+        if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then
+            lock_compile_failure(motion,reason);return motion
+        end
+        return nil,reason
+    end
+    for _,row in ipairs(rows) do
+        local active,why=services.active(current,rules,row)
+        if active==nil then return failed(why) end
+        if active then
+            if row.trait=="win" or row.trait=="defeat" or row.trait=="end" then
+                local outcome,why=services.outcome(current,{row.trait})
+                if why then return failed(why) end
+                if outcome then motion.level_motion_outcome=outcome;return motion end
+            else
+                local reverse,why=false
+                if row.trait=="move" or row.trait:sub(1,5)=="nudge" or row.trait:sub(1,4)=="fall" then
+                    reverse,why=services.reverse(current,rules)
+                    if reverse==nil then return failed(why) end
+                end
+                actions[#actions+1]={trait=row.trait,reverse=reverse}
+                local planned,why=services.resolve(world,traits,nil,nil,nil,actions)
+                if not planned then return nil,why end
+                if planned.tele_attempts then
+                    local layers,reason,through=services.layers(world,rules,planned.tele_attempts)
+                    if not layers then return nil,reason end
+                    planned,why=services.resolve(world,traits,nil,layers,through,actions)
+                    if not planned then return nil,why end
+                    planned.tele_attempts=nil
+                    if reason then motion=planned;return failed(reason) end
+                end
+                motion=planned
+                -- Query-only positions; stored unit capabilities and captured map
+                -- sleep/locks remain those of the phase's projected snapshot.
+                current={};for k,v in pairs(world) do current[k]=v end
+                current.entities={};for id,e in pairs(world.entities) do current.entities[id]=e end
+                for _,change in ipairs(motion.changes) do
+                    local e={};for k,v in pairs(world.entities[change.entity_id]) do e[k]=v end
+                    e.x,e.y=change.to.x,change.to.y;current.entities[change.entity_id]=e
+                end
+                if motion.board_shift then current.board_offset=motion.board_shift.to end
+            end
+        end
+    end
+    -- False distinguishes an ordered pass with no scoped terminal from old hosts.
+    motion.level_motion_outcome=false
+    return motion
 end
 
 -- Whole-tree transaction planner: navigation, outcomes and movement share one Undo.
@@ -1528,7 +1583,9 @@ function RW_PlanLevelAction(tree, action, services)
     if not post_effects then return fail(post_error) end
     local post, projection_error = services.project(completed.world,post_effects,post_traits)
     if not post then return fail(projection_error) end
-    local level_outcome, outcome_error = services.level_outcome(post,turn.level_traits)
+    local level_outcome, outcome_error
+    if turn.level_motion_outcome~=nil then level_outcome=turn.level_motion_outcome or nil
+    else level_outcome,outcome_error=services.level_outcome(post,turn.level_traits) end
     if outcome_error then return fail(outcome_error) end
     local level_ending=level_outcome=="end"
     if level_ending then level_outcome="win" end
@@ -1537,7 +1594,8 @@ function RW_PlanLevelAction(tree, action, services)
         if contact.source.kind=="level" or contact.target.kind=="level" then turn.end_contact=nil end
     end
     local outcome = turn.level_transform and (turn.level_transform=="@revert" and "revert" or "transform") or level_outcome
-        or ((turn.end_contact or turn.done_win or turn.bonus_win_contact or turn.empty_win_contact or services.win(post)) and "win" or nil)
+        or ((turn.end_contact or turn.done_win or turn.bonus_win_contact or turn.empty_win_contact
+            or services.win(post,turn.level_motion_outcome~=nil)) and "win" or nil)
     if select_after_defeat and outcome == "defeat" then outcome = nil end
     local outcome_diagnostic
     if outcome == "win" then
@@ -2168,6 +2226,16 @@ local function start(run_self_tests)
         return movement_api:Invoke("RW_ResolveLevelStart",world,traits)
     end
     turn_services.level_motion=function(world,traits,rules)
+        local rows,why=rules_api:Invoke("RW_LevelMotionDeclarations",world,rules)
+        if rows==nil then return nil,why end
+        if rows then
+            return RW_PlanOrderedLevelMotion(world,traits,rules,rows,{
+                active=function(...) return rules_api:Invoke("RW_LevelMotionDeclarationActive",...) end,
+                reverse=function(...) return rules_api:Invoke("RW_LevelMotionReverse",...) end,
+                outcome=function(...) return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",...) end,
+                resolve=function(...) return movement_api:Invoke("RW_ResolveLevelMotion",...) end,
+                layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end})
+        end
         local stop
         for index,trait in ipairs(traits) do
             if trait=="win" or trait=="defeat" or trait=="end" then
@@ -2516,7 +2584,7 @@ local function start(run_self_tests)
         return world_api:Invoke("RW_PlaceLevelSelectors",tree,ids,block)
     end
     level_services.candidates = function(world) return movement_api:Invoke("RW_LevelSelectionCandidates",world) end
-    level_services.win = function(world) return movement_api:Invoke("RW_HasWinContact",world) end
+    level_services.win = function(world,skip_scoped_win) return movement_api:Invoke("RW_HasWinContact",world,skip_scoped_win) end
     level_services.level_outcome = function(world,traits)
         return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",world,traits)
     end

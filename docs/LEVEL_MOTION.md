@@ -211,3 +211,10 @@ TELE. Eligible sources retire the map at their declaration position, using captu
 map SAFE and ignoring source SAFE/FLOAT. Preserve any earlier motion/RNG and stop
 later actions; skip post-motion code/CRASH on the doomed board. See EAT.md for the
 installed global-branch oracle, compiler/native-adapter tests and outgoing gaps.
+
+Outgoing LEVEL EAT now introduces flat destruction/HAS barriers in this ordered
+loop. Prefix replay carries captured motion locks/SLEEP and TELE count across
+barriers; per-unit phase FLOAT is retained for survivors and initialized for births.
+The scheduler flattens these children into its existing transaction and rebuilds
+code/status once afterward, without rerunning contacts. See EAT.md for native
+selection/serial deletion references, 9216 source cases, budget and remaining gaps.

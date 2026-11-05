@@ -1298,7 +1298,7 @@ end
 
 -- Synthetic LEVEL motion belongs to late levelblock(), not unit collection.
 -- The caller supplies the surviving ordered declarations up to any terminal.
-function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit,actions)
+function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit,actions,capture)
     local old=world.board_offset or {x=0,y=0,direction="None"}
     local names={"Right","Up","Left","Down"}
     local indices={Right=0,Up=1,Left=2,Down=3,Mid=4,None=4}
@@ -1314,6 +1314,7 @@ function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit,ac
     -- levelblock captures this once, before CHILL changes mapdir.
     local still=counts.still~=nil or locks[lockdir+1] and counts[locks[lockdir+1]]~=nil
     local sleep=counts.sleep~=nil
+    if capture then still,sleep=capture.still,capture.sleep end
     local x,y=old.x,old.y
     local state=world.random_state or 1;local original=state
     local nudges={nudgeright=0,nudgeup=1,nudgeleft=2,nudgedown=3}
@@ -1321,7 +1322,7 @@ function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit,ac
     local direction=world.board_offset and old.direction or "Down"
     local rotation=old.rotation
     local facing_written=false
-    local tele_count=0
+    local tele_count=capture and capture.tele_count or 0
     local attempts={}
     local interrupted=false
     local positions,tele_ids,history
@@ -1398,6 +1399,7 @@ function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit,ac
     end
     if state~=original then result.random_state={from=original,to=state} end
     if #attempts>0 then result.tele_attempts=attempts end
+    result.motion_capture={still=still==true,sleep=sleep,tele_count=tele_count}
     return result
 end
 

@@ -95,11 +95,23 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
   births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},rules) end,
  evaluate=function(w) local f,e=RW_CompileWorld(w,cs);if not f then return nil,e.reason end
   return f.effects,nil,f.relations,f.rules,f.code_status end,
- level_motion=function(w,traits,rules)
+ level_motion=function(w,traits,rules,budget,raw,relations,count)
   local rows=RW_LevelMotionDeclarations(w,rules)
-  if rows then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,{active=RW_LevelMotionDeclarationActive,
+  if rows then
+   local motion={active=RW_LevelMotionDeclarationActive,
    reverse=RW_LevelMotionReverse,
-   outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}) end
+   outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}
+   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' then outgoing=true end end
+   if not outgoing then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,motion) end
+   local contents={};for _,r in ipairs(relations or {}) do if r.op=='has' or r.op=='empty_has' then contents[#contents+1]=r end end
+   return RW_PlanScopedLevelSequence(raw,w,traits,rules,rows,{motion=motion,preview=RW_PreviewPlan,select=RW_ResolveScopedEatTargets,
+    project=function(world,r,t) local e,why=RW_EvaluateRules(world,r);if not e then return nil,why end;return RW_ProjectWorld(world,e,t) end,
+    destroy=function(world,ids,r) return RW_PlanDestructionPhase(world,ids,contents,'level_eat',{
+     initialized_births=function(a,b,c,d,n) return RW_InitializeHasBirths(a,b,c,d,n,false) end,
+     create=RW_PlanCreate,delete=RW_PlanDelete},nil,r,count) end,
+    empty=function(world,cells,r) return RW_PlanEmptyContactPhase(world,cells,contents,r,{
+     births=RW_InitializeEmptyHasBirths,create=RW_PlanCreate},count) end},budget)
+  end
   local stop
   for index,trait in ipairs(traits) do if RW_ResolveLevelPropertyOutcome(w,{trait}) then stop=index;break end end
   local p,e=RW_ResolveLevelMotion(w,traits,stop);if not p then return nil,e end
@@ -138,6 +150,98 @@ local function turn(s,action)
  local n,r=RW_Commit(s,p);assert(r.accepted,r.reason)
  assert(RW_Undo(n).world==s.world,'scoped motion Undo lost earlier phases')
  return n,p
+end
+do
+ local function outgoing(rows,kind)
+  local s=fixture(rows);local id=s.world.next_entity_id;s.world.next_entity_id=id+1
+  s.world.entities[id]={id=id,kind='object',class='object',archetype=kind or 'rock',x=18,y=18,direction='Left'}
+  return s,id
+ end
+ for _,property in ipairs({'FLOAT','YOU'}) do
+  local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'},{'ROCK','IS',property}})
+  local first=s.world.next_entity_id;local n,p=turn(s)
+  assert(not n.world.entities[id] and n.world.entities[first].archetype=='flag' and n.world.entities[first].direction=='Left')
+  assert(n.world.next_entity_id==first+1 and not p.level_destroy)
+ end
+ local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'ROCK','IS','SAFE'}});local n=turn(s);assert(n.world.entities[id])
+ local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'LEVEL','IS','SAFE'}});local n=turn(s);assert(not n.world.entities[id])
+ local s,id=outgoing({{'LEVEL','EAT','ALL'}});local n=turn(s);assert(n.world.entities[id],'native scoped ALL is a no-op')
+ local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'LEVEL','EAT','NOT','ROCK'}});local n=turn(s);assert(n.world.entities[id])
+ local s,id=outgoing({{'LEVEL','EAT','LEVEL'},{'LEVEL','HAS','FLAG'}},'level_block')
+ local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities),'unsafe map eats physical LEVEL by whole-map retirement')
+ local s,id=outgoing({{'LEVEL','EAT','LEVEL'},{'LEVEL','HAS','FLAG'}},'level_block')
+ s.world.rule_sources[#s.world.rule_sources+1]={when={op='always'},effects={},scoped_conditions={{op='level_trait',trait='safe',when={op='always'}}}}
+ local first=s.world.next_entity_id;local n,p=turn(s)
+ assert(not p.level_destroy and not n.world.entities[id] and n.world.entities[first].archetype=='flag','captured SAFE map still eats unsafe physical LEVEL')
+ local s=fixture({{'LEVEL','EAT','TEXT'},{'TEXT','HAS','ROCK'}});local first=s.world.next_entity_id
+ local n,p=turn(s);local count=0;for _,e in pairs(n.world.entities) do assert(e.class~='text' and e.archetype=='rock');count=count+1 end
+ assert(count==6 and n.world.next_entity_id==first+6 and p.contact_frame,'Text deaths must retain frozen HAS declarations')
+ local s=fixture({{'LEVEL','EAT','EMPTY'},{'EMPTY','HAS','FLAG'}});s.world.width,s.world.height=8,6
+ local n=turn(s);local flags=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flags=flags+1 end end
+ assert(flags==42,'global EMPTY deletion must create HAS at every selected vacancy')
+ local s,id=outgoing({{'LEVEL','IS','TELE'},{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','TELE'}})
+ local count=0;for _ in pairs(s.world.entities) do count=count+1 end
+ local n,p=turn(s);local rng=1;for i=1,4*count do rng=rng*48271%2147483647 end
+ assert(n.world.random_state==rng and not n.world.entities[id] and n.world.entities[s.world.next_entity_id])
+ local phases=0;for _,stage in ipairs(p.stages) do if stage.name:find('level_motion_',1,true) then phases=phases+1 end end
+ assert(phases==3,'TELE/EAT/HAS/TELE must retain sequential atomic child phases')
+ local before=s.world
+ for _,stage in ipairs(p.stages) do if stage.name:find('_eat',1,true) then
+  stage.plan.changes[1].from.x=stage.plan.changes[1].from.x+1;break
+ end end
+ local _,r=RW_Commit(s,p);assert(not r.accepted and s.world==before and not s.world.random_state,'stale later delete must roll back TELE/RNG')
+ local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'ROCK','WITHOUT','ROCK','HAS','FLAG'}})
+ local other=s.world.next_entity_id;s.world.next_entity_id=other+1
+ s.world.entities[other]={id=other,kind='object',class='object',archetype='rock',x=20,y=18,direction='Left'}
+ local n=turn(s);local flags=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then flags=flags+1;assert(e.x==20) end end
+ assert(flags==1,'outgoing EAT HAS queries must see earlier victims already deleted')
+ local s,id=outgoing({{'LEVEL','EAT','ROCK','AND','ROCK'},{'ROCK','HAS','ROCK'}})
+ local first=s.world.next_entity_id;local n=turn(s)
+ assert(not n.world.entities[id] and not n.world.entities[first] and n.world.entities[first+1].archetype=='rock' and n.world.next_entity_id==first+2)
+ local saved=services.level_motion
+ services.level_motion=function(w,t,r,b,raw,relations,count) return saved(w,t,r,1,raw,relations,count) end
+ local s,id=outgoing({{'LEVEL','IS','TELE'},{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'}})
+ local n=turn(s);assert(n.world.too_complex and n.world.random_state and n.world.entities[id] and n.world.next_entity_id==s.world.next_entity_id,
+  'flat stage limit must commit earlier motion, discard uncommitted births and allow Undo')
+ services.level_motion=saved
+ local s,id=outgoing({{'LEVEL','IS','TELE'},{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'},
+  {'LEVEL','IS','TELE'},{'LEVEL','EAT','FLAG'},{'LEVEL','IS','TELE'},{'LEVEL','IS','TELE'}})
+ local count=0;for _ in pairs(s.world.entities) do count=count+1 end
+ local n=turn(s);local rng=1;for i=1,2*(3*count-1) do rng=rng*48271%2147483647 end
+ assert(n.world.random_state==rng,'TELE cap must span deletion/birth barriers and use each current unit list')
+ local s,id=outgoing({{'LEVEL','IS','CHILL'},{'LEVEL','EAT','ROCK'},{'LEVEL','IS','MOVE'},{'LEVEL','IS','LOCKEDDOWN'}})
+ s.world.board_offset={x=0,y=0,direction='Right'}
+ local n=turn(s);assert(n.world.board_offset.y==2 and n.world.random_state==48271,'EAT must not recapture direction-dependent movement locks')
+ local randoms={}
+ for copies=1,2 do
+  local s=fixture({{'EMPTY','HAS','EMPTY'}});s.world.width,s.world.height=8,6
+  local rows={};for i=1,copies do rows[i]={op='level_eat',relation={target_type='@empty',when={op='always'}}} end
+  s.world.rule_sources[#s.world.rule_sources+1]={when={op='always'},effects={},scoped_conditions=rows}
+  local n=turn(s);randoms[copies]=n.world.random_state
+ end
+ assert(randoms[1] and randoms[1]==randoms[2],'EMPTY deleted-cell cache must span duplicate outgoing clauses without newborns')
+ local saved=RW_InitializeHasBirths
+ local s,id=outgoing({{'LEVEL','IS','TELE'},{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','TELE'}})
+ local first=s.world.next_entity_id;local count=0;for _ in pairs(s.world.entities) do count=count+1 end
+ RW_InitializeHasBirths=function(w,ids,...)
+  if ids[1]==id then local e=w.entities[id];return nil,'rule_complexity_limit',{{kind='object',class='object',archetype='flag',x=e.x,y=e.y,direction='Left'}},{} end
+  return saved(w,ids,...)
+ end
+ local n,p=turn(s);assert(n.world.too_complex and n.world.entities[id] and n.world.entities[first].archetype=='flag')
+ local rng=1;for i=1,2*count do rng=rng*48271%2147483647 end;assert(n.world.random_state==rng)
+ for _,event in ipairs(p.events or {}) do assert(event.entity_id~=id or event.kind~='destroy') end
+ RW_InitializeHasBirths=function(w,ids,...) if ids[1]==id then return nil,'injected_level_eat_birth_error' end;return saved(w,ids,...) end
+ local p,e=RW_PlanTurn(s.world,{type='wait'},services)
+ assert(not p and e.stage=='level_motion' and e.reason=='injected_level_eat_birth_error' and not s.world.random_state and s.world.next_entity_id==first)
+ RW_InitializeHasBirths=saved
+ local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'},{'FLAG','IS','FLOAT'},{'LEVEL','IS','TELE'}})
+ local first=s.world.next_entity_id;local n=turn(s)
+ assert(n.world.entities[first].x==18 and n.world.entities[first].y==18,'newborn FLOAT must initialize before later TELE')
+ local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'},{'FLAG','EAT','LEVEL'},{'LEVEL','IS','TELE'}})
+ local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.random_state,
+  'later incoming EAT LEVEL must observe HAS products and stop TELE')
+ local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'LEVEL','WITHOUT','ROCK','IS','MOVE'}})
+ local n=turn(s);assert(n.world.board_offset.y==1,'outgoing destruction must enable later scoped conditions')
 end
 do
  local function eater(rows)
@@ -465,6 +569,14 @@ do
  OnStart();assert(display.entities[eater])
  listeners.wait();assert(not next(display.entities) and depth==1,'mapped global EAT LEVEL did not retire the board')
  listeners.undo();assert(display.entities[eater] and depth==0,'whole-tree Undo did not restore eaten map')
+ w=fixture({{'LEVEL','IS','TELE'},{'LEVEL','EAT','ROCK'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','TELE'}}).world
+ local victim=w.next_entity_id;w.next_entity_id=victim+1;local product=w.next_entity_id
+ w.entities[victim]={id=victim,kind='object',class='object',archetype='rock',x=18,y=18,direction='Left'}
+ local count=0;for _ in pairs(w.entities) do count=count+1 end
+ OnStart();listeners.wait()
+ local rng=1;for i=1,4*count do rng=rng*48271%2147483647 end
+ assert(not display.entities[victim] and display.entities[product].archetype=='flag' and display.random_state==rng and depth==1)
+ listeners.undo();assert(display.entities[victim] and not display.entities[product] and not display.random_state and depth==0)
  script,Enum,RW_Render,RW_GetNavigationDefinitions,printerr=old_script,old_enum,old_render,old_definitions,old_printerr
 end
 print('PASS: LEVEL start orientation/rotation and late MOVE/CHILL/nudges/FALL/TURN/DETURN, conditions/NOT/BROKEN, terminal order, RNG/rollback/Undo; '..cases..' installed motion/lock and '..start_cases..' startblock oracle cases')

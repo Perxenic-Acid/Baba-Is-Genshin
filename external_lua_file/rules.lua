@@ -293,8 +293,8 @@ function RW_LevelMotionDeclarations(world,rules)
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
-            if d.op=="eat_level" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.op=="eat_level" then has_ordered=true end
+            if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
+                rows[#rows+1]=d;if d.trait=="tele" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -349,6 +349,54 @@ function RW_LevelMotionReverse(world,rules)
         end end
     end
     return count%2==1
+end
+
+-- One outgoing LEVEL EAT declaration, before any of its selected deletions.
+-- Target SAFE is queried now; FLOAT never filters this global branch.
+function RW_ResolveScopedEatTargets(world,rules,declaration,level_safe)
+    local context=condition_context(world,rules)
+    local disabled,why=query_level_trait(context,"broken")
+    if disabled==nil then return nil,why end
+    local result={ids={},cells={}}
+    if disabled then return result end
+    local source={id=0,class="level",x=0,y=0,direction="None"}
+    local active,why=RW_TestEntityCondition(context,declaration.when or {op="always"},source)
+    if active==nil then return nil,why end
+    if not active then return result end
+    for _,condition in ipairs(declaration.exclusions or {}) do
+        local blocked,why=RW_TestEntityCondition(context,condition,source)
+        if blocked==nil then return nil,why end
+        if blocked then return result end
+    end
+    local target=declaration.target_type
+    if target=="@all" then return result end
+    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local ordered,seen={},{}
+    for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not seen[id] then seen[id]=true;ordered[#ordered+1]=id end end
+    for _,id in ipairs(ids) do if not seen[id] then ordered[#ordered+1]=id end end
+    if target=="@empty" then
+        local occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
+        for x=1,world.width do for y=1,world.height do
+            if not occupied[x..":"..y] then result.cells[#result.cells+1]={x=x,y=y} end
+        end end
+        return result
+    end
+    local matching={}
+    for _,id in ipairs(ordered) do local e=world.entities[id]
+        if target=="@text" and e.class=="text" or e.class~="text" and e.archetype==(target=="@level" and (declaration.level_type or "level_block") or target) then
+            matching[#matching+1]=id
+        end
+    end
+    if target=="@level" and #matching>0 then
+        if level_safe==nil then level_safe,why=query_level_trait(context,"safe");if level_safe==nil then return nil,why end end
+        if not level_safe then result.level_destroy=true;return result end
+    end
+    for _,id in ipairs(matching) do
+        local safe,why=query_trait(context,world.entities[id],"safe")
+        if safe==nil then return nil,why end
+        if not safe then result.ids[#result.ids+1]=id end
+    end
+    return result
 end
 
 -- Ordered scoped property projection from one frozen declaration frame.
@@ -2752,7 +2800,18 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 empty_directions[#empty_directions+1]={op="direction",trait=obj.name,when=query_clone(ast.when)}
             end
             local has_start=#relations+1
-            if level_subject and sem and sem.noun=="transform" and objnot and obj.tag=="special" and obj.name=="text" and level_conditions(ast.when) then
+            if level_subject and sem and sem.noun=="eat" and level_conditions(ast.when) then
+                local target=subject_key(obj)
+                if obj.tag=="noun" and obj.type and obj.type.tag=="level" then target="@level" end
+                if obj.tag=="special" and obj.name=="all" then target="@all" end
+                if target then
+                    if objnot then add_ban(predicate_bans,ast.verb,"@level",target,ast.when)
+                    else relations[#relations+1]={op="level_eat",source_type="@level",target_type=target,
+                        level_type=target=="@level" and (obj.type.block_type or "level_block") or nil,
+                        verb=ast.verb,when=query_clone(ast.when),source=ast.source} end
+                    supported=true
+                end
+            elseif level_subject and sem and sem.noun=="transform" and objnot and obj.tag=="special" and obj.name=="text" and level_conditions(ast.when) then
                 scoped_text_bans[#scoped_text_bans+1]=query_clone(ast.when)
                 relations[#relations+1]={op="forbid_transform",source_type=subject.type.block_type or "level_block",target_type="@text",when=query_clone(ast.when)}
                 supported=true
@@ -2954,7 +3013,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 for _,condition in ipairs(bans[write_origins[index]] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
             end
         end
-        if relation.op=="fear" or relation.op=="follow" or relation.op=="make" or relation.op=="eat" then
+        if relation.op=="fear" or relation.op=="follow" or relation.op=="make" or relation.op=="eat" or relation.op=="level_eat" then
             local bans=(predicate_bans[relation.verb] or {})[relation.source_type] or {}
             relation.exclusions={}
             for _,condition in ipairs(bans[relation.target_type] or {}) do relation.exclusions[#relation.exclusions+1]=condition end
@@ -2977,6 +3036,8 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 when=query_clone(relation.scoped_when or {op="always"})}
         elseif relation.op=="eat" and relation.eats_level then
             scoped_conditions[#scoped_conditions+1]={op="eat_level",relation=query_clone(relation)}
+        elseif relation.op=="level_eat" then
+            scoped_conditions[#scoped_conditions+1]={op="level_eat",relation=query_clone(relation)}
         end
     end
     if #scoped_conditions>0 then
@@ -3018,7 +3079,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         end
         if active then
             if scoped then relation.scoped_when=nil end
-            enabled[#enabled+1]=relation
+            if relation.op~="level_eat" then enabled[#enabled+1]=relation end
         end
     end
     filtered=enabled

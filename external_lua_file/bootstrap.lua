@@ -1174,13 +1174,19 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         end
         local projected,why=services.project(final,effects,traits)
         if not projected then return fail("level_motion_project",why) end
-        local motion,why=services.level_motion(projected,traits,rules)
+        projected.empty_deleted=empty_deleted
+        local motion,why=services.level_motion(projected,traits,rules,32-#plan.stages-2,final,relations,back_count)
         if not motion then return fail("level_motion",why) end
         plan.level_motion_outcome=motion.level_motion_outcome
         if motion.level_destroy then level_destroy=true end
-        if motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 or motion.infinite_loop or motion.too_complex then
-            plan.stages[#plan.stages+1]={name="level_motion",plan=motion}
+        if motion.level_stages or motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 or motion.infinite_loop or motion.too_complex then
+            if motion.level_stages then
+                for index,stage in ipairs(motion.level_stages) do
+                    plan.stages[#plan.stages+1]={name="level_motion_"..index.."_"..stage.name,plan=stage.plan}
+                end
+            else plan.stages[#plan.stages+1]={name="level_motion",plan=motion} end
             for _,change in ipairs(motion.changes) do plan.changes[#plan.changes+1]=change end
+            if motion.events then plan.events=plan.events or {};for _,event in ipairs(motion.events) do plan.events[#plan.events+1]=event end end
             local checked,why,phase=services.preview(world,plan)
             if not checked then return fail("level_motion_complete",why,phase) end
             trace[#trace+1]="level_motion"
@@ -1188,10 +1194,10 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 plan.infinite_loop,plan.too_complex,plan.reason=motion.infinite_loop,motion.too_complex,motion.reason
                 return plan,nil,trace
             end
-            if #(motion.motion_history or {})>0 and not motion.level_destroy then
+            if (#(motion.motion_history or {})>0 or motion.reading_changed) and not motion.level_destroy then
                 local verified,why,updated_relations,updated_rules,status=services.evaluate(checked)
                 if verified and status and #status.changes>0 then
-                    local updates={}
+                    local updates={};if motion.reading_changed then for _,op in ipairs(motion.changes) do updates[#updates+1]=op end end
                     for _,row in ipairs(motion.motion_history) do updates[#updates+1]={kind="move",entity_id=row.entity_id} end
                     if reading_changed(final,updates,rules) then
                         local updated,err=services.preview(checked,status)
@@ -1295,6 +1301,91 @@ function RW_PlanOrderedLevelMotion(world,traits,rules,rows,services)
     -- False distinguishes an ordered pass with no scoped terminal from old hosts.
     motion.level_motion_outcome=false
     return motion
+end
+
+-- EAT is a deletion/birth barrier between motion prefixes. Keep child phases
+-- flat for the outer transaction; never collapse moves and deletes of one ID.
+function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,budget)
+    local result={consumes_turn=true,changes={},level_stages={},events={},reason="level_motion",motion_history={}}
+    local current,view,capture=world,projected
+    local deleted={};for k,v in pairs(projected.empty_deleted or {}) do deleted[k]=v end
+    local initial,why=services.motion.resolve(projected,traits,1)
+    if not initial then return nil,why end
+    capture=initial.motion_capture
+    local function failed(reason)
+        if reason=="word_rule_limit" or reason=="word_rule_cycle" or reason=="rule_complexity_limit" then
+            lock_compile_failure(result,reason);return result
+        end
+        return nil,reason
+    end
+    local function append(phase,name)
+        if #phase.changes>0 or phase.board_shift or phase.random_state or #(phase.motion_history or {})>0 then
+            if #result.level_stages>=(budget or 30) then lock_compile_failure(result,"rule_complexity_limit");return false end
+            result.level_stages[#result.level_stages+1]={name=name,plan=phase}
+            for _,op in ipairs(phase.changes) do result.changes[#result.changes+1]=op end
+            for _,row in ipairs(phase.motion_history or {}) do result.motion_history[#result.motion_history+1]=row end
+            for _,event in ipairs(phase.events or {}) do result.events[#result.events+1]=event end
+            if #phase.changes>0 then result.reading_changed=true end
+            local next_world,why=services.preview(current,phase)
+            if not next_world then return nil,why end
+            current=next_world
+        end
+        if phase.infinite_loop or phase.too_complex then
+            result.infinite_loop,result.too_complex,result.reason=phase.infinite_loop,phase.too_complex,phase.reason
+            return false
+        end
+        if phase.level_destroy then result.level_destroy=true;return false end
+        if phase.level_motion_outcome then result.level_motion_outcome=phase.level_motion_outcome;return false end
+        return true
+    end
+    local function refresh_view()
+        local next_view,why=services.project(current,rules,traits)
+        if not next_view then return nil,why end
+        for id,e in pairs(next_view.entities) do
+            if view.entities[id] then e.behaviors=view.entities[id].behaviors end
+        end
+        next_view.level_behaviors=projected.level_behaviors
+        next_view.empty_deleted=deleted;view=next_view
+        return true
+    end
+    local chunk={}
+    local function flush()
+        if #chunk==0 then return true end
+        local motion_services={};for k,v in pairs(services.motion) do motion_services[k]=v end
+        motion_services.resolve=function(w,t,stop,layers,through,actions)
+            return services.motion.resolve(w,t,stop,layers,through,actions,capture)
+        end
+        local phase,why=RW_PlanOrderedLevelMotion(view,traits,rules,chunk,motion_services)
+        if not phase then return nil,why end
+        capture=phase.motion_capture or capture;phase.motion_capture=nil
+        local ok,why=append(phase,"motion");if not ok then return ok,why end
+        chunk={};return refresh_view()
+    end
+    for _,row in ipairs(rows) do
+        if row.op=="level_eat" then
+            local ok,why=flush();if ok==nil then return failed(why) elseif not ok then return result end
+            local selected,why=services.select(view,rules,row.relation,projected.level_behaviors and projected.level_behaviors.safe==true)
+            if not selected then return failed(why) end
+            if selected.level_destroy then result.level_destroy=true;return result end
+            local phase,why
+            if #selected.ids>0 then phase,why=services.destroy(current,selected.ids,rules)
+            elseif #selected.cells>0 then
+                local cells={};for _,cell in ipairs(selected.cells) do
+                    if not deleted[cell.x..":"..cell.y] then cells[#cells+1]=cell end
+                end
+                phase,why=services.empty(current,cells,rules)
+                if phase then for _,cell in ipairs(cells) do deleted[cell.x..":"..cell.y]=true end end
+            end
+            if not phase and why then return failed(why) end
+            if phase then
+                local ok,why=append(phase,"eat");if ok==nil then return nil,why elseif not ok then return result end
+                local ok,why=refresh_view();if not ok then return failed(why) end
+            end
+        else chunk[#chunk+1]=row end
+    end
+    local ok,why=flush();if ok==nil then return failed(why) end
+    if result.level_motion_outcome==nil and not result.infinite_loop and not result.too_complex then result.level_motion_outcome=false end
+    return result
 end
 
 -- Whole-tree transaction planner: navigation, outcomes and movement share one Undo.
@@ -2227,16 +2318,29 @@ local function start(run_self_tests)
         if not traits then return nil,why end
         return movement_api:Invoke("RW_ResolveLevelStart",world,traits)
     end
-    turn_services.level_motion=function(world,traits,rules)
+    turn_services.level_motion=function(world,traits,rules,budget,raw,relations,count)
         local rows,why=rules_api:Invoke("RW_LevelMotionDeclarations",world,rules)
         if rows==nil then return nil,why end
         if rows then
-            return RW_PlanOrderedLevelMotion(world,traits,rules,rows,{
+            local motion_services={
                 active=function(...) return rules_api:Invoke("RW_LevelMotionDeclarationActive",...) end,
                 reverse=function(...) return rules_api:Invoke("RW_LevelMotionReverse",...) end,
                 outcome=function(...) return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",...) end,
                 resolve=function(...) return movement_api:Invoke("RW_ResolveLevelMotion",...) end,
-                layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end})
+                layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end}
+            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" then outgoing=true;break end end
+            if not outgoing then return RW_PlanOrderedLevelMotion(world,traits,rules,rows,motion_services) end
+            local contents={};for _,r in ipairs(relations or {}) do if r.op=="has" or r.op=="empty_has" then contents[#contents+1]=r end end
+            return RW_PlanScopedLevelSequence(raw,world,traits,rules,rows,{
+                motion=motion_services,preview=function(...) return world_api:Invoke("RW_PreviewPlan",...) end,
+                select=function(...) return rules_api:Invoke("RW_ResolveScopedEatTargets",...) end,
+                project=function(w,r,t)
+                    local effects,why=rules_api:Invoke("RW_EvaluateRules",w,r);if not effects then return nil,why end
+                    return properties_api:Invoke("RW_ProjectWorld",w,effects,t)
+                end,
+                destroy=function(w,ids,r) return RW_PlanDestructionPhase(w,ids,contents,"level_eat",contact_services,nil,r,count) end,
+                empty=function(w,cells,r) return RW_PlanEmptyContactPhase(w,cells,contents,r,{
+                    births=contact_services.empty_births,create=contact_services.create},count) end},budget)
         end
         local stop
         for index,trait in ipairs(traits) do

@@ -76,3 +76,10 @@ SHIFT 的无条件对齐与 BACK 的过滤空派发保持不同规则。中间�
 M9.7W: raw frozen scoped LEVEL properties now re-evaluate after contact/EAT/MAKE/
 BONUS mutations and at final tree outcome projection, like ordinary property
 conditions. No Text recompile occurs during frozen contacts. See LEVEL_CONDITIONS.md.
+
+Outgoing scoped LEVEL EAT composes several flat motion/EAT/HAS phases in the
+outer turn. Each child checks against the preceding snapshot; the checked top-level
+changes remains their diagnostic concatenation, never a simultaneous plan. Names
+use a level_motion index prefix. Motion journals stay with their child, preserving
+moves of a later-deleted ID. Stage exhaustion commits the available prefix as TOO
+COMPLEX, reserving final code-status / map-retirement slots. See EAT.md for scope.

@@ -3,7 +3,8 @@
 Primary reference: installed `Data/blocks.lua` levelblock(), around2075 (capture
 lstill/lsleep),3195–3346 (MOVE/CHILL/nudges/FALL); `Data/tools.lua` cantmove()
 around2248 and reversecheck() around2469. `clears.lua`123 and `load.lua`79 set
-the initial mapdir to Down. This is synthetic map scrolling, not unit displacement.
+the initial mapdir to Down. MOVE/nudges/FALL scroll the synthetic map; the separate
+late TELE branch below displaces real units.
 
 ## Implemented
 
@@ -56,8 +57,9 @@ boundary roundtrip verifies whole-tree Undo. Actual production OnStart/wait/Undo
 adapters run with mapped-script and UI mocks. `tests/run.lua` includes this test;
 real-device success is not inferred.
 
-Remaining synthetic scope: ongoing cardinal orientation dispatch, FEAR, TELE and
-FOLLOW. Startup cardinal assignment and TURN/DETURN are implemented below.
+Remaining synthetic scope: ongoing cardinal orientation dispatch and verification
+of FEAR/FOLLOW map-source behavior. Scoped TELE, startup cardinal assignment and
+TURN/DETURN are implemented below.
 Frontend rotation is deferred. This oracle does
 not establish the complete native levelblock destruction/terminal interleaving:
 our frozen contact phases remain grouped before late scrolling, and terminal
@@ -104,3 +106,44 @@ domaprotation() defines the operation, but its rules.lua caller is commented out
 in the installed source. No per-turn binding is invented from that definition;
 native callback timing needs separate evidence. This does not block the explicit
 startblock initialization or levelblock TURN/DETURN paths above.
+
+## Late LEVEL TELE
+
+Installed blocks.lua3178–3194 executes at most three eligible TELE clauses per
+levelblock call. Unless the map's initially captured STILL/lock test is true,
+each clause walks all real units in unit-list order. It draws X and Y before
+calling tools.lua floating_level(), so mismatched-layer units consume draws too.
+Eligible units update to an interior cell without collision, rider STILL/locks,
+SLEEP, destination FLOAT or BACK transport-suppression checks. Map SLEEP does not
+disable this branch. The cap counts an executed pass even with no eligible units.
+
+This operation now shares RW_ResolveLevelMotion's ordered trait loop and RNG with
+CHILL/turns/map scrolling. It preserves unit facing, links, logical identities and
+map angle; TELE-only RNG does not materialize map facing. unit_order controls
+physical traversal. A flat final move per identity is accompanied by every actual
+intermediate update in motion_history, including a trip returning to its start.
+Unchanged destinations issue no motion history, matching installed update().
+RNG-only passes still commit, and BACK/journals retain zero-net actual motion.
+
+After late transport the scheduler recompiles the surviving board, applies one
+reading-related BROKEN code-status barrier and checks surviving real CRASH. A
+WORD/complexity limit commits the triggering transport/RNG prefix into the existing
+only-Undo terminal state; other errors reject the entire turn. Later outcome
+queries use the new rules. Contact destruction, orientation and conversions do
+not rerun after late code release. Earlier phases still use their frozen frames.
+
+tests/reference_level_tele.lua executes the installed TELE/motion branches,
+floating_level(), cantmove() and reversecheck() unchanged in7680 cases: zero to
+five TELE declarations, layer patterns, map locks/sleep/reverse, alternate unit
+order, Text/linked/shared-identity units and interleaved CHILL/turn/FALL/MOVE.
+Host update stubs retain only changes, as independently inspected tools.lua299.
+Scheduler tests cover Text recompilation, the shared scoped query, all-mismatched
+RNG-only transport, late errors/limits/CRASH, code status, zero-net BACK history
+and actual mapped boot/wait/Undo. Both tests run in run.lua.
+
+The established phase capability snapshot is used for unit and map FLOAT inside
+the batch. Native unit FLOAT is a stored status value, but floating_level()
+re-tests scoped LEVEL FLOAT conditions after each earlier relocation. Exact
+intra-batch conditional map-layer/remaining declaration re-evaluation is still a
+shared scoped-query gap; this oracle isolates unconditional supplied status/layers.
+Particles/sound and native callback timing remain deferred frontend/host work.

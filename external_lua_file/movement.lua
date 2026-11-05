@@ -1320,12 +1320,38 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
     local falls={fall={0,20},fallright={35,0},fallup={0,-20},fallleft={-35,0}}
     local direction=world.board_offset and old.direction or "Down"
     local rotation=old.rotation
+    local facing_written=false
+    local tele_count=0
+    local positions,tele_ids,history
     for index,trait in ipairs(traits or world.level_traits or {}) do
         if stop_index and index>=stop_index then break end
         local dx,dy=0,0
-        if trait=="chill" then
+        if trait=="tele" and tele_count<3 and not still then
+            tele_count=tele_count+1
+            if not positions then
+                positions,history,tele_ids={},{},unit_ids(world)
+                for _,id in ipairs(tele_ids) do local e=world.entities[id]
+                    positions[id]={x=e.x,y=e.y,direction=e.direction or "None"}
+                end
+            end
+            for _,id in ipairs(tele_ids) do
+                -- Original draws both coordinates before the FLOAT test.
+                state=(state*48271)%2147483647;local tx=state%world.width+1
+                state=(state*48271)%2147483647;local ty=state%world.height+1
+                local e=world.entities[id]
+                if has_capability(world,e,"float")==((counts.float or 0)>0) then
+                    local at=positions[id]
+                    if at.x~=tx or at.y~=ty then
+                        local to={x=tx,y=ty,direction=at.direction}
+                        history[#history+1]={kind="move",entity_id=id,from=at,to=to}
+                        positions[id]=to
+                    end
+                end
+            end
+        elseif trait=="chill" then
             state=(state*48271)%2147483647
             dir=state%4;direction=names[dir+1]
+            facing_written=true
             if not still and not sleep then dx,dy=table.unpack(vectors[dir+1]) end
         elseif trait=="move" or nudges[trait]~=nil then
             local travel=trait=="move" and dir or nudges[trait]
@@ -1340,12 +1366,20 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
             rotation=((dir+1)%4)*90
             dir=(dir+(trait=="turn" and -1 or 1))%4
             direction=names[dir+1]
+            facing_written=true
         end
         x,y=x+dx,y+dy
     end
     local result={consumes_turn=true,changes={},reason="level_motion"}
-    if x~=old.x or y~=old.y or state~=original and direction~=old.direction
-        or (rotation or 0)~=(old.rotation or 0) or direction~=old.direction and rotation~=nil then
+    if positions then
+        for _,id in ipairs(tele_ids) do local e,to=world.entities[id],positions[id]
+            if e.x~=to.x or e.y~=to.y then result.changes[#result.changes+1]={kind="move",entity_id=id,
+                from={x=e.x,y=e.y,direction=e.direction or "None"},to=to} end
+        end
+        if #history>0 then result.motion_history=history end
+    end
+    if x~=old.x or y~=old.y or facing_written and direction~=old.direction
+        or (rotation or 0)~=(old.rotation or 0) then
         result.board_shift={from={x=old.x,y=old.y,direction=old.direction,rotation=old.rotation},
             to={x=x,y=y,direction=direction,rotation=rotation}}
     end

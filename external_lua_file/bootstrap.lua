@@ -1171,11 +1171,41 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if not projected then return fail("level_motion_project",why) end
         local motion,why=services.level_motion(projected,traits)
         if not motion then return fail("level_motion",why) end
-        if motion.board_shift or motion.random_state then
+        if motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 then
             plan.stages[#plan.stages+1]={name="level_motion",plan=motion}
+            for _,change in ipairs(motion.changes) do plan.changes[#plan.changes+1]=change end
             local checked,why,phase=services.preview(world,plan)
             if not checked then return fail("level_motion_complete",why,phase) end
             trace[#trace+1]="level_motion"
+            if #(motion.motion_history or {})>0 then
+                local verified,why,updated_relations,updated_rules,status=services.evaluate(checked)
+                if verified and status and #status.changes>0 then
+                    local updates={}
+                    for _,row in ipairs(motion.motion_history) do updates[#updates+1]={kind="move",entity_id=row.entity_id} end
+                    if reading_changed(final,updates,rules) then
+                        local updated,err=services.preview(checked,status)
+                        if not updated then return fail("code_status_after_level_motion",err) end
+                        plan.stages[#plan.stages+1]={name="code_status_after_level_motion",plan=status}
+                        for _,change in ipairs(status.changes) do plan.changes[#plan.changes+1]=change end
+                        checked=updated;trace[#trace+1]="code_status_after_level_motion"
+                        verified,why,updated_relations,updated_rules=services.evaluate(checked)
+                    end
+                end
+                if not verified then
+                    if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then lock_compile_failure(plan,why)
+                    else return fail("level_motion_final_rules",why) end
+                else
+                    -- Only late outcome queries use the new code. Contacts do not rerun.
+                    plan.contact_frame=updated_rules;plan.level_traits=level_traits_from(updated_relations)
+                    if services.level_traits then plan.level_traits,why=services.level_traits(checked,updated_rules) end
+                    if not plan.level_traits then return fail("level_motion_final_traits",why) end
+                    local projected,why=services.project(checked,verified,plan.level_traits)
+                    if not projected then return fail("level_motion_final_project",why) end
+                    for _,entity in pairs(projected.entities) do
+                        if entity.behaviors.crash then plan.infinite_loop=true;plan.reason="infinite_loop";break end
+                    end
+                end
+            end
         end
     end
     if level_destroy and not plan.infinite_loop and not plan.too_complex then

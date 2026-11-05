@@ -159,6 +159,61 @@ local s=fixture({{'LEVEL','IS','CHILL','AND','MOVE'}})
 local n,p=turn(s);assert(n.world.random_state==48271 and n.world.board_offset.x==0 and n.world.board_offset.y==2)
 assert(n.world.board_offset.direction=='Down')
 assert(p.stages[#p.stages].name=='level_motion')
+for count=1,4 do
+ local rows={};for i=1,count do rows[i]={'LEVEL','IS','TELE'} end
+ local tele=fixture(rows);local moved,p=turn(tele)
+ local expected=1;for i=1,2*3*count*math.min(3,count) do expected=(expected*48271)%2147483647 end
+ assert(moved.world.random_state==expected and not moved.world.board_offset,'LEVEL TELE RNG must not write map facing')
+ local journal
+ for _,stage in ipairs(p.stages) do if stage.name=='level_motion' then journal=stage.plan.motion_history end end
+ assert(journal and #journal>0 and p.contact_frame,'late TELE must recompile moved Text before outcome queries')
+end
+local tele=fixture({{'LEVEL','IS','TELE'},{'TEXT','IS','FLOAT'}})
+local moved,p=turn(tele);assert(moved.world.random_state and not moved.world.board_offset)
+for id,e in pairs(tele.world.entities) do assert(moved.world.entities[id].x==e.x and moved.world.entities[id].y==e.y) end
+local tele=fixture({{'LEVEL','IS','TELE'},{'LEVEL','IS','STILL'}})
+local moved=turn(tele);assert(not moved.world.random_state)
+do
+ local saved=services.evaluate
+ local tele=fixture({{'LEVEL','IS','TELE'}})
+ services.evaluate=function(w)
+  if w.random_state then return nil,'injected_late_tele_failure' end
+  return saved(w)
+ end
+ local p,e=RW_PlanTurn(tele.world,{type='wait'},services)
+ assert(not p and e.stage=='level_motion_final_rules' and e.reason=='injected_late_tele_failure' and not tele.world.random_state)
+ services.evaluate=function(w) if w.random_state then return nil,'rule_complexity_limit' end;return saved(w) end
+ local moved=turn(tele);assert(moved.world.too_complex and moved.world.random_state and not tele.world.random_state)
+ services.evaluate=function(w)
+  local effects,why,relations,rules,status=saved(w)
+  if effects and w.random_state then
+   local entity=w.entities[1]
+   status={consumes_turn=true,changes={},reason='injected_code_status'}
+   if entity.broken~=1 then status.changes[1]={kind='broken',entity_id=1,from=entity.broken,to=1} end
+  end
+  return effects,why,relations,rules,status
+ end
+ local moved,p=turn(tele);assert(moved.world.entities[1].broken==1)
+ local found=false;for _,stage in ipairs(p.stages) do if stage.name=='code_status_after_level_motion' then found=true end end
+ assert(found,'late TELE reading did not apply code-status barrier')
+ services.evaluate=function(w)
+  local effects,why,relations,rules,status=saved(w)
+  if effects and w.random_state then effects[#effects+1]={op='grant_trait',trait='crash',target={kind='id',value=1},entity_ids={1}} end
+  return effects,why,relations,rules,status
+ end
+ local moved=turn(tele);assert(moved.world.infinite_loop and moved.world.random_state,'late TELE CRASH did not lock the triggering board')
+ services.evaluate=saved
+end
+do
+ local s=RW_CreateSession();s.world.width,s.world.height=2,2;s.world.next_entity_id=2
+ s.world.entities={[1]={id=1,kind='object',class='object',archetype='rock',x=1,y=2,direction='Left',behaviors={}}}
+ local p=RW_ResolveLevelMotion(s.world,{'tele','tele'})
+ assert(#p.changes==0 and #p.motion_history==2 and not p.board_shift and p.random_state)
+ assert(RW_BackRetainDecision(s.world,p,false),'zero-net LEVEL TELE lost BACK history')
+ local n,r=RW_Commit(s,p);assert(r.accepted)
+ local rows=assert(RW_BackHistoryRows(s.world,RW_GetTurnRecord(n,1)));assert(#rows==2)
+ assert(RW_Undo(n).world==s.world)
+end
 local turned=fixture({{'LEVEL','IS','CHILL','AND','TURN','AND','MOVE'}})
 local t=turn(turned);assert(t.world.board_offset.x==-1 and t.world.board_offset.y==1
  and t.world.board_offset.direction=='Left' and t.world.board_offset.rotation==0)
@@ -279,6 +334,11 @@ do
  OnStart();assert(display.board_offset.direction=='Right' and display.board_offset.rotation==90 and depth==0)
  listeners.wait();assert(display.board_offset.x==1 and display.board_offset.y==0 and display.board_offset.rotation==90)
  listeners.undo();assert(display.board_offset.x==0 and display.board_offset.rotation==90 and depth==0)
+ w=fixture({{'LEVEL','IS','TELE'}}).world
+ OnStart();listeners.wait()
+ local expected=1;for i=1,6 do expected=(expected*48271)%2147483647 end
+ assert(display.random_state==expected and not display.board_offset and depth==1)
+ listeners.undo();assert(not display.random_state and display.entities[1].x==1 and display.entities[1].y==2 and depth==0)
  script,Enum,RW_Render,RW_GetNavigationDefinitions,printerr=old_script,old_enum,old_render,old_definitions,old_printerr
 end
 print('PASS: LEVEL start orientation/rotation and late MOVE/CHILL/nudges/FALL/TURN/DETURN, conditions/NOT/BROKEN, terminal order, RNG/rollback/Undo; '..cases..' installed motion/lock and '..start_cases..' startblock oracle cases')

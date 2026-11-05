@@ -45,3 +45,11 @@ Production tests cover phase order,
 collision bypass, denial, destination DEFEAT/HAS, deterministic replay/Undo and a
 teleported word creating Infinite Loop. Routine native acceptance is waived; no
 native success is inferred. MOTION is now 32x32 with a sparse loose TELE word.
+
+2026-11-05: scoped LEVEL TELE is now implemented separately in the late ordered
+map phase; see LEVEL_MOTION.md. It randomizes all same-layer real units, up to
+three passes, drawing two coordinates for every unit before layer filtering.
+It does not use the ordinary teleporter network or its BACK rider-suppression
+set. Atomic RNG/motion journals, late code/status/CRASH/limit handling and Undo
+are covered by7680 installed cases plus production scheduler/adapter tests.
+Conditional intra-batch map-layer/declaration re-evaluation remains documented.

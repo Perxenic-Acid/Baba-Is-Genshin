@@ -626,3 +626,4 @@ dofile('tests/reference_level_hot.lua')
 
 dofile('tests/reference_level_sink.lua')
 dofile('tests/reference_level_unlock.lua')
+dofile('tests/reference_level_bonus.lua')

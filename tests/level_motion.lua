@@ -103,12 +103,13 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
    weak=RW_LevelWeakDestroys,
    melt=RW_LevelMeltDestroys,
    outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}
-   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' or row.trait=='boom' or row.trait=='open' or row.trait=='shut' then outgoing=true end end
+   local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' or row.trait=='hot' or row.trait=='sink' or row.trait=='boom' or row.trait=='open' or row.trait=='shut' or row.trait=='bonus' then outgoing=true end end
    if not outgoing then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,motion) end
    local contents={};for _,r in ipairs(relations or {}) do if r.op=='has' or r.op=='empty_has' then contents[#contents+1]=r end end
    return RW_PlanScopedLevelSequence(raw,w,traits,rules,rows,{motion=motion,preview=RW_PreviewPlan,select=RW_ResolveScopedEatTargets,
     area_select=RW_ResolveScopedAreaTargets,
     unlock_select=RW_ResolveScopedUnlockTargets,unlock_empty=RW_LevelUnlockEmptyDestroys,
+    bonus_select=RW_ResolveScopedBonus,
     hot_declarations=RW_LevelHotDeclarations,hot_targets=RW_LevelHotTargets,
     hot_destroy=function(world,ids,r,view)
      local layers={};for _,id in ipairs(ids) do layers[id]=(view.entities[id].behaviors or {}).float==true end
@@ -181,6 +182,39 @@ do
  local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','MOVE'},{'ROCK','HAS','FLAG'}})
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1,'WEAK must retire map without suppressing later motion or triggering HAS')
  assert(n.world.next_entity_id==s.world.next_entity_id)
+ do
+ for _,you in ipairs({'YOU','YOU2'}) do
+  local s,id=outgoing({{'LEVEL','IS','BONUS'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','FLOAT'},{'ROCK','IS',you,'AND',you},{'ROCK','IS','FLOAT'},{'LEVEL','IS','MOVE'}})
+  local n,p=turn(s);assert(n.world.bonus_count==1 and n.world.entities[id] and n.world.board_offset.y==1)
+  local rewards=0;for _,event in ipairs(p.events or {}) do if event.kind=='bonus' and event.source=='level' then rewards=rewards+event.amount end end;assert(rewards==1)
+  local s,id=outgoing({{'LEVEL','IS','BONUS','AND','BONUS'},{'LEVEL','IS','SAFE'},{'LEVEL','IS',you}})
+  local n=turn(s);assert(n.world.bonus_count==2 and n.world.entities[id],'each scoped BONUS declaration rewards independently')
+  local s,id=outgoing({{'LEVEL','IS','BONUS'},{'LEVEL','IS','FLOAT'},{'ROCK','IS',you},{'ROCK','IS','FLOAT'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','CHILL'}})
+  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and not n.world.bonus_count and not n.world.random_state and n.world.next_entity_id==s.world.next_entity_id,'unsafe LEVEL BONUS returns without reward, HAS or suffix RNG')
+ end
+ local s,id=outgoing({{'LEVEL','IS','BONUS'},{'LEVEL','IS','SAFE'},{'EMPTY','IS','YOU2'}})
+ local n=turn(s);assert(n.world.bonus_count==1 and n.world.entities[id])
+ local s,id=outgoing({{'LEVEL','IS','BONUS'},{'LEVEL','IS','FLOAT'},{'ROCK','IS','YOU'}})
+ local n,p=turn(s);assert(not n.world.bonus_count and n.world.entities[id] and not p.level_destroy,'scoped BONUS FLOAT mismatch')
+ local saved=RW_ResolveScopedBonus
+ for _,reason in ipairs({'word_rule_limit','rule_complexity_limit','invalid_level_bonus'}) do
+  local s,id=outgoing({{'LEVEL','IS','BONUS','AND','BONUS'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','YOU'}})
+  local calls=0;RW_ResolveScopedBonus=function(...)calls=calls+1;if calls==2 then return nil,reason end;return saved(...) end
+  local p,e=RW_PlanTurn(s.world,{type='wait'},services)
+  if reason=='invalid_level_bonus' then assert(not p and e.reason==reason and not s.world.bonus_count)
+  else
+   local n,r=RW_Commit(s,p);assert(r.accepted and n.world.bonus_count==1 and (n.world.infinite_loop or n.world.too_complex) and RW_Undo(n).world==s.world)
+   local rewards=0;for _,event in ipairs(p.events) do if event.kind=='bonus' then rewards=rewards+1 end end;assert(rewards==1)
+  end
+ end
+ RW_ResolveScopedBonus=saved
+ local saved_motion=services.level_motion
+ services.level_motion=function(w,t,r,b,raw,relations,count)return saved_motion(w,t,r,1,raw,relations,count) end
+ local s=outgoing({{'LEVEL','IS','BONUS','AND','BONUS'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','YOU'}})
+ local n,p=turn(s);assert(n.world.too_complex and n.world.bonus_count==1)
+ local rewards=0;for _,event in ipairs(p.events) do if event.kind=='bonus' then rewards=rewards+1 end end;assert(rewards==1,'stage budget must not leak the uncommitted reward')
+ services.level_motion=saved_motion
+ end
  do
  for _,pair in ipairs({{'OPEN','SHUT'},{'SHUT','OPEN'}}) do
   local s,id=outgoing({{'LEVEL','IS',pair[1]},{'LEVEL','IS','FLOAT'},{'ROCK','IS',pair[2]},{'ROCK','IS','FLOAT'},{'ROCK','IS','SAFE'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','CHILL'}})
@@ -676,6 +710,9 @@ do
   OnStart();listeners.wait();assert(not display.entities[victim] and display.entities[victim+1].archetype=='flag' and depth==1)
   listeners.undo();assert(display.entities[victim] and not display.entities[victim+1] and depth==0)
  end
+ w=fixture({{'LEVEL','IS','BONUS','AND','BONUS'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','YOU2'}}).world
+ OnStart();listeners.wait();assert(display.bonus_count==2 and depth==1)
+ listeners.undo();assert(not display.bonus_count and depth==0)
  w=fixture({{'LEVEL','IS','MELT'},{'EMPTY','IS','HOT'},{'LEVEL','IS','CHILL'}}).world
  OnStart();listeners.wait();assert(not next(display.entities) and not display.random_state and depth==1)
  listeners.undo();assert(next(display.entities) and depth==0)

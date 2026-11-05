@@ -1338,7 +1338,7 @@ function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,b
     end
     local function append(phase,name)
         if phase.level_pending_destroy then result.level_pending_destroy=true end
-        if #phase.changes>0 or phase.board_shift or phase.random_state or #(phase.motion_history or {})>0 then
+        if #phase.changes>0 or phase.board_shift or phase.random_state or phase.bonus_state or #(phase.motion_history or {})>0 then
             if #result.level_stages>=(budget or 30) then lock_compile_failure(result,"rule_complexity_limit");return false end
             result.level_stages[#result.level_stages+1]={name=name,plan=phase}
             for _,op in ipairs(phase.changes) do result.changes[#result.changes+1]=op end
@@ -1397,6 +1397,21 @@ function RW_PlanScopedLevelSequence(world,projected,traits,rules,rows,services,b
                         local ok,why=append(phase,"hot");if ok==nil then return nil,why elseif not ok then return result end
                         local ok,why=refresh_view();if not ok then return failed(why) end
                     end
+                end
+            end
+        elseif row.trait=="bonus" then
+            local ok,why=flush();if ok==nil then return failed(why) elseif not ok then return result end
+            local active,why=services.motion.active(view,rules,row)
+            if active==nil then return failed(why) end
+            if active then
+                local selected,why=services.bonus_select(view,rules,projected.level_behaviors and projected.level_behaviors.safe==true)
+                if not selected then return failed(why) end
+                if selected.level_destroy then result.level_destroy=true;return result end
+                if selected.pickup then
+                    local count=current.bonus_count or 0
+                    local phase={consumes_turn=true,changes={},bonus_state={from=count,to=count+1},events={{kind="bonus",source="level",cause="level_bonus",amount=1}}}
+                    local ok,why=append(phase,"bonus");if ok==nil then return nil,why elseif not ok then return result end
+                    local ok,why=refresh_view();if not ok then return failed(why) end
                 end
             end
         elseif row.trait=="open" or row.trait=="shut" then
@@ -2393,7 +2408,7 @@ local function start(run_self_tests)
                 outcome=function(...) return properties_api:Invoke("RW_ResolveLevelPropertyOutcome",...) end,
                 resolve=function(...) return movement_api:Invoke("RW_ResolveLevelMotion",...) end,
                 layers=function(...) return rules_api:Invoke("RW_LevelTeleLayers",...) end}
-            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" or row.trait=="sink" or row.trait=="boom" or row.trait=="open" or row.trait=="shut" then outgoing=true;break end end
+            local outgoing=false;for _,row in ipairs(rows) do if row.op=="level_eat" or row.trait=="hot" or row.trait=="sink" or row.trait=="boom" or row.trait=="open" or row.trait=="shut" or row.trait=="bonus" then outgoing=true;break end end
             if not outgoing then return RW_PlanOrderedLevelMotion(world,traits,rules,rows,motion_services) end
             local contents={};for _,r in ipairs(relations or {}) do if r.op=="has" or r.op=="empty_has" then contents[#contents+1]=r end end
             return RW_PlanScopedLevelSequence(raw,world,traits,rules,rows,{
@@ -2402,6 +2417,7 @@ local function start(run_self_tests)
                 area_select=function(...) return rules_api:Invoke("RW_ResolveScopedAreaTargets",...) end,
                 unlock_select=function(...) return rules_api:Invoke("RW_ResolveScopedUnlockTargets",...) end,
                 unlock_empty=function(...) return rules_api:Invoke("RW_LevelUnlockEmptyDestroys",...) end,
+                bonus_select=function(...) return rules_api:Invoke("RW_ResolveScopedBonus",...) end,
                 hot_declarations=function(...) return rules_api:Invoke("RW_LevelHotDeclarations",...) end,
                 hot_targets=function(...) return rules_api:Invoke("RW_LevelHotTargets",...) end,
                 hot_destroy=function(w,ids,r,view)
@@ -2956,7 +2972,9 @@ local function start(run_self_tests)
         elseif event.kind=="all_done" then
             print(string.format("[RuleWorld] ALL DONE matched=%d required=%d",event.matched,event.required))
         elseif event.kind=="bonus" then
-            if event.source=="empty" then
+            if event.source=="level" then
+                print(string.format("[RuleWorld] BONUS level total=%d",next_tree.bonus_count or 0))
+            elseif event.source=="empty" then
                 print(string.format("[RuleWorld] BONUS empty=(%d,%d) total=%d",event.x,event.y,next_tree.bonus_count or 0))
             else
                 print(string.format("[RuleWorld] BONUS unit=%d collector=%d total=%d",event.entity_id,event.collector_id,next_tree.bonus_count or 0))

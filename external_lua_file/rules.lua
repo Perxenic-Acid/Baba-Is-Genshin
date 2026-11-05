@@ -290,12 +290,12 @@ end
 function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
-        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true,boom=true,open=true,shut=true}
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true,hot=true,sink=true,boom=true,open=true,shut=true,bonus=true}
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
             if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.trait=="boom" or d.trait=="open" or d.trait=="shut" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
+                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.trait=="hot" or d.trait=="sink" or d.trait=="boom" or d.trait=="open" or d.trait=="shut" or d.trait=="bonus" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -461,6 +461,14 @@ end
 function RW_LevelHotTargets(world,rules,declaration)
     return level_property_targets(world,rules,declaration,"melt")
 end
+local function scoped_level_target(world,target)
+    if target.kind~="archetype" then return false end
+    if target.value=="level_block" then return true end
+    for _,noun in pairs((world.language or {}).nouns or {}) do
+        if type(noun)=="table" and noun.tag=="level" and noun.block_type==target.value then return true end
+    end
+    return false
+end
 
 -- OPEN/SHUT queue every declaration before deleting. SAFE queries must finish
 -- even on the declaration that will destroy an unsafe map. Repeated IDs are
@@ -475,12 +483,12 @@ function RW_ResolveScopedUnlockTargets(world,rules,trait,level_safe)
         -- as synthetic declarations once, retaining standalone scoped hosts.
         local represented=0
         for _,rule in ipairs(frame) do for _,effect in ipairs(rule.effects or {}) do
-            if effect.op=="grant_trait" and effect.trait==opposite and effect.target.kind=="archetype" and effect.target.value=="level_block" then represented=represented+1 end
+            if effect.op=="grant_trait" and effect.trait==opposite and scoped_level_target(world,effect.target) then represented=represented+1 end
         end end
         for _,rule in ipairs(frame) do
             for _,effect in ipairs(rule.effects or {}) do
                 if effect.op=="grant_trait" and effect.trait==opposite and effect.target.kind~="empty" then
-                    if effect.target.kind=="archetype" and effect.target.value=="level_block" then
+                    if scoped_level_target(world,effect.target) then
                         local active,why=RW_LevelMotionDeclarationActive(world,rules,{trait=opposite,when=rule.when})
                         if active==nil then return nil,why end
                         if active and not level_safe then return {ids={},cells={},level_destroy=true} end
@@ -522,6 +530,64 @@ function RW_LevelUnlockEmptyDestroys(world,rules,trait,level_safe)
     local floating,why=query_level_trait(condition_context(world,rules),"float")
     if floating==nil then return nil,why end
     return (world.empty_float_declared==true)==floating and not level_safe
+end
+
+-- Native LEVEL BONUS scans YOU declarations, then YOU2, then EMPTY placeholders.
+-- An unsafe map returns through destroylevel("bonus") before MF_bonus is called.
+function RW_ResolveScopedBonus(world,rules,level_safe)
+    local context=condition_context(world,rules)
+    local found=false
+    for _,trait in ipairs({"you","you2"}) do
+        for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+            local represented=0
+            for _,rule in ipairs(frame) do for _,effect in ipairs(rule.effects or {}) do
+                if effect.op=="grant_trait" and effect.trait==trait and scoped_level_target(world,effect.target) then represented=represented+1 end
+            end end
+            for _,rule in ipairs(frame) do
+                for _,effect in ipairs(rule.effects or {}) do
+                    if effect.op=="grant_trait" and effect.trait==trait and effect.target.kind~="empty" then
+                        if scoped_level_target(world,effect.target) then
+                            local active,why=RW_LevelMotionDeclarationActive(world,rules,{trait=trait,when=rule.when})
+                            if active==nil then return nil,why end
+                            found=found or active
+                            if active and not level_safe then return {level_destroy=true} end
+                        else
+                            local ids,why=level_property_targets(world,rules,{target=effect.target,when=rule.when},trait)
+                            if not ids then return nil,why end
+                            for _,id in ipairs(ids) do
+                                local floating,why=query_level_trait(context,"float")
+                                if floating==nil then return nil,why end
+                                if ((world.entities[id].behaviors or {}).float==true)==floating then
+                                    found=true
+                                    if not level_safe then return {level_destroy=true} end
+                                end
+                            end
+                        end
+                    end
+                end
+                for _,d in ipairs(rule.scoped_conditions or {}) do
+                    if d.op=="level_trait" and d.trait==trait then
+                        if represented>0 then represented=represented-1
+                        else
+                            local active,why=RW_LevelMotionDeclarationActive(world,rules,d)
+                            if active==nil then return nil,why end
+                            found=found or active
+                            if active and not level_safe then return {level_destroy=true} end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if world.empty_control_declared or world.empty_control2_declared then
+        local floating,why=query_level_trait(context,"float")
+        if floating==nil then return nil,why end
+        if (world.empty_float_declared==true)==floating then
+            found=true
+            if not level_safe then return {level_destroy=true} end
+        end
+    end
+    return {pickup=found}
 end
 
 -- One outgoing LEVEL EAT declaration, before any of its selected deletions.

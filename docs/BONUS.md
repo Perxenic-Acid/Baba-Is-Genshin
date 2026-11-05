@@ -57,3 +57,34 @@ reward per scan, cell-local HAS, SAFE suppressing the empty pickup, matching-lay
 scoped LEVEL YOU, atomic counters/events, campaign reload and whole-tree Undo.
 Real BONUS multiplicity/SAFE behavior is unchanged. Synthetic LEVEL BONUS remains
 pending; see [EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md) for source evidence and tests.
+
+## Scoped LEVEL BONUS
+
+Installed blocks.lua2993-3080 processes all YOU declarations, then YOU2 (3D is
+excluded by user scope). Matching real collectors use stored FLOAT against current
+map FLOAT; scoped LEVEL collectors need no real witness or layer comparison.
+EMPTY YOU/YOU2 uses its declared placeholder and global FLOAT even without eligible
+vacant cells. Target SAFE is irrelevant. On a captured-SAFE map, one active BONUS
+row awards exactly one bonus, regardless of collector/grant multiplicity; repeated
+physical BONUS rows award separately. The map and collectors remain.
+
+An unsafe map immediately calls destroylevel("bonus") and returns before MF_bonus.
+tools.lua1533-1622 confirms that deferred destruction also does not issue a reward.
+This path therefore clears the board without HAS or bonus increment and skips
+later scoped motion/RNG. This deliberately differs from ordinary BONUS pickup.
+
+RW_ResolveScopedBonus implements current raw collector queries; the ordered scoped
+scheduler commits each reward as a stale-checked bonus_state child stage, with a
+transient source="level" event dispatched only after outer Commit. Counter-only
+stages consume the shared flat-stage budget. Prefix compile limits retain earlier
+awards/events; ordinary errors reject everything. Existing campaign-delta accounting
+and whole-tree Undo apply to the same local counter without special UI state.
+
+tests/reference_level_bonus.lua executes the installed branch in1024 combinations
+and compares production rewards/returns. Extra cases cover physical Text, BROKEN
+and NOT collectors. Turn/mapped input cases cover duplicate rows, counter-only
+stages, suffix motion, unsafe no-reward/no-HAS/no-RNG, EMPTY, limit/error prefixes,
+stage budget and whole-tree Undo. Native saving/AV and broader scoped condition/
+host-boundary timing gaps remain deferred; synthetic LEVEL BONUS is now supported.
+Custom typed LEVEL block archetypes are recognized as synthetic collectors and
+complementary OPEN/SHUT declarations even with no physical entrance present.

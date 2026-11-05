@@ -1278,6 +1278,54 @@ function RW_ResolveOrientation(world)
     return {consumes_turn=true,changes=changes,reason="orientation"}
 end
 
+-- Synthetic LEVEL motion belongs to late levelblock(), not unit collection.
+-- The caller supplies the surviving ordered declarations up to any terminal.
+function RW_ResolveLevelMotion(world,traits,stop_index)
+    local old=world.board_offset or {x=0,y=0,direction="None"}
+    local names={"Right","Up","Left","Down"}
+    local indices={Right=0,Up=1,Left=2,Down=3,Mid=4,None=4}
+    local vectors={{1,0},{0,-1},{-1,0},{0,1},{0,0}}
+    -- Original clears.lua/load.lua initialize mapdir=3. Keep absent state lazy.
+    local dir=world.board_offset and indices[old.direction] or 3
+    local counts={}
+    for _,trait in ipairs(traits or world.level_traits or {}) do counts[trait]=(counts[trait] or 0)+1 end
+    local reverse=(counts.reverse or 0)%2==1
+    local lockdir=dir
+    if reverse and lockdir<4 then lockdir=(lockdir+2)%4 end
+    local locks={"lockedright","lockedup","lockedleft","lockeddown"}
+    -- levelblock captures this once, before CHILL changes mapdir.
+    local still=counts.still~=nil or locks[lockdir+1] and counts[locks[lockdir+1]]~=nil
+    local sleep=counts.sleep~=nil
+    local x,y=old.x,old.y
+    local state=world.random_state or 1;local original=state
+    local nudges={nudgeright=0,nudgeup=1,nudgeleft=2,nudgedown=3}
+    local falls={fall={0,20},fallright={35,0},fallup={0,-20},fallleft={-35,0}}
+    local direction=world.board_offset and old.direction or "Down"
+    for index,trait in ipairs(traits or world.level_traits or {}) do
+        if stop_index and index>=stop_index then break end
+        local dx,dy=0,0
+        if trait=="chill" then
+            state=(state*48271)%2147483647
+            dir=state%4;direction=names[dir+1]
+            if not still and not sleep then dx,dy=table.unpack(vectors[dir+1]) end
+        elseif trait=="move" or nudges[trait]~=nil then
+            local travel=trait=="move" and dir or nudges[trait]
+            if reverse and travel<4 then travel=(travel+2)%4 end
+            if not still and not sleep then dx,dy=table.unpack(vectors[travel+1]) end
+        elseif falls[trait] and not still then
+            dx,dy=table.unpack(falls[trait])
+            if reverse then dx,dy=-dx,-dy end
+        end
+        x,y=x+dx,y+dy
+    end
+    local result={consumes_turn=true,changes={},reason="level_motion"}
+    if x~=old.x or y~=old.y or state~=original and direction~=old.direction then
+        result.board_shift={from={x=old.x,y=old.y,direction=old.direction},to={x=x,y=y,direction=direction}}
+    end
+    if state~=original then result.random_state={from=original,to=state} end
+    return result
+end
+
 -- Autonomous impulses reuse the ordinary collision/destruction solver.
 function RW_ResolveAutomatic(world,empty_directions)
     local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}

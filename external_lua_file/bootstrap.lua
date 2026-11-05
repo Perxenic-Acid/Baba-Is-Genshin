@@ -1131,6 +1131,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         local orientation,why=services.orient(projected)
         if not orientation then return fail("orientation",why) end
         if #orientation.changes>0 then
+            final_world,final_effects,final_relations,final_rules=nil,nil,nil,nil
             plan.stages[#plan.stages+1]={name="orientation",plan=orientation}
             for _,change in ipairs(orientation.changes) do plan.changes[#plan.changes+1]=change end
             local checked,why,phase=services.preview(world,plan)
@@ -1149,6 +1150,32 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 else return fail("orientation_final_rules",why) end
             end
         end
+        end
+    end
+    if services.level_motion and not plan.infinite_loop and not plan.too_complex and not level_destroy then
+        local final,why,phase=final_world
+        if not final then final,why,phase=services.preview(world,plan) end
+        if not final then return fail("level_motion_preview",why,phase) end
+        local effects,relations,rules=final_effects,final_relations,final_rules
+        if not effects then effects,why,relations,rules=services.evaluate(final) end
+        if not effects then
+            if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
+                lock_compile_failure(plan,why);return plan,nil,trace
+            end
+            return fail("level_motion_rules",why)
+        end
+        local traits=level_traits_from(relations)
+        if services.level_traits then traits,why=services.level_traits(final,rules) end
+        if not traits then return fail("level_motion_traits",why) end
+        local projected,why=services.project(final,effects,traits)
+        if not projected then return fail("level_motion_project",why) end
+        local motion,why=services.level_motion(projected,traits)
+        if not motion then return fail("level_motion",why) end
+        if motion.board_shift or motion.random_state then
+            plan.stages[#plan.stages+1]={name="level_motion",plan=motion}
+            local checked,why,phase=services.preview(world,plan)
+            if not checked then return fail("level_motion_complete",why,phase) end
+            trace[#trace+1]="level_motion"
         end
     end
     if level_destroy and not plan.infinite_loop and not plan.too_complex then
@@ -2077,6 +2104,17 @@ local function start(run_self_tests)
     turn_services.back_retain=function(world,plan,active) return world_api:Invoke("RW_BackRetainDecision",world,plan,active) end
     turn_services.fall=function(world) return movement_api:Invoke("RW_ResolveFall",world) end
     turn_services.orient=function(world) return movement_api:Invoke("RW_ResolveOrientation",world) end
+    turn_services.level_motion=function(world,traits)
+        local stop
+        for index,trait in ipairs(traits) do
+            if trait=="win" or trait=="defeat" or trait=="end" then
+                local terminal,why=properties_api:Invoke("RW_ResolveLevelPropertyOutcome",world,{trait})
+                if why then return nil,why end
+                if terminal then stop=index;break end
+            end
+        end
+        return movement_api:Invoke("RW_ResolveLevelMotion",world,traits,stop)
+    end
     turn_services.automatic=function(world,_,rules)
         local directions,why=rules_api:Invoke("RW_CollectEmptyMotionDirections",world,rules)
         if not directions then return nil,why end

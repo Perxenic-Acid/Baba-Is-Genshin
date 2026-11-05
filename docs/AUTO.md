@@ -78,3 +78,8 @@ subsystem gaps. Real unit processing remains sorted serial resolution, not the f
 original mutable collision-state scheduler. Native timer cadence and UI bindings
 must be handled separately from pure command planning; source Lua exposes native
 AUTO_DELAY state but does not define a portable wall-clock period.
+
+2026-11-05: the shared synthetic motion gap is partially closed: LEVEL MOVE,
+CHILL, cardinal nudges and four FALL variants now execute in a separate late
+ordered phase. See LEVEL_MOTION.md. This does not alter AUTO's host clock/queue
+integration or establish native pulse boundary dispatch timing.

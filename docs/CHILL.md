@@ -30,3 +30,8 @@ not the original fixedrandom sequence. The existing automatic solver serializes
 units; exact original multi-unit collision-state scheduling remains a motion gap.
 The oracle covers collection, not the complete original movement solver.
 Frontend and authored level design remain deferred.
+
+2026-11-05: scoped LEVEL CHILL is now implemented separately in the late ordered
+level_motion stage, including draws while SLEEP/STILL, no CHILL REVERSE, atomic
+RNG/facing/scroll and Undo. See LEVEL_MOTION.md for source/oracle coverage and
+remaining synthetic map orientation/other motion scope.

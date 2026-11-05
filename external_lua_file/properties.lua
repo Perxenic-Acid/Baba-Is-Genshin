@@ -193,10 +193,27 @@ function RW_ProjectWorld(world, effects, level_traits)
             end
         end
     end
+    -- Ordered physical declaration groups are transient projection data. Counts
+    -- alone cannot reconstruct YOU-before-YOU2 or BONUS declaration dispatch.
+    projected.bonus_contact_groups={control={},control2={},bonus={}}
+    local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
+            for _,capability in ipairs({"control","control2","bonus"}) do if behavior[capability] then
+                local group={}
+                for _,id in ipairs(effect.entity_ids) do
+                    if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
+                end
+                table.sort(group,function(a,b)
+                    local ra,rb=unit_rank[a],unit_rank[b]
+                    if ra and rb then return ra<rb end
+                    if ra then return true elseif rb then return false end
+                    return a<b
+                end)
+                projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group
+            end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
             -- Retain holes even when this declaration has no eligible vacancy.
             local motion_slot
@@ -494,6 +511,25 @@ end
 -- BONUS awards per physical property instance and YOU instance, before deleting
 -- unsafe products. SAFE protects removal only; duplicate pickup events survive.
 function RW_ResolveBonusContacts(world)
+    if world.bonus_contact_groups then
+        local groups=world.bonus_contact_groups;local victims,events,removed={},{},{}
+        for _,capability in ipairs({"control","control2"}) do
+            for _,actors in ipairs(groups[capability] or {}) do for _,id in ipairs(actors) do
+                local actor=world.entities[id]
+                for _,targets in ipairs(groups.bonus or {}) do for _,other_id in ipairs(targets) do
+                    local target=world.entities[other_id]
+                    if actor.x==target.x and actor.y==target.y and (actor.behaviors.float==true)==(target.behaviors.float==true) then
+                        events[#events+1]={kind="bonus",entity_id=other_id,collector_id=id,x=target.x,y=target.y,amount=1}
+                        if not target.behaviors.safe and not removed[other_id] then
+                            removed[other_id]=true;victims[#victims+1]=other_id
+                        end
+                    end
+                end end
+            end end
+        end
+        return victims,events
+    end
+    -- Legacy diagnostic snapshots may provide only capabilities and counts.
     local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
     local registry=world.behavior_registry or BEHAVIORS
     local function count(id,capability)

@@ -45,18 +45,17 @@ state. Non-limit failures reject the entire transaction.
 
 ## Remaining scope
 
-Synthetic scoped LEVEL/virtual EMPTY BONUS contacts and native campaign reward UI
-are not implemented. Cross-platform persistent saving belongs to later host work.
+Native campaign reward UI and cross-platform persistent saving belong to later
+host work. Synthetic LEVEL and virtual EMPTY routes are described below.
 The installed removal-array/fixed-ID aliasing accident is not mapped onto our small
-persistent identity allocator. Physical unitlist ordering is sorted IDs here; the
-ordinary engine's serial handledels condition-order differences remain documented
-contact-system gaps. This does not claim full original board/event scheduling parity.
+persistent identity allocator. Ordinary engine condition-dispatch differences remain
+documented contact-system gaps. This does not claim full original board/event scheduling parity.
 
 M9.8K adds virtual EMPTY BONUS through its separate native late-cell scan: one
 reward per scan, cell-local HAS, SAFE suppressing the empty pickup, matching-layer
 scoped LEVEL YOU, atomic counters/events, campaign reload and whole-tree Undo.
-Real BONUS multiplicity/SAFE behavior is unchanged. Synthetic LEVEL BONUS remains
-pending; see [EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md) for source evidence and tests.
+Real BONUS multiplicity/SAFE behavior is unchanged. See
+[EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md) for source evidence and tests.
 
 ## Scoped LEVEL BONUS
 
@@ -143,3 +142,32 @@ SAFE protection, defeat priority, suffix RNG, late-query terminal/error prefixes
 and mapped production wait/whole-tree Undo. Existing scoped condition dispatch,
 saved surroundings, grouped earlier contacts and native host-boundary timing
 remain shared limits; no complete native scheduler parity is claimed.
+
+## Ordinary BONUS declaration and unit order
+
+Installed features.lua319-383 getunitswitheffect returns one collector per physical
+declaration/unit instance; blocks.lua1788-1830 concatenates YOU then YOU2, then
+queries each BONUS declaration separately through tools.lua236-269 findtype.
+handledels (blocks.lua1927+) deletes the first occurrence of each queued identity.
+The former count-only implementation preserved totals but grouped events by sorted
+identity and also sorted victims, losing declaration order before HAS allocation.
+
+RW_ProjectWorld now publishes transient bonus_contact_groups with control/control2/
+bonus declaration lists, filtering denied grants and retaining duplicates. Each
+group uses world.unit_order, then sorted missing IDs for diagnostic compatibility.
+RW_ResolveBonusContacts traverses both channels and target groups in that order;
+unsafe victims retain first encounter order. Manual diagnostic worlds without the
+projection metadata keep their capability/count fallback. No dispatch metadata is
+committed to raw worlds, allocators, boundaries or Undo.
+
+tests/reference_bonus_order.lua executes unchanged installed getunitswitheffect,
+findtype, pickup loops and handledels in2048 cases, comparing the complete reward
+event sequence and unique deletion order. Cases include same-noun stacks, reversed
+unit/declaration order, both control channels, duplicates and SAFE/FLOAT. A production
+bonus plan verifies resulting HAS allocation order, rewards and Undo. Existing
+72-case ordinary BONUS tests retain their multiplicity/self-contact coverage.
+
+Scope: current unit_order supplies the per-name and projected cell order. Exact
+original per-cell arrival-list mutation after movement is not represented separately;
+that belongs to the existing mutable scheduling gap. Raw condition query call timing
+also remains projected rather than repeated per collector; no full parity is claimed.

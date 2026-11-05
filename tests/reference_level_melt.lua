@@ -58,3 +58,53 @@ do
  local destroys,why,stop=RW_LevelMeltDestroys(p,{})
  assert(destroys and not why and stop,'full board lost conditional EMPTY HOT placeholder')
 end
+
+-- One HOT declaration must query concrete units in native unit-list order,
+-- including after structural replacement/reinsertion changed identity order.
+do
+ local tools=read('tools.lua');local first=assert(tools:find('function findall(',1,true));local last=assert(tools:find('\nfunction ',first+1,true))
+ assert(load(tools:sub(first,last-1),'@installed_melt_findall_order','t',env))()
+ local session=RW_CreateSession();local w=session.world
+ w.entities={};w.unit_order={11,10};w.level_behaviors={};w.next_entity_id=12
+ local objects={};for _,id in ipairs({10,11}) do
+  w.entities[id]={id=id,kind='object',class='object',archetype='rock',x=id-9,y=1,direction='Right',behaviors={}}
+  objects[id]={values={id-9,1,0},strings={'rock','object'},broken=0}
+ end
+ local trace={};env.unitlists={rock={11,10}};env.mmf={newObject=function(id)return objects[id] end}
+ env.getname=function()return 'rock' end
+ env.testcond=function(_,id)trace[#trace+1]=id;return true end
+ env.findall({'rock',{{'oracle',{}}}})
+ assert(#trace==2 and trace[1]==11 and trace[2]==10)
+ local original=RW_TestEntityCondition;local actual={}
+ RW_TestEntityCondition=function(world,c,e)
+  if c.oracle_marker then actual[#actual+1]=e.id;return true end
+  return original(world,c,e)
+ end
+ local rules={{when={op='spatial',clauses={},oracle_marker=true},effects={{op='grant_trait',trait='hot',target={kind='archetype',value='rock'}}}}}
+ local ok,why=pcall(RW_LevelMeltDestroys,w,rules);RW_TestEntityCondition=original;assert(ok,why)
+ assert(#actual==#trace and actual[1]==trace[1] and actual[2]==trace[2],'MELT HOT condition queries lost native unit-list order')
+ for _,order in ipairs({{11,10},{10,11}}) do
+  w.unit_order=order;env.unitlists.rock=order
+  env.testcond=function(_,id)error(id==11 and 'invalid_hot_condition' or 'word_rule_limit',0) end
+  local native_ok,native_reason=pcall(env.findall,{'rock',{{'oracle',{}}}})
+  assert(not native_ok)
+  RW_TestEntityCondition=function(world,c,e)
+   if c.oracle_marker then return nil,e.id==11 and 'invalid_hot_condition' or 'word_rule_limit' end
+   return original(world,c,e)
+  end
+  local ok,p,why=pcall(RW_PlanOrderedLevelMotion,w,{'tele','melt'},rules,
+   {{op='level_trait',trait='tele'},{op='level_trait',trait='melt'}},
+   {active=function()return true end,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers,
+    reverse=RW_LevelMotionReverse,melt=RW_LevelMeltDestroys})
+  RW_TestEntityCondition=original;assert(ok,p)
+  if native_reason=='invalid_hot_condition' then assert(not p and why==native_reason)
+  else
+   assert(native_reason=='word_rule_limit' and p.infinite_loop and p.random_state)
+   local next_session,result=RW_Commit(session,p);assert(result.accepted,result.reason)
+   assert(next_session.world.infinite_loop and next_session.world.random_state==p.random_state.to)
+   assert(RW_Undo(next_session).world==w)
+  end
+ end
+ assert(not w.random_state and w.entities[10].x==1 and w.entities[11].x==2)
+end
+print('PASS: installed findall MELT HOT condition dispatch follows replacement-aware unit_order')

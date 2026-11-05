@@ -375,7 +375,13 @@ function RW_LevelMeltDestroys(world,rules)
         local hot,why=query_level_trait(context,"hot")
         if hot==nil then return nil,why end
         pending=hot
-        for _,entity in pairs(world.entities) do
+        local ids,seen,remaining={},{},{}
+        for _,id in ipairs(world.unit_order or {}) do
+            if world.entities[id] and not seen[id] then ids[#ids+1]=id;seen[id]=true end
+        end
+        for id in pairs(world.entities) do if not seen[id] then remaining[#remaining+1]=id end end
+        table.sort(remaining);for _,id in ipairs(remaining) do ids[#ids+1]=id end
+        for _,id in ipairs(ids) do local entity=world.entities[id]
             local hot,why=query_trait(context,entity,"hot")
             if hot==nil then return nil,why end
             if hot then

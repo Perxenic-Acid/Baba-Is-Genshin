@@ -263,3 +263,14 @@ Production projection/turn/mapped-adapter tests cover SAFE/FLOAT, self-HOT,
 EMPTY early return, before/after EAT witnesses, HAS/allocator, motion and Undo.
 Native host boundary timing and complete original declaration-query dispatch order
 remain shared scope limits. Other scoped destruction actions remain pending.
+
+MELT HOT query-order follow-up: real hot-source queries now traverse maintained
+world.unit_order, with sorted legacy IDs only as a fallback. Native findall uses
+the target unit list, including replacement/reinsertion order. An installed
+findall regression with one HOT declaration fails under pairs traversal and
+passes after this change. Injected diagnostics verify the practical distinction:
+an earlier ordinary condition error rejects preceding TELE atomically, whereas
+an earlier WORD limit commits its RNG/motion prefix into Infinite Loop. Both
+orders leave the source world untouched. This closes real-unit ordering within
+one target declaration; cross-declaration and scoped-versus-real dispatch order
+remain the documented broader limitation.

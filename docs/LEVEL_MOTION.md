@@ -230,7 +230,7 @@ not an ordinary overlap or a WEAK contact on a physical entrance.
 Unlike incoming/outgoing EAT map retirement, this native branch does not return:
 tools.lua1533 only sets the delayed destruction flag. Preserve subsequent map
 motion, RNG and EAT/HAS stages before final no-HAS map erasure. A transient
-level_weak_destroy flag carries this fact across motion chunks; the scheduler
+level_pending_destroy flag carries this fact across motion chunks; the scheduler
 consumes it after the entire ordered loop. Nothing is saved on world or Undo.
 Compile-limit prefixes retain the existing only-Undo policy; ordinary errors
 reject the complete transaction. Earlier terminal returns retain their order.
@@ -240,3 +240,26 @@ plus late query failure prefixes. level_motion.lua covers SAFE/FLOAT, subsequent
 motion and EAT/HAS/CHILL, allocator/no-HAS erasure, local Undo and actual mapped
 OnStart/input/whole-tree Undo. These are offline checks. Other scoped destruction
 actions and complete original levelblock scheduling remain pending.
+
+## Scoped LEVEL MELT
+
+Installed blocks.lua2757-2785 distinguishes real/scoped HOT from virtual EMPTY
+HOT. Real HOT declarations query current source identities/conditions/BROKEN and
+stored FLOAT; source SAFE does not protect the map. Scoped HOT can melt the map
+itself. Captured map SAFE protects it. These paths set delayed destruction without
+returning, retaining later motion, RNG and EAT/HAS before final no-HAS erasure.
+
+EMPTY HOT instead uses findallfeature's declaration placeholder, not the number
+of qualifying vacancies. It can trigger on a full board or a failed conditional
+cell list; EMPTY FLOAT likewise uses declaration presence. With matching map
+FLOAT and unsafe map, this path returns immediately, skipping the ordered suffix.
+The projector now publishes transient empty_hot_declared beside the existing
+FLOAT/YOU/WIN/END metadata. No virtual entities, saved flags or host RNG are added.
+The shared pending flag is now named level_pending_destroy.
+
+reference_level_melt.lua executes installed MELT, floating_level and
+findallfeature in3072 cases, including full boards and conditional placeholders.
+Production projection/turn/mapped-adapter tests cover SAFE/FLOAT, self-HOT,
+EMPTY early return, before/after EAT witnesses, HAS/allocator, motion and Undo.
+Native host boundary timing and complete original declaration-query dispatch order
+remain shared scope limits. Other scoped destruction actions remain pending.

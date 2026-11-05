@@ -41,7 +41,7 @@ do
    active=function()return true end,reverse=RW_LevelMotionReverse,outcome=RW_ResolveLevelPropertyOutcome,
    resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers,weak=function()return nil,reason end})
   if reason=='invalid_weak_query' then assert(not p and why==reason)
-  else assert(p and p.random_state and p.random_state.to==182605794 and not p.level_weak_destroy)
+  else assert(p and p.random_state and p.random_state.to==182605794 and not p.level_pending_destroy)
    assert(reason=='rule_complexity_limit' and p.too_complex or reason~='rule_complexity_limit' and p.infinite_loop)
   end
  end

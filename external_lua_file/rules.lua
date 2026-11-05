@@ -290,12 +290,12 @@ end
 function RW_LevelMotionDeclarations(world,rules)
     local selected={tele=true,move=true,chill=true,turn=true,deturn=true,
         nudgeright=true,nudgeup=true,nudgeleft=true,nudgedown=true,
-        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true}
+        fall=true,fallright=true,fallup=true,fallleft=true,win=true,defeat=true,["end"]=true,weak=true,melt=true}
     local rows,has_ordered={},false
     for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
         for _,rule in ipairs(frame) do for _,d in ipairs(rule.scoped_conditions or {}) do
             if d.op=="eat_level" or d.op=="level_eat" or d.op=="level_trait" and selected[d.trait] then
-                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
+                rows[#rows+1]=d;if d.trait=="tele" or d.trait=="weak" or d.trait=="melt" or d.op=="eat_level" or d.op=="level_eat" then has_ordered=true end
             end
         end end
     end
@@ -363,6 +363,34 @@ function RW_LevelWeakDestroys(world,rules)
         if ((entity.behaviors or {}).float==true)==floating then return true end
     end
     return false
+end
+
+-- Real/scoped HOT marks delayed destruction. The native EMPTY placeholder
+-- branch can additionally return from levelblock, even with no vacant cells.
+function RW_LevelMeltDestroys(world,rules)
+    local context=condition_context(world,rules)
+    local safe=world.level_behaviors and world.level_behaviors.safe==true
+    local pending=false
+    if not safe then
+        local hot,why=query_level_trait(context,"hot")
+        if hot==nil then return nil,why end
+        pending=hot
+        for _,entity in pairs(world.entities) do
+            local hot,why=query_trait(context,entity,"hot")
+            if hot==nil then return nil,why end
+            if hot then
+                local floating,why=query_level_trait(context,"float")
+                if floating==nil then return nil,why end
+                if ((entity.behaviors or {}).float==true)==floating then pending=true end
+            end
+        end
+    end
+    if world.empty_hot_declared then
+        local floating,why=query_level_trait(context,"float")
+        if floating==nil then return nil,why end
+        if (world.empty_float_declared==true)==floating and not safe then return true,nil,true end
+    end
+    return pending,nil,false
 end
 
 -- One outgoing LEVEL EAT declaration, before any of its selected deletions.

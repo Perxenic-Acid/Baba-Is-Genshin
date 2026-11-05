@@ -101,6 +101,7 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
    local motion={active=RW_LevelMotionDeclarationActive,
    reverse=RW_LevelMotionReverse,
    weak=RW_LevelWeakDestroys,
+   melt=RW_LevelMeltDestroys,
    outcome=RW_ResolveLevelPropertyOutcome,resolve=RW_ResolveLevelMotion,layers=RW_LevelTeleLayers}
    local outgoing=false;for _,row in ipairs(rows) do if row.op=='level_eat' then outgoing=true end end
    if not outgoing then return RW_PlanOrderedLevelMotion(w,traits,rules,rows,motion) end
@@ -171,6 +172,20 @@ do
  local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','MOVE'},{'ROCK','HAS','FLAG'}})
  local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1,'WEAK must retire map without suppressing later motion or triggering HAS')
  assert(n.world.next_entity_id==s.world.next_entity_id)
+ local s,id=outgoing({{'LEVEL','IS','MELT'},{'ROCK','IS','HOT'},{'ROCK','IS','SAFE'},{'LEVEL','IS','MOVE'},{'ROCK','HAS','FLAG'}})
+ local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1 and n.world.next_entity_id==s.world.next_entity_id,'SAFE HOT witnesses melt the map without HAS; later motion still runs')
+ local s,id=outgoing({{'LEVEL','IS','MELT'},{'ROCK','IS','HOT'},{'ROCK','IS','FLOAT'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(not p.level_destroy and n.world.entities[id] and n.world.board_offset.y==1)
+ local s,id=outgoing({{'LEVEL','IS','MELT'},{'LEVEL','IS','HOT'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(p.level_destroy and n.world.board_offset.y==1,'scoped self-HOT must not return before suffix')
+ local s,id=outgoing({{'LEVEL','IS','MELT'},{'EMPTY','IS','HOT'},{'LEVEL','IS','CHILL'}})
+ local n,p=turn(s);assert(p.level_destroy and not n.world.board_offset and n.world.random_state==s.world.random_state,'EMPTY HOT must return before CHILL')
+ local s,id=outgoing({{'LEVEL','IS','MELT'},{'EMPTY','IS','HOT'},{'EMPTY','IS','FLOAT'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(not p.level_destroy and n.world.entities[id] and n.world.board_offset.y==1)
+ local s,id=outgoing({{'LEVEL','EAT','ROCK'},{'LEVEL','IS','MELT'},{'ROCK','IS','HOT'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(not p.level_destroy and not n.world.entities[id] and next(n.world.entities) and n.world.board_offset.y==1,'earlier EAT removes the HOT witness before MELT')
+ local s,id=outgoing({{'LEVEL','IS','MELT'},{'LEVEL','EAT','ROCK'},{'ROCK','IS','HOT'},{'ROCK','HAS','FLAG'},{'LEVEL','IS','MOVE'}})
+ local n,p=turn(s);assert(p.level_destroy and not next(n.world.entities) and n.world.board_offset.y==1 and n.world.next_entity_id==s.world.next_entity_id+1,'MELT pending destruction must survive later EAT/HAS barriers')
  local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','SAFE'},{'LEVEL','IS','MOVE'}})
  local n,p=turn(s);assert(not p.level_destroy and n.world.entities[id] and n.world.board_offset.y==1)
  local s,id=outgoing({{'LEVEL','IS','WEAK'},{'LEVEL','IS','FLOAT'},{'LEVEL','IS','MOVE'}})
@@ -567,6 +582,9 @@ do
  OnStart();assert(next(display.entities) and depth==0)
  listeners.wait();assert(not next(display.entities) and display.board_offset.y==1 and depth==1)
  listeners.undo();assert(next(display.entities) and not display.board_offset and depth==0)
+ w=fixture({{'LEVEL','IS','MELT'},{'EMPTY','IS','HOT'},{'LEVEL','IS','CHILL'}}).world
+ OnStart();listeners.wait();assert(not next(display.entities) and not display.random_state and depth==1)
+ listeners.undo();assert(next(display.entities) and depth==0)
  w=fixture({{'LEVEL','IS','RIGHT'},{'LEVEL','IS','MOVE'}}).world
  OnStart();assert(display.board_offset.direction=='Right' and display.board_offset.rotation==90 and depth==0)
  listeners.wait();assert(display.board_offset.x==1 and display.board_offset.y==0 and display.board_offset.rotation==90)

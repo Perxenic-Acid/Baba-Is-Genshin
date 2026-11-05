@@ -77,5 +77,7 @@ s=fixture({{'ROCK','BECOME','EMPTY'}});n=step(s);assert(not n.world.entities[2])
 s=fixture({{'EMPTY','BECOME','FLAG'}});s.world.width,s.world.height=8,8
 n=step(s);assert(n.world.next_entity_id==s.world.next_entity_id+59)
 s=fixture({{'ROCK','BECOME','ALL'}})
-n=step(s);assert(n.world.entities[2].archetype=='rock' and n.world.next_entity_id==s.world.next_entity_id+#RW_NounPalette(s.world)-1)
+n=step(s);assert(n.world.entities[2].archetype=='rock' and n.world.next_entity_id==s.world.next_entity_id+2*#RW_NounPalette(s.world)-1)
+s=fixture({{'ROCK','BECOME','ALL'},{'ROCK','BECOME','NOT','ALL'},{'ROCK','BECOME','FLAG'}})
+n=step(s);assert(n.world.entities[2].archetype=='flag','NOT ALL cancels expanded products but preserves explicit BECOME FLAG')
 print('PASS: BECOME vs IS protection/NOT, self multiplicity, TEXT/EMPTY/ALL, conditions, links, MAKE converted tracking, no HAS and Undo')

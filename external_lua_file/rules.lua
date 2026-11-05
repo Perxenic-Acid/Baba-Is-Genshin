@@ -1676,7 +1676,7 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
                 if relation.op == "protect_transform" then protect=true
                 elseif relation.op == "forbid_transform" then bans[relation.target_type]=true
                 elseif relation.op=="forbid_become" then become_bans[relation.target_type]=true
-                elseif relation.op=="become" then choices[#choices+1]={become_target=relation.target_type}
+                elseif relation.op=="become" then choices[#choices+1]={become_target=relation.target_type,all_product=relation.origin=="@all"}
                 elseif relation.op == "write_text" then choices[#choices+1]={text_name=relation.target_text}
                 else choices[#choices+1]=relation.op == "transform_text" and "@text"
                     or relation.op == "transform_all" and "@all" or relation.target_type end
@@ -1713,7 +1713,7 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
             local denied=becoming and become_bans or bans
             if (becoming or (not protect and not bans[source])) and not denied[target]
                 and not (type(target)=="table" and denied["@text"])
-                and not (becoming and target=="@all" and become_bans["@all"]) then
+                and not (becoming and (target=="@all" or choice.all_product) and become_bans["@all"]) then
                 if target=="@all" then
                     if not virtual and entity.class~="text" then retain=true end
                     local empty_all
@@ -2033,7 +2033,7 @@ local function expand_mimic(ast_rules,world)
     local copy_lookup,all_queue={},{}
     local literal_products={}
     local function expanded_product_verb(verb)
-        return verb=="has" or verb=="make" or verb=="eat" or verb=="fear" or verb=="follow" or verb=="write"
+        return verb=="has" or verb=="make" or verb=="eat" or verb=="fear" or verb=="follow" or verb=="write" or verb=="become"
     end
     local function add_lookup(entry)
         copy_lookup[#copy_lookup+1]=entry
@@ -2135,6 +2135,8 @@ local function expand_mimic(ast_rules,world)
                         if literal_products[copied] and copied.verb=="write" then
                             copy.object={tag="literal",token=written_token(world,copied.object)}
                             result[#result+1]=copy
+                        elseif literal_products[copied] and copied.verb=="become" then
+                            copy.literal_all=true;result[#result+1]=copy
                         elseif not literal_products[copied] then result[#result+1]=copy end
                         count=count+1
                         if count>250 then return nil,"rule_complexity_limit" end
@@ -2611,6 +2613,13 @@ function RW_LowerRuleAST(ast_rules, registry, world)
                 if target and (not objnot or sem.negative_noun=="forbid_become") then
                     relations[#relations+1]={op=objnot and "forbid_become" or "become",source_type=key,
                         target_type=target,source=ast.source,when=query_clone(ast.when)}
+                    if target=="@all" and not objnot and not ast.literal_all then
+                        for _,name in ipairs(RW_NounPalette(world)) do
+                            local product={op="become",source_type=key,target_type=name,origin="@all",source=ast.source,when=query_clone(ast.when)}
+                            relations[#relations+1]=product
+                            if subnot or subj.tag=="special" and subj.name=="all" then relations[#relations+1]=query_clone(product) end
+                        end
+                    end
                     supported=true
                 end
             elseif sem and key and (ast.when.op == "always" or ast.when.op == "spatial") and sem.noun == "transform" then

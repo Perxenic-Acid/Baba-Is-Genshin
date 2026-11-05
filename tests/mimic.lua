@@ -216,3 +216,16 @@ for i=1,251 do ast[#ast+1]={verb='is',subject={tag='noun',type={tag='object',nam
 local g,err=RW_LowerRuleAST(ast,nil,s.world);assert(not g and err=='rule_complexity_limit')
 table.remove(ast);assert(RW_LowerRuleAST(ast,nil,s.world))
 print('PASS: MIMIC one generation, per-identity combined/negative conditions, self/duplicate conversions, limit and Undo')
+for _,case in ipairs({{subject={'CRATE'},factor=2},{subject={'NOT','ROCK'},factor=3}}) do
+ local row={};for _,word in ipairs(case.subject) do row[#row+1]=word end
+ row[#row+1]='BECOME';row[#row+1]='ALL'
+ s=fixture({row,{'ROCK','MIMIC','CRATE'}});n=step(s)
+ local counts={}
+ for _,unit in pairs(n.world.entities) do if unit.class=='object' and unit.x==6 and unit.y==3 then
+  counts[unit.archetype]=(counts[unit.archetype] or 0)+1
+ end end
+ for _,name in ipairs(RW_NounPalette(s.world)) do assert(counts[name]==case.factor,'MIMIC BECOME ALL product count: '..name) end
+end
+s=fixture({{'CRATE','BECOME','ALL'},{'CRATE','BECOME','NOT','ALL'},{'CRATE','BECOME','FLAG'},{'ROCK','MIMIC','CRATE'}})
+n=step(s);assert(n.world.entities[2].archetype=='flag','copied NOT ALL must preserve an explicit BECOME FLAG')
+print('PASS: MIMIC BECOME ALL literal/concrete paths, NOT subjects, own NOT ALL, explicit products and Undo')

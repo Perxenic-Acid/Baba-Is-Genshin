@@ -139,3 +139,24 @@ oracle for occupancy/IS NOT behavior. Current project BECOME ALL still lacks the
 concrete pre-expanded products; this is verified unfinished implementation, not
 parity established by the reference-only tests. Native conversion scheduling and
 literal-versus-explicit product ordering require their own comparison.
+
+## M9.9T concrete BECOME ALL products
+
+Lowering now retains the literal ALL relation and appends the installed
+subrules concrete products, including self. ALL/NOT subjects append both native
+expansion paths. Concrete derivatives carry ALL provenance so BECOME NOT ALL
+cancels them without vetoing a separate explicit target. The converter carries
+that provenance only in its transient selected choices. MIMIC expands BECOME ALL
+in its lookup and marks the raw copied AST as literal-only, preventing a second
+palette expansion when lowering the copied record. No marker is persisted in
+world entities or Undo facts.
+
+Focused transaction tests cover ordinary and negative-subject copied palettes,
+explicit BECOME FLAG surviving NOT ALL, allocator counts and Undo. The existing
+432-case original conversion oracle and the 192-case literal ALL oracle pass.
+Full regression passed; normal startup remains 1,438,000 instructions. Multiple literal ALL records with interleaved births
+still require a native scheduling comparison: the current converter checks each
+literal against its phase world, while original createall_single can observe
+products emitted earlier. The literal path's IS NOT filtering versus BECOME NOT
+filtering also needs separate parity work. This milestone does not claim those
+existing scheduler/negative-rule gaps are fixed.

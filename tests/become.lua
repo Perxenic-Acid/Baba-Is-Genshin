@@ -112,3 +112,9 @@ for _,same_cell in ipairs({false,true}) do
  end
 end
 print('PASS: literal ALL newborn occupancy crosses source identities within one cell and stays isolated between cells, with Undo')
+s=fixture({{'ROCK','BECOME','ALL'}})
+object(s.world,3,'rock',6.0,3.0)
+n=step(s);local numeric_counts={}
+for _,unit in pairs(n.world.entities) do if unit.class=='object' and unit.x==6 and unit.y==3 then numeric_counts[unit.archetype]=(numeric_counts[unit.archetype] or 0)+1 end end
+for _,name in ipairs(RW_NounPalette(s.world)) do assert(numeric_counts[name]==(name=='rock' and 4 or 3),'numeric-equivalent source coordinates must share literal occupancy: '..name) end
+print('PASS: mixed integer/float source coordinates share literal ALL birth occupancy and Undo')

@@ -1726,14 +1726,16 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
                     if virtual then empty_all={};products[#products+1]={empty_all=empty_all} end
                     for _,name in ipairs(RW_NounPalette(world)) do
                         if name~=source and not literal_denied[name] then
-                            local cell_key=entity.x..":"..entity.y
-                            local exists=literal_occupancy[cell_key] and literal_occupancy[cell_key][name] or false
+                            local column=literal_occupancy[entity.x]
+                            local cell=column and column[entity.y]
+                            local exists=cell and cell[name] or false
                             for _,other in pairs(world.entities) do
                                 if other.x==entity.x and other.y==entity.y and other.class~="text" and other.archetype==name then exists=true end
                             end
                             if not exists then
-                                literal_occupancy[cell_key]=literal_occupancy[cell_key] or {}
-                                literal_occupancy[cell_key][name]=true
+                                column=column or {};literal_occupancy[entity.x]=column
+                                cell=cell or {};column[entity.y]=cell
+                                cell[name]=true
                                 if empty_all then empty_all[#empty_all+1]=name else products[#products+1]=name end
                             end
                         end

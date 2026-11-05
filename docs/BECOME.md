@@ -201,3 +201,13 @@ Additional transaction coverage places two ROCK sources either on the same cell
 or on separate cells. Same-cell literal fills are shared across source IDs;
 separate cells each receive their full palette. Concrete duplicate products and
 retained ROCK identities remain distinct. Both routes exercise whole-turn Undo.
+
+## Numeric-equivalent literal occupancy coordinates
+
+A regression fixture with two same-cell ROCK sources at integer (6,3) and
+floating-integral (6.0,3.0) reproduced duplicate literal births: string keys
+separated coordinates that Lua numeric comparison and original numeric tile IDs
+treat as equal. The plan-local index now uses nested numeric x/y keys. The fixture
+fails before and passes after the change, including allocator/Undo checks; the
+192+24 installed literal ALL cases pass. Full regression passed; startup remains at 1,438,000 instructions. No world
+schema or persisted coordinate representation changes.

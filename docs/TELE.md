@@ -53,3 +53,7 @@ It does not use the ordinary teleporter network or its BACK rider-suppression
 set. Atomic RNG/motion journals, late code/status/CRASH/limit handling and Undo
 are covered by7680 installed cases plus production scheduler/adapter tests.
 Conditional intra-batch map-layer/declaration re-evaluation remains documented.
+
+Dynamic scoped map FLOAT is now rechecked per transported identity after preceding
+relocations; see LEVEL_MOTION.md and tests/level_tele_layers.lua. The remaining
+initial-trait-list declaration scheduling gap is distinct and remains deferred.

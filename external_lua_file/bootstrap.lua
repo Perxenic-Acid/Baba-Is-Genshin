@@ -1169,14 +1169,18 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if not traits then return fail("level_motion_traits",why) end
         local projected,why=services.project(final,effects,traits)
         if not projected then return fail("level_motion_project",why) end
-        local motion,why=services.level_motion(projected,traits)
+        local motion,why=services.level_motion(projected,traits,rules)
         if not motion then return fail("level_motion",why) end
-        if motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 then
+        if motion.board_shift or motion.random_state or #motion.changes>0 or #(motion.motion_history or {})>0 or motion.infinite_loop or motion.too_complex then
             plan.stages[#plan.stages+1]={name="level_motion",plan=motion}
             for _,change in ipairs(motion.changes) do plan.changes[#plan.changes+1]=change end
             local checked,why,phase=services.preview(world,plan)
             if not checked then return fail("level_motion_complete",why,phase) end
             trace[#trace+1]="level_motion"
+            if motion.infinite_loop or motion.too_complex then
+                plan.infinite_loop,plan.too_complex,plan.reason=motion.infinite_loop,motion.too_complex,motion.reason
+                return plan,nil,trace
+            end
             if #(motion.motion_history or {})>0 then
                 local verified,why,updated_relations,updated_rules,status=services.evaluate(checked)
                 if verified and status and #status.changes>0 then
@@ -2153,7 +2157,7 @@ local function start(run_self_tests)
         if not traits then return nil,why end
         return movement_api:Invoke("RW_ResolveLevelStart",world,traits)
     end
-    turn_services.level_motion=function(world,traits)
+    turn_services.level_motion=function(world,traits,rules)
         local stop
         for index,trait in ipairs(traits) do
             if trait=="win" or trait=="defeat" or trait=="end" then
@@ -2162,7 +2166,17 @@ local function start(run_self_tests)
                 if terminal then stop=index;break end
             end
         end
-        return movement_api:Invoke("RW_ResolveLevelMotion",world,traits,stop)
+        local motion,why=movement_api:Invoke("RW_ResolveLevelMotion",world,traits,stop)
+        if not motion then return nil,why end
+        if motion.tele_attempts then
+            local layers,reason,through=rules_api:Invoke("RW_LevelTeleLayers",world,rules,motion.tele_attempts)
+            if not layers then return nil,reason end
+            motion,why=movement_api:Invoke("RW_ResolveLevelMotion",world,traits,stop,layers,through)
+            if not motion then return nil,why end
+            if reason then lock_compile_failure(motion,reason) end
+            motion.tele_attempts=nil
+        end
+        return motion
     end
     turn_services.automatic=function(world,_,rules)
         local directions,why=rules_api:Invoke("RW_CollectEmptyMotionDirections",world,rules)

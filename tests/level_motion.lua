@@ -94,10 +94,18 @@ local services={project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_Previe
   births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},rules) end,
  evaluate=function(w) local f,e=RW_CompileWorld(w,cs);if not f then return nil,e.reason end
   return f.effects,nil,f.relations,f.rules,f.code_status end,
- level_motion=function(w,traits)
+ level_motion=function(w,traits,rules)
   local stop
   for index,trait in ipairs(traits) do if RW_ResolveLevelPropertyOutcome(w,{trait}) then stop=index;break end end
-  return RW_ResolveLevelMotion(w,traits,stop)
+  local p,e=RW_ResolveLevelMotion(w,traits,stop);if not p then return nil,e end
+  if p.tele_attempts then
+   local layers,why,through=RW_LevelTeleLayers(w,rules,p.tele_attempts)
+   if not layers then return nil,why end
+   p,e=RW_ResolveLevelMotion(w,traits,stop,layers,through);if not p then return nil,e end
+   if why then p.reason=why;if why=='rule_complexity_limit' then p.too_complex=true else p.infinite_loop=true end end
+   p.tele_attempts=nil
+  end
+  return p
  end}
 services.level_start=function(w)
  if not RW_LevelStartNeeded(w) then return {consumes_turn=true,changes={}} end

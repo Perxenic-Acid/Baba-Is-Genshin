@@ -247,6 +247,44 @@ query_level_trait=function(world,trait)
     end
     guard[key]=nil;return granted and not denied
 end
+-- Replay only TELE occupancy for per-unit synthetic-map layer queries.
+function RW_LevelTeleLayers(world,rules,attempts)
+    if type(world)~="table" or type(world.entities)~="table" or not dense_list(attempts) then
+        return nil,"invalid_level_tele_trace"
+    end
+    for _,attempt in ipairs(attempts) do
+        if type(attempt)~="table" or not world.entities[attempt.entity_id]
+            or type(attempt.x)~="number" or attempt.x%1~=0 or attempt.x<1 or attempt.x>world.width
+            or type(attempt.y)~="number" or attempt.y%1~=0 or attempt.y<1 or attempt.y>world.height then
+            return nil,"invalid_level_tele_trace"
+        end
+    end
+    local working={};for k,v in pairs(world) do working[k]=v end
+    working.entities={}
+    for id,e in pairs(world.entities) do
+        local copy={};for k,v in pairs(e) do copy[k]=v end;working.entities[id]=copy
+    end
+    local layers={}
+    for index,attempt in ipairs(attempts) do
+        -- Stored real-unit FLOAT is fixed for this phase. floating_level()
+        -- re-tests the map's raw FLOAT declarations after each earlier update.
+        local context=condition_context(working,rules)
+        local map_float,why=query_level_trait(context,"float")
+        if map_float==nil then
+            if why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit" then
+                layers[index]=false;return layers,why,index
+            end
+            return nil,why
+        end
+        local original=world.entities[attempt.entity_id]
+        layers[index]=((original.behaviors or {}).float==true)==map_float
+        if layers[index] then
+            local e=working.entities[attempt.entity_id];e.x,e.y=attempt.x,attempt.y
+        end
+    end
+    return layers
+end
+
 -- Ordered scoped property projection from one frozen declaration frame.
 function RW_QueryLevelTraits(world,rules)
     local context=condition_context(world,rules)

@@ -147,3 +147,16 @@ re-tests scoped LEVEL FLOAT conditions after each earlier relocation. Exact
 intra-batch conditional map-layer/remaining declaration re-evaluation is still a
 shared scoped-query gap; this oracle isolates unconditional supplied status/layers.
 Particles/sound and native callback timing remain deferred frontend/host work.
+
+2026-11-05 dynamic-layer follow-up: each TELE coordinate draw is recorded in a
+transient attempt tape. The rules module replays preceding eligible relocations
+on a private position copy and rechecks raw scoped FLOAT/BROKEN declarations for
+each unit, retaining the real unit's stored phase FLOAT. The movement module then
+replays those decisions with the same pure RNG draws. Query limits commit the
+completed prefix plus the triggering attempt's two draws, and stop later motion;
+other errors reject atomically. Neither tape nor condition caches enter world/Undo.
+This supersedes the intra-batch map-layer gap above. Remaining declaration
+eligibility/terminal ordering after TELE still uses the initial late trait list;
+that separate scoped scheduling gap remains. tests/level_tele_layers.lua compares
+1280 changing-occupancy cases with installed WITHOUT/floating_level, including
+repeated EMPTY quotas, negation, fixed unit layers, RNG prefixes and Undo.

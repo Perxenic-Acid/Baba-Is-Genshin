@@ -1298,7 +1298,7 @@ end
 
 -- Synthetic LEVEL motion belongs to late levelblock(), not unit collection.
 -- The caller supplies the surviving ordered declarations up to any terminal.
-function RW_ResolveLevelMotion(world,traits,stop_index)
+function RW_ResolveLevelMotion(world,traits,stop_index,tele_layers,tele_limit)
     local old=world.board_offset or {x=0,y=0,direction="None"}
     local names={"Right","Up","Left","Down"}
     local indices={Right=0,Up=1,Left=2,Down=3,Mid=4,None=4}
@@ -1322,6 +1322,8 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
     local rotation=old.rotation
     local facing_written=false
     local tele_count=0
+    local attempts={}
+    local interrupted=false
     local positions,tele_ids,history
     for index,trait in ipairs(traits or world.level_traits or {}) do
         if stop_index and index>=stop_index then break end
@@ -1339,7 +1341,13 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
                 state=(state*48271)%2147483647;local tx=state%world.width+1
                 state=(state*48271)%2147483647;local ty=state%world.height+1
                 local e=world.entities[id]
-                if has_capability(world,e,"float")==((counts.float or 0)>0) then
+                attempts[#attempts+1]={entity_id=id,x=tx,y=ty}
+                local eligible=has_capability(world,e,"float")==((counts.float or 0)>0)
+                if tele_layers then
+                    eligible=tele_layers[#attempts]
+                    if type(eligible)~="boolean" then return nil,"invalid_level_tele_layers" end
+                end
+                if eligible then
                     local at=positions[id]
                     if at.x~=tx or at.y~=ty then
                         local to={x=tx,y=ty,direction=at.direction}
@@ -1347,6 +1355,7 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
                         positions[id]=to
                     end
                 end
+                if tele_limit and #attempts>=tele_limit then interrupted=true;break end
             end
         elseif trait=="chill" then
             state=(state*48271)%2147483647
@@ -1369,6 +1378,7 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
             facing_written=true
         end
         x,y=x+dx,y+dy
+        if interrupted then break end
     end
     local result={consumes_turn=true,changes={},reason="level_motion"}
     if positions then
@@ -1384,6 +1394,7 @@ function RW_ResolveLevelMotion(world,traits,stop_index)
             to={x=x,y=y,direction=direction,rotation=rotation}}
     end
     if state~=original then result.random_state={from=original,to=state} end
+    if #attempts>0 then result.tele_attempts=attempts end
     return result
 end
 

@@ -297,3 +297,12 @@ reference_level_hot.lua executes the installed HOT branch in3072 cases covering
 repeated MELT/HAS, SAFE, FLOAT, survivors, newborn identities and allocation.
 Production turn tests additionally cover serial SAFE births, frozen conditional
 membership and mapped OnStart/input/whole-tree Undo.
+
+HOT group isolation follow-up: after this MELT declaration's own condition passes,
+query only matching denials; never aggregate other positive MELT declarations.
+The ordinary property-query helper accepts an internal known-grant argument while
+retaining its BROKEN/recursion guard and negative-condition checks. Installed
+findall confirms that deleting the first group's units can leave a later failing
+condition entirely unqueried. A regression reproduces premature WORD-limit
+propagation before the fix; another requires exactly one own-condition query.
+This does not close broader cross-declaration MELT source dispatch gaps above.

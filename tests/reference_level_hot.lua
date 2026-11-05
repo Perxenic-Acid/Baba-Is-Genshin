@@ -78,3 +78,42 @@ do
  assert(#p.changes==0 and not p.random_state and #p.events==0)
 end
 print('PASS: HOT serial eligibility terminal prefixes, RNG, skipped victims, ordinary atomic rejection and Undo')
+
+-- Native findall tests only the current declaration. A later positive MELT
+-- condition must not execute while selecting the earlier unconditional group.
+do
+ local w=RW_CreateSession().world;w.entities={[10]={id=10,kind='object',class='object',archetype='rock',x=1,y=1,direction='Right'}};w.unit_order={10};w.next_entity_id=20
+ local target={kind='archetype',value='rock'}
+ local late={op='spatial',clauses={},late_melt_marker=true}
+ local tools=read('tools.lua');local first=assert(tools:find('function findall(',1,true));local last=assert(tools:find('\nfunction ',first+1,true))
+ local native_calls=0
+ local native_env=setmetatable({unitlists={rock={10}},mmf={newObject=function()return {broken=0} end},getname=function()return 'rock' end,
+  testcond=function(c)if c==late then native_calls=native_calls+1;error('word_rule_limit') end;return true end},{__index=_G})
+ assert(load(tools:sub(first,last-1),'@installed_hot_single_findall','t',native_env))()
+ assert(#native_env.findall({'rock',{}})==1)
+ native_env.unitlists.rock={};assert(#native_env.findall({'rock',late})==0 and native_calls==0)
+ local rules={{when={op='always'},effects={{op='grant_trait',trait='melt',target=target}}},
+  {when=late,effects={{op='grant_trait',trait='melt',target=target}}}}
+ local original=RW_TestEntityCondition;local calls=0
+ RW_TestEntityCondition=function(world,c,e)
+  if c.late_melt_marker then calls=calls+1;return nil,'word_rule_limit' end
+  return original(world,c,e)
+ end
+ local declarations=RW_LevelHotDeclarations(w,rules)
+ local ok,ids,why=pcall(RW_LevelHotTargets,w,rules,declarations[1])
+ RW_TestEntityCondition=original;assert(ok,ids)
+ assert(ids and #ids==1 and ids[1]==10 and calls==0,'earlier MELT group evaluated a later positive declaration: '..tostring(why))
+ local once={op='spatial',clauses={},first_melt_marker=true};rules[1].when=once
+ local first_calls=0
+ RW_TestEntityCondition=function(world,c,e)
+  if c.first_melt_marker then first_calls=first_calls+1;return true end
+  if c.late_melt_marker then error('later positive queried') end
+  return original(world,c,e)
+ end
+ local ok,ids=pcall(RW_LevelHotTargets,w,rules,RW_LevelHotDeclarations(w,rules)[1])
+ RW_TestEntityCondition=original;assert(ok,ids);assert(#ids==1 and first_calls==1,'current MELT declaration queried more than once')
+ -- Negative declarations still protect the same current group.
+ rules[#rules+1]={when={op='always'},effects={{op='deny_trait',trait='melt',target=target}}}
+ assert(#assert(RW_LevelHotTargets(w,rules,declarations[1]))==0)
+end
+print('PASS: HOT MELT selection isolates positive declarations while retaining negative protection')

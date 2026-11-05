@@ -186,7 +186,7 @@ end
 local virtual_broken
 local query_level_trait
 -- Query this rule frame, never stale entity.behaviors from a previous turn.
-local function query_trait(world,entity,trait)
+local function query_trait(world,entity,trait,known_grant)
     if entity.broken==1 then return false end
     if world._query_traits and not world._query_traits[trait] then return false end
     if virtual_broken and entity.class=="empty" and not world._ignore_virtual_broken then
@@ -201,10 +201,10 @@ local function query_trait(world,entity,trait)
     guard[key]=true
     local context={};for k,v in pairs(world) do context[k]=v end
     context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
-    local granted,denied=false,false
+    local granted,denied=known_grant==true,false
     for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
         for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
-            if effect.trait==trait and effect.target and valid_selector(effect.target,world) and ((entity.class=="empty" and effect.target.kind=="empty") or (entity.class~="empty" and matches(entity,effect.target,world))) then
+            if effect.trait==trait and (not known_grant or effect.op=="deny_trait") and effect.target and valid_selector(effect.target,world) and ((entity.class=="empty" and effect.target.kind=="empty") or (entity.class~="empty" and matches(entity,effect.target,world))) then
                 local enabled,err
                 if rule.when and rule.when.op=="spatial" then enabled,err=RW_TestEntityCondition(context,rule.when,entity)
                 else enabled,err=evaluate_condition(context,rule.when) end
@@ -424,7 +424,9 @@ function RW_LevelHotTargets(world,rules,declaration)
             local active,why=RW_TestEntityCondition(context,declaration.when,e)
             if active==nil then return nil,why end
             if active then
-                active,why=query_trait(context,e,"melt")
+                -- findall has established this particular positive clause.
+                -- Only denials may veto it; other grants execute in later groups.
+                active,why=query_trait(context,e,"melt",true)
                 if active==nil then return nil,why end
                 if active then result[#result+1]=id end
             end

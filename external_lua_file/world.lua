@@ -2746,7 +2746,7 @@ function RW_GetNavigationDefinitions()
             add("rock",18,13,"Down");add("wall",25,13);add("flag",26,13)
             loose({"EAT","TEXT","SAFE","FLOAT","OPEN","SHUT","PUSH","STILL","IS","AND","NOT","ROCK","AVATAR","WALL","FLAG","HAS","ON","NEAR"})
         else
-            words({"EMPTY","IS","RIGHT"},3,6);words({"EMPTY","FACING","ROCK","IS","YOU"},17,3)
+            words({"EMPTY","NEAR","ROCK","IS","RIGHT"},3,6);words({"EMPTY","NEXTTO","ROCK","IS","YOU"},17,3)
             words({"EMPTY","EAT","ROCK"},17,6);words({"ROCK","IS","STOP"},3,9)
             words({"ROCK","HAS","FLAG"},17,9);add("rock",12,13,"Up")
             loose({"EMPTY","EAT","TEXT","SAFE","FLOAT","MOVE","FEAR","FLAG","IS","AND","NOT","ROCK","NEAR","FACING","HAS","STOP","RIGHT","YOU"})

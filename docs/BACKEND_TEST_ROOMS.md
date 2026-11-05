@@ -56,3 +56,21 @@ each projection and never stored on the world. Stacked Object/Text occupancy,
 integer/float coordinate equality, grant/deny validation and moved-unit freshness
 are covered by tests/projection_occupancy.lua. With this change the same first
 EMPTY input uses 29,279,000 instructions without sampling; startup remains 1,438,000.
+
+2026-11-05 follow-up: the rightmost EMPTY room now starts with
+`EMPTY NEAR ROCK IS RIGHT` and `EMPTY NEXTTO ROCK IS YOU`. Right once still
+consumes the Rock and leaves its HAS Flag. Global direction/FACING words remain
+available for free construction. The 32x30 workspace and loose-word spacing stay.
+
+Query frames index declaration presence and lazily index numeric-coordinate
+occupancy. ON/NEAR/NEXTTO/FACING reuse that local occupancy; positive ordinary-noun
+local conditions prune impossible EMPTY cells before full evaluation. Negative
+clauses and GROUP parameters retain the full scan. Only provably unconditional
+EMPTY direction frames reuse a direction result; spatial/FOLLOW/status-dependent
+frames remain per-cell. Indexes are transient, rebuilt for new frames, and never
+stored in world/Undo. Brute-force comparison covers stacked/duplicate/negative/
+BROKEN witnesses and changed positions. The native input route now requires <=6M
+instructions, down from its former32M guard, and checks that the moved Avatar
+reaches the display. Sampled first input: 4,271,000 versus29,822,000 before this
+fix; startup remains below2M. Native watchdog involvement is an inference from
+workload and symptoms; no new exported device log was available for this report.

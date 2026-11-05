@@ -366,7 +366,9 @@ for index,route in ipairs({"DDDDDD","DDDDDDD","DDDDDDDD"}) do
  press(index==3 and "D" or "DD")
  if index==3 then
   debug.sethook()
-  assert(room_instructions<=32000000,'EMPTY test room input budget: '..room_instructions)
+  assert(room_instructions<=6000000,'EMPTY test room input budget: '..room_instructions)
+  local avatar;for _,e in pairs(rendered.entities) do if e.archetype=='avatar' then avatar=e end end
+  assert(avatar and avatar.x==7,'EMPTY input must reach the display after Commit')
  end
  local flag,crate=false,false
  for _,e in pairs(rendered.entities) do
@@ -601,3 +603,4 @@ dofile("tests/reference_level_facing.lua")
 dofile("tests/level_text_products.lua")
 dofile("tests/projection_occupancy.lua")
 dofile("tests/queued_swap_contacts.lua")
+dofile('tests/empty_query_budget.lua')

@@ -159,6 +159,27 @@ local function condition_context(world,rules)
     -- Declaration presence only, scoped to this fresh query frame. Conditions
     -- and status results are still evaluated independently for every vacancy.
     context._empty_broken_present=has_empty_broken(world,rules)
+    -- Declaration-only index belongs to this query frame, never to world/Undo.
+    local traits={}
+    local invariant=true
+    for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+        for _,row in ipairs(frame) do
+            for _,effect in ipairs(row.effects or {}) do
+                traits[effect.trait]=true
+                if effect.target and effect.target.kind=="empty"
+                    and (effect.trait=="sleep" or effect.trait=="broken" or effect.trait=="right"
+                        or effect.trait=="up" or effect.trait=="left" or effect.trait=="down")
+                    and (not row.when or row.when.op~="always") then invariant=false end
+            end
+            for _,d in ipairs(row.empty_directions or {}) do
+                if d.op~="direction" or not d.when or d.when.op~="always" then invariant=false end
+            end
+        end
+    end
+    context._query_traits=traits
+    context._empty_direction_invariant=invariant
+    context._empty_direction_value=nil
+    context._query_occupancy=nil
     return context
 end
 local virtual_broken
@@ -166,6 +187,7 @@ local query_level_trait
 -- Query this rule frame, never stale entity.behaviors from a previous turn.
 local function query_trait(world,entity,trait)
     if entity.broken==1 then return false end
+    if world._query_traits and not world._query_traits[trait] then return false end
     if virtual_broken and entity.class=="empty" and not world._ignore_virtual_broken then
         local disabled,err=virtual_broken(world,entity)
         if disabled==nil then return nil,err end
@@ -791,14 +813,42 @@ function RW_TestEntityCondition(world,node,entity,emptydir_autofail)
             if relation=="facing" then return vector and dx==vector[1] and dy==vector[2] end
         end
         local candidates={}
+        if world._query_traits and not world._query_occupancy then
+            local occupancy={}
+            for _,target in pairs(world.entities) do
+                local x,y=target.x,target.y
+                if type(x)=="number" and x==x and type(y)=="number" and y==y then
+                    occupancy[x]=occupancy[x] or {};local column=occupancy[x]
+                    column[y]=column[y] or {};column[y][#column[y]+1]=target
+                end
+            end
+            world._query_occupancy=occupancy
+        end
         if clause.relation=="facing" then
             -- FACING has a single witness cell. Avoid evaluating every region
             -- alternative for every real unit in every virtual EMPTY query.
             if vector then
                 local x,y=entity.x+vector[1],entity.y+vector[2]
-                for id,target in pairs(world.entities) do
-                    if id~=entity.id and target.x==x and target.y==y then candidates[#candidates+1]=target end
+                if world._query_occupancy then
+                    local column=world._query_occupancy[x]
+                    for _,target in ipairs(column and column[y] or {}) do
+                        if target.id~=entity.id then candidates[#candidates+1]=target end
+                    end
+                else
+                    for id,target in pairs(world.entities) do
+                        if id~=entity.id and target.x==x and target.y==y then candidates[#candidates+1]=target end
+                    end
                 end
+            end
+        elseif world._query_occupancy and (clause.relation=="on" or clause.relation=="near" or clause.relation=="nextto") then
+            local radius=clause.relation=="on" and 0 or 1
+            for x=entity.x-radius,entity.x+radius do
+                local column=world._query_occupancy[x]
+                if column then for y=entity.y-radius,entity.y+radius do
+                    if in_region(x,y) then for _,target in ipairs(column[y] or {}) do
+                        if target.id~=entity.id then candidates[#candidates+1]=target end
+                    end end
+                end end
             end
         else
             for id,target in pairs(world.entities) do
@@ -918,10 +968,41 @@ function RW_ResolveEffects(world, effects)
                 return nil,"invalid_empty_grid"
             end
             resolved.cells={}
+            -- A positive local witness is necessary for these conjunctions.
+            -- Prune impossible vacancies before the full identity-based test.
+            local possible
+            if effect.when and effect.when.op=="spatial" then
+                for _,clause in ipairs(effect.when.clauses or {}) do
+                    local relation=clause.relation
+                    local local_terms=true
+                    for _,term in ipairs(clause.parameters or {}) do
+                        local value=term;while value and value.tag=="not" do value=value.operand end
+                        if value and value.tag=="noun" and value.type and value.type.tag=="group" then local_terms=false end
+                    end
+                    if local_terms and not clause.negated and (relation=="near" or relation=="nextto" or relation=="on") then
+                        for _,term in ipairs(clause.parameters or {}) do
+                            if term.tag=="noun" and term.type and term.type.tag=="object" then
+                                possible={}
+                                for _,target in pairs(world.entities) do if target.archetype==term.type.name and target.class~="text" then
+                                    local radius=relation=="on" and 0 or 1
+                                    for dx=-radius,radius do for dy=-radius,radius do
+                                        if relation~="nextto" or math.abs(dx)+math.abs(dy)==1 then
+                                            local x,y=target.x+dx,target.y+dy
+                                            possible[x]=possible[x] or {};possible[x][y]=true
+                                        end
+                                    end end
+                                end end
+                                break
+                            end
+                        end
+                    end
+                    if possible then break end
+                end
+            end
             local occupied={}
             for _,entity in pairs(world.entities) do occupied[entity.x .. ":" .. entity.y]=true end
             for y=1,world.height do for x=1,world.width do
-                if not occupied[x .. ":" .. y] then
+                if not occupied[x .. ":" .. y] and (not possible or possible[x] and possible[x][y]) then
                     local enabled,why=true,nil
                     local empty={class="empty",x=x,y=y}
                     local disabled;disabled,why=virtual_broken(world,empty)
@@ -1112,7 +1193,7 @@ function RW_EvaluateRules(world, generated_rules)
     end
 
     local needs_context=false
-    for _,effect in ipairs(active) do if contains_rule_query(effect.when) or effect.trait=="broken" then needs_context=true;break end end
+    for _,effect in ipairs(active) do if effect.when or contains_rule_query(effect.when) or effect.trait=="broken" then needs_context=true;break end end
     return RW_ResolveEffects(needs_context and condition_context(world,generated_rules or {}) or world, active)
 end
 
@@ -3456,6 +3537,9 @@ end
 
 function RW_QueryEmptyDirection(world,x,y,rules)
     local context=rules and condition_context(world,rules) or world
+    if context._empty_direction_invariant and context._empty_direction_value then
+        return context._empty_direction_value
+    end
     local guard=context._condition_guard or {}
     local key="emptydir:"..x..":"..y
     if guard[key] then return "None" end
@@ -3464,6 +3548,7 @@ function RW_QueryEmptyDirection(world,x,y,rules)
     nested._condition_guard=guard;nested._condition_depth=(context._condition_depth or 0)+1
     guard[key]=true
     local direction,why=query_empty_direction(nested,x,y)
+    if direction and context._empty_direction_invariant then context._empty_direction_value=direction end
     guard[key]=nil
     return direction,why
 end

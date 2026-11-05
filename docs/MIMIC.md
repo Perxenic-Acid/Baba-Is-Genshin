@@ -2,8 +2,9 @@
 
 Current scope includes positive ALL MIMIC sources and GROUP targets through the
 existing endpoint rules; see the final implementation section. Earlier milestone
-scope/deferred notes below describe historical states. NOT GROUP subjects and
-conditional scoped LEVEL consumers retain their documented limitations.
+scope/deferred notes below describe historical states. NOT GROUP subjects are
+recognized inert declarations, matching original pass timing; conditional scoped
+LEVEL consumers retain their documented limitations.
 
 Primary reference: installed Baba Is You Data/rules.lua, subrules(), MIMIC
 protection collection and copy loop (lines 1209-1342). No mod source is used.
@@ -307,3 +308,54 @@ ALL targets and duplicate/conditional declarations. This baseline does not yet
 remove the project's deferred diagnostic for those subjects; the next change
 must preserve the one-pass copy timing instead of treating NOT GROUP as an
 ordinary-noun complement at MIMIC time.
+
+## Negative GROUP endpoints: native timing
+
+NOT GROUP/GROUP2/GROUP3 MIMIC is now a recognized inert declaration rather than
+an unsupported diagnostic. Installed subrules checks getmat on the literal
+negative source, which cannot match the authored objectlist. grouprules later
+emits ordinary MIMIC clauses, but the copy pass has already finished and is not
+repeated. Negative targets/protections with this subject are likewise inert;
+they never become bans for ordinary imitators. The original physical sentence
+still participates in activation, WORD parsing and compile budgets.
+
+Ordinary NOT subjects targeting a GROUP follow the related addoption exception:
+NOT ROCK/TEXT/EMPTY/LEVEL MIMIC GROUP (and NOT GROUP targets) are not expanded
+immediately, so they also cannot copy in that pass. NOT ALL is explicitly exempt:
+it still generates EMPTY and TEXT sources before copying, including group targets.
+Keep raw declarations through preprocessing/budget checks; suppress only the
+already-finished inert copies. No new persistent fields or runtime phases exist.
+
+reference_negative_group_mimic.lua now compares native and project per-identity
+HAS results across its288 cases, retaining positive GROUP controls. The separate
+reference_negative_mimic_group_targets.lua compares576 cases across ordinary,
+Text, Empty, LEVEL, ALL and negative GROUP subjects, three group channels,
+positive/negative group targets, duplicate/conditional declarations and an
+independent ordinary MIMIC source. It also checks native tagged-copy counts before
+grouprules. Physical tests cover complete sentence activation, both sides of
+membership, independent NOT protections, scheduled destruction/HAS and Undo.
+These results supersede the earlier negative-GROUP deferral/baseline notes.
+
+## Repeated NOT parity
+
+Installed rules.lua parser prefix handling (around772-779) toggles each physical
+NOT before addoption. MIMIC now unwraps even NOT prefixes when resolving source
+and target declaration keys. Odd prefixes keep their existing complement, ban
+or inert-GROUP behavior. The raw copied declaration lookup uses the same keys,
+so NOT NOT CRATE HAS FLAG remains available to an imitator. Copied positive
+subjects use their unwrapped term: otherwise a wrapped ALL group member could
+be mistaken for a fresh ALL expansion by later group consumers. Physical AST
+paths/NOT activation and rule multiplicity stay intact.
+
+reference_mimic_not_parity.lua executes the unchanged native parser toggle and
+then addoption/subrules/grouprules across3,456 cases. Declaration heads, imitator
+subjects and targets each vary over0-3 NOT tokens, ordinary/ALL/GROUP names and
+conditional clauses. Runtime HAS counts are compared per real/Text identity.
+Physical tests additionally use0-4 NOT tokens, validate activation and Undo,
+and retain NOT ALL's EMPTY PUSH blocking rather than treating it as no effect.
+The original NOT NOT ROCK MIMIC FLAG fixture now compiles without a deferred
+entry and grants PUSH, matching the zero-NOT form.
+
+Full tests/run.lua regression, installed GROUP/MIMIC order checks and layout/word
+catalog audits passed. Normal startup remains1,440,000 instructions. Native
+acceptance remains separate and is not inferred from these tests.

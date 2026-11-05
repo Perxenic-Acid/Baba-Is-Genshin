@@ -259,3 +259,52 @@ frame=assert(RW_CompileWorld(s.world,cs));assert(#frame.deferred==0)
 n=step(s,{type='move',dx=1,dy=0})
 assert(n.world.entities[1].x==3 and n.world.entities[2].x==7,'ALL MIMIC must preserve typed LEVEL target declarations')
 print('PASS: typed LEVEL target supplies ALL MIMIC ordinary control and Undo')
+for _,name in ipairs({'GROUP','GROUP2','GROUP3'}) do for _,member in ipairs({false,true}) do
+ local rows={{'AVATAR','IS','YOU'},{'CRATE','IS','PUSH'},{'NOT',name,'MIMIC','CRATE'}}
+ if member then rows[#rows+1]={'ROCK','IS',name} end
+ s=fixture(rows);frame=assert(RW_CompileWorld(s.world,cs));assert(#frame.deferred==0)
+ local view=assert(RW_ProjectWorld(s.world,frame.effects))
+ assert(not view.entities[2].behaviors.push,'NOT GROUP MIMIC must not copy to ordinary complements')
+ for id,e in pairs(s.world.entities) do if e.class=='text' then assert(frame.active_text_ids[id],'inert recognized MIMIC sentence stays active') end end
+ n=step(s,{type='move',dx=1,dy=0});assert(n.world.entities[1].x==3 and n.world.entities[2].x==6)
+ rows={{'CRATE','HAS','FLAG'},{'ROCK','IS','YOU','AND','DEFEAT'},
+  {'NOT',name,'MIMIC','NOT','CRATE'},{'ROCK','MIMIC','CRATE'}}
+ if member then rows[#rows+1]={'ROCK','IS',name} end
+ s=fixture(rows);n=step(s);local flags=0
+ for _,e in pairs(n.world.entities)do if e.class=='object' and e.archetype=='flag' and e.x==6 and e.y==3 then flags=flags+1 end end
+ assert(flags==1,'NOT GROUP protection must not suppress an independent concrete MIMIC source')
+end end
+print('PASS: inert NOT GROUP MIMIC three-channel activation, membership/complement, independent NOT protection, scheduled HAS and Undo')
+for _,name in ipairs({'GROUP','GROUP2','GROUP3'}) do
+ for _,excluded in ipairs({'ROCK','TEXT','EMPTY','LEVEL'}) do
+  s=fixture({{'AVATAR','IS','YOU'},{name,'IS','PUSH'},{'NOT',excluded,'MIMIC',name}})
+  s.world.language.nouns.LEVEL={tag='level',block_type='level_block'}
+  frame=assert(RW_CompileWorld(s.world,cs));assert(#frame.deferred==0)
+  local view=assert(RW_ProjectWorld(s.world,frame.effects))
+  assert(not view.entities[1].behaviors.push and not view.entities[2].behaviors.push)
+  for id,e in pairs(s.world.entities)do if e.class=='text' then assert(frame.active_text_ids[id]) end end
+  n=step(s,{type='move',dx=1,dy=0});assert(n.world.entities[1].x==3 and n.world.entities[2].x==6)
+ end
+end
+print('PASS: ordinary/Text/Empty/LEVEL NOT subjects targeting GROUP are recognized inert sentences with activation and Undo')
+for count=0,4 do for _,subject in ipairs({'ROCK','ALL','GROUP'}) do
+ local sentence={};for i=1,count do sentence[#sentence+1]='NOT' end
+ for _,word in ipairs({subject,'MIMIC','FLAG'})do sentence[#sentence+1]=word end
+ local rows={sentence,{'FLAG','IS','PUSH'},{'AVATAR','IS','YOU'}}
+ if subject=='GROUP' then rows[#rows+1]={'ROCK','IS','GROUP'} end
+ s=fixture(rows);frame=assert(RW_CompileWorld(s.world,cs));assert(#frame.deferred==0)
+ local p=assert(RW_ProjectWorld(s.world,frame.effects))
+ assert((p.entities[2].behaviors.push or false)==(count%2==0),'MIMIC subject NOT prefixes must cancel in pairs')
+ for id,e in pairs(s.world.entities)do if e.class=='text' then assert(frame.active_text_ids[id]) end end
+ n=step(s,{type='move',dx=1,dy=0})
+ assert(n.world.entities[1].x==(subject=='ALL' and count%2==1 and 2 or 3),
+  'NOT ALL copied EMPTY PUSH still blocks the ordinary mover')
+end end
+for count=0,4 do
+ local sentence={'ROCK','MIMIC'};for i=1,count do sentence[#sentence+1]='NOT' end;sentence[#sentence+1]='FLAG'
+ s=fixture({sentence,{'FLAG','HAS','CRATE'},{'ROCK','IS','YOU','AND','DEFEAT'}})
+ n=step(s);local crates=0
+ for _,e in pairs(n.world.entities)do if e.class=='object' and e.archetype=='crate' and e.x==6 and e.y==3 then crates=crates+1 end end
+ assert(crates==(count%2==0 and 1 or 0),'MIMIC target NOT parity must preserve scheduled HAS')
+end
+print('PASS: physical repeated NOT source/target parity, GROUP/ALL consumers, activation, scheduled HAS and Undo')

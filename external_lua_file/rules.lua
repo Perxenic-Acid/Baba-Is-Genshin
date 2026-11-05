@@ -2027,6 +2027,8 @@ local function expand_mimic(ast_rules,world)
     local normalized,err=normalize_group_all(ast_rules,world);if not normalized then return nil,err end
     ast_rules=normalized
     local function key(term)
+        local negative;term,negative=unwrap(term)
+        if negative then return nil end
         if type(term)~="table" then return nil end
         if term.tag=="noun" and term.type then
             if term.type.tag=="group" then return "@group:"..term.type.name end
@@ -2035,6 +2037,8 @@ local function expand_mimic(ast_rules,world)
         return subject_key(term)
     end
     local function target_key(term)
+        local negative;term,negative=unwrap(term)
+        if negative then return nil end
         if term and term.tag=="special" and term.name=="all" then return "@all" end
         return key(term)
     end
@@ -2203,7 +2207,16 @@ local function expand_mimic(ast_rules,world)
         local target,negative=unwrap(rule.object)
         local source,destination=key(rule.subject) or positive_all[rule] and "@all",target_key(target)
         if not source or not destination then
-            if not expanded_negative[rule] then
+            local subject,negative_source=unwrap(rule.subject)
+            -- getmat("not group...") fails during native subrules. Ordinary
+            -- NOT subjects targeting GROUP also skip immediate expansion.
+            -- grouprules runs later and never reruns copying. NOT ALL is the
+            -- explicit addoption exception and still expands to EMPTY/Text.
+            local group_source=subject and subject.tag=="noun" and subject.type and subject.type.tag=="group"
+            local group_target=target and target.tag=="noun" and target.type and target.type.tag=="group"
+            local all_source=subject and subject.tag=="special" and subject.name=="all"
+            local inert_group=negative_source and (group_source or group_target and not all_source)
+            if not expanded_negative[rule] and not inert_group then
                 result[#result+1]=rule -- unsupported forms remain visible as deferred.
             end
         elseif not negative then
@@ -2221,7 +2234,7 @@ local function expand_mimic(ast_rules,world)
                         if condition.op~="always" then combined.requirements[#combined.requirements+1]=query_clone(condition) end
                     end
                     if not blocked then
-                        local copy=query_clone(copied);copy.subject=query_clone(rule.subject)
+                        local copy=query_clone(copied);copy.subject=query_clone((unwrap(rule.subject)))
                         copy.when=#combined.requirements>0 and combined or {op="always"}
                         -- A literal non-IS RHS ALL remains a counted native
                         -- declaration, not another runtime palette expansion.

@@ -473,7 +473,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if not ready then return after_failure(movement_prefix,motion_phase.."_eat_query",why) end
         local shift,shift_error=services[motion_phase](shifted_world,before_conversions,before_rules)
         if shift then remember_empty(shift.destructions) end
-        if not shift then return fail(motion_phase,shift_error) end
+        if not shift then return after_failure(movement_prefix,motion_phase,shift_error) end
         local stages=movement_prefix.stages or {{name="movement",plan={consumes_turn=true,
             changes=movement.changes,board_shift=movement.board_shift}}}
         stages[#stages+1]={name=motion_phase,plan={consumes_turn=true,changes=shift.changes,random_state=shift.random_state,motion_history=shift.motion_history}}
@@ -623,7 +623,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             local projected,why=services.project(complete,effects,level_traits_from(relations))
             if not projected then return fail("follow_project",why) end
             local follow,why=services.follow(projected,relations)
-            if not follow then return fail("follow",why) end
+            if not follow then return after_failure(plan,"follow",why) end
             local next_world,why=services.preview(complete,follow)
             if not next_world then return fail("follow_preview",why) end
             plan.stages[#plan.stages+1]={name="follow",plan=follow}
@@ -909,7 +909,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 local projected,why=services.project(complete,refreshed,plan.level_traits)
                 if not projected then return fail("eat_project",why) end
                 local eat,why=services.eat(complete,projected,frozen_relations,contents,frozen_rules,back_count)
-                if not eat then return fail("eat",why) end
+                if not eat then return after_failure(plan,"eat",why) end
                 local next_world,why=services.preview(complete,eat)
                 if not next_world then return fail("eat_preview",why) end
                 plan.stages[#plan.stages+1]={name="eat",plan=eat}
@@ -2522,7 +2522,8 @@ local function start(run_self_tests)
         return plan,why
     end
     turn_services.eat=function(world,projected,relations,contents,rules,count)
-        local targets=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"eat")
+        local targets,why=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"eat")
+        if not targets then return nil,why end
         local ids=properties_api:Invoke("RW_ResolveEatVictims",projected,targets)
         return RW_PlanDestructionPhase(world,ids,contents,"eat",contact_services,nil,rules,count)
     end
@@ -2537,7 +2538,8 @@ local function start(run_self_tests)
         return creation
     end
     turn_services.follow=function(world,relations)
-        local targets=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"follow")
+        local targets,why=rules_api:Invoke("RW_ResolveVerbTargets",world,relations,"follow")
+        if not targets then return nil,why end
         return movement_api:Invoke("RW_ResolveFollow",world,targets)
     end
     turn_services.fear=function(world,relations,rules)

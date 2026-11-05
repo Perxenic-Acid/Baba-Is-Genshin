@@ -55,3 +55,18 @@ CRASH 事务测试。完整回归不在正常开局运行。新增关卡后正�
 M9.8J adds late EMPTY self-contact destruction/HAS, including SAFE/FLOAT and
 newborn BROKEN/CRASH/WORD checks. Other virtual destruction paths remain pending;
 see [EMPTY_LIFECYCLE.md](EMPTY_LIFECYCLE.md).
+
+FOLLOW/FEAR/EAT target collection now distinguishes a failed relation query from
+a false condition. RW_ResolveVerbTargets propagates nil/reason immediately, and
+RW_ResolveFearTargets plus native FOLLOW/EAT adapters preserve that diagnostic.
+No partial target list is used. The scheduler applies the existing terminal
+policy at these phase barriers: word_rule_limit/word_rule_cycle commit the prior
+prefix as Infinite Loop, rule_complexity_limit commits Too Complex, and ordinary
+errors reject the entire turn. This is the project's bounded-query contract,
+not a claim that the installed native testcond API returns these Lua diagnostics.
+
+tests/verb_query_failures.lua injects failures at the real relation applicability
+boundary in twelve compiled FOLLOW/FEAR/EAT turns. It verifies exact diagnostics,
+movement-prefix retention, terminal input lockout, ordinary atomic rejection,
+and complete Undo. Earlier completed phases remain committed; the failing query
+phase contributes no effects. Normal boot performs no extra query or self-test.

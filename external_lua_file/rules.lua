@@ -4025,7 +4025,9 @@ function RW_ResolveVerbTargets(world,relations,verb)
             local selector=relation.source_type=="@text" and {kind="class",value="text"}
                 or {kind="archetype",value=relation.source_type}
             for _,id in ipairs(RW_SelectEntities(world,selector)) do
-                if RW_RelationApplies(world,relation,world.entities[id]) then
+                local enabled,why=RW_RelationApplies(world,relation,world.entities[id])
+                if enabled==nil then return nil,why end
+                if enabled then
                     groups[id]=groups[id] or {};groups[id][#groups[id]+1]=relation.target_type
                 end
             end
@@ -4035,7 +4037,8 @@ function RW_ResolveVerbTargets(world,relations,verb)
 end
 
 function RW_ResolveFearTargets(world,relations,rules)
-    local groups=RW_ResolveVerbTargets(world,relations,"fear")
+    local groups,why=RW_ResolveVerbTargets(world,relations,"fear")
+    if not groups then return nil,why end
     local occupied,cells
     for _,relation in ipairs(relations or {}) do if relation.op=="fear" and relation.source_type=="@empty" then
         if not occupied then

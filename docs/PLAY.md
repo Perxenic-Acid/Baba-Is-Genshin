@@ -17,6 +17,9 @@ subject expansion and spatial conditions use the existing parser/lowering paths.
 Matching PLAY NOT note clauses veto only the corresponding PLAY note.
 
 Each positive rule instance emits one event if any source satisfies its condition.
+Real source condition queries, event identity lists and particle positions follow
+the saved unit-list order (world.unit_order), with numeric fallback for diagnostic
+worlds lacking that metadata. They do not use tile-arrival order or sorted IDs.
 Multiple matching objects produce one sound request and multiple particle positions;
 duplicate clauses produce duplicate events. TEXT groups all physical Text. EMPTY
 uses virtual cells and requests no particles. SAFE, FLOAT and SLEEP do not mute PLAY.
@@ -45,5 +48,10 @@ TEXT/EMPTY/MIMIC, ordering, activation, invalid argument roles, defaults and Und
 tests/reference_play.lua executes installed grouping, emission and frequency
 sections across 7,872 source/count/condition/note cases. It uses normalized feature
 conditions and host sound/particle recorders, not the full original parser/game.
+The recorder compares the full particle position sequence against reversed native
+unit lists, covering duplicate declarations and Text as well as ordinary sources.
+Cross-noun group dispatch remains deterministic relation order in this backend;
+the original getunitswithverb traverses noun groups with pairs(), so no portable
+cross-noun ordering is claimed.
 Full regression passes; normal startup is 1,932,000 offline instructions (<2M).
 Routine native acceptance is waived; these checks do not establish native parity.

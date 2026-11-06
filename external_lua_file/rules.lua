@@ -4322,6 +4322,12 @@ local function play_data_table()
 end
 function RW_ResolvePlayEvents(world,relations)
     local events={}
+    local ordered,seen,remaining={},{},{}
+    for _,id in ipairs(world.unit_order or {}) do
+        if world.entities[id] and not seen[id] then ordered[#ordered+1]=id;seen[id]=true end
+    end
+    for id in pairs(world.entities) do if not seen[id] then remaining[#remaining+1]=id end end
+    table.sort(remaining);for _,id in ipairs(remaining) do ordered[#ordered+1]=id end
     for _,relation in ipairs(relations or {}) do if relation.op=="play" then
         local ids,positions={},{}
         if relation.source_type=="@empty" then
@@ -4332,14 +4338,15 @@ function RW_ResolvePlayEvents(world,relations)
                 if enabled then positions[#positions+1]={x=x,y=y} end
             end end end
         else
-            for id,e in pairs(world.entities) do
+            for _,id in ipairs(ordered) do
+                local e=world.entities[id]
                 if (relation.source_type=="@text" and e.class=="text") or (e.class~="text" and e.archetype==relation.source_type) then
                     local enabled,err=RW_RelationApplies(world,relation,e)
                     if enabled==nil then return nil,err end
                     if enabled then ids[#ids+1]=id end
                 end
             end
-            table.sort(ids);for _,id in ipairs(ids) do local e=world.entities[id];positions[#positions+1]={x=e.x,y=e.y} end
+            for _,id in ipairs(ids) do local e=world.entities[id];positions[#positions+1]={x=e.x,y=e.y} end
         end
         if #positions>0 then
             local data=play_data_table();local name=relation.source_type=="@text" and "text" or relation.source_type=="@empty" and "empty" or relation.source_type

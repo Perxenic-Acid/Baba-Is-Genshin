@@ -1541,7 +1541,16 @@ function RW_ResolveAutomatic(world,empty_directions)
     end
     for _,id in ipairs(ids) do if id<0 then automatic_order[#automatic_order+1]=id end end
     for _,spec in ipairs({{"move"},{"nudgeright","Right"},{"nudgeup","Up"},{"nudgeleft","Left"},{"nudgedown","Down"}}) do
-        for _,id in ipairs(spec[1]=="move" and automatic_order or ids) do
+        local dispatch_order=spec[1]=="move" and automatic_order or ids
+        local groups=spec[2] and world.automatic_source_groups and world.automatic_source_groups[spec[1]]
+        if groups then
+            dispatch_order={};local seen={}
+            for _,group in ipairs(groups) do for _,id in ipairs(group) do
+                if not seen[id] then seen[id]=true;dispatch_order[#dispatch_order+1]=id end
+            end end
+            for _,id in ipairs(ids) do if id<0 then dispatch_order[#dispatch_order+1]=id end end
+        end
+        for _,id in ipairs(dispatch_order) do
             local entity=working.entities[id]
             local counts=working.trait_counts[id] or {}
             local count=spec[1]=="move" and autonomous[id] or (counts[spec[1]] or (entity and has_capability(world,entity,spec[1]) and 1 or 0))

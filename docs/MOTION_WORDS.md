@@ -258,3 +258,19 @@ keep their own no-bounce behavior. FEAR direction probes no longer count root
 shattering as a free direction; actual selected movement still destroys blocked
 unsafe WEAK. Installed retry/final-death and WEAK findfears oracles supplement
 turn/HAS/Undo cases. See EMPTY_LIFECYCLE.md for virtual scope and remaining gaps.
+
+2026-11-06: real directional nudge dispatch retains physical declaration order
+and each noun's unit-list order, deduplicating queued identities while preserving
+duplicate impulse counts. The four directional phases remain Right/Up/Left/Down.
+This matters when an earlier front STOP frees the path for a trailing STOP.
+Nudges still preserve intrinsic facing; source groups remain transient projection
+metadata and never enter saved state or Undo.
+
+tests/reference_automatic_order.lua adds 192 installed findallfeature/findall/
+add_moving_units cases, observing root calls through the real movement solver.
+It covers all four axes, permuted unit order, repeated/interleaved declarations,
+normalized conditions, SLEEP/STILL, displacement, facing and Undo. tests/chill.lua
+adds physical duplicate-rule compilation and adjacent STOP clearance in four axes.
+These tests do not establish the full native mutable collision scheduler or
+live condition-query timing. EMPTY placeholders still dispatch after real units;
+mixed real/EMPTY interleaving remains a shared motion gap.

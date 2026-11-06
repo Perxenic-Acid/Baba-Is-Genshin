@@ -207,13 +207,13 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.more_source_groups={}
     projected.done_source_groups={}
     projected.end_source_groups={}
-    projected.automatic_source_groups={move={},auto={},chill={}}
+    projected.automatic_source_groups={move={},auto={},chill={},nudgeright={},nudgeup={},nudgeleft={},nudgedown={}}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more","done","end","move","auto","chill"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more","done","end","move","auto","chill","nudgeright","nudgeup","nudgeleft","nudgedown"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end

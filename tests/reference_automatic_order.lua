@@ -58,3 +58,48 @@ for _,pattern in ipairs(patterns)do for seed=1,16 do for mode=0,7 do
 end end end end end
 assert(checked==7680)
 print('PASS: installed findfeature/findallfeature/findall/add_moving_units declaration/unit order, multi-unit CHILL RNG, MOVE/AUTO precedence, duplicates, Text, conditions, SLEEP/STILL and Undo ('..checked..' cases)')
+
+-- Observe root dispatch through the real solver, without replacing its results.
+local nudge_cases=0
+for axis,trait in ipairs({'nudgeright','nudgeup','nudgeleft','nudgedown'}) do
+for _,order in ipairs(permutations) do for _,names in ipairs({{'rock','flag','rock'},{'flag','rock','flag'}}) do
+for mode=0,3 do
+ local w=RW_CreateSession().world;w.width=50;w.height=50;w.entities={};w.unit_order=order;w.next_entity_id=20
+ local units,effects={},{};local env=setmetatable({DIR=1,XPOS=2,YPOS=3,unitlists={},codeunits={},featureindex={[trait]={}}},{__index=_G})
+ for index,id in ipairs({11,12,13}) do
+  local name=index==3 and 'flag' or 'rock';local x,y=index*10,index*10
+  w.entities[id]={id=id,kind='object',class='object',archetype=name,x=x,y=y,direction='Up'}
+  units[id]={name=name,values={1,x,y},broken=0}
+ end
+ for _,id in ipairs(order) do local name=units[id].name;env.unitlists[name]=env.unitlists[name] or {};table.insert(env.unitlists[name],id) end
+ env.mmf={newObject=function(id)return units[id]end};env.getname=function(u)return u.name end
+ env.testcond=function(c,id)return mode~=3 or c.index~=2 or id==12 end
+ env.hasfeature=function(_,_,t,id)return t=='sleep' and mode==1 and id==11 and true or nil end
+ env.cantmove=function(_,id)return mode==2 and id==12 end
+ assert(load(selectors..collector,'@installed_nudge_collection','t',env))()
+ for index,name in ipairs(names) do
+  local conds={index=index};table.insert(env.featureindex[trait],{{name,'is',trait},conds})
+  local matching={};for id,u in pairs(units) do if u.name==name and env.testcond(conds,id) then matching[#matching+1]=id end end;table.sort(matching)
+  effects[#effects+1]={op='grant_trait',trait=trait,entity_ids=matching}
+ end
+ if mode==1 then effects[#effects+1]={op='grant_trait',trait='sleep',entity_ids={11}} end
+ if mode==2 then effects[#effects+1]={op='grant_trait',trait='still',entity_ids={12}} end
+ local sources,empty=env.findallfeature(nil,'is',trait);local list=env.add_moving_units(trait,sources,{},{},empty)
+ local expected={};for _,task in ipairs(list) do for impulse=1,task.moves do expected[#expected+1]=task.unitid end end
+ local original=RW_ResolveMovement;local observed={}
+ RW_ResolveMovement=function(world,action) observed[#observed+1]=action.entity_id;return original(world,action) end
+ local ok,plan=pcall(RW_ResolveAutomatic,assert(RW_ProjectWorld(w,effects)));RW_ResolveMovement=original;assert(ok,plan)
+ assert(#expected==#observed,'nudge dispatch count')
+ for i,id in ipairs(expected) do assert(observed[i]==id,'nudge declaration/unit dispatch order '..nudge_cases) end
+ local out=assert(RW_PreviewPlan(w,plan));local v=vectors[axis]
+ for id,u in pairs(units) do
+  local count=0;for _,candidate in ipairs(expected) do if candidate==id then count=count+1 end end
+  assert(out.entities[id].x==u.values[2]+v[1]*count and out.entities[id].y==u.values[3]+v[2]*count)
+  assert(out.entities[id].direction=='Up','nudge changed intrinsic facing')
+ end
+ local session=RW_CreateSession();session.world=w;local after,report=RW_Commit(session,plan);assert(report.accepted,report.reason)
+ assert(RW_Undo(after).world==w and not after.world.automatic_source_groups)
+ nudge_cases=nudge_cases+1
+end end end end
+assert(nudge_cases==192)
+print('PASS: installed four-axis nudge collection and observed root dispatch order, duplicate impulses, conditions, SLEEP/STILL, facing and Undo ('..nudge_cases..' cases)')

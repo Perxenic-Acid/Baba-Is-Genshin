@@ -46,4 +46,5 @@ findall and add_moving_units in 7680 cases with permuted identities, duplicate
 clauses, Text, sleeping/locked units and normalized conditional eligibility. It
 checks draw assignment, final facing, collision-free displacement and Undo, not
 the complete native collision scheduler or dynamic condition-query timing.
-Mixed real/EMPTY queue interleaving and nudge collection order remain gaps.
+Mixed real/EMPTY queue interleaving remains a gap. Four-axis nudge collection
+was subsequently aligned as described in MOTION_WORDS.md.

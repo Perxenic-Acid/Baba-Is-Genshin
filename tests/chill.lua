@@ -93,3 +93,25 @@ do
  assert(accepted.accepted and replay.world.random_state==state)
 end
 print("CHILL: deterministic motion/rollback and "..cases.." installed collection oracle cases passed")
+
+-- Front STOP moves first in creation order, freeing the trailing STOP's path.
+for _,spec in ipairs({{'NUDGERIGHT',1,0},{'NUDGEUP',0,-1},{'NUDGELEFT',-1,0},{'NUDGEDOWN',0,1}}) do
+ local session=RW_CreateSession();local world=session.world
+ world.width=40;world.height=40;world.language.nouns.ROCK='rock'
+ world.entities={};world.unit_order={12,11};world.next_entity_id=20
+ for _,id in ipairs({11,12}) do local offset=id==12 and 1 or 0
+  world.entities[id]={id=id,kind='object',class='object',archetype='rock',x=20+offset*spec[2],y=20+offset*spec[3],direction='Up'}
+ end
+ for row,word in ipairs({spec[1],spec[1],'STOP'}) do for x,token in ipairs({'ROCK','IS',word}) do
+  local id=world.next_entity_id;world.next_entity_id=id+1;world.unit_order[#world.unit_order+1]=id
+  world.entities[id]={id=id,kind='object',class='text',text={name=token},x=x,y=row*3,direction='None'}
+ end end
+ local turn,err=RW_PlanTurn(world,{type='wait'},services);assert(turn,err and err.reason)
+ local after,report=RW_Commit(session,turn);assert(report.accepted,report.reason)
+ for _,id in ipairs({11,12}) do local before=world.entities[id];local actual=after.world.entities[id]
+  assert(actual.x==before.x+2*spec[2] and actual.y==before.y+2*spec[3],'compiled nudge STOP queue order')
+  assert(actual.direction=='Up')
+ end
+ assert(RW_Undo(after).world==world and not after.world.automatic_source_groups)
+end
+print('PASS: physical duplicate four-axis nudge rules retain creation-order STOP clearance, facing and whole-turn Undo')

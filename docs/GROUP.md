@@ -376,3 +376,14 @@ Avatar dies under GROUP HAS FLAG.
 Full tests/run.lua and the official layout/catalog audits passed. Startup remains
 1,440,000 offline Lua instructions; actual native behavior is not inferred from
 those checks.
+
+Conditional GROUP parameter promotion follows the original findgroup's per-name
+unit-list order, derived from global creation order with a sorted fallback only
+for unlisted transient identities. It does not use cell arrival order or numeric
+ID sorting when an authored/runtime global list exists. Both direct and recursive
+membership rounds stop after their first qualifying identity. The installed
+findgroup/hasconds query-trace oracle covers 2,592 three-channel Object/Text cases,
+duplicate memberships, previous-round signatures and permutations. Normalized
+condition answers isolate this traversal contract; explicit probes verify that a
+later limit failure is skipped after a match while a required first failure is
+propagated. This does not establish full native testcond recursion parity.

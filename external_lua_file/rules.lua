@@ -186,7 +186,7 @@ end
 local virtual_broken
 local query_level_trait
 -- Query this rule frame, never stale entity.behaviors from a previous turn.
-local function query_trait(world,entity,trait,known_grant)
+local function query_trait(world,entity,trait,known_grant,grant_rule)
     if entity.broken==1 then return false end
     if world._query_traits and not world._query_traits[trait] then return false end
     if virtual_broken and entity.class=="empty" and not world._ignore_virtual_broken then
@@ -202,6 +202,14 @@ local function query_trait(world,entity,trait,known_grant)
     local context={};for k,v in pairs(world) do context[k]=v end
     context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
     local granted,denied=known_grant==true,false
+    if grant_rule then
+        local enabled,err
+        if grant_rule.when and grant_rule.when.op=="spatial" then enabled,err=RW_TestEntityCondition(context,grant_rule.when,entity)
+        else enabled,err=evaluate_condition(context,grant_rule.when) end
+        if enabled==nil then guard[key]=nil;return nil,err end
+        if not enabled then guard[key]=nil;return false end
+        granted,known_grant=true,true
+    end
     for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
         for _,rule in ipairs(rules) do for _,effect in ipairs(rule.effects or {}) do
             if effect.trait==trait and (not known_grant or effect.op=="deny_trait") and effect.target and valid_selector(effect.target,world) and ((entity.class=="empty" and effect.target.kind=="empty") or (entity.class~="empty" and matches(entity,effect.target,world))) then
@@ -219,7 +227,7 @@ local function query_trait(world,entity,trait,known_grant)
 end
 -- EMPTY has no saved unit status. Original testcond -> isitbroken queries the
 -- current declaration frame with ignorebroken=true for that nested query.
-query_level_trait=function(world,trait)
+query_level_trait=function(world,trait,grant_declaration)
     local guard=world._condition_guard or {};local key="level:"..trait
     if guard[key] then return false end
     if (world._condition_depth or 0)>=80 then return nil,"word_rule_limit" end
@@ -234,9 +242,15 @@ query_level_trait=function(world,trait)
     end
     local granted,denied=false,false
     local entity={id=0,class="level",archetype="level_block",x=0,y=0,direction="None"}
+    if grant_declaration then
+        local active,why=RW_TestEntityCondition(context,grant_declaration.when,entity)
+        if active==nil then guard[key]=nil;return nil,why end
+        if not active then guard[key]=nil;return false end
+        granted=true
+    end
     for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
         for _,rule in ipairs(rules) do for _,declaration in ipairs(rule.scoped_conditions or {}) do
-            if declaration.trait==trait then
+            if declaration.trait==trait and (not grant_declaration or declaration.op=="deny_level_trait") then
                 local active,why=RW_TestEntityCondition(context,declaration.when,entity)
                 if active==nil then guard[key]=nil;return nil,why end
                 if active then
@@ -827,33 +841,69 @@ local function powered_condition(world,trait,negated)
     guard[key]=true
     local context={};for k,v in pairs(world) do context[k]=v end
     context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
-    local found,empty_source=false,false
-    local level_power,why=query_level_trait(context,trait)
-    if level_power==nil then guard[key]=nil;return nil,why end
-    found=level_power
-    for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
-        for _,rule in ipairs(rules) do
-            if rule.scoped_power and rule.scoped_power[trait] then found=true end
-            for _,effect in ipairs(rule.effects or {}) do
-                if effect.op=="grant_trait" and effect.trait==trait and effect.target.kind=="empty" then empty_source=true end
+    local found=false
+    local ids,occupied
+    local function ordered_ids()
+        if ids then return ids end
+        local seen,rest={},{};ids={}
+        for _,id in ipairs(world.unit_order or {}) do
+            if world.entities[id] and not seen[id] then ids[#ids+1]=id;seen[id]=true end
+        end
+        for id in pairs(world.entities) do if not seen[id] then rest[#rest+1]=id end end
+        table.sort(rest);for _,id in ipairs(rest) do ids[#ids+1]=id end
+        return ids
+    end
+    local function source_active(source)
+        if source.declaration then return query_level_trait(context,trait,source.declaration) end
+        if source.legacy then
+            local disabled,why=query_level_trait(context,"broken")
+            if disabled==nil then return nil,why end
+            return not disabled
+        end
+        local selector=source.effect.target
+        if not selector or not valid_selector(selector,world) then return false end
+        if selector.kind=="empty" then
+            if not occupied then occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end end
+            -- Native findempty(checkonly=true) visits columns before rows.
+            for x=1,world.width do for y=1,world.height do
+                if not occupied[x..":"..y] then
+                    local active,why=query_trait(context,{class="empty",x=x,y=y},trait,true,source.rule)
+                    if active==nil or active then return active,why end
+                end
+            end end
+        else
+            for _,id in ipairs(ordered_ids()) do local entity=world.entities[id]
+                if matches(entity,selector,world) then
+                    local active,why=query_trait(context,entity,trait,true,source.rule)
+                    if active==nil or active then return active,why end
+                end
             end
         end
+        return false
     end
-    if not found then
-        local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
-        for _,id in ipairs(ids) do
-            local active,err=query_trait(context,world.entities[id],trait)
+    for _,rules in ipairs({world.rule_sources or {},world._condition_rules or {}}) do
+        local sources={}
+        local function add(source,order)source.order=order;source.index=#sources+1;sources[#sources+1]=source end
+        for index,rule in ipairs(rules) do
+            if rule.scoped_power and rule.scoped_power[trait] then add({legacy=true},rule.power_order or index) end
+            for _,effect in ipairs(rule.effects or {}) do
+                if effect.op=="grant_trait" and effect.trait==trait and not rule.power_scoped then
+                    add({rule=rule,effect=effect},rule.power_order or index)
+                end
+            end
+            for _,declaration in ipairs(rule.scoped_conditions or {}) do
+                if declaration.op=="level_trait" and declaration.trait==trait then
+                    add({declaration=declaration},declaration.power_order or rule.power_order or index)
+                end
+            end
+        end
+        table.sort(sources,function(a,b)if a.order~=b.order then return a.order<b.order end;return a.index<b.index end)
+        for _,source in ipairs(sources) do
+            local active,err=source_active(source)
             if active==nil then guard[key]=nil;return nil,err end
             if active then found=true;break end
         end
-    end
-    if not found and empty_source then
-        local occupied={};for _,e in pairs(world.entities) do occupied[e.x..":"..e.y]=true end
-        for y=1,world.height do for x=1,world.width do if not found and not occupied[x..":"..y] then
-            local active,err=query_trait(context,{class="empty",x=x,y=y},trait)
-            if active==nil then guard[key]=nil;return nil,err end
-            found=active
-        end end end
+        if found then break end
     end
     guard[key]=nil
     return negated and not found or not negated and found
@@ -879,7 +929,12 @@ group_parameters=function(world,name,invert)
     local context={};for k,v in pairs(world) do context[k]=v end
     context._condition_guard=guard;context._condition_depth=(world._condition_depth or 0)+1
     local members,units={},{}
-    local ids={};for id in pairs(world.entities) do ids[#ids+1]=id end;table.sort(ids)
+    local ids,seen,rest={},{},{}
+    for _,id in ipairs(world.unit_order or {}) do
+        if world.entities[id] and not seen[id] then ids[#ids+1]=id;seen[id]=true end
+    end
+    for id in pairs(world.entities) do if not seen[id] then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do ids[#ids+1]=id end
     for _,rule in ipairs(world._condition_rules or {}) do
         for _,member in ipairs((rule.group_members or {})[name] or {}) do
             members[#members+1]=member
@@ -972,14 +1027,25 @@ local function seeing_condition(world,parameters,entity,negated)
             if hidden==nil then return nil,err end
             if not hidden then
                 targets[#targets+1]={id=id,name=e.class=="text" and "@text" or e.archetype};visible=true
-                local phantom,err=query_trait(world,e,"phantom");if phantom==nil then return nil,err end
-                if not phantom then for _,trait in ipairs({"block_entry","pushable","pull"}) do
-                    local blocking,err=query_trait(world,e,trait);if blocking==nil then return nil,err end
-                    if blocking then solid=true;break end
-                end end
             end
         end
         if not visible then targets[#targets+1]={name="@empty"} end
+        -- seeing() collects every visible identity before simplecheck() runs.
+        -- Preserve its OR/AND short circuit, including the second HIDE query.
+        for _,id in ipairs(ids) do
+            local e=world.entities[id];local blocking=false
+            for _,trait in ipairs({"block_entry","pushable","pull"}) do
+                local active,err=query_trait(world,e,trait);if active==nil then return nil,err end
+                if active then blocking=true;break end
+            end
+            if blocking then
+                local hidden,err=query_trait(world,e,"hide");if hidden==nil then return nil,err end
+                if not hidden then
+                    local phantom,err=query_trait(world,e,"phantom");if phantom==nil then return nil,err end
+                    if not phantom then solid=true;break end
+                end
+            end
+        end
         if solid then break end
         x,y=x+v[1],y+v[2]
     end
@@ -1345,9 +1411,30 @@ function RW_TestEntityCondition(world,node,entity,emptydir_autofail)
                 if id ~= entity.id and in_region(target.x,target.y) then candidates[#candidates+1]=target end
             end
         end
+        local stack_rank
+        if #candidates>1 then
+            local seen_cells,stacked={},{}
+            for _,target in ipairs(candidates) do
+                local key=string.format("%.0f:%.0f",target.x,target.y)
+                if seen_cells[key] then stacked[key]=true else seen_cells[key]=true end
+            end
+            if next(stacked) then
+                stack_rank={};local cells=condition_cells(world)
+                for key in pairs(stacked) do
+                    for rank,id in ipairs(cells[key] or {}) do stack_rank[id]=rank end
+                end
+            end
+        end
         table.sort(candidates,function(a,b)
-            if a.x ~= b.x then return a.x < b.x end
-            if a.y ~= b.y then return a.y < b.y end
+            if a.x ~= b.x then
+                if clause.relation=="besideright" then return a.x>b.x end
+                return a.x < b.x
+            end
+            if a.y ~= b.y then
+                if clause.relation=="below" then return a.y>b.y end
+                return a.y < b.y
+            end
+            if stack_rank and stack_rank[a.id] and stack_rank[b.id] then return stack_rank[a.id]<stack_rank[b.id] end
             return a.id < b.id
         end)
         local used,allfound={},0
@@ -2230,6 +2317,27 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
         if needed then
             status_context=condition_context(world,generated_rules or {})
             status_context.entities={};for id,entity in pairs(world.entities) do status_context.entities[id]=entity end
+            status_context.cell_order=condition_cells(world)
+            status_context.unit_order={}
+            local seen={}
+            for _,id in ipairs(world.unit_order or {}) do
+                if world.entities[id] and not seen[id] then
+                    status_context.unit_order[#status_context.unit_order+1]=id;seen[id]=true
+                end
+            end
+            local rest={};for id in pairs(world.entities) do if not seen[id] then rest[#rest+1]=id end end
+            table.sort(rest);for _,id in ipairs(rest) do status_context.unit_order[#status_context.unit_order+1]=id end
+        end
+    end
+    local function retire_status_unit(id)
+        if not status_context then return end
+        local unit=status_context.entities[id];status_context.entities[id]=nil
+        for index=#status_context.unit_order,1,-1 do
+            if status_context.unit_order[index]==id then table.remove(status_context.unit_order,index) end
+        end
+        if unit then
+            local stack=status_context.cell_order[string.format("%.0f:%.0f",unit.x,unit.y)] or {}
+            for index=#stack,1,-1 do if stack[index]==id then table.remove(stack,index) end end
         end
     end
     local function initialize_product(product,id,original)
@@ -2243,9 +2351,18 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
         if original then
             local witness=query_clone(original);witness.id=-original.id
             status_context.entities[witness.id]=witness
+            for index,old_id in ipairs(status_context.unit_order) do
+                if old_id==original.id then status_context.unit_order[index]=witness.id;break end
+            end
+            local stack=status_context.cell_order[string.format("%.0f:%.0f",original.x,original.y)] or {}
+            for index,old_id in ipairs(stack) do if old_id==original.id then stack[index]=witness.id;break end end
         end
         local unit=query_clone(product);unit.id=id;unit.broken=0
         status_context.entities[id]=unit
+        status_context.unit_order[#status_context.unit_order+1]=id
+        local key=string.format("%.0f:%.0f",unit.x,unit.y)
+        local stack=status_context.cell_order[key] or {};status_context.cell_order[key]=stack
+        stack[#stack+1]=id
         local active,err=query_trait(status_context,unit,"broken")
         if active==nil then return nil,err end
         unit.broken=active and 1 or 0;product.broken=active and 1 or nil
@@ -2306,7 +2423,7 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
             if not virtual then
                 changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)}
                 back_conversions[#back_conversions+1]={source=query_clone(entity),product_ids={},removed=true}
-                if status_context then status_context.entities[entity.id]=nil end
+                retire_status_unit(entity.id)
             end
             return true
         end
@@ -2411,9 +2528,9 @@ function RW_PlanConversions(world, conversions, generated_rules,back_count)
         if #event.product_ids>0 or event.removed then back_conversions[#back_conversions+1]=event end
         if not virtual and not retain and not used and remove then
             changes[#changes+1]={kind="delete",entity_id=entity.id,from=query_clone(entity)}
-            if status_context then status_context.entities[entity.id]=nil end
+            retire_status_unit(entity.id)
         end
-        if status_context and not virtual then status_context.entities[-entity.id]=nil end
+        if not virtual then retire_status_unit(-entity.id) end
         return true
     end
     local function convert_group(entity,source,virtual)
@@ -3139,7 +3256,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
         for _,term in ipairs(node.requirements or {}) do if not level_conditions(term) then return false end end
         return true
     end
-    for _,ast in ipairs(ast_rules) do
+    for ast_index,ast in ipairs(ast_rules) do
         if type(ast) ~= "table" or type(ast.when) ~= "table" then return nil,"invalid_ast_rule" end
         local subj,subnot=unwrap(ast.subject)
         local obj,objnot=unwrap(ast.object)
@@ -3363,6 +3480,21 @@ function RW_LowerRuleAST(ast_rules, registry, world)
             for index=generated_start,#generated do generated[index].when=query_clone(ast.when) end
             for index=relations_start,#relations do relations[index].when=query_clone(ast.when) end
         end
+        -- Scoped declarations are published together below; retain their physical
+        -- position relative to ordinary POWER clauses for POWERED's short circuit.
+        for index=generated_start,#generated do
+            for _,effect in ipairs(generated[index].effects or {}) do
+                if effect.op=="grant_trait" and (effect.trait=="power" or effect.trait=="power2" or effect.trait=="power3") then
+                    generated[index].power_order=ast_index
+                    if subj.tag=="noun" and subj.type and subj.type.tag=="level" then generated[index].power_scoped=true end
+                end
+            end
+        end
+        for index=relations_start,#relations do local relation=relations[index]
+            if relation.op=="level_trait" and (relation.trait=="power" or relation.trait=="power2" or relation.trait=="power3") then
+                relation.power_order=ast_index
+            end
+        end
         if not supported and #subjects > 0 then deferred[#deferred+1]=ast end
     end
     local filtered={}
@@ -3412,7 +3544,7 @@ function RW_LowerRuleAST(ast_rules, registry, world)
     for _,relation in ipairs(filtered) do
         if relation.op=="level_trait" or relation.op=="deny_level_trait" then
             scoped_conditions[#scoped_conditions+1]={op=relation.op,trait=relation.trait,
-                when=query_clone(relation.scoped_when or {op="always"})}
+                when=query_clone(relation.scoped_when or {op="always"}),power_order=relation.power_order}
         elseif relation.op=="eat" and relation.eats_level then
             scoped_conditions[#scoped_conditions+1]={op="eat_level",relation=query_clone(relation)}
         elseif relation.op=="level_eat" then

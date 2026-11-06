@@ -60,3 +60,18 @@ exclusions 保留，不在编译时对整个类型一刀切。HAS 在冻结规�
 WORD、条件转换/WRITE/HAS、条件否定、AND 物理重数与 Undo。原有 Too Complex、Infinite Loop、
 方向、导航和接触词回归继续通过。正常启动不跑完整自测，约 938000 条离线 Lua 指令，
 仍受 2000000 条预算约束。离线通过不代表已完成本轮真机验收。
+
+ON and FACING consume same-cell witnesses in current unitmap arrival order,
+including explicit cell_order overrides, rather than numeric identity order.
+This matters for overlapping negative AND parameters that compete for witnesses.
+The installed ON/FACING oracle adds 5,760 cases across four axes, repeated and
+negative parameters, physical Text and global/explicit stack permutations;
+compiled physical sentences verify projection, turn Commit and whole-tree Undo.
+NEAR/NEXTTO retain the original x-then-y neighborhood traversal and now honor
+each cell's stack. All four aligned rays consume nearest cells first, including
+descending y for BELOW and descending x for BESIDERIGHT. Stack rank maps are
+built only when candidate cells actually contain multiple witnesses. The added
+installed region oracle covers 34,560 real/EMPTY cases with overlapping,
+distributed and off-axis layouts, complementary/repeated parameters and explicit
+versus global ordering. Physical compiled tests cover all these relations and
+verify that a nearer WATER can consume a complement before a distant FLAG.

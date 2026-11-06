@@ -111,6 +111,21 @@ local duplicate=s.world.next_entity_id;s.world.next_entity_id=duplicate+1
 s.world.entities[duplicate]={id=duplicate,kind='object',class='text',text={name='POWERED'},x=1,y=8,direction='None'}
 n,p=step(s);local count=0;for _,e in pairs(n.world.entities) do if e.archetype=='flag' then count=count+1 end end
 assert(count==2,'stacked prefix sentence variants preserve product multiplicity')
+-- LEVEL's POWER declaration is a synthetic source, not an extra search through
+-- concrete entrance shapes after its scoped condition fails.
+s=fixture({{'LEVEL','FACING','ROCK','IS','POWER'},{'POWERED','AVATAR','IS','PUSH'}})
+s.world.language.nouns.LEVEL={tag='level',block_type='level_block'}
+object(s.world,3,'level_block',5,3,'Right')
+w,f=projection(s);assert(w.entities[3].behaviors.power and not w.entities[1].behaviors.push,'physical LEVEL power must not replace failed virtual LEVEL source')
+-- Dynamic denials remain effective when one positive clause is selected first.
+s=fixture({{'ROCK','IS','POWER'},{'ROCK','ON','FLAG','IS','NOT','POWER'},{'POWERED','AVATAR','IS','PUSH'}})
+w=projection(s);assert(w.entities[1].behaviors.push)
+object(s.world,3,'flag',6,3);w=projection(s);assert(not w.entities[1].behaviors.push)
+step(s)
+s=fixture({{'LEVEL','IS','POWER'},{'IDLE','LEVEL','IS','NOT','POWER'},{'POWERED','AVATAR','IS','PUSH'}})
+s.world.language.nouns.LEVEL={tag='level',block_type='level_block'}
+w=projection(s);assert(w.entities[1].behaviors.push)
+n,p=step(s);w=projection(n);assert(not w.entities[1].behaviors.push,'conditional scoped denial on wait')
 print('PASS: POWERED three global channels, prefixes/NOT/AND/activation/shadowing, spatial sources/EMPTY/Text/LEVEL, conversion/HAS/WORD, bounded grounding and Undo')
 
 -- LONELY shares the prefix parser, but checks physical occupancy per identity.

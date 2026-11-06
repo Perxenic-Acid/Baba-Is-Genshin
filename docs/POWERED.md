@@ -23,19 +23,21 @@ POWER declarations refresh using the current declaration frame, without stale
 projected behavior facts. Physical Text, virtual Empty and ordinary units can supply
 power. Empty requires an available cell whose source condition holds.
 
-Unconditional scoped LEVEL IS POWER/POWER2/POWER3 supplies its channel. Denied scoped
-POWER is suppressed. Lowering adds one effect-free scoped_power declaration to the
-transient generated rule frame so conditional conversions/HAS can see it without
-persisting cache state. Conditional scoped LEVEL rules retain their existing gap;
-physical level shapes with ordinary archetype rules remain ordinary source units.
+Scoped LEVEL IS POWER/POWER2/POWER3 supplies its channel through raw scoped_conditions
+in the transient generated frame; supported conditions use the synthetic LEVEL
+query context described in LEVEL_CONDITIONS.md. Denied or BROKEN scoped POWER is
+suppressed. Conditional conversion/HAS queries receive these declarations without
+persisting cache state. A typed LEVEL clause is a synthetic source for POWERED;
+its physical entrance property projection does not provide an extra source when
+the scoped condition fails.
 
 Global channel recursion guards prevent self/mutual ungrounded power. A separate
 source can ground cross-channel dependencies. Depth exhaustion propagates the
 existing word_rule_limit terminal mechanism. No poweredstatus result is cached
 across phase changes: each phase sees current live sources and occupancy while
 contacts retain frozen declarations. Full original checkedconds/poweredstatus cache
-parity for pathological dependency cycles is not claimed. GROUP and unsupported
-property/LEVEL condition combinations remain previously documented gaps.
+parity for pathological dependency cycles is not claimed. Shared LEVEL condition
+and recursive invalidation limits remain documented in LEVEL_CONDITIONS.md.
 
 The POWER properties are derived capabilities; they add no turn phase or persisted
 world fields. Whole-tree Undo restores actual source/board changes. The normal
@@ -58,3 +60,27 @@ prefixes LONELY/IDLE/OFTEN/SELDOM, then GROUP and ordinary properties.
 M9.7M: conditional scoped LEVEL POWER channels and dynamic synthetic BROKEN now
 use raw current/frozen declarations; see LEVEL_CONDITIONS.md. No saved synthetic
 status or persistent query cache is introduced.
+
+POWERED now traverses positive declarations first, then matching identities in
+native per-name creation order; virtual EMPTY uses installed findempty's
+column-before-row scan and returns on the first eligible cell. LEVEL is queried
+at its declaration's position rather than ahead of all ordinary sources. A
+selected positive clause is evaluated once before raw negative declarations may
+veto it; BROKEN and existing recursion guards still apply. An inactive earlier
+clause cannot be satisfied by a different later positive clause.
+
+Lowering attaches transient power_order to POWER rows/scoped declarations because
+scoped_conditions are published together at the end of the compiled frame.
+power_scoped prevents a typed LEVEL declaration from searching concrete entrance
+shapes after its virtual condition fails. These fields are compiler/query data,
+not saved world state or poweredstatus caches. Physical LEVEL shapes still
+receive their ordinary property projection.
+
+The installed powered/findempty trace oracle covers 2,400 paired source/type,
+three-channel, condition-mask and unit-order cases twice: authored raw frames and
+lowered AST frames with scoped rows moved by publication. It compares every
+condition query and verifies skipped versus required limit failures. Production
+compiler/planner tests retain dynamic ordinary/scoped NOT POWER, failed synthetic
+versus active concrete LEVEL conditions, cross-channel grounding and whole-turn
+Undo. Predicate answers and host BROKEN/cancellation are normalized in the source
+oracle; full original checkedconds/poweredstatus invalidation remains deferred.

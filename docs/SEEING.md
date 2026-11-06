@@ -83,3 +83,13 @@ right identities are consumed after a preceding arrival, including full Undo.
 The preceding rules.lua fails the new source oracle. This does not change the
 existing occlusion phase/query timing contract or claim full native recursion
 invalidation parity; the oracle supplies normalized per-identity trait eligibility.
+
+SEEING now separates each cell's complete HIDE/visibility pass from its
+simplecheck occlusion pass, matching installed conditions.lua seeing() and
+tools.lua simplecheck(). Occlusion short-circuits STOP, PUSH, PULL in that order,
+then HIDE and PHANTOM, and stops at the first opaque identity. This avoids
+unnecessary recursive queries behind an already established blocker while still
+propagating visibility failures anywhere in the current cell. The installed
+query-trace oracle covers 2,048 two-unit trait/stack combinations and explicit
+skipped-versus-required limit failures. This proves query order with normalized
+trait answers, not complete native recursive-condition invalidation parity.

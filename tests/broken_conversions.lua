@@ -64,4 +64,32 @@ s=fixture({{"AVATAR","WRITE","ROCK"},{"TEXT","IS","BROKEN"}})
 n,plan=wait(s)
 assert(n.world.entities[1].class=="text" and n.world.entities[1].text.name=="ROCK" and n.world.entities[1].broken==1)
 assert(n.world.entities[1].level_link.definition_id=="conversion.child" and RW_Undo(n).world==s.world)
-print("PASS: conversion-primary/extra BROKEN, old-source witnesses, ordered duplicate products, same-name BECOME, WRITE, late MAKE/CRASH, links, identity and Undo")
+-- The old source keeps its pre-conversion stack slot. The replacement is a
+-- distinct newborn appended after existing occupants while status is queried.
+for reverse=0,1 do
+ s=fixture({{'AVATAR','IS','ROCK'},{'ROCK','ON','NOT','WATER','AND','NOT','AVATAR','IS','BROKEN'}})
+ s.world.language.nouns.WATER='water'
+ s.world.entities[2]={id=2,kind='object',class='object',archetype='flag',x=2,y=2,direction='None'}
+ s.world.unit_order={1,2}
+ for id=10,s.world.next_entity_id-1 do s.world.unit_order[#s.world.unit_order+1]=id end
+ if reverse==1 then s.world.cell_order={['2:2']={2,1}}end
+ n,plan=wait(s)
+ assert((n.world.entities[1].broken==1)==(reverse==0),'old source stack slot during conversion status')
+ assert(RW_Undo(n).world==s.world)
+end
+-- Later sources may query scoped conditions through POWERED. Their transient
+-- unit list must not retain a retired negative source or an EMPTY-converted ID.
+for remove_first=0,1 do
+ s=RW_CreateSession();local w=s.world;w.rule_sources={};w.next_entity_id=10;w.unit_order={1,2}
+ w.entities={[1]={id=1,kind='object',class='object',archetype=remove_first==1 and 'flag' or 'avatar',x=2,y=2,direction='Left'},
+  [2]={id=2,kind='object',class='object',archetype='avatar',x=4,y=2,direction='Left'}}
+ local raw={{when={op='spatial',clauses={{relation='powered',negated=false,parameters={}}}},effects={{op='grant_trait',trait='broken',target={kind='archetype',value='rock'}}}},
+  {effects={},scoped_conditions={{op='level_trait',trait='power',when={op='spatial',clauses={{relation='on',negated=false,parameters={{tag='noun',type={tag='object',name='rock'}}}}}}}}}}
+ local changes,why,allocation=RW_PlanConversions(w,{{op='become',source_type='avatar',target_type='rock',when={op='always'}},
+  {op='transform',source_type='flag',target_type='@empty',when={op='always'}}},raw);assert(changes,why)
+ local result;n,result=RW_Commit(s,{consumes_turn=true,changes=changes,id_allocation=allocation});assert(result.accepted,result.reason)
+ assert(n.world.entities[2].archetype=='rock' and n.world.entities[2].broken==1,'scoped status query after previous conversion retirement')
+ if remove_first==0 then assert(n.world.entities[1].broken==1)else assert(not n.world.entities[1])end
+ assert(RW_Undo(n).world==s.world)
+end
+print("PASS: conversion-primary/extra BROKEN, ordered old-source witnesses, duplicate products, same-name BECOME, WRITE, late MAKE/CRASH, links, identity and Undo")

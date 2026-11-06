@@ -115,8 +115,10 @@ an explicit gap. Neither is being counted as finished gameplay support.
 
 ## Conversion products (M9.5Q)
 
-Installed Data/convert.lua:329-381 constructs each product and calls addunit before
-adding it to the map. The old source is removed only after the full group (476).
+Installed Data/convert.lua:329-381 constructs each product and calls addunit.
+Data/syntax.lua addunit itself appends the newborn to the map before statusblock;
+doconvert's subsequent addunitmap is idempotent. The old source is removed only
+after the full group (476).
 `RW_PlanConversions(world, relations, generated_rules)` now accepts the actual raw
 frame from the native scheduler and initializes each product in that order.
 
@@ -349,3 +351,17 @@ Undo. Existing conservative WORD dependency detection remains a documented gap.
 M9.7M: conditional scoped LEVEL POWER channels and dynamic synthetic BROKEN now
 use raw current/frozen declarations; see LEVEL_CONDITIONS.md. No saved synthetic
 status or persistent query cache is introduced.
+
+Conversion initialization now retains the old source's actual global and cell
+order under its query-only negative identity, and appends each product after
+existing occupants before querying status. This prevents primary identity reuse
+from moving the newborn into the old source's witness slot. Temporary ordering
+tables are cloned, never written to world/Undo; retired witnesses are removed
+from both query lists before later sources. The installed doconvert/addunit/addunitmap/brokenblock/ON
+lifecycle oracle covers 160 explicit stack, NOT-AND, self/duplicate/Text product
+cases. Its statusblock adapter invokes the actual brokenblock only; other status
+properties and full host metadata initialization are outside this oracle.
+Physical compiled conversion tests verify acquisition differences and Undo.
+Direct conversion transactions also query conditional scoped LEVEL POWER through
+POWERED after a preceding source was converted or deleted; both query lists must
+already exclude that retired source, and whole-turn Undo restores it.

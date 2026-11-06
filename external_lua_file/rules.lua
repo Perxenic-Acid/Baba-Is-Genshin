@@ -4191,7 +4191,12 @@ function RW_PlanMakeProducts(world,relations,converted)
                 end
                 sources=empty_sources
             else
-                for _,id in ipairs(RW_SelectEntities(world,selector)) do sources[#sources+1]=world.entities[id] end
+                local selected=RW_SelectEntities(world,selector)
+                local pending={};for _,id in ipairs(selected) do pending[id]=true end
+                for _,id in ipairs(world.unit_order or {}) do
+                    if pending[id] then sources[#sources+1]=world.entities[id];pending[id]=nil end
+                end
+                for _,id in ipairs(selected) do if pending[id] then sources[#sources+1]=world.entities[id] end end
             end
             for _,source in ipairs(sources) do
                 local enabled,why=RW_RelationApplies(world,relation,source)

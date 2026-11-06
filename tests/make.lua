@@ -248,3 +248,25 @@ assert(RW_QueryEmptyDirection(guard_world,2,2)=='Left' and next(guard_world._con
 guard_world._condition_depth=80
 failed,reason=RW_QueryEmptyDirection(guard_world,2,2)
 assert(not failed and reason=='word_rule_limit' and next(guard_world._condition_guard)==nil)
+
+-- Source creation order controls allocation and the assignment of pure RNG draws.
+do
+    local s=fixture({{'ROCK','MAKE','FLAG'},{'ROCK','MAKE','FLAG'}})
+    object(s.world,3,'rock',9,3,'None');s.world.entities[2].direction='None'
+    local order={3,2,1};local rest={}
+    for id in pairs(s.world.entities) do if id>3 then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do order[#order+1]=id end
+    s.world.unit_order=order;s.world.random_state=17
+    local first=s.world.next_entity_id
+    local n=step(s)
+    local state=17;local directions={'Right','Up','Left','Down'}
+    for i,source_id in ipairs({3,2,3,2}) do
+        state=(state*48271)%2147483647
+        local product=n.world.entities[first+i-1]
+        assert(product and product.archetype=='flag' and product.x==s.world.entities[source_id].x
+            and product.direction==directions[state%4+1],'scheduled MAKE must allocate and draw in unit-list order')
+    end
+    assert(n.world.random_state==state and s.world.random_state==17)
+    assert(RW_Undo(n).world==s.world,'MAKE order and RNG must restore with Undo')
+end
+print('PASS: scheduled MAKE unit order, duplicate allocation, per-source RNG and Undo')

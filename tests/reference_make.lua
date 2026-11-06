@@ -25,8 +25,9 @@ local function unit(name,dir,converted)
     return {values={4,4,dir,0,0,0},strings={name,'','','','',name:sub(1,5)=='text_' and 'text' or 'object'},flags={false,converted}}
 end
 function env.create(name,x,y,dir)
-    births[#births+1]={name=name,direction=names[dir+1]}
+    births[#births+1]={name=name,direction=names[dir+1],x=x,y=y}
     units[100+#births]=unit(name,dir,true)
+    units[100+#births].values[1]=x;units[100+#births].values[2]=y
 end
 local original=assert(load(body,'@original_MAKE','t',env))
 local checked=0
@@ -92,3 +93,44 @@ for _,target in ipairs({'rock','avatar','flag','text','empty'}) do for duplicate
     empty_cases=empty_cases+1
 end end
 print('PASS: installed EMPTY MAKE unset-facing/Text/duplicates/non-product RNG oracle ('..empty_cases..' cases)')
+
+-- Execute native grouping as well as creation, with nonnumeric creation order.
+local features=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/features.lua]],'rb'))
+local text=features:read('*a');features:close()
+assert(load(text:sub(assert(text:find('function getunitswithverb(',1,true)),assert(text:find('function getunitverbtargets(',1,true))-1),'@original_make_groups','t',env))()
+env.nlist.brief={};env.DEAD=3;env.testcond=function() return true end
+env.findnoun=function(name,list)
+    if list==env.nlist.brief then return false end
+    return name=='text' or name=='empty' or name=='all'
+end
+local ordered_cases=0
+for _,order in ipairs({{30,10,20},{20,30,10},{10,20,30}}) do
+for _,source_name in ipairs({'rock','text_rock'}) do
+for _,target in ipairs({'avatar','flag','text'}) do
+for copies=1,2 do for _,unset in ipairs({false,true}) do
+    units={};births={};state=17;env.unitlists={};env.featureindex={make={}}
+    local name=source_name=='rock' and 'rock' or 'text'
+    env.unitlists[name]=order
+    local w={entities={},unit_order=order,random_state=17,language={nouns={ROCK='rock',AVATAR='avatar',FLAG='flag'}}}
+    for i,id in ipairs({10,20,30}) do
+        local dir=unset and 4 or i-1
+        units[id]=unit(source_name,dir,false);units[id].values[1]=i+1;units[id].flags[env.DEAD]=false
+        w.entities[id]={id=id,kind='object',class=name=='text' and 'text' or 'object',archetype='rock',text=name=='text' and {name='ROCK'} or nil,x=i+1,y=4,direction=names[dir+1]}
+    end
+    local relations={}
+    for i=1,copies do
+        env.featureindex.make[i]={{name,'make',target},{},{},{}}
+        relations[i]={op='make',source_type=name=='text' and '@text' or name,target_type=target=='text' and '@text' or target}
+    end
+    original()
+    local products,rng=RW_PlanMakeProducts(w,relations)
+    assert(#products==#births,'ordered MAKE count')
+    for i,p in ipairs(products) do
+        local product_name=p.class=='text' and 'text_'..p.text.name:lower() or p.archetype
+        local expected=births[i]
+        assert(product_name==expected.name and p.x==expected.x and p.y==expected.y and p.direction==expected.direction,'ordered MAKE product and per-source RNG')
+    end
+    assert((rng and rng.to or 17)==state,'ordered MAKE final RNG')
+    ordered_cases=ordered_cases+1
+end end end end end
+print('PASS: installed MAKE grouping, unit-list product order and per-source random directions ('..ordered_cases..' cases)')

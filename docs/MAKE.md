@@ -151,3 +151,14 @@ instructions. No native-rendering or manual acceptance is inferred.
 M9.8E also connects the direction query to EMPTY conversion products and carries
 conversion RNG through the scheduled stage. See EMPTY_CONVERSIONS.md for per-product
 versus shared ALL draws, tests and remaining lifecycle/parity limits.
+
+Real MAKE sources now follow saved world.unit_order within each declaration, with
+sorted identity fallback for diagnostic worlds without that metadata. This matches
+installed features.lua getunitswithverb's unitlists traversal and blocks.lua's
+producer loop: random facing draws and product allocation follow source creation
+order, not numeric IDs. Existing converted-occupant and duplicate-rule behavior is
+unchanged. The source oracle adds 72 native grouping/MAKE cases with permuted unit
+lists, ordinary/Text sources, known/unset facing and duplicate clauses. Scheduled
+coverage checks allocated identities, per-source RNG assignment and complete Undo.
+Cross-noun group dispatch retains deterministic relation order; native pairs(group)
+ordering is not portable and no exact cross-noun dispatch guarantee is claimed.

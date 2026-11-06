@@ -199,12 +199,14 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.hold_source_groups={}
     projected.tele_source_groups={}
     projected.sink_source_groups={}
+    projected.weak_source_groups={}
+    projected.melt_source_groups={}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -218,6 +220,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                 if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
                 elseif capability=="tele" then projected.tele_source_groups[#projected.tele_source_groups+1]=group
                 elseif capability=="sink" then projected.sink_source_groups[#projected.sink_source_groups+1]=group
+                elseif capability=="weak" or capability=="melt" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
                 else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
@@ -389,6 +392,22 @@ function RW_ResolveContactVictims(world, kind)
                     end
                 end
                 if sunk then removed[id]=true;victims[#victims+1]=id end
+            end
+        end end
+        return victims
+    end
+    if (kind=="weak" or kind=="melt") and world[kind.."_source_groups"] then
+        local victims={}
+        for _,group in ipairs(world[kind.."_source_groups"]) do for _,id in ipairs(group) do
+            local actor=world.entities[id]
+            if actor and not removed[id] and not actor.behaviors.safe
+                and not (kind=="weak" and world.weak_new_ids and world.weak_new_ids[id]) then
+                for _,other_id in ipairs(ids) do
+                    local other=world.entities[other_id]
+                    if overlap(actor,other) and ((kind=="weak" and other_id~=id) or (kind=="melt" and other.behaviors.hot)) then
+                        removed[id]=true;victims[#victims+1]=id;break
+                    end
+                end
             end
         end end
         return victims

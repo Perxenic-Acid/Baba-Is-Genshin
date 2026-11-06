@@ -167,3 +167,17 @@ cases, comparing deletion sequences without sorting. A physical compiled turn
 checks target-before-source HAS allocation/facing, transient projection metadata
 and whole-turn Undo. Other contact words and the separate scoped LEVEL loop retain
 their existing phase boundaries; this does not claim complete native scheduling.
+
+WEAK and MELT now retain their physical declaration groups and per-declaration
+unit_order too. First selected identity determines HAS allocation order, rather
+than a final numeric sort. Selection remains simultaneous; newborn WEAK grace,
+independent SAFE/FLOAT and MELT self-HOT remain unchanged. Repeated selections are
+deduplicated before our once-per-victim HAS contract. Installed handledels uses
+pairs on dense deletion lists; this backend explicitly preserves encounter order.
+
+The shared reference_sink_order.lua oracle now also executes installed WEAK and
+MELT selection bodies, with 16,384 total cases (4,096 SINK, 8,192 WEAK including
+newborns, 4,096 MELT). It compares first-encounter identity sequences, including
+duplicate physical declarations and reversed unit/tile lists. Physical compiled
+WEAK/MELT turns check HAS allocation/facing and Undo. Raw capability snapshots keep
+their diagnostic fallback; groups stay outside authoritative state.

@@ -244,3 +244,15 @@ do
     assert(not n.world.sink_source_groups and RW_Undo(n).world==s.world)
 end
 print('PASS: physical SINK target-before-source tile order, HAS allocation/facing and whole-turn Undo')
+
+for _,word in ipairs({'WEAK','MELT'}) do
+    local s=make({{'avatar',3,2,'Left'},{'rock',3,2,'Right'},{'flag',3,2,'Up'}},
+        {{'FLAG','IS',word},{'ROCK','IS',word},{'AVATAR','IS','HOT'},
+            {'FLAG','HAS','WATER'},{'ROCK','HAS','SKULL'}})
+    local first=s.world.next_entity_id;local n=step(s,{type='wait'})
+    assert(n.world.entities[first].archetype=='water' and n.world.entities[first].direction=='Up',word..' first physical declaration HAS')
+    assert(n.world.entities[first+1].archetype=='skull' and n.world.entities[first+1].direction=='Right')
+    assert(n.world.entities[1] and not n.world.entities[2] and not n.world.entities[3])
+    assert(not n.world.weak_source_groups and not n.world.melt_source_groups and RW_Undo(n).world==s.world)
+end
+print('PASS: physical WEAK/MELT declaration order, HAS allocation/facing and whole-turn Undo')

@@ -79,7 +79,7 @@ local f=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is Y
 local first=assert(source:find("\t\tif (generaldata2.values[ENDINGGOING] == 0) then",1,true))
 local last=assert(source:find("\t\tlocal ismore =",first,true));local code=source:sub(first,last-1)
 local checked=0
-for mask=0,15 do for safe=0,3 do
+for reverse=0,1 do for mask=0,15 do for safe=0,3 do
  local world=fixture({}).world;world.entities={};world.trait_counts={};local originals,chosen={},{}
  for id=1,4 do
   local done=math.floor(mask/2^(id-1))%2==1;local protected=math.floor(safe/2^((id-1)%2))%2==1
@@ -88,15 +88,21 @@ for mask=0,15 do for safe=0,3 do
   originals[id]={fixed=id+1000,originalname="rock",strings={name="rock"},flags={dead=false},values={x=id,y=3,dir=1,id=id,float=id%2}}
   if done then chosen[#chosen+1]=originals[id];chosen[#chosen+1]=originals[id] end
  end
- local removed={};local env={ipairs=ipairs,table=table,doned={},delthese={},generaldata2={values={ending=0}},ENDINGGOING="ending",FLOAT="float",DEAD="dead",EFFECTCOUNT="effect",POSITIONING="position",
+ if reverse==1 then
+  local reversed={};for i=#chosen,1,-1 do reversed[#reversed+1]=chosen[i] end;chosen=reversed
+ end
+ world.done_source_groups={{}};for _,u in ipairs(chosen) do table.insert(world.done_source_groups[1],u.fixed-1000) end
+ local removed,sequence={},{};local env={ipairs=ipairs,table=table,doned={},delthese={},generaldata2={values={ending=0}},ENDINGGOING="ending",FLOAT="float",DEAD="dead",EFFECTCOUNT="effect",POSITIONING="position",
  XPOS="x",YPOS="y",DIR="dir",ID="id",UNITNAME="name",VISION="vision",CAMTARGET="camera",spritedata={values={vision=0}},math={random=function() return 0 end},
- getunitswitheffect=function() return chosen end,setsoundname=function() end,addundo=function() end,dynamicat=function() end,delunit=function(id) removed[id-1000]=true end}
+ getunitswitheffect=function() return chosen end,setsoundname=function() end,addundo=function() end,dynamicat=function() end,delunit=function(id) if not removed[id-1000] then sequence[#sequence+1]=id-1000 end;removed[id-1000]=true end}
  assert(load(code,"installed DONE block","t",env))()
- local ids=RW_ResolveDone(world,{})
+ local ids,events=RW_ResolveDone(world,{})
+ assert(#ids==#sequence,'original DONE ordered count')
+ for i,id in ipairs(sequence) do assert(ids[i]==id and events[i].entity_id==id,'original DONE ordered retirement/events') end
  local seen={};for _,id in ipairs(ids) do seen[id]=true end
  for id=1,4 do assert((seen[id]==true)==(removed[id]==true),"original DONE removal mismatch") end
  checked=checked+1
-end end
+end end end
 -- Original custom/editor ALL DONE decision, including Text and duplicate counts.
 first=assert(source:find("\t\tif (featureindex[\"done\"] ~= nil) then",last,true))
 last=assert(source:find("\t\tif (generaldata.strings[WORLD] == generaldata.strings[BASEWORLD]) and (generaldata.strings[CURRLEVEL] == \"305level\") then",first,true))
@@ -119,3 +125,18 @@ for mask=0,15 do for repeats=1,3 do
  checked=checked+1
 end end
 print("PASS: DONE no-HAS/SAFE/status/conditions/conversion/MORE/frozen Text/newborns/LEVEL/ALL/Undo and "..checked.." installed oracle cases")
+
+do
+ local s=fixture({{'FLAG','IS','DONE'},{'ROCK','IS','DONE'},{'FLAG','IS','DONE'}})
+ s.world.entities[3]={id=3,kind='object',class='object',archetype='flag',x=20,y=20,direction='Down'}
+ s.world.entities[4]={id=4,kind='object',class='object',archetype='flag',x=22,y=20,direction='Up'}
+ s.world.unit_order={4,2,3,1};local rest={}
+ for id in pairs(s.world.entities) do if id>4 then rest[#rest+1]=id end end
+ table.sort(rest);for _,id in ipairs(rest) do s.world.unit_order[#s.world.unit_order+1]=id end
+ local n,p=step(s)
+ assert(#p.events==3 and p.events[1].entity_id==4 and p.events[2].entity_id==3 and p.events[3].entity_id==2,'DONE physical declaration and unit order, duplicate retirement once')
+ assert(p.events[1].direction=='Up' and p.events[2].direction=='Down' and p.events[3].direction=='Left')
+ assert(n.world.entities[1] and not n.world.entities[2] and not n.world.entities[3] and not n.world.entities[4])
+ assert(n.world.next_entity_id==s.world.next_entity_id and not n.world.done_source_groups and RW_Undo(n).world==s.world)
+end
+print('PASS: physical DONE declaration/unit retirement event order, duplicates, no allocation and Undo')

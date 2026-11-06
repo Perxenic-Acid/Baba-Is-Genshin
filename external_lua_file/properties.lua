@@ -205,12 +205,13 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.shut_source_groups={}
     projected.boom_source_groups={}
     projected.more_source_groups={}
+    projected.done_source_groups={}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more","done"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -224,7 +225,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                 if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
                 elseif capability=="tele" then projected.tele_source_groups[#projected.tele_source_groups+1]=group
                 elseif capability=="sink" then projected.sink_source_groups[#projected.sink_source_groups+1]=group
-                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" or capability=="boom" or capability=="more" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
+                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" or capability=="boom" or capability=="more" or capability=="done" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
                 else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
@@ -740,6 +741,12 @@ function RW_ResolveDone(world,relations)
         if scoped or e.behaviors.done then ids[#ids+1]=id end
     end
     table.sort(ids)
+    if not scoped and world.done_source_groups then
+        ids={};local seen={}
+        for _,group in ipairs(world.done_source_groups) do for _,id in ipairs(group) do
+            if world.entities[id] and not seen[id] then ids[#ids+1]=id;seen[id]=true end
+        end end
+    end
     local all=false
     for _,r in ipairs(relations or {}) do if r.op=="all_done" then all=true;break end end
     local events={}

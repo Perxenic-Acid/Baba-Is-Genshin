@@ -54,3 +54,18 @@ sound, which remains deferred frontend work. Exact original call order
 between levelblock() host callbacks and unit block() is not claimed; synthetic scoped
 retirement is integrated at the shared pre-MORE barrier. Existing authored ALL palette
 rules still apply; this does not globally register all official noun types.
+
+Ordinary retirement now follows physical DONE declaration groups and per-group
+unit_order, rather than numeric identity order. First occurrence controls each
+identity's single retirement/event; duplicate grants still count independently
+for ALL completion. Transient done_source_groups never enter world facts or Undo.
+Scoped LEVEL retirement keeps its existing separate selection path, and raw
+capability-only diagnostics keep numeric fallback. This does not alter no-HAS,
+pre-MORE retirement, frozen rule timing or host animation scope.
+
+The installed DONE/ALL completion oracle now covers 176 cases, including forward
+and reversed source lists and ordered retirement/events. A compiled turn checks
+declaration-before-unit ordering across nouns, duplicate grants, complete facing
+events, no allocation and whole-turn Undo. Native repeated delunit calls are
+normalized to our existing once-per-identity backend retirement contract; host
+animation RNG and repeated visual calls remain frontend work.

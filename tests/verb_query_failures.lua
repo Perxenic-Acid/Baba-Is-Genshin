@@ -5,13 +5,13 @@ RW_RelationApplies=function(...)
  return original(...)
 end
 local cases=0
-for _,verb in ipairs({'follow','fear','eat'}) do
+for _,verb in ipairs({'follow','fear','eat','make','play'}) do
  for _,reason in ipairs({'word_rule_limit','word_rule_cycle','rule_complexity_limit','injected_query_error'}) do
   local s=RW_CreateSession();local w=s.world;w.entities={};w.next_entity_id=10
   w.language.nouns.ROCK='rock'
   w.entities[1]={id=1,kind='object',class='object',archetype='avatar',x=2,y=2,direction='Right'}
   w.entities[2]={id=2,kind='object',class='object',archetype='rock',x=7,y=2,direction='Left'}
-  for row,words in ipairs({{'AVATAR','IS','YOU'},{'AVATAR',verb:upper(),'ROCK'}}) do for x,word in ipairs(words) do
+  for row,words in ipairs({{'AVATAR','IS','YOU'},{'AVATAR',verb:upper(),verb=='play' and 'C4' or 'ROCK'}}) do for x,word in ipairs(words) do
    local id=w.next_entity_id;w.next_entity_id=id+1;w.entities[id]={id=id,kind='object',class='text',text={name=word},x=x,y=6+row*2,direction='None'}
   end end
   diagnostic=reason
@@ -19,6 +19,8 @@ for _,verb in ipairs({'follow','fear','eat'}) do
    active=true
    local targets,why
    if verb=='fear' then targets,why=RW_ResolveFearTargets(world,relations,rules)
+   elseif verb=='make' then targets,why=RW_PlanMakeProducts(world,relations,{})
+   elseif verb=='play' then targets,why=RW_ResolvePlayEvents(world,relations)
    else targets,why=RW_ResolveVerbTargets(world,relations,verb) end
    active=false
    assert(targets==nil and why==reason,'real relation diagnostics must propagate through target resolution')
@@ -34,6 +36,7 @@ for _,verb in ipairs({'follow','fear','eat'}) do
    assert(w.entities[1].x==2 and w.last_input==nil and #s.history==0)
   else
    assert(plan,why and why.reason)
+   assert(#(plan.events or {})==0,'failed query must not dispatch partial events')
    assert(reason=='rule_complexity_limit' and plan.too_complex or reason~='rule_complexity_limit' and plan.infinite_loop,'compile-limit states must retain their own terminal classification')
    local committed,r=RW_Commit(s,plan);assert(r.accepted,r.reason)
    assert(committed.world.entities[1].x==3,'late verb-query limits must commit completed movement prefix')
@@ -45,4 +48,4 @@ for _,verb in ipairs({'follow','fear','eat'}) do
  end
 end
 RW_RelationApplies=original
-print('PASS: FOLLOW/FEAR/EAT relation failures, terminal prefix Commit, ordinary atomic rejection and Undo ('..cases..' cases)')
+print('PASS: FOLLOW/FEAR/EAT/MAKE/PLAY relation failures, terminal prefix Commit, ordinary atomic rejection and Undo ('..cases..' cases)')

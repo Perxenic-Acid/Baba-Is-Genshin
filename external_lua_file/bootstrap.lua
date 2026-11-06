@@ -862,7 +862,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
             for _,relation in ipairs(frozen_relations or {}) do if relation.op=="play" then active=true;break end end
             if active then
                 local events,why=services.play(complete,frozen_relations)
-                if not events then return fail("play",why) end
+                if not events then return after_failure(plan,"play",why) end
                 plan.events=plan.events or {};for _,event in ipairs(events) do plan.events[#plan.events+1]=event end;trace[#trace+1]="play"
             end
         end
@@ -937,7 +937,7 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                     if change.kind=="create" or change.kind=="transform" or change.kind=="retype" or change.kind=="back_restore" then converted[change.entity_id]=true end
                 end end
                 local creation,why=services.make(complete,frozen_relations,converted,frozen_rules,back_count)
-                if not creation then return fail("make",why) end
+                if not creation then return after_failure(plan,"make",why) end
                 local next_world,why=services.preview(complete,creation)
                 if not next_world then return fail("make_preview",why) end
                 plan.stages[#plan.stages+1]={name="make",plan=creation}

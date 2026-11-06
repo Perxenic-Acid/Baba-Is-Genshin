@@ -66,7 +66,14 @@ errors reject the entire turn. This is the project's bounded-query contract,
 not a claim that the installed native testcond API returns these Lua diagnostics.
 
 tests/verb_query_failures.lua injects failures at the real relation applicability
-boundary in twelve compiled FOLLOW/FEAR/EAT turns. It verifies exact diagnostics,
+boundary in twenty compiled FOLLOW/FEAR/EAT/MAKE/PLAY turns. It verifies exact diagnostics,
 movement-prefix retention, terminal input lockout, ordinary atomic rejection,
 and complete Undo. Earlier completed phases remain committed; the failing query
 phase contributes no effects. Normal boot performs no extra query or self-test.
+
+MAKE and PLAY already propagate relation-query diagnostics from their product/event
+resolvers. Their scheduler barriers now use the same terminal-prefix policy rather
+than rejecting the triggering turn. A failed PLAY query emits no partial events;
+ordinary query errors still reject atomically. Installed blocks.lua collects PLAY
+via getunitswithverb at line 1225 and MAKE at line 1660; the compile-limit mapping
+here is our bounded-query policy, not a native error-return convention.

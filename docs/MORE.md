@@ -52,3 +52,23 @@ the existing frozen-source convention, without claiming native dynamic condition
 parity. A physical FLAG/ROCK MORE AND PUSH turn verifies contested-cell ownership,
 allocation, facing and whole-turn Undo. Historical PULL/lifecycle scope notes above
 are superseded by later subsystem work; frontend/native acceptance remains separate.
+
+MORE now queries STOP/PUSH/PULL from frozen raw declarations at each current
+obstacle, including initialized earlier copies and virtual EMPTY vacancies.
+A tentative phase-local world includes each copy immediately, so spatial
+conditions on old occupants can change as growth proceeds. Source MORE lists
+remain frozen; copies do not join them. BROKEN/BACK initialization happens before
+later obstacle queries. No projection cache or temporary identity is persisted.
+The production adapter uses RW_PlanMorePhase; the capability-only resolver call
+without services remains a diagnostic fallback.
+
+Query limits commit only already completed products; birth initialization limits
+also retain the triggering newborn, matching the existing creation-prefix rule.
+Ordinary errors reject the whole turn. Tests cover conditional STOP/PUSH/PULL,
+old blockers activated by growth, BROKEN newborns, prefix allocation and Undo.
+The installed MORE body is executed in 96 ON/conditional-NOT, cardinal-axis and
+source-order cases, comparing complete product sequences. Its host hasfeature
+adapter supplies normalized spatial eligibility; native creation choreography and
+full recursive condition timing are not claimed. This supersedes the inherited
+newborn blocker convention noted above. Coordinate occupancy keys are canonical
+for equal integer/float coordinates.

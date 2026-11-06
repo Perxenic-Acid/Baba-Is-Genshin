@@ -578,11 +578,18 @@ end
 
 -- MORE copies real units once per phase. Newly created copies block later sources
 -- but are not themselves added to this phase's source list.
-function RW_ResolveMoreProducts(world)
+function RW_ResolveMoreProducts(world,services)
     local ids,occupancy={},{}
+    local context
+    if services then
+        context={};for key,value in pairs(world) do context[key]=value end
+        context.entities={};for id,e in pairs(world.entities) do context.entities[id]=e end
+        if world.unit_order then context.unit_order=clone(world.unit_order) end
+    end
+    local function key(x,y) return string.format("%.0f:%.0f",x,y) end
     local function name(e) return e.class=="text" and "text_"..e.text.name or e.archetype end
     local function add(e)
-        local key=e.x..":"..e.y;occupancy[key]=occupancy[key] or {};table.insert(occupancy[key],e)
+        local k=key(e.x,e.y);occupancy[k]=occupancy[k] or {};table.insert(occupancy[k],e)
     end
     for id,e in pairs(world.entities) do ids[#ids+1]=id;add(e) end
     table.sort(ids)
@@ -597,19 +604,43 @@ function RW_ResolveMoreProducts(world)
             for _,v in ipairs({{1,0},{0,-1},{-1,0},{0,1}}) do
                 local x,y=source.x+v[1],source.y+v[2]
                 local valid=x>=1 and x<=world.width and y>=1 and y<=world.height
-                local occupants=occupancy[x..":"..y] or {}
+                local occupants=occupancy[key(x,y)] or {}
                 for _,other in ipairs(occupants) do
-                    if name(other)==name(source) or other.behaviors.block_entry or other.behaviors.push or other.behaviors.pull then valid=false;break end
+                    local blocked,why
+                    if services then blocked,why=services.obstacle(context,other)
+                    else blocked=other.behaviors.block_entry or other.behaviors.push or other.behaviors.pull or false end
+                    if blocked==nil then return nil,why,products end
+                    if name(other)==name(source) or blocked then valid=false;break end
                 end
-                if #occupants==0 then
-                    local empty=world.empty_cells and world.empty_cells[x..":"..y]
-                    if empty and (empty.behaviors.block_entry or empty.behaviors.push or empty.behaviors.pull) then valid=false end
+                if valid and #occupants==0 then
+                    if services then
+                        local blocked,why=services.obstacle(context,{class="empty",x=x,y=y,direction="None"})
+                        if blocked==nil then return nil,why,products end
+                        if blocked then valid=false end
+                    else
+                        local empty=world.empty_cells and world.empty_cells[key(x,y)]
+                        if empty and (empty.behaviors.block_entry or empty.behaviors.push or empty.behaviors.pull) then valid=false end
+                    end
                 end
                 if valid then
                     local copy={kind=source.kind,class=source.class,archetype=source.archetype,text=clone(source.text),
                         x=x,y=y,direction=source.direction or "None",level_link=clone(source.level_link)}
+                    if services then
+                        local initialized,why,prefix=services.initialize(context,{copy})
+                        if not initialized then
+                            if prefix then for _,p in ipairs(prefix) do products[#products+1]=p end end
+                            return nil,why,products
+                        end
+                        copy=initialized[1]
+                    end
                     products[#products+1]=copy
-                    local obstacle=clone(copy);obstacle.behaviors=source.behaviors;add(obstacle)
+                    local obstacle=clone(copy)
+                    if services then
+                        obstacle.id=context.next_entity_id
+                        context.entities[obstacle.id]=obstacle;context.next_entity_id=obstacle.id+1
+                        if context.unit_order then context.unit_order[#context.unit_order+1]=obstacle.id end
+                    else obstacle.behaviors=source.behaviors end
+                    add(obstacle)
                 end
             end
         end

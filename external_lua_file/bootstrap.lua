@@ -212,6 +212,19 @@ function RW_PlanInitializedCreation(world,specifications,rules,services,back_cou
     return plan
 end
 
+function RW_PlanMorePhase(world,projected,rules,services,back_count)
+    local products,why,prefix=services.products(projected,{
+        obstacle=function(w,e) return services.obstacle(w,e,rules) end,
+        initialize=function(w,p) return services.initialize(w,p,rules,back_count) end})
+    local terminal=not products and prefix and
+        (why=="word_rule_limit" or why=="word_rule_cycle" or why=="rule_complexity_limit")
+    if not products and not terminal then return nil,why end
+    local plan,err=services.create(world,products or prefix)
+    if not plan then return nil,err end
+    if terminal then lock_compile_failure(plan,why) end
+    return plan
+end
+
 -- Native EMPTY delete() calls run serially: earlier HAS births are witnesses for
 -- later conditions/status, while all virtual victims were selected beforehand.
 function RW_PlanEmptyContactPhase(world,cells,relations,rules,services,back_count,bonus)
@@ -2394,9 +2407,9 @@ local function start(run_self_tests)
             create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end},count)
     end
     turn_services.more=function(world,projected,rules,count)
-        local products,why=properties_api:Invoke("RW_ResolveMoreProducts",projected)
-        if not products then return nil,why end
-        return RW_PlanInitializedCreation(world,products,rules,{
+        return RW_PlanMorePhase(world,projected,rules,{
+            products=function(w,s) return properties_api:Invoke("RW_ResolveMoreProducts",w,s) end,
+            obstacle=function(w,e,r) return rules_api:Invoke("RW_QueryMoreObstacle",w,e,r) end,
             initialize=function(w,p,r,c) return rules_api:Invoke("RW_InitializeBirthSpecifications",w,p,r,c) end,
             create=function(w,p) return world_api:Invoke("RW_PlanCreate",w,p) end},count)
     end

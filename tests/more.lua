@@ -1,7 +1,7 @@
 -- HOT/MELT uses the production compiler and scheduled, frozen-rule contact phases.
 local cs={read=RW_ReadLines,parse=RW_ParseRuleAST,lower=RW_LowerRuleAST,
     evaluate=RW_EvaluateRules,project=RW_ProjectWorld,words=RW_WordTokenMap}
-local services={more=function(w,p) return RW_PlanCreate(w,RW_ResolveMoreProducts(p)) end,shift=RW_ResolveShift,destroy=function(w,ids,c,k,deaths) return RW_PlanDestructionPhase(w,ids,c,k,{births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},deaths) end,project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,
+local services={more=function(w,p,rules) return RW_PlanMorePhase(w,p,rules,{products=RW_ResolveMoreProducts,obstacle=RW_QueryMoreObstacle,initialize=RW_InitializeBirthSpecifications,create=RW_PlanCreate}) end,shift=RW_ResolveShift,destroy=function(w,ids,c,k,deaths) return RW_PlanDestructionPhase(w,ids,c,k,{births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},deaths) end,project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,
     convert=RW_PlanConversions,refresh=RW_EvaluateRules,
     contact=function(w,p,k,c) return RW_PlanContactPhase(w,p,k,c,{victims=RW_ResolveContactVictims,
         births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete}) end,
@@ -98,3 +98,62 @@ do
     assert(not n.world.more_source_groups and RW_Undo(n).world==s.world)
 end
 print('PASS: physical MORE declaration order decides competing PUSH growth, allocation/facing and Undo')
+local function wait(s)
+ local plan,why=RW_PlanTurn(s.world,{type='wait'},services);assert(plan,why and why.reason)
+ local n,r=RW_Commit(s,plan);assert(r.accepted,r.reason);assert(RW_Undo(n).world==s.world);return n,plan
+end
+-- Newborn blockers use their own position, rather than their mother's traits.
+for _,trait in ipairs({'STOP','PUSH','PULL'}) do for oncopy=0,1 do
+ local s=fixture({{'ROCK','IS','MORE'},{'FLAG','IS','MORE'},{'ROCK','ON','AVATAR','IS',trait}})
+ s.world.entities[1].x=oncopy==1 and 4 or 3
+ s.world.entities[3].archetype='flag';s.world.entities[3].x=5
+ local first=s.world.next_entity_id;local n=wait(s);local count=0
+ for id,e in pairs(n.world.entities) do if id>=first and e.x==4 and e.y==2 then count=count+1 end end
+ assert(count==(oncopy==1 and 1 or 2),'MORE conditional newborn '..trait..' '..oncopy..' '..count)
+end end
+-- A previous copy can activate a conditional blocker on an old occupant.
+s=only({{'ROCK','IS','MORE'},{'FLAG','IS','MORE'},{'CRATE','NEAR','ROCK','IS','STOP'}})
+s.world.language.nouns.CRATE='crate'
+s.world.entities[3]={id=3,kind='object',class='object',archetype='flag',x=6,y=2,direction='Up'}
+s.world.entities[4]={id=4,kind='object',class='object',archetype='crate',x=5,y=2,direction='Left'}
+f=s.world.next_entity_id;n=wait(s)
+for id,e in pairs(n.world.entities) do assert(not (id>=f and e.archetype=='flag' and e.x==5 and e.y==2),'MORE must recheck old blockers after earlier growth') end
+-- Query limits retain only completed products; ordinary errors reject atomically.
+for _,reason in ipairs({'word_rule_limit','rule_complexity_limit','injected'}) do
+ s=only({{'ROCK','IS','MORE'}});local frame=assert(RW_CompileWorld(s.world,cs));local calls=0
+ local plan,why=RW_PlanMorePhase(s.world,frame.effective or assert(RW_ProjectWorld(s.world,frame.effects)),frame.rules,{
+  products=RW_ResolveMoreProducts,initialize=RW_InitializeBirthSpecifications,create=RW_PlanCreate,
+  obstacle=function() calls=calls+1;if calls==2 then return nil,reason end;return false end})
+ if reason=='injected' then assert(not plan and why==reason)
+ else
+  assert(plan and #plan.changes==1 and (plan.infinite_loop or plan.too_complex))
+  local updated,result=RW_Commit(s,plan);assert(result.accepted and updated.world.next_entity_id==s.world.next_entity_id+1)
+  assert(RW_Undo(updated).world==s.world)
+ end
+end
+print('PASS: MORE live conditional newborn/existing blockers, STOP/PUSH/PULL, query-limit prefixes, rejection and Undo')
+-- Initialized BROKEN copies lose STOP before a later source tests them.
+s=fixture({{'ROCK','IS','MORE','AND','STOP'},{'FLAG','IS','MORE'},{'ROCK','ON','AVATAR','IS','BROKEN'}})
+s.world.entities[1].x=4;s.world.entities[3].archetype='flag';s.world.entities[3].x=5
+f=s.world.next_entity_id;n=wait(s);local overlap=0
+for id,e in pairs(n.world.entities) do if id>=f and e.x==4 and e.y==2 then
+ overlap=overlap+1;if e.archetype=='rock' then assert(e.broken==1) end
+end end
+assert(overlap==2,'MORE copy status must initialize before later obstacle queries')
+-- Birth-status limits retain the triggering newborn, not later copies.
+s=only({{'ROCK','IS','MORE'}});local frame=assert(RW_CompileWorld(s.world,cs));local calls=0
+local plan=assert(RW_PlanMorePhase(s.world,assert(RW_ProjectWorld(s.world,frame.effects)),frame.rules,{
+ products=RW_ResolveMoreProducts,obstacle=RW_QueryMoreObstacle,create=RW_PlanCreate,
+ initialize=function(w,p,r)
+  calls=calls+1;if calls==2 then return nil,'rule_complexity_limit',p end
+  return RW_InitializeBirthSpecifications(w,p,r)
+ end}))
+assert(plan.too_complex and #plan.changes==2 and calls==2)
+local committed,result=RW_Commit(s,plan);assert(result.accepted and committed.world.next_entity_id==s.world.next_entity_id+2)
+assert(RW_Undo(committed).world==s.world)
+print('PASS: MORE initialized BROKEN obstacle queries and birth-limit triggering prefix/Undo')
+-- Equal integer/float coordinates must share a blocker cell.
+s=only({{'ROCK','IS','MORE'},{'CRATE','IS','STOP'}});s.world.language.nouns.CRATE='crate'
+s.world.entities[4]={id=4,kind='object',class='object',archetype='crate',x=4.0,y=2.0,direction='None'}
+f=s.world.next_entity_id;n=wait(s);assert(n.world.next_entity_id==f+3)
+print('PASS: MORE numeric-coordinate occupancy parity')

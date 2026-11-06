@@ -4151,6 +4151,19 @@ local function query_empty_direction(context,x,y)
     return direction
 end
 
+-- MORE checks blockers after every copy, using frozen declarations and live
+-- tentative occupancy. Never inherit the mother's conditional capabilities.
+function RW_QueryMoreObstacle(world,entity,rules)
+    local context=condition_context(world,rules or {})
+    local blocked=false
+    for _,trait in ipairs({"block_entry","pushable","pull"}) do
+        local active,why=query_trait(context,entity,trait)
+        if active==nil then return nil,why end
+        if active then blocked=true end
+    end
+    return blocked
+end
+
 function RW_QueryEmptyDirection(world,x,y,rules)
     local context=rules and condition_context(world,rules) or world
     if context._empty_direction_invariant and context._empty_direction_value then

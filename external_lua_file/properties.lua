@@ -204,12 +204,13 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.open_source_groups={}
     projected.shut_source_groups={}
     projected.boom_source_groups={}
+    projected.more_source_groups={}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -223,7 +224,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                 if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
                 elseif capability=="tele" then projected.tele_source_groups[#projected.tele_source_groups+1]=group
                 elseif capability=="sink" then projected.sink_source_groups[#projected.sink_source_groups+1]=group
-                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" or capability=="boom" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
+                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" or capability=="boom" or capability=="more" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
                 else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
@@ -583,6 +584,10 @@ function RW_ResolveMoreProducts(world)
     end
     for id,e in pairs(world.entities) do ids[#ids+1]=id;add(e) end
     table.sort(ids)
+    if world.more_source_groups then
+        ids={}
+        for _,group in ipairs(world.more_source_groups) do for _,id in ipairs(group) do ids[#ids+1]=id end end
+    end
     local products={}
     for _,id in ipairs(ids) do
         local source=world.entities[id]

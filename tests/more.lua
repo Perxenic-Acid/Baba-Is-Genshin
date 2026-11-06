@@ -79,3 +79,22 @@ local failed,e=RW_PlanTurn(s.world,{type='move',dx=1,dy=0},bad)
 assert(not failed and s.world.next_entity_id==f and #s.history==0)
 s=only({{'ROCK','WRITE','MORE'}});n=step(s);assert(n.world.entities[2].text.name=='MORE')
 print('PASS: MORE four-way growth, borders/STOP/PUSH/EMPTY, same-noun deduplication, Text/metadata/facing, conditions/NOT, newborn grace and Undo')
+
+do
+    local s=fixture({{'FLAG','IS','MORE','AND','PUSH'},{'ROCK','IS','MORE','AND','PUSH'}})
+    s.world.entities[3].archetype='flag';s.world.entities[3].x=5;s.world.entities[3].direction='Up'
+    s.world.unit_order={1,2,3};local rest={}
+    for id in pairs(s.world.entities) do if id>3 then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do s.world.unit_order[#s.world.unit_order+1]=id end
+    local first=s.world.next_entity_id
+    local plan,err=RW_PlanTurn(s.world,{type='wait'},services);assert(plan,err and err.reason)
+    local n,result=RW_Commit(s,plan);assert(result.accepted,result.reason)
+    assert(n.world.entities[first].archetype=='flag' and n.world.entities[first].x==6,'MORE physical declaration controls allocation')
+    local winner
+    for id,e in pairs(n.world.entities) do if id>=first and e.x==4 and e.y==2 then
+        assert(not winner,'competing PUSH copies must not overlap');winner=e
+    end end
+    assert(winner and winner.archetype=='flag' and winner.direction=='Up','first physical MORE source wins contested cell')
+    assert(not n.world.more_source_groups and RW_Undo(n).world==s.world)
+end
+print('PASS: physical MORE declaration order decides competing PUSH growth, allocation/facing and Undo')

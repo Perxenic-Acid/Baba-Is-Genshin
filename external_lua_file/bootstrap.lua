@@ -836,11 +836,15 @@ local function plan_turn(world, action, services, initial_frame,back_context)
         if active then
             local projected,why=services.project(complete,frame.effects,level_traits_from(frame.relations))
             if not projected then return fail("hold_project",why) end
-            local hold,why=services.hold(projected);if not hold then return fail("hold",why) end
+            local hold,why=services.hold(projected,frame.rules);if not hold then return fail("hold",why) end
             local after,why=services.preview(complete,hold);if not after then return fail("hold_preview",why) end
             plan.stages[#plan.stages+1]={name="hold",plan=hold}
             for _,change in ipairs(hold.changes) do plan.changes[#plan.changes+1]=change end
             complete=after;trace[#trace+1]="hold"
+            if hold.infinite_loop or hold.too_complex then
+                plan.infinite_loop,plan.too_complex,plan.reason=hold.infinite_loop,hold.too_complex,hold.reason
+                return plan,nil,trace
+            end
             if #hold.changes>0 then frame=nil end
         end
         more_frame=frame
@@ -2422,7 +2426,11 @@ local function start(run_self_tests)
         return world_api:Invoke("RW_PlanDelete",world,ids)
     end
     turn_services.play=function(world,relations) return rules_api:Invoke("RW_ResolvePlayEvents",world,relations) end
-    turn_services.hold=function(world) return movement_api:Invoke("RW_ResolveHold",world) end
+    turn_services.hold=function(world,rules)
+        return movement_api:Invoke("RW_ResolveHold",world,rules,function(w,e,dx,dy,r)
+            return rules_api:Invoke("RW_QueryHoldLocked",w,e,dx,dy,r)
+        end)
+    end
     turn_services.tele=function(world,suppressed,rules)
         return movement_api:Invoke("RW_ResolveTele",world,suppressed,rules,function(w,e,r)
             return rules_api:Invoke("RW_QueryTeleStill",w,e,r)

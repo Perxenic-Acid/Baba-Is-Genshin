@@ -4156,6 +4156,42 @@ function RW_QueryTeleStill(world,entity,rules)
     return query_trait(condition_context(world,rules or {}),entity,"still")
 end
 
+-- Native cantmove() queries current declarations in this order. Real FLOAT is
+-- latched, while floating_level() rechecks the map's current FLOAT declaration.
+function RW_QueryHoldLocked(world,entity,dx,dy,rules)
+    local context=condition_context(world,rules or {})
+    local still,why=query_trait(context,entity,"still")
+    if still==nil then return nil,why end
+    local hold;hold,why=query_level_trait(context,"hold")
+    if hold==nil then return nil,why end
+    if hold then
+        local floating;floating,why=query_level_trait(context,"float")
+        if floating==nil then return nil,why end
+        if ((entity.behaviors or {}).float==true)==floating then return true end
+    end
+    if still then return true end
+    if (dx==0)==(dy==0) then return false end
+    local reverse;reverse,why=query_trait(context,entity,"reverse")
+    if reverse==nil then return nil,why end
+    if reverse then
+        local count=0
+        for _,frame in ipairs({world.rule_sources or {},rules or {}}) do
+            for _,rule in ipairs(frame) do for _,effect in ipairs(rule.effects or {}) do
+                if effect.op=="grant_trait" and effect.trait=="reverse" and matches(entity,effect.target,context) then
+                    local active
+                    if rule.when and rule.when.op=="spatial" then active,why=RW_TestEntityCondition(context,rule.when,entity)
+                    else active,why=evaluate_condition(context,rule.when) end
+                    if active==nil then return nil,why end
+                    if active then count=count+1 end
+                end
+            end end
+        end
+        if count%2==1 then dx,dy=-dx,-dy end
+    end
+    local trait=dx>0 and "lockedright" or dx<0 and "lockedleft" or dy<0 and "lockedup" or "lockeddown"
+    return query_trait(context,entity,trait)
+end
+
 -- MORE checks blockers after every copy, using frozen declarations and live
 -- tentative occupancy. Never inherit the mother's conditional capabilities.
 function RW_QueryMoreObstacle(world,entity,rules)

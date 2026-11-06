@@ -98,3 +98,25 @@ declaration order/duplicates, global/tile order, initial overlap/holder memory a
 per-identity FLOAT, comparing final positions/memory and atomic Undo. Shared
 conditional-query timing, intermediate native holder undo rows and the full mutable
 collision scheduler retain their existing scope limits.
+
+HOLD following now queries the frozen raw declarations against preceding HOLD
+relocations. Its cantmove adapter checks STILL, LEVEL HOLD and dynamic map FLOAT,
+then directional locks with physical REVERSE-count parity. Real rider FLOAT and
+HOLD acquisition/source lists remain fixed for this phase. Diagonal/same-position
+following skips directional locks, as native hdir4 does; SLEEP is not a lock.
+Only the query copy changes positions. Existing acquisition/memory and logical-ID
+selection remain transaction-owned and retain their prior ordering.
+
+Query recursion/complexity limits retain all completed acquisition plus the
+following prefix, stop later phases and commit an only-Undo terminal board.
+Unprocessed riders keep their acquired holder; ordinary failures reject the turn.
+No query caches or callbacks enter persisted world state. Capability-only resolver
+calls without the callback keep the diagnostic fallback.
+
+Compiled tests cover live STILL/locks, repeated REVERSE, LEVEL HOLD/FLOAT layers,
+release/facing, prefix Commit and Undo. tests/reference_hold_locks.lua executes
+installed HOLD, cantmove and reversecheck in240 four-axis, lock-type, conditional
+REVERSE and traversal combinations, comparing all positions and holder memory.
+Property eligibility is normalized in its hasfeature adapter; native GRAB is not
+part of the official registered catalog and host-specific grab state is excluded.
+These checks do not establish the full native collision or phase graph.

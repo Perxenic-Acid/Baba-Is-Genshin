@@ -2130,8 +2130,13 @@ function RW_ResolveTele(world,suppressed,rules,query_still)
         random_state=state~=original_state and {from=original_state,to=state} or nil}
 end
 
-function RW_ResolveHold(world)
+function RW_ResolveHold(world,rules,query_locked)
     local ids,holders,positions,held,first=unit_ids(world),{},{},{},{}
+    local context
+    if query_locked then
+        context={};for k,v in pairs(world) do context[k]=v end
+        context.entities={};for id,e in pairs(world.entities) do context.entities[id]=e end
+    end
     local sources={}
     if world.hold_source_groups then
         for _,group in ipairs(world.hold_source_groups) do for _,id in ipairs(group) do sources[#sources+1]=id end end
@@ -2150,6 +2155,7 @@ function RW_ResolveHold(world)
             end
         end
     end
+    local failure
     for _,id in ipairs(ids) do local holder=held[id]
         if holder~=0 then
             if not holders[holder] then held[id]=0
@@ -2157,25 +2163,38 @@ function RW_ResolveHold(world)
                 local source_id=first[holder]
                 local p,target=positions[id],positions[source_id];local e=world.entities[id]
                 local dx,dy=target.x-p.x,target.y-p.y
-                local locked=held_by_level(world,e) or has_capability(world,e,"still")
-                if (dx==0)~=(dy==0) then
-                    local rx,ry=reverse_vector(world,e,dx,dy)
-                    local key=rx>0 and "lockedright" or rx<0 and "lockedleft" or ry<0 and "lockedup" or "lockeddown"
-                    locked=locked or has_capability(world,e,key)
+                local locked
+                if query_locked then
+                    locked,failure=query_locked(context,context.entities[id],dx,dy,rules)
+                    if locked==nil then failure=failure or "invalid_hold_lock_query";break end
+                else
+                    locked=held_by_level(world,e) or has_capability(world,e,"still")
+                    if (dx==0)~=(dy==0) then
+                        local rx,ry=reverse_vector(world,e,dx,dy)
+                        local key=rx>0 and "lockedright" or rx<0 and "lockedleft" or ry<0 and "lockedup" or "lockeddown"
+                        locked=locked or has_capability(world,e,key)
+                    end
                 end
                 if locked then held[id]=0
                 else positions[id]={x=target.x,y=target.y}
+                    if context then
+                        local copy={};for k,v in pairs(context.entities[id]) do copy[k]=v end
+                        copy.x,copy.y=target.x,target.y;context.entities[id]=copy
+                    end
                     if not same_layer(world,e,world.entities[source_id]) then held[id]=0 end
                 end
             end
         end
     end
+    if failure and failure~="word_rule_limit" and failure~="word_rule_cycle" and failure~="rule_complexity_limit" then return nil,failure end
     local changes={}
     for _,id in ipairs(ids) do local e,p=world.entities[id],positions[id]
         if e.x~=p.x or e.y~=p.y then changes[#changes+1]={kind="move",entity_id=id,from={x=e.x,y=e.y,direction=e.direction},to={x=p.x,y=p.y,direction=e.direction}} end
         if (e.holder or 0)~=held[id] then changes[#changes+1]={kind="holder",entity_id=id,from=e.holder,to=held[id]} end
     end
-    return {consumes_turn=true,changes=changes,reason="hold"}
+    return {consumes_turn=true,changes=changes,reason=failure or "hold",
+        infinite_loop=(failure=="word_rule_limit" or failure=="word_rule_cycle") or nil,
+        too_complex=failure=="rule_complexity_limit" or nil}
 end
 
 

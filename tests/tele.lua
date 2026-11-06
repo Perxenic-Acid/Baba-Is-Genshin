@@ -1,7 +1,7 @@
 -- TELE uses the production compiler and scheduled, frozen-rule contact phases.
 local cs={read=RW_ReadLines,parse=RW_ParseRuleAST,lower=RW_LowerRuleAST,
     evaluate=RW_EvaluateRules,project=RW_ProjectWorld,words=RW_WordTokenMap}
-local services={tele=RW_ResolveTele,more=function(w,p) return RW_PlanCreate(w,RW_ResolveMoreProducts(p)) end,shift=RW_ResolveShift,destroy=function(w,ids,c,k,deaths) return RW_PlanDestructionPhase(w,ids,c,k,{births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},deaths) end,project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,
+local services={tele=function(w,s,r) return RW_ResolveTele(w,s,r,RW_QueryTeleStill) end,more=function(w,p) return RW_PlanCreate(w,RW_ResolveMoreProducts(p)) end,shift=RW_ResolveShift,destroy=function(w,ids,c,k,deaths) return RW_PlanDestructionPhase(w,ids,c,k,{births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete},deaths) end,project=RW_ProjectWorld,resolve=RW_ResolveTurn,preview=RW_PreviewPlan,
     convert=RW_PlanConversions,refresh=RW_EvaluateRules,
     contact=function(w,p,k,c) return RW_PlanContactPhase(w,p,k,c,{victims=RW_ResolveContactVictims,
         births=RW_PlanHasBirths,create=RW_PlanCreate,delete=RW_PlanDelete}) end,
@@ -62,3 +62,38 @@ n,p=step(s);assert(n.world.infinite_loop and n.world.entities[word].y==8,'TELE-t
 local blocked,why=RW_PlanTurn(n.world,{type='wait'},services);assert(not blocked and why.reason=='infinite_loop_undo_only')
 assert(RW_Undo(n).world.entities[word].y==9 and not s.world.random_state)
 print('PASS: TELE stage ordering, collision bypass, direction, STILL/FLOAT/SLEEP, denial, arrival DEFEAT/HAS, replay/RNG/Undo and triggering Infinite Loop')
+-- Earlier riders change STILL conditions for later riders on the same source.
+for _,condition in ipairs({'ON','NEAR'}) do for negative=0,1 do for reverse=0,1 do
+ local rows={{'ROCK','IS','TELE'},{'FLAG',condition,'AVATAR','IS'}}
+ if negative==1 then table.insert(rows[2],'NOT');rows[3]={'FLAG','IS','STILL'} end
+ table.insert(rows[2],'STILL')
+ local s=overlap(fixture(rows));s.world.entities[4]={id=4,kind='object',class='object',archetype='flag',x=3,y=2,direction='Up'}
+ s.world.unit_order=reverse==0 and {1,4,2,3} or {4,1,2,3}
+ for id=10,s.world.next_entity_id-1 do table.insert(s.world.unit_order,id) end
+ local n=step(s)
+ local expected=negative==0 and reverse==0 and 7 or negative==1 and reverse==1 and 7 or 3
+ assert(n.world.entities[1].x==7 and n.world.entities[4].x==expected,'TELE live '..condition..' '..negative..' '..reverse)
+ assert(n.world.entities[4].direction=='Up' and not s.world.random_state)
+end end end
+-- A late query limit commits the first teleport and its RNG; an ordinary error
+-- rejects the entire scheduled turn. Later phases must not run after the limit.
+for _,reason in ipairs({'word_rule_limit','word_rule_cycle','rule_complexity_limit','injected'}) do
+ local s=overlap(fixture({{'ROCK','IS','TELE'}}));s.world.entities[4]={id=4,kind='object',class='object',archetype='flag',x=3,y=2,direction='Up'}
+ s.world.unit_order={1,4,2,3};for id=10,s.world.next_entity_id-1 do table.insert(s.world.unit_order,id) end
+ local svc={};for k,v in pairs(services) do svc[k]=v end
+ svc.tele=function(w,marks,rules) return RW_ResolveTele(w,marks,rules,function(context,e,r)
+  if e.id==4 then return nil,reason end
+  return RW_QueryTeleStill(context,e,r)
+ end) end
+ svc.contact=function()error('TELE limit must stop contacts')end
+ local plan,why=RW_PlanTurn(s.world,{type='wait'},svc)
+ if reason=='injected' then assert(not plan and why.reason==reason and not s.world.random_state)
+ else
+  assert(plan and (plan.infinite_loop or plan.too_complex))
+  local n,result=RW_Commit(s,plan);assert(result.accepted,result.reason)
+  assert(n.world.entities[1].x==7 and n.world.entities[4].x==3 and n.world.random_state==48271)
+  local rejected,e=RW_PlanTurn(n.world,{type='wait'},svc);assert(not rejected and e.reason:find('undo_only'))
+  assert(RW_Undo(n).world==s.world)
+ end
+end
+print('PASS: TELE dynamic ON/NEAR STILL and NOT, tile-order eligibility, terminal movement/RNG prefixes, rejection and Undo')

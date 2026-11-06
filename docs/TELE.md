@@ -92,3 +92,20 @@ Scoped TELE now re-tests ordered motion/terminal declaration conditions after
 preceding TELE updates, including initially inactive rows and current REVERSE
 parity. Earlier skipped terminals are not revisited; see LEVEL_MOTION.md for
 source oracles, transaction details and remaining non-motion LEVEL scheduling.
+
+Ordinary TELE now rechecks each candidate's STILL from the frozen raw rule frame
+against all preceding relocations, including candidates already marked as teleported
+or excluded by name. This follows blocks.lua's hasfeature-before-objectdata order.
+ON/NEAR grants and denials can therefore release or freeze later riders during the
+same source scan. Source membership/destination weights and real FLOAT layers remain
+phase snapshots; this change does not recompile moved Text or refresh saved status.
+
+Only a phase-local copy of moved identities is updated for queries. A query recursion
+or complexity limit commits completed TELE moves, exact arrival history and RNG,
+stops later phases and permits only Undo. Other query failures reject the full turn.
+Legacy capability-only resolver calls remain available without the query callback.
+Compiled turn tests cover live positive/negative STILL and late-limit/rejection paths.
+`tests/reference_tele_still.lua` executes the installed TELE loop in256 combinations
+of source/tile order, ON/NEAR, conditional denials, frozen FLOAT and seeded draws,
+comparing positions, RNG and ordered arrivals. Spatial hasfeature eligibility is
+normalized in the host adapter; wider conditional/native phase timing gaps remain.

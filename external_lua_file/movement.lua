@@ -2047,7 +2047,7 @@ function RW_ResolveFollow(world,targets)
 end
 
 -- TELE bypasses collision, preserves facing and moves each rider at most once.
-function RW_ResolveTele(world,suppressed)
+function RW_ResolveTele(world,suppressed,rules,query_still)
     if suppressed~=nil then
         if type(suppressed)~="table" then return nil,"invalid_tele_suppression" end
         for id,value in pairs(suppressed) do
@@ -2055,6 +2055,11 @@ function RW_ResolveTele(world,suppressed)
         end
     end
     local ids,sources=unit_ids(world),{}
+    local context
+    if query_still then
+        context={};for k,v in pairs(world) do context[k]=v end
+        context.entities={};for id,e in pairs(world.entities) do context.entities[id]=e end
+    end
     local positions,cells,history={},{},{}
     local function cell(x,y) return string.format("%.0f:%.0f",x,y) end
     for _,id in ipairs(ids) do local e=world.entities[id]
@@ -2071,14 +2076,19 @@ function RW_ResolveTele(world,suppressed)
     local function name(e) return e.class=="text" and "@text" or e.archetype end
     local function same_layer(a,b) return has_capability(world,a,"float")==has_capability(world,b,"float") end
     local state=world.random_state or 1;local original_state=state
-    local moved={}
+    local moved={};local failure
     for _,source_id in ipairs(sources) do
         local source=world.entities[source_id];local at=positions[source_id]
         local targets={}
         for _,id in ipairs(cells[cell(at.x,at.y)] or {}) do targets[#targets+1]=id end
         for _,id in ipairs(targets) do local target=world.entities[id]
+            local still=has_capability(world,target,"still")
+            if query_still then
+                still,failure=query_still(context,context.entities[id],rules)
+                if still==nil then failure=failure or "invalid_tele_still_query";break end
+            end
             if id~=source_id and not moved[id] and not (suppressed and suppressed[id]) and name(target)~=name(source)
-                and not has_capability(world,target,"still") and same_layer(source,target) then
+                and not still and same_layer(source,target) then
                 local destinations={}
                 for _,other_id in ipairs(sources) do
                     if other_id~=source_id and name(world.entities[other_id])==name(source) then destinations[#destinations+1]=other_id end
@@ -2097,17 +2107,25 @@ function RW_ResolveTele(world,suppressed)
                             to={x=destination.x,y=destination.y,direction=direction}}
                     end
                     positions[id]={x=destination.x,y=destination.y};moved[id]=true
+                    if context then
+                        local copy={};for k,v in pairs(context.entities[id]) do copy[k]=v end
+                        copy.x,copy.y=destination.x,destination.y;context.entities[id]=copy
+                    end
                 end
             end
         end
+        if failure then break end
     end
+    if failure and failure~="word_rule_limit" and failure~="word_rule_cycle" and failure~="rule_complexity_limit" then return nil,failure end
     local changes={}
     for _,id in ipairs(ids) do local e,p=world.entities[id],positions[id]
         if e.x~=p.x or e.y~=p.y then changes[#changes+1]={kind="move",entity_id=id,
             from={x=e.x,y=e.y,direction=e.direction or "None"},
             to={x=p.x,y=p.y,direction=e.direction or "None"}} end
     end
-    return {consumes_turn=true,changes=changes,reason="tele",
+    return {consumes_turn=true,changes=changes,reason=failure or "tele",
+        infinite_loop=(failure=="word_rule_limit" or failure=="word_rule_cycle") or nil,
+        too_complex=failure=="rule_complexity_limit" or nil,
         motion_history=#history>0 and history or nil,
         random_state=state~=original_state and {from=original_state,to=state} or nil}
 end

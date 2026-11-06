@@ -805,11 +805,15 @@ local function plan_turn(world, action, services, initial_frame,back_context)
                 surviving_marks={}
                 for id in pairs(tele_suppressed) do if complete.entities[id] then surviving_marks[id]=true end end
             end
-            local tele,why=services.tele(projected,surviving_marks);if not tele then return fail("tele",why) end
+            local tele,why=services.tele(projected,surviving_marks,frame.rules);if not tele then return fail("tele",why) end
             local after,why=services.preview(complete,tele);if not after then return fail("tele_preview",why) end
             plan.stages[#plan.stages+1]={name="tele",plan=tele}
             for _,change in ipairs(tele.changes) do plan.changes[#plan.changes+1]=change end
             complete=after;trace[#trace+1]="tele"
+            if tele.infinite_loop or tele.too_complex then
+                plan.infinite_loop,plan.too_complex,plan.reason=tele.infinite_loop,tele.too_complex,tele.reason
+                return plan,nil,trace
+            end
             if #tele.changes>0 then frame=nil end
         end
         more_frame=frame
@@ -2419,7 +2423,11 @@ local function start(run_self_tests)
     end
     turn_services.play=function(world,relations) return rules_api:Invoke("RW_ResolvePlayEvents",world,relations) end
     turn_services.hold=function(world) return movement_api:Invoke("RW_ResolveHold",world) end
-    turn_services.tele=function(world,suppressed) return movement_api:Invoke("RW_ResolveTele",world,suppressed) end
+    turn_services.tele=function(world,suppressed,rules)
+        return movement_api:Invoke("RW_ResolveTele",world,suppressed,rules,function(w,e,r)
+            return rules_api:Invoke("RW_QueryTeleStill",w,e,r)
+        end)
+    end
     local back_services={
         preview=turn_services.preview,
         frame=function(...) return world_api:Invoke("RW_GetBackFrame",...) end,

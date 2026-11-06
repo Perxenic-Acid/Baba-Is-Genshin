@@ -4151,6 +4151,11 @@ local function query_empty_direction(context,x,y)
     return direction
 end
 
+-- TELE queries STILL after each preceding relocation; FLOAT remains its phase layer.
+function RW_QueryTeleStill(world,entity,rules)
+    return query_trait(condition_context(world,rules or {}),entity,"still")
+end
+
 -- MORE checks blockers after every copy, using frozen declarations and live
 -- tentative occupancy. Never inherit the mother's conditional capabilities.
 function RW_QueryMoreObstacle(world,entity,rules)

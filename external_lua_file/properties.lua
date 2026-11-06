@@ -201,12 +201,14 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.sink_source_groups={}
     projected.weak_source_groups={}
     projected.melt_source_groups={}
+    projected.open_source_groups={}
+    projected.shut_source_groups={}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -220,7 +222,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                 if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
                 elseif capability=="tele" then projected.tele_source_groups[#projected.tele_source_groups+1]=group
                 elseif capability=="sink" then projected.sink_source_groups[#projected.sink_source_groups+1]=group
-                elseif capability=="weak" or capability=="melt" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
+                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
                 else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
@@ -428,6 +430,31 @@ function RW_ResolveContactVictims(world, kind)
                 end
             end end
         end
+        return victims
+    end
+    if kind=="unlock" and world.open_source_groups and world.shut_source_groups then
+        local victims={}
+        local ordered,seen={},{}
+        for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not seen[id] then ordered[#ordered+1]=id;seen[id]=true end end
+        for _,id in ipairs(ids) do if not seen[id] then ordered[#ordered+1]=id end end
+        local function select(id)
+            if not removed[id] and not world.entities[id].behaviors.safe then removed[id]=true;victims[#victims+1]=id end
+        end
+        for _,doors in ipairs(world.shut_source_groups) do for _,id in ipairs(doors) do
+            local door=world.entities[id]
+            if door then
+                local tile=world.cell_order and world.cell_order[string.format("%.0f:%.0f",door.x,door.y)] or ordered
+                for _,keys in ipairs(world.open_source_groups) do
+                    local eligible={};for _,key_id in ipairs(keys) do eligible[key_id]=true end
+                    for _,key_id in ipairs(tile) do
+                        if eligible[key_id] and overlap(door,world.entities[key_id]) then
+                            select(id);if key_id~=id then select(key_id) end
+                            break
+                        end
+                    end
+                end
+            end
+        end end
         return victims
     end
     if kind == "boom" then

@@ -278,3 +278,20 @@ do
     assert(RW_Undo(n).world==s.world)
 end
 print('PASS: DEFEAT channel order/HAS and surviving unsafe newborn WEAK hazards, next-turn expiry and Undo')
+
+do
+    local s=make({{'rock',3,2,'Down'},{'flag',3,2,'Right'},{'flag',3,2,'Up'}},
+        {{'ROCK','IS','SHUT'},{'FLAG','FACING','RIGHT','IS','OPEN'},
+            {'FLAG','FACING','UP','IS','OPEN'},{'FLAG','HAS','AVATAR'},{'ROCK','HAS','WATER'}})
+    s.world.unit_order={3,2,1};local rest={}
+    for id in pairs(s.world.entities) do if id>3 then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do s.world.unit_order[#s.world.unit_order+1]=id end
+    s.world.cell_order={['3:2']={2,1,3}}
+    local first=s.world.next_entity_id;local n=step(s,{type='wait'})
+    assert(n.world.entities[first].archetype=='water' and n.world.entities[first].direction=='Down','unlock door first')
+    assert(n.world.entities[first+1].archetype=='avatar' and n.world.entities[first+1].direction=='Right','first conditional OPEN clause')
+    assert(n.world.entities[first+2].archetype=='avatar' and n.world.entities[first+2].direction=='Up','second same-name OPEN clause must remain distinct')
+    assert(not n.world.entities[1] and not n.world.entities[2] and not n.world.entities[3])
+    assert(not n.world.open_source_groups and not n.world.shut_source_groups and RW_Undo(n).world==s.world)
+end
+print('PASS: distinct physical conditional OPEN clauses, door-first HAS allocation/facing and Undo')

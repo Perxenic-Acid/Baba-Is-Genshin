@@ -47,3 +47,29 @@ Scoped LEVEL and virtual EMPTY OPEN/SHUT lifecycle, FLOAT layers, WEAK and more
 advanced original movement-pass ordering remain deferred. This milestone does
 not claim those semantics. Normal startup does not run regression tests; the
 existing 2M instruction budget still applies. Real-device acceptance is pending.
+
+## Ordinary contact declaration and tile order
+
+The earlier milestone's scope notes are historical; later EMPTY/scoped lifecycle
+work is documented separately. Current ordinary contact projection retains each
+physical OPEN and SHUT declaration as transient source groups, with unit_order.
+For each SHUT source, each OPEN clause independently selects its first same-FLOAT
+matching key in cell_order (unit_order fallback). Same-name keys satisfying distinct
+conditions must not collapse into one noun-level search. Both SAFE participants
+still stop that clause's search; they do not cause a later key to be selected.
+
+Unsafe doors are selected before their non-self unsafe keys, preserving first
+encounter order for once-per-victim HAS allocation. Selection remains simultaneous:
+already selected doors/keys can participate in other physical clauses. Self OPEN
+and SHUT still selects its one unsafe identity. This update changes the ordinary
+post-DEFEAT contact branch; movement unlock and scoped loops retain their existing
+separate semantics. Raw capability-only diagnostic worlds retain the legacy path.
+
+tests/reference_unlock_order.lua executes installed getunitswitheffect and the
+OPEN/SHUT contact body in 16,384 cases, comparing first-encounter deletion order
+across source/conditional-key groups, duplicates, unit/tile order and SAFE/FLOAT.
+OPEN condition results are normalized per physical clause/identity in this oracle.
+A physical FACING RIGHT/FACING UP test checks two same-name conditional keys,
+door-first HAS identity/facing allocation and complete Undo. Native dense-list
+pairs deletion traversal uses our explicit encounter-order convention. Routine
+native acceptance is waived; these are offline/source checks.

@@ -203,12 +203,13 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.melt_source_groups={}
     projected.open_source_groups={}
     projected.shut_source_groups={}
+    projected.boom_source_groups={}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -222,7 +223,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                 if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
                 elseif capability=="tele" then projected.tele_source_groups[#projected.tele_source_groups+1]=group
                 elseif capability=="sink" then projected.sink_source_groups[#projected.sink_source_groups+1]=group
-                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
+                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" or capability=="boom" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
                 else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
@@ -453,6 +454,37 @@ function RW_ResolveContactVictims(world, kind)
                         end
                     end
                 end
+            end
+        end end
+        return victims
+    end
+    if kind=="boom" and world.boom_source_groups then
+        local victims,rank={},{}
+        local index=0
+        for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not rank[id] then index=index+1;rank[id]=index end end
+        for _,id in ipairs(ids) do if not rank[id] then index=index+1;rank[id]=index end end
+        for _,stack in pairs(world.cell_order or {}) do for i,id in ipairs(stack) do rank[id]=i end end
+        local function select(id)
+            if not removed[id] and not world.entities[id].behaviors.safe then removed[id]=true;victims[#victims+1]=id end
+        end
+        for _,group in ipairs(world.boom_source_groups) do for _,id in ipairs(group) do
+            local source=world.entities[id]
+            if source then
+                local radius=math.min((((world.trait_counts or {})[id] or {}).boom or 1)-1,math.max(world.width,world.height))
+                local targets={}
+                for _,other_id in ipairs(ids) do local other=world.entities[other_id]
+                    if other_id~=id and not removed[other_id]
+                        and (source.behaviors.float==true)==(other.behaviors.float==true)
+                        and math.abs(other.x-source.x)<=radius and math.abs(other.y-source.y)<=radius then targets[#targets+1]=other_id end
+                end
+                table.sort(targets,function(a,b)
+                    local x,y=world.entities[a],world.entities[b]
+                    if x.x~=y.x then return x.x<y.x end
+                    if x.y~=y.y then return x.y<y.y end
+                    return rank[a]<rank[b]
+                end)
+                for _,other_id in ipairs(targets) do select(other_id) end
+                select(id)
             end
         end end
         return victims

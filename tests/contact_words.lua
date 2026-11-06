@@ -295,3 +295,20 @@ do
     assert(not n.world.open_source_groups and not n.world.shut_source_groups and RW_Undo(n).world==s.world)
 end
 print('PASS: distinct physical conditional OPEN clauses, door-first HAS allocation/facing and Undo')
+
+do
+    local s=make({{'rock',4,3,'Left'},{'avatar',5,3,'Right'},{'flag',3,3,'Up'},{'water',4,3,'Down'}},
+        {{'ROCK','IS','BOOM','AND','BOOM'},{'FLAG','HAS','WATER'},{'WATER','HAS','AVATAR'},
+            {'AVATAR','HAS','SKULL'},{'ROCK','HAS','FLAG'}})
+    s.world.unit_order={1,2,3,4};local rest={}
+    for id in pairs(s.world.entities) do if id>4 then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do s.world.unit_order[#s.world.unit_order+1]=id end
+    s.world.cell_order={['4:3']={4,1}}
+    local first=s.world.next_entity_id;local n=step(s,{type='wait'})
+    for index,expected in ipairs({{'water','Up'},{'avatar','Down'},{'skull','Right'},{'flag','Left'}}) do
+        local e=n.world.entities[first+index-1]
+        assert(e and e.archetype==expected[1] and e.direction==expected[2],'BOOM coordinate order, source last and HAS allocation')
+    end
+    assert(n.world.next_entity_id==first+4 and not n.world.boom_source_groups and RW_Undo(n).world==s.world)
+end
+print('PASS: physical BOOM coordinate/tile/source-last order, duplicate grants, HAS allocation and Undo')

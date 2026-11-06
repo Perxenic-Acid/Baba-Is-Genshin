@@ -4,7 +4,7 @@ local f=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is Y
 local source=f:read('*a');f:close()
 local a=assert(source:find('local isboom =',1,true));local b=assert(source:find('delthese,doremovalsound = handledels',a,true))
 local checked=0
-for count=1,4 do for mask=0,63 do
+for reverse=0,1 do for tile_reverse=0,1 do for count=1,4 do for mask=0,63 do
  local function bit(n) return math.floor(mask/2^n)%2==1 end
  local w={width=12,height=12,entities={},trait_counts={}}
  local units,ids={},{}
@@ -15,19 +15,29 @@ for count=1,4 do for mask=0,63 do
   w.entities[id]=e;w.trait_counts[id]={boom=count}
   units[id]={fixed=id,values={x,y},strings={'rock',bit(4) and 'text' or 'object'}};ids[#ids+1]=id
  end
+ if reverse==1 then ids={4,3,2,1} end
+ w.unit_order=ids;w.cell_order={};w.boom_source_groups={}
+ for _,id in ipairs(ids) do local e=w.entities[id];local key=e.x..':'..e.y
+  w.cell_order[key]=w.cell_order[key] or {};table.insert(w.cell_order[key],tile_reverse==1 and 1 or #w.cell_order[key]+1,id)
+ end
+ for copy=1,count do
+  local group={};for _,id in ipairs(ids) do if w.entities[id].behaviors.boom then group[#group+1]=id end end
+  w.boom_source_groups[#w.boom_source_groups+1]=group
+ end
  local env=setmetatable({XPOS=1,YPOS=2,UNITNAME=1,UNITTYPE=2,SHAKE=1,generaldata={values={}},roomsizex=12,roomsizey=12,unitmap={},delthese={}}, {__index=_G})
  for _,e in pairs(w.entities) do env.unitmap[e.x+e.y*12]=true end
- env.getunitswitheffect=function() local r={};for _,id in ipairs(ids) do if w.entities[id].behaviors.boom then r[#r+1]=units[id] end end;return r end
+ env.getunitswitheffect=function() local r={};for _,group in ipairs(w.boom_source_groups) do for _,id in ipairs(group) do r[#r+1]=units[id] end end;return r end
  env.issafe=function(id) return w.entities[id].behaviors.safe end
  env.hasfeature_count=function(_,_,_,id) return count end
  env.inbounds=function(x,y) return x>=1 and x<=12 and y>=1 and y<=12 end
- env.findallhere=function(x,y) local r={};for _,id in ipairs(ids) do local e=w.entities[id];if e.x==x and e.y==y then r[#r+1]=id end end;return r end
+ env.findallhere=function(x,y)return w.cell_order[x..':'..y] or {} end
  env.floating=function(x,y) return w.entities[x].behaviors.float==w.entities[y].behaviors.float end
  env.MF_particles=function() end;env.checkeffecthistory=function() return 1,0 end;env.getcolour=function() return 0,0 end
  assert(load(source:sub(a,b-1),'@original_boom','t',env))()
- local expected={};for _,id in ipairs(env.delthese) do expected[id]=true end
- local actual={};for _,id in ipairs(assert(RW_ResolveContactVictims(w,'boom'))) do actual[id]=true end
- for _,id in ipairs(ids) do assert((expected[id] or false)==(actual[id] or false),'BOOM mismatch '..count..':'..mask..':'..id) end
+ local expected,seen={},{};for _,id in ipairs(env.delthese) do if not seen[id] then expected[#expected+1]=id;seen[id]=true end end
+ local actual=assert(RW_ResolveContactVictims(w,'boom'))
+ assert(#expected==#actual,'BOOM ordered victim count')
+ for i,id in ipairs(expected) do assert(actual[i]==id,'BOOM ordered mismatch '..count..':'..mask..':'..id) end
  checked=checked+1
-end end
-print('PASS: installed BOOM radius, diagonal range, SAFE/FLOAT, Text and overlapping blast sources ('..checked..' cases)')
+end end end end
+print('PASS: installed BOOM radius, x/y/tile/source order, duplicates, SAFE/FLOAT, Text and overlapping blast sources ('..checked..' cases)')

@@ -4020,17 +4020,29 @@ end
 
 function RW_ResolveVerbTargets(world,relations,verb)
     local groups={}
+    if verb=="eat" then groups.eat_groups={} end
     for _,relation in ipairs(relations or {}) do
         if relation.op==verb then
             local selector=relation.source_type=="@text" and {kind="class",value="text"}
                 or {kind="archetype",value=relation.source_type}
-            for _,id in ipairs(RW_SelectEntities(world,selector)) do
+            local selected=RW_SelectEntities(world,selector)
+            local actors={}
+            if verb=="eat" then
+                local ordered,pending={},{}
+                for _,id in ipairs(selected) do pending[id]=true end
+                for _,id in ipairs(world.unit_order or {}) do if pending[id] then ordered[#ordered+1]=id;pending[id]=nil end end
+                for _,id in ipairs(selected) do if pending[id] then ordered[#ordered+1]=id end end
+                selected=ordered
+            end
+            for _,id in ipairs(selected) do
                 local enabled,why=RW_RelationApplies(world,relation,world.entities[id])
                 if enabled==nil then return nil,why end
                 if enabled then
                     groups[id]=groups[id] or {};groups[id][#groups[id]+1]=relation.target_type
+                    actors[#actors+1]=id
                 end
             end
+            if verb=="eat" then groups.eat_groups[#groups.eat_groups+1]={entity_ids=actors,target_type=relation.target_type} end
         end
     end
     return groups

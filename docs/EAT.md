@@ -18,9 +18,9 @@ phases remain one atomic Plan/Commit/whole-tree Undo transaction.
 
 Physical Text can be a source or target. Ordinary ALL uses the authored palette;
 EMPTY has no persistent target identity. Scoped LEVEL and virtual EMPTY sources
-remain deferred, consistently with the other noun predicates. Source/target order
-uses stable IDs; original mutable engine-list ordering outside the tested victim
-matrix is not a claim of complete parity.
+remain deferred, consistently with the other noun predicates. This historical
+scope is superseded by the later movement/scoped sections below. Real EAT source
+and target ordering now follows the ordered collection described at the end.
 
 Checks:
 
@@ -200,3 +200,19 @@ the ordered LEVEL loop, while copied declarations use the existing one-generatio
 lookup path. A failing installed-subrules comparison reproduced two copied noun
 clauses instead of one; the fix passes12 source cases covering both LEVEL-to-unit
 and unit-to-LEVEL copying, repeated original clauses and NOT ALL protection.
+
+Real EAT collection retains transient eat_groups from compiled physical relation
+instances. Within each group sources follow saved unit_order; targets follow the
+current cell_order (unit_order fallback). First encounter determines victim order,
+while identity deduplication still prevents duplicate HAS. The victim snapshot is
+still simultaneous: mutually eaten sources participate and newborns do not eat
+again. HAS allocation follows that ordered victim list. These groups never enter
+world facts or Undo; raw diagnostic target maps retain their legacy sorted fallback.
+
+The installed EAT selection oracle now compares the actual deletion sequence,
+without sorting away differences, across 3,072 cases including reversed unit/tile
+lists, duplicate clauses, SAFE/FLOAT and mutual consumption. A compiled scheduler
+test checks declaration order, stacked tile order, HAS identity/facing allocation,
+transient metadata and whole-turn Undo. Native getunitswithverb groups different
+noun sources via pairs(); this backend retains deterministic relation order across
+different nouns, without claiming portable native cross-noun dispatch order.

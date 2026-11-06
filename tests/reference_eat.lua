@@ -14,7 +14,12 @@ function env.findtype(spec,x,y,ignore)
         if id~=ignore and u.values[1]==x and u.values[2]==y
             and ((spec[1]=='text' and u.class=='text') or u.name==spec[1]) then ids[#ids+1]=id end
     end
-    table.sort(ids);return ids
+    local tile=world.cell_order and world.cell_order[x..':'..y]
+    if tile then
+        local ranks={};for i,id in ipairs(tile) do ranks[id]=i end
+        table.sort(ids,function(a,b) return ranks[a]<ranks[b] end)
+    else table.sort(ids) end
+    return ids
 end
 function env.issafe(id) return world.entities[id].behaviors.safe end
 function env.floating(a,b) return world.entities[a].behaviors.float==world.entities[b].behaviors.float end
@@ -33,6 +38,12 @@ for scenario=1,6 do for safe=0,7 do for float=0,7 do for positions=0,3 do for du
         world.entities[id]={id=id,kind='object',class=class,archetype=class=='object' and name or nil,
             x=x,y=4,behaviors={safe=bit(safe,id),float=bit(float,id)}}
     end
+    world.unit_order=duplicate==2 and {3,2,1} or {1,2,3}
+    world.cell_order={}
+    for _,id in ipairs(world.unit_order) do
+        local e=world.entities[id];local key=e.x..':'..e.y
+        world.cell_order[key]=world.cell_order[key] or {};table.insert(world.cell_order[key],id)
+    end
     local rules
     if scenario==1 then rules={{'rock','avatar'}}
     elseif scenario==2 then rules={{'rock','rock'}}
@@ -40,19 +51,22 @@ for scenario=1,6 do for safe=0,7 do for float=0,7 do for positions=0,3 do for du
     elseif scenario==4 then rules={{'rock','text'}}
     elseif scenario==5 then rules={{'text','rock'}}
     else rules={{'rock','rock'},{'rock','avatar'}} end
-    local targets={}
+    local targets={eat_groups={}}
     for _,rule in ipairs(rules) do for j=1,duplicate do
         local actors={}
-        for id=1,3 do
+        local actor_ids={}
+        for _,id in ipairs(world.unit_order) do
             local u=units[id];local name=u.class=='text' and 'text' or u.name
             if name==rule[1] then
                 actors[#actors+1]=u;targets[id]=targets[id] or {}
                 targets[id][#targets[id]+1]=rule[2]=='text' and '@text' or rule[2]
+                actor_ids[#actor_ids+1]=id
             end
         end
         groups[#groups+1]={rule[2],actors,rule[1]}
+        targets.eat_groups[#targets.eat_groups+1]={entity_ids=actor_ids,target_type=rule[2]=='text' and '@text' or rule[2]}
     end end
-    original();table.sort(env.delthese)
+    original()
     local actual=RW_ResolveEatVictims(world,targets)
     assert(#actual==#env.delthese,scenario..':'..safe..':'..float..':'..positions)
     for i,id in ipairs(actual) do assert(id==env.delthese[i]) end

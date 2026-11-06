@@ -94,3 +94,25 @@ object(s.world,3,'flag',6,3);s.world.entities[4]={id=4,kind='object',class='text
 n=step(s);assert(not n.world.entities[1] and not n.world.entities[3] and n.world.entities[2] and n.world.entities[4])
 s=setup({{'ROCK','EAT','EMPTY'}});n=step(s);assert(n.world.entities[1] and n.world.entities[2])
 print('PASS: EAT self/mutual/duplicate targets, SAFE/FLOAT/SLEEP, conditions/NOT, HAS, frozen Text, MAKE/CRASH order and Undo')
+
+do
+    local s=setup({{'ROCK','EAT','FLAG'},{'ROCK','EAT','AVATAR'},
+        {'AVATAR','HAS','ROCK'},{'FLAG','HAS','AVATAR'}})
+    object(s.world,3,'flag',6,3,'Left');object(s.world,4,'flag',6,3,'Up')
+    s.world.unit_order={1,2,3,4};local rest={}
+    for id in pairs(s.world.entities) do if id>4 then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do s.world.unit_order[#s.world.unit_order+1]=id end
+    s.world.cell_order={['6:3']={4,2,3,1}}
+    local frame=assert(RW_CompileWorld(s.world,cs))
+    local targets=assert(RW_ResolveVerbTargets(s.world,frame.relations,'eat'))
+    local projected=assert(RW_ProjectWorld(s.world,frame.effects))
+    local victims=RW_ResolveEatVictims(projected,targets)
+    assert(#victims==3 and victims[1]==4 and victims[2]==3 and victims[3]==1,'EAT declaration and tile order')
+    local first=s.world.next_entity_id;local n=step(s)
+    assert(n.world.entities[first].archetype=='avatar' and n.world.entities[first].direction=='Up')
+    assert(n.world.entities[first+1].archetype=='avatar' and n.world.entities[first+1].direction=='Left')
+    assert(n.world.entities[first+2].archetype=='rock' and n.world.entities[2])
+    assert(not n.world.eat_groups and not n.world.entities[1] and not n.world.entities[3] and not n.world.entities[4])
+    assert(RW_Undo(n).world==s.world)
+end
+print('PASS: compiled EAT declaration/tile order, ordered HAS allocation, transient metadata and Undo')

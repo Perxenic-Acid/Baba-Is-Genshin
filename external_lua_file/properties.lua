@@ -492,6 +492,30 @@ end
 -- EAT chooses all victims from one frozen, post-contact snapshot. A source
 -- selected as another eater's victim still participates; HAS runs once per ID.
 function RW_ResolveEatVictims(world,targets)
+    if targets and targets.eat_groups then
+        if #targets.eat_groups==0 then return {} end
+        local ids,seen,rest={},{},{}
+        for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not seen[id] then ids[#ids+1]=id;seen[id]=true end end
+        for id in pairs(world.entities) do if not seen[id] then rest[#rest+1]=id end end
+        table.sort(rest);for _,id in ipairs(rest) do ids[#ids+1]=id end
+        local victims,removed={},{}
+        for _,group in ipairs(targets.eat_groups) do for _,id in ipairs(group.entity_ids) do
+            local source=world.entities[id]
+            if source then
+                local tile=world.cell_order and world.cell_order[string.format("%.0f:%.0f",source.x,source.y)] or ids
+                for _,other_id in ipairs(tile) do
+                    local other=world.entities[other_id]
+                    if other and other_id~=id and other.x==source.x and other.y==source.y
+                        and not other.behaviors.safe and not removed[other_id]
+                        and (source.behaviors.float==true)==(other.behaviors.float==true)
+                        and (other.class=="text" and "@text" or other.archetype)==group.target_type then
+                        removed[other_id]=true;victims[#victims+1]=other_id
+                    end
+                end
+            end
+        end end
+        return victims
+    end
     local removed={}
     for id,parameters in pairs(targets or {}) do
         local source=world.entities[id]

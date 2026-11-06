@@ -412,6 +412,24 @@ function RW_ResolveContactVictims(world, kind)
         end end
         return victims
     end
+    if kind=="defeat" and world.bonus_contact_groups then
+        local victims={}
+        for _,channel in ipairs({"control","control2"}) do
+            for _,group in ipairs(world.bonus_contact_groups[channel] or {}) do for _,id in ipairs(group) do
+                local actor=world.entities[id]
+                if actor and not removed[id] and not actor.behaviors.safe then
+                    for _,other_id in ipairs(ids) do
+                        local other=world.entities[other_id]
+                        if other.behaviors.defeat and overlap(actor,other)
+                            and (other_id==id or not other.behaviors.weak or other.behaviors.safe) then
+                            removed[id]=true;victims[#victims+1]=id;break
+                        end
+                    end
+                end
+            end end
+        end
+        return victims
+    end
     if kind == "boom" then
         for _,id in ipairs(ids) do
             local source=world.entities[id]
@@ -485,6 +503,7 @@ function RW_ResolveContactVictims(world, kind)
             if (actor.behaviors.control or actor.behaviors.control2) and not actor.behaviors.safe then
                 for _,other_id in ipairs(ids) do
                     if world.entities[other_id].behaviors.defeat
+                        and (other_id==id or not world.entities[other_id].behaviors.weak or world.entities[other_id].behaviors.safe)
                         and overlap(actor,world.entities[other_id]) then removed[id]=true; break end
                 end
             end

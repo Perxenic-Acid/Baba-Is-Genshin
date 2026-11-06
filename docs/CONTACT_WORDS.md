@@ -181,3 +181,23 @@ newborns, 4,096 MELT). It compares first-encounter identity sequences, including
 duplicate physical declarations and reversed unit/tile lists. Physical compiled
 WEAK/MELT turns check HAS allocation/facing and Undo. Raw capability snapshots keep
 their diagnostic fallback; groups stay outside authoritative state.
+
+## DEFEAT channels and surviving WEAK hazards
+
+Installed blocks.lua 1528 onward collects all YOU declarations before YOU2, then
+tests hazards. DEFEAT now reuses the transient projected control/control2 groups
+to retain that channel/declaration/unit ordering for HAS allocation. Repeated
+selections still execute HAS once per victim. 3D remains excluded by user scope.
+
+The original non-self hazard branch additionally requires the hazard to lack WEAK
+or have SAFE. Both ordered production and raw diagnostic resolution now preserve
+this check; self YOU + DEFEAT still destroys itself, including when WEAK. This
+matters when earlier HAS births retain current-turn WEAK grace: surviving unsafe
+WEAK/DEFEAT newborns cannot defeat another YOU before that grace expires.
+
+tests/reference_defeat_order.lua executes the installed source collector and
+DEFEAT selection in 32,768 cases covering YOU/YOU2 order, duplicate declarations,
+unit order, SAFE/FLOAT, self defeat and WEAK hazards. Physical scheduled turns
+check channel-ordered HAS allocation and a SINK HAS -> WEAK grace -> DEFEAT path,
+the following turn's grace expiry and whole-turn Undo. Native dense deletion-list
+pairs traversal is represented by explicit encounter order as for other contacts.

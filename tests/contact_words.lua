@@ -256,3 +256,25 @@ for _,word in ipairs({'WEAK','MELT'}) do
     assert(not n.world.weak_source_groups and not n.world.melt_source_groups and RW_Undo(n).world==s.world)
 end
 print('PASS: physical WEAK/MELT declaration order, HAS allocation/facing and whole-turn Undo')
+
+do
+    local s=make({{'avatar',3,2,'Left'},{'rock',3,2,'Right'},{'flag',3,2,'Up'}},
+        {{'FLAG','IS','YOU2'},{'ROCK','IS','YOU'},{'AVATAR','IS','DEFEAT'},
+            {'FLAG','HAS','WATER'},{'ROCK','HAS','SKULL'}})
+    local first=s.world.next_entity_id;local n=step(s,{type='wait'})
+    assert(n.world.entities[first].archetype=='skull' and n.world.entities[first].direction=='Right','DEFEAT YOU before earlier authored YOU2')
+    assert(n.world.entities[first+1].archetype=='water' and n.world.entities[first+1].direction=='Up')
+    assert(n.world.entities[1] and not n.world.entities[2] and not n.world.entities[3] and RW_Undo(n).world==s.world)
+end
+do
+    local s=make({{'avatar',2,2},{'water',3,2},{'flag',3,2}},
+        {{'AVATAR','IS','YOU','AND','FLOAT'},{'WATER','IS','SINK'},
+            {'WATER','HAS','ROCK'},{'ROCK','IS','WEAK','AND','DEFEAT','AND','FLOAT'},{'ROCK','HAS','FLAG'}})
+    local first=s.world.next_entity_id;local n=step(s)
+    assert(n.world.entities[1] and n.world.entities[1].x==3,'unsafe newborn WEAK hazard must not defeat another YOU')
+    assert(n.world.entities[first] and n.world.entities[first].archetype=='rock')
+    local next_turn=step(n,{type='wait'})
+    assert(next_turn.world.entities[1] and not next_turn.world.entities[first],'newborn grace expires before next DEFEAT phase')
+    assert(RW_Undo(n).world==s.world)
+end
+print('PASS: DEFEAT channel order/HAS and surviving unsafe newborn WEAK hazards, next-turn expiry and Undo')

@@ -198,12 +198,13 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.bonus_contact_groups={control={},control2={},bonus={}}
     projected.hold_source_groups={}
     projected.tele_source_groups={}
+    projected.sink_source_groups={}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -216,6 +217,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                 end)
                 if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
                 elseif capability=="tele" then projected.tele_source_groups[#projected.tele_source_groups+1]=group
+                elseif capability=="sink" then projected.sink_source_groups[#projected.sink_source_groups+1]=group
                 else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
@@ -368,6 +370,28 @@ function RW_ResolveContactVictims(world, kind)
     table.sort(ids)
     local function overlap(a,b)
         return a.x == b.x and a.y == b.y and (a.behaviors.float == true)==(b.behaviors.float == true)
+    end
+    if kind=="sink" and world.sink_source_groups then
+        local ordered,seen={},{}
+        for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not seen[id] then ordered[#ordered+1]=id;seen[id]=true end end
+        for _,id in ipairs(ids) do if not seen[id] then ordered[#ordered+1]=id end end
+        local victims={}
+        for _,group in ipairs(world.sink_source_groups) do for _,id in ipairs(group) do
+            local source=world.entities[id]
+            if source and not removed[id] then
+                local sunk=false
+                local tile=world.cell_order and world.cell_order[string.format("%.0f:%.0f",source.x,source.y)] or ordered
+                for _,other_id in ipairs(tile) do
+                    local other=world.entities[other_id]
+                    if other_id~=id and other and not removed[other_id] and overlap(source,other) then
+                        if not other.behaviors.safe then removed[other_id]=true;victims[#victims+1]=other_id end
+                        if not source.behaviors.safe then sunk=true end
+                    end
+                end
+                if sunk then removed[id]=true;victims[#victims+1]=id end
+            end
+        end end
+        return victims
     end
     if kind == "boom" then
         for _,id in ipairs(ids) do

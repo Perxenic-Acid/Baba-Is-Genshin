@@ -228,3 +228,19 @@ local frozen_win=make({{"avatar",2,2},{"flag",3,2},{"water",3,8}},
 local won_tree=tree_step(frozen_win)
 assert(won_tree.outcomes[won_tree.active_id].kind == "win")
 print("PASS: DEFEAT/SINK identity, ordered frozen rules, repeated HAS/Text/Level, new births, allocation rollback and Undo")
+
+do
+    local s=make({{'water',3,2,'Down'},{'rock',3,2,'Right'},{'flag',3,2,'Up'}},
+        {{'WATER','IS','SINK'},{'FLAG','HAS','AVATAR'},{'ROCK','HAS','SKULL'},{'WATER','HAS','ROCK'}})
+    s.world.unit_order={1,2,3};local rest={}
+    for id in pairs(s.world.entities) do if id>3 then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do s.world.unit_order[#s.world.unit_order+1]=id end
+    s.world.cell_order={['3:2']={3,1,2}}
+    local first=s.world.next_entity_id;local n=step(s,{type='wait'})
+    assert(n.world.entities[first].archetype=='avatar' and n.world.entities[first].direction=='Up')
+    assert(n.world.entities[first+1].archetype=='skull' and n.world.entities[first+1].direction=='Right')
+    assert(n.world.entities[first+2].archetype=='rock' and n.world.entities[first+2].direction=='Down')
+    assert(not n.world.entities[1] and not n.world.entities[2] and not n.world.entities[3])
+    assert(not n.world.sink_source_groups and RW_Undo(n).world==s.world)
+end
+print('PASS: physical SINK target-before-source tile order, HAS allocation/facing and whole-turn Undo')

@@ -149,3 +149,21 @@ at this victim or produce an unrelated query-limit terminal state. Relation
 shape validation remains eager; matching declaration order/multiplicity is
 unchanged. Dedicated injected-limit tests cover both helpers, and the installed
 inside() dispatch oracle verifies source filtering before condition dispatch.
+
+## Ordered ordinary SINK selection
+
+Installed blocks.lua's ordinary SINK section (1329 onward) collects sources with
+getunitswitheffect and targets with findallhere. Projection now retains transient
+sink_source_groups in physical declaration order, including repeated grants and
+per-declaration unit_order. Each source scans its cell_order (unit_order fallback),
+appends unsafe targets immediately, then appends the unsafe source last. Previously
+selected victims cannot sink again. Independent SAFE and matching FLOAT checks
+remain intact; HAS follows this ordered victim sequence without recursive SINK.
+Raw capability-only diagnostic snapshots retain their legacy sorted fallback.
+
+tests/reference_sink_order.lua executes installed getunitswitheffect, findallhere,
+map helpers and the SINK body in 4,096 declaration/duplicate/unit/tile/SAFE/FLOAT
+cases, comparing deletion sequences without sorting. A physical compiled turn
+checks target-before-source HAS allocation/facing, transient projection metadata
+and whole-turn Undo. Other contact words and the separate scoped LEVEL loop retain
+their existing phase boundaries; this does not claim complete native scheduling.

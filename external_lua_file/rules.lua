@@ -934,13 +934,38 @@ group_parameters=function(world,name,invert)
     end
     guard[key]=nil;return finish(base)
 end
+-- One query-local unitmap. Explicit stacks override global creation order;
+-- transient births absent from a saved stack append in creation order.
+local function condition_cells(world)
+    local cells,seen={},{}
+    local function key(e)return string.format("%.0f:%.0f",e.x,e.y)end
+    local function add(id)
+        local e=world.entities[id]
+        if e and not seen[id] then
+            local k=key(e);cells[k]=cells[k] or {};cells[k][#cells[k]+1]=id;seen[id]=true
+        end
+    end
+    for _,id in ipairs(world.unit_order or {}) do add(id) end
+    local rest={};for id in pairs(world.entities) do if not seen[id] then rest[#rest+1]=id end end
+    table.sort(rest);for _,id in ipairs(rest) do add(id) end
+    for k,stack in pairs(world.cell_order or {}) do
+        local ordered,used={},{}
+        for _,id in ipairs(stack) do
+            if world.entities[id] and key(world.entities[id])==k and not used[id] then ordered[#ordered+1]=id;used[id]=true end
+        end
+        for _,id in ipairs(cells[k] or {}) do if not used[id] then ordered[#ordered+1]=id end end
+        cells[k]=ordered
+    end
+    return cells
+end
 local function seeing_condition(world,parameters,entity,negated)
     local vectors={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
     local v=vectors[entity.direction];local targets={}
     if not v then return negated end
+    local cells=condition_cells(world)
     local x,y=entity.x+v[1],entity.y+v[2]
     while x>=1 and x<=world.width and y>=1 and y<=world.height do
-        local ids={};for id,e in pairs(world.entities) do if e.x==x and e.y==y then ids[#ids+1]=id end end;table.sort(ids)
+        local ids=cells[string.format("%.0f:%.0f",x,y)] or {}
         local visible,solid=false,false
         for _,id in ipairs(ids) do
             local e=world.entities[id];local hidden,err=query_trait(world,e,"hide")
@@ -1078,11 +1103,10 @@ local function facedby_condition(world,parameters,entity,negated)
     local vectors={{1,0},{0,-1},{-1,0},{0,1}}
     local dirs={Right={1,0},Up={0,-1},Left={-1,0},Down={0,1}}
     local used,matched,allfound={},{},0
+    local cells=condition_cells(world)
     for _,offset in ipairs(vectors) do
         local x,y=entity.x+offset[1],entity.y+offset[2]
-        local ids={}
-        for id,e in pairs(world.entities) do if e.x==x and e.y==y then ids[#ids+1]=id end end
-        table.sort(ids)
+        local ids=cells[string.format("%.0f:%.0f",x,y)] or {}
         for index,p in ipairs(parameters) do
             if not matched[index] then
                 if p.name=="@level" and not p.negative and not used.level then

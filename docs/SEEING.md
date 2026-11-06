@@ -67,3 +67,19 @@ See LEVEL_CONDITIONS.md for source evidence, tests and remaining query limits.
 M9.8D queries current/frozen EMPTY direction before tracing its ray. The installed
 real/EMPTY oracle now covers 59,904 cases. Shared emptydir guards and remaining
 recursive invalidation boundaries are documented in MAKE.md.
+
+SEEING preserves current per-cell arrival order in its visible witness list.
+Multiple negative AND arguments can consume overlapping candidates differently,
+so numeric-ID sorting was semantically incorrect. A query-local ordered unitmap
+is shared with FACEDBY, with sorted fallback only when global order is absent.
+TELE and HOLD update their temporary query stacks after actual displacements;
+new arrivals append and same-position updates keep the existing order. These
+stacks are never persisted by a query or renderer. Creation-only transient worlds
+append previously unlisted newborns in creation order.
+
+The combined installed FACEDBY/SEEING oracle adds18,432 ordered stack cases.
+Compiled physical AND tests and TELE/HOLD late-STILL tests verify that the
+right identities are consumed after a preceding arrival, including full Undo.
+The preceding rules.lua fails the new source oracle. This does not change the
+existing occlusion phase/query timing contract or claim full native recursion
+invalidation parity; the oracle supplies normalized per-identity trait eligibility.

@@ -97,3 +97,11 @@ for _,reason in ipairs({'word_rule_limit','word_rule_cycle','rule_complexity_lim
  end
 end
 print('PASS: TELE dynamic ON/NEAR STILL and NOT, tile-order eligibility, terminal movement/RNG prefixes, rejection and Undo')
+-- Arrival order must reach a later rider's conditional STILL query.
+s=overlap(fixture({{'ROCK','IS','TELE'},{'ROCK','IS','HIDE'},{'FLAG','SEEING','NOT','ROCK','AND','NOT','AVATAR','IS','STILL'},{'WATER','IS','STILL'}}))
+s.world.language.nouns.WATER='water'
+s.world.entities[4]={id=4,kind='object',class='object',archetype='flag',x=3,y=2,direction='Right'}
+s.world.entities[5]={id=5,kind='object',class='object',archetype='water',x=7,y=2,direction='Left'}
+s.world.unit_order={1,4,2,3,5};for id=10,s.world.next_entity_id-1 do table.insert(s.world.unit_order,id)end
+n=step(s);assert(n.world.entities[1].x==7 and n.world.entities[4].x==7,'TELE query must see Water before newly arrived Avatar')
+print('PASS: TELE live SEEING witnesses preserve destination arrival order')

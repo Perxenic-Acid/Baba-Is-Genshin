@@ -121,3 +121,10 @@ for hold=0,1 do for mapfloat=0,1 do for unitfloat=0,1 do
  assert(n.world.entities[1].x==((hold==1 and mapfloat==unitfloat) and 3 or 7),'dynamic HOLD map layer '..hold..' '..mapfloat..' '..unitfloat..' actual '..n.world.entities[1].x)
 end end end
 print('PASS: HOLD raw LEVEL HOLD/FLOAT versus frozen rider layer')
+-- An earlier held arrival appends behind existing witnesses in the query map.
+s=chain({{'ROCK','IS','HOLD'},{'ROCK','IS','HIDE'},{'FLAG','SEEING','NOT','ROCK','AND','NOT','AVATAR','IS','STILL'},{'WATER','IS','STILL'}},false)
+s.world.language.nouns.WATER='water';s.world.entities[4].direction='Right'
+s.world.entities[5]={id=5,kind='object',class='object',archetype='water',x=7,y=2,direction='Left'}
+table.insert(s.world.unit_order,5,5)
+n=step(s,{type='wait'});assert(n.world.entities[1].x==7 and n.world.entities[4].x==11,'HOLD query must see Water before newly arrived Avatar')
+print('PASS: HOLD live SEEING witnesses preserve destination arrival order')

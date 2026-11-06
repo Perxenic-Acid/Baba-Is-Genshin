@@ -2073,6 +2073,7 @@ function RW_ResolveTele(world,suppressed,rules,query_still)
     for k,stack in pairs(world.cell_order or {}) do
         cells[k]={};for _,id in ipairs(stack) do cells[k][#cells[k]+1]=id end
     end
+    if context then context.cell_order=cells end
     local function name(e) return e.class=="text" and "@text" or e.archetype end
     local function same_layer(a,b) return has_capability(world,a,"float")==has_capability(world,b,"float") end
     local state=world.random_state or 1;local original_state=state
@@ -2136,6 +2137,13 @@ function RW_ResolveHold(world,rules,query_locked)
     if query_locked then
         context={};for k,v in pairs(world) do context[k]=v end
         context.entities={};for id,e in pairs(world.entities) do context.entities[id]=e end
+        context.cell_order={}
+        for _,id in ipairs(ids) do local e=world.entities[id];local k=string.format("%.0f:%.0f",e.x,e.y)
+            context.cell_order[k]=context.cell_order[k] or {};table.insert(context.cell_order[k],id)
+        end
+        for k,stack in pairs(world.cell_order or {}) do
+            context.cell_order[k]={};for _,id in ipairs(stack) do table.insert(context.cell_order[k],id) end
+        end
     end
     local sources={}
     if world.hold_source_groups then
@@ -2179,6 +2187,12 @@ function RW_ResolveHold(world,rules,query_locked)
                 else positions[id]={x=target.x,y=target.y}
                     if context then
                         local copy={};for k,v in pairs(context.entities[id]) do copy[k]=v end
+                        if p.x~=target.x or p.y~=target.y then
+                            local old=context.cell_order[string.format("%.0f:%.0f",p.x,p.y)]
+                            for i=#old,1,-1 do if old[i]==id then table.remove(old,i) end end
+                            local key=string.format("%.0f:%.0f",target.x,target.y)
+                            context.cell_order[key]=context.cell_order[key] or {};table.insert(context.cell_order[key],id)
+                        end
                         copy.x,copy.y=target.x,target.y;context.entities[id]=copy
                     end
                     if not same_layer(world,e,world.entities[source_id]) then held[id]=0 end

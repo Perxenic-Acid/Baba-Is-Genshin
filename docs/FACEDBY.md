@@ -47,3 +47,13 @@ M9.8D replaces the default-only EMPTY observer behavior with current-frame
 emptydir queries. Direction/FOLLOW can make adjacent vacancies watch a subject;
 occupied cells retain NOT EMPTY semantics. An additional 640 installed-source
 cases cover this path. See MAKE.md for shared query guards and remaining gaps.
+
+FACEDBY real-unit witnesses now use explicit per-cell order, with global unit
+order and sorted diagnostic fallback. Negative AND parameters consume distinct
+identities greedily, so replacing unitmap order with numeric IDs can change truth.
+The query-local index filters moved identities and appends transient newborns;
+no occupancy cache enters persisted state. The installed FACEDBY/SEEING stack
+oracle covers18,432 combined cases with permutations, independent global/cell
+order, four axes, facing, Text/complements and HIDE/PHANTOM/STOP. Eligibility is
+normalized per identity; physical compiler/turn/Undo tests separately cover the
+observable negative-AND change. Wider spatial-condition ordering remains separate.

@@ -100,7 +100,8 @@ raw/frozen declaration frame. Ordered cardinal IS declarations overwrite facing;
 the first FOLLOW target list with an eligible non-overlapping target locks further
 FOLLOW searches, while later cardinal IS declarations still overwrite it. Nearest
 Manhattan targets use the last equal-distance witness and favor the vertical axis
-on a diagonal. Physical traversal is normalized to stable ID order. FOLLOW ALL,
+on a diagonal. Physical traversal follows saved unit-list order, with numeric ID
+fallback when diagnostic worlds omit that metadata. FOLLOW ALL,
 EMPTY and LEVEL are not orientation targets. SLEEP or dynamic BROKEN yields None.
 
 The compiler retains the mixed direction/FOLLOW declaration order as transient
@@ -162,3 +163,10 @@ lists, ordinary/Text sources, known/unset facing and duplicate clauses. Schedule
 coverage checks allocated identities, per-source RNG assignment and complete Undo.
 Cross-noun group dispatch retains deterministic relation order; native pairs(group)
 ordering is not portable and no exact cross-noun dispatch guarantee is claimed.
+
+EMPTY FOLLOW now also preserves the native target unit-list order in equal-distance
+ties. The installed emptydir oracle covers both numeric and reversed traversal
+(5,488 cases); scheduled EMPTY MAKE checks that the selected witness sets product
+facing without consuming RNG, with whole-turn Undo. Shared conversion, motion and
+directional-condition consumers use this same pure query. Frozen frame timing and
+cell-based recursive query guards retain the boundaries documented above.

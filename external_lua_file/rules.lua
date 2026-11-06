@@ -4116,7 +4116,14 @@ local function query_empty_direction(context,x,y)
                     local selector=relation.target_type=="@text" and {kind="class",value="text"}
                         or {kind="archetype",value=relation.target_type}
                     local distance=9999
-                    for _,id in ipairs(RW_SelectEntities(world,selector)) do
+                    local selected=RW_SelectEntities(world,selector)
+                    local ordered,pending={},{}
+                    for _,id in ipairs(selected) do pending[id]=true end
+                    for _,id in ipairs(world.unit_order or {}) do
+                        if pending[id] then ordered[#ordered+1]=id;pending[id]=nil end
+                    end
+                    for _,id in ipairs(selected) do if pending[id] then ordered[#ordered+1]=id end end
+                    for _,id in ipairs(ordered) do
                         local target=world.entities[id];local dx,dy=target.x-x,target.y-y
                         local dist=math.abs(dx)+math.abs(dy)
                         if dist>0 and dist<=distance then

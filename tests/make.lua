@@ -270,3 +270,23 @@ do
     assert(RW_Undo(n).world==s.world,'MAKE order and RNG must restore with Undo')
 end
 print('PASS: scheduled MAKE unit order, duplicate allocation, per-source RNG and Undo')
+
+do
+    for _,reverse in ipairs({false,true}) do
+        local s=empty_fixture({{'EMPTY','FOLLOW','ROCK'},{'EMPTY','MAKE','FLAG'}})
+        object(s.world,3,'rock',2,3)
+        local order=reverse and {3,2,1} or {1,2,3};local rest={}
+        for id in pairs(s.world.entities) do if id>3 then rest[#rest+1]=id end end
+        table.sort(rest);for _,id in ipairs(rest) do order[#order+1]=id end
+        s.world.unit_order=order
+        local frame=assert(RW_CompileWorld(s.world,cs))
+        local expected=reverse and 'Right' or 'Left'
+        assert(RW_QueryEmptyDirection(s.world,4,3,frame.rules)==expected,'EMPTY FOLLOW equal-distance last unit-list witness')
+        local n=step(s);local found=false
+        for id,e in pairs(n.world.entities) do if id>=s.world.next_entity_id and e.x==4 and e.y==3 then
+            assert(e.archetype=='flag' and e.direction==expected);found=true
+        end end
+        assert(found and n.world.random_state==nil and RW_Undo(n).world==s.world)
+    end
+end
+print('PASS: EMPTY FOLLOW unit-list ties feed scheduled MAKE facing without RNG, with Undo')

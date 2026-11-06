@@ -1,4 +1,4 @@
--- Execute installed tools.lua emptydir; normalize native unit-list order to IDs.
+-- Execute installed tools.lua emptydir in numeric and reversed native unit order.
 dofile('external_lua_file/rules.lua')
 local f=assert(io.open([[C:/Program Files (x86)/Steam/steamapps/common/Baba Is You/Data/tools.lua]],'rb'))
 local source=f:read('*a');f:close()
@@ -13,6 +13,7 @@ env.objectlist={rock=1,flag=1,text=1}
 env.mmf={newObject=function(id) return units[id] end}
 local choices={'right','up','left','follow_rock','follow_flag','follow_text','disabled_down'}
 local count=0
+for _,reverse in ipairs({false,true}) do
 for _,a in ipairs(choices) do for _,b in ipairs(choices) do for _,c in ipairs(choices) do
 for layout=1,4 do for _,sleeping in ipairs({false,true}) do
     sleep=sleeping;units={};env.unitlists={rock={},flag={},text={}};env.featureindex={empty={}}
@@ -26,6 +27,14 @@ for layout=1,4 do for _,sleeping in ipairs({false,true}) do
         units[id]={values={p[2],p[3]}};table.insert(env.unitlists[p[1]],id)
         w.entities[id]={id=id,kind='object',class=p[1]=='text' and 'text' or 'object',archetype=p[1]~='text' and p[1] or nil,
             text=p[1]=='text' and {name='ROCK'} or nil,x=p[2],y=p[3],direction='None'}
+    end
+    if reverse then
+        w.unit_order={}
+        for id=#positions[layout],1,-1 do w.unit_order[#w.unit_order+1]=id end
+        for name,list in pairs(env.unitlists) do
+            local reversed={};for i=#list,1,-1 do reversed[#reversed+1]=list[i] end
+            env.unitlists[name]=reversed
+        end
     end
     local rules,ordered={},{}
     if sleep then rules[#rules+1]={when={op='always'},effects={{op='grant_trait',trait='sleep',target={kind='empty',value='empty'}}}} end
@@ -48,4 +57,5 @@ for layout=1,4 do for _,sleeping in ipairs({false,true}) do
     assert(actual==expected,table.concat({a,b,c},',')..':'..layout..':'..tostring(sleep)..':'..actual..'/'..expected)
     count=count+1
 end end end end end
+end
 print('PASS: installed EMPTY direction/FOLLOW ordering, nearest/ties/overlap/empty targets, SLEEP/disabled declarations ('..count..' cases)')

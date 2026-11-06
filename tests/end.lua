@@ -21,6 +21,12 @@ end
 local s=fixture({you,ending});local n,p=step(s);assert(p.end_contact and n.world.entities[2] and not n.world.infinite_loop)
 assert(p.end_contact.source.entity_id==1 and p.end_contact.target.entity_id==2)
 s=fixture({{"AVATAR","IS","YOU2"},ending});n,p=step(s);assert(p.end_contact)
+s=fixture({{"AVATAR","IS","YOU2"},{"FLAG","IS","YOU"},{"ROCK","FACING","RIGHT","IS","END"},{"ROCK","FACING","UP","IS","END"}})
+s.world.entities[2].direction="Up"
+s.world.entities[3]={id=3,kind="object",class="object",archetype="flag",x=12,y=12,direction="Down"}
+s.world.entities[4]={id=4,kind="object",class="object",archetype="rock",x=12,y=12,direction="Right"}
+s.world.unit_order={2,1,4,3};for id=10,s.world.next_entity_id-1 do table.insert(s.world.unit_order,id) end
+n,p=step(s);assert(p.end_contact.source.entity_id==3 and p.end_contact.target.entity_id==4,"END must choose YOU before YOU2 and physical END clauses before target IDs")
 s=fixture({{"AVATAR","IS","SELECT"},ending});n,p=step(s);assert(not p.end_contact)
 s=fixture({you,ending,{"ROCK","IS","FLOAT"}});n,p=step(s);assert(not p.end_contact)
 s=fixture({you,ending,{"ROCK","IS","FLOAT"},{"AVATAR","IS","FLOAT"}});n,p=step(s);assert(p.end_contact)

@@ -62,3 +62,11 @@ calls per duplicated declaration are represented by one completion event/witness
 not a particle playback schedule. Exact host callback ordering versus per-unit
 block() remains outside the shared phased simulation guarantee. Conditional scoped
 LEVEL surroundings retain the existing deferred boundary.
+
+Ordinary END evidence follows YOU declarations before YOU2 declarations, then
+physical END clauses and current tile order, rather than numeric entity IDs.
+The completion transaction retains the first encountered source/target pair.
+`tests/reference_end_order.lua` executes the installed blocks.lua END body in
+256 ordered-witness cases; condition eligibility is supplied as normalized
+per-clause identity lists. This checks contact selection, not native ending
+choreography. Scoped LEVEL and virtual EMPTY keep their independent paths.

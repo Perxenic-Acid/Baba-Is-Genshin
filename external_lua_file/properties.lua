@@ -206,12 +206,13 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.boom_source_groups={}
     projected.more_source_groups={}
     projected.done_source_groups={}
+    projected.end_source_groups={}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more","done"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more","done","end"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -225,7 +226,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                 if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
                 elseif capability=="tele" then projected.tele_source_groups[#projected.tele_source_groups+1]=group
                 elseif capability=="sink" then projected.sink_source_groups[#projected.sink_source_groups+1]=group
-                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" or capability=="boom" or capability=="more" or capability=="done" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
+                elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" or capability=="boom" or capability=="more" or capability=="done" or capability=="end" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
                 else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
             -- findallfeature counts real matches and EMPTY placeholders alike.
@@ -848,12 +849,33 @@ function RW_ResolveEndContact(world,mode)
             return evidence(point("level"),point("empty"))
         end
     end
+    if world.bonus_contact_groups and world.end_source_groups then
+        local ordered,seen={},{}
+        for _,id in ipairs(world.unit_order or {}) do if world.entities[id] and not seen[id] then ordered[#ordered+1]=id;seen[id]=true end end
+        for _,id in ipairs(ids) do if not seen[id] then ordered[#ordered+1]=id end end
+        for _,channel in ipairs({"control","control2"}) do
+            for _,actors in ipairs(world.bonus_contact_groups[channel] or {}) do for _,id in ipairs(actors) do
+                local actor=world.entities[id]
+                local tile=world.cell_order and world.cell_order[string.format("%.0f:%.0f",actor.x,actor.y)] or ordered
+                for _,targets in ipairs(world.end_source_groups) do
+                    local eligible={};for _,target_id in ipairs(targets) do eligible[target_id]=true end
+                    for _,target_id in ipairs(tile) do local target=world.entities[target_id]
+                        if eligible[target_id] and actor.x==target.x and actor.y==target.y
+                            and (actor.behaviors.float==true)==(target.behaviors.float==true) then
+                            return evidence(point("unit",id,actor),point("unit",target_id,target))
+                        end
+                    end
+                end
+            end end
+        end
+    else
     for _,id in ipairs(ids) do local actor=world.entities[id];local a=actor.behaviors
         if you(a) then for _,other_id in ipairs(ids) do local target=world.entities[other_id];local b=target.behaviors
             if b["end"] and actor.x==target.x and actor.y==target.y and (a.float==true)==(b.float==true) then
                 return evidence(point("unit",id,actor),point("unit",other_id,target))
             end
         end end
+    end
     end
     for _,key in ipairs(keys) do local e=world.empty_cells[key];local b=e.behaviors
         if you(b) and b["end"] and not b.win and (not b.defeat or b.safe)

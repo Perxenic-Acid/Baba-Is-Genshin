@@ -591,8 +591,16 @@ function RW_ResolveMoreProducts(world,services)
     local function add(e)
         local k=key(e.x,e.y);occupancy[k]=occupancy[k] or {};table.insert(occupancy[k],e)
     end
-    for id,e in pairs(world.entities) do ids[#ids+1]=id;add(e) end
+    for id in pairs(world.entities) do ids[#ids+1]=id end
     table.sort(ids)
+    local seen={}
+    for _,id in ipairs(world.unit_order or {}) do
+        if world.entities[id] and not seen[id] then add(world.entities[id]);seen[id]=true end
+    end
+    for _,id in ipairs(ids) do if not seen[id] then add(world.entities[id]) end end
+    for k,stack in pairs(world.cell_order or {}) do
+        occupancy[k]={};for _,id in ipairs(stack) do add(world.entities[id]) end
+    end
     if world.more_source_groups then
         ids={}
         for _,group in ipairs(world.more_source_groups) do for _,id in ipairs(group) do ids[#ids+1]=id end end

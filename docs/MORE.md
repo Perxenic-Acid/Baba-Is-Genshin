@@ -72,3 +72,20 @@ adapter supplies normalized spatial eligibility; native creation choreography an
 full recursive condition timing are not claimed. This supersedes the inherited
 newborn blocker convention noted above. Coordinate occupancy keys are canonical
 for equal integer/float coordinates.
+
+MORE obstacle traversal now uses current per-cell order, falling back to saved
+global unit order (sorted IDs only for worlds without that metadata). Each new
+copy appends to its destination stack. This matches installed findobstacle's
+unitmap traversal and addunitmap's arrival ordering. Never populate these lists
+with pairs(entities): an earlier STOP/PUSH/PULL/same-name blocker short-circuits
+queries on later identities, including queries that would reach a recursion or
+complexity limit. Which identity is queried first can change the terminal result.
+
+The installed MORE/findobstacle/addunitmap oracle compares the complete obstacle
+identity query trace and products in384 cases with six stack permutations,
+independent global/explicit cell order, blocker combinations and newborn arrivals.
+Host hasfeature eligibility is normalized; it does not claim full conditional
+recursion parity. Compiled turn tests prove that an explicit first blocker hides
+a later failing query, while the opposite global order commits only the prior
+creation prefix or rejects ordinary errors. Undo restores both order metadata
+and the allocator. The oracle fails against the preceding properties.lua.

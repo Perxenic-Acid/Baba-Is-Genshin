@@ -157,3 +157,29 @@ s=only({{'ROCK','IS','MORE'},{'CRATE','IS','STOP'}});s.world.language.nouns.CRAT
 s.world.entities[4]={id=4,kind='object',class='object',archetype='crate',x=4.0,y=2.0,direction='None'}
 f=s.world.next_entity_id;n=wait(s);assert(n.world.next_entity_id==f+3)
 print('PASS: MORE numeric-coordinate occupancy parity')
+-- Native short circuit must hide a later failing query behind the first blocker.
+for reverse=0,1 do for _,reason in ipairs({'word_rule_limit','rule_complexity_limit','injected'}) do
+ local s=only({{'ROCK','IS','MORE'},{'FLAG','IS','STOP'}});local w=s.world
+ w.entities[4]={id=4,kind='object',class='object',archetype='flag',x=3,y=1,direction='None'}
+ w.entities[5]={id=5,kind='object',class='object',archetype='crate',x=3,y=1,direction='None'}
+ w.unit_order={1,2,5,4};for id=10,w.next_entity_id-1 do w.unit_order[#w.unit_order+1]=id end
+ if reverse==0 then w.cell_order={['3:1']={4,5}}end
+ local frontier=w.next_entity_id
+ local visited=false;local svc={};for k,v in pairs(services)do svc[k]=v end
+ svc.more=function(world,projected,rules) return RW_PlanMorePhase(world,projected,rules,{
+  products=RW_ResolveMoreProducts,create=RW_PlanCreate,initialize=RW_InitializeBirthSpecifications,
+  obstacle=function(context,e,raw)
+   if e.id==5 then visited=true;return nil,reason end
+   return RW_QueryMoreObstacle(context,e,raw)
+  end})end
+ local p,why=RW_PlanTurn(w,{type='wait'},svc)
+ if reverse==1 and reason=='injected' then assert(not p and why.reason==reason and w.next_entity_id==frontier)
+ else
+  assert(p,why and why.reason);local n,r=RW_Commit(s,p);assert(r.accepted,r.reason)
+  assert(visited==(reverse==1),'MORE must stop at the first tile blocker')
+  assert(n.world.next_entity_id==w.next_entity_id+(reverse==1 and 1 or 3))
+  assert((n.world.infinite_loop==true or n.world.too_complex==true)==(reverse==1))
+  assert(RW_Undo(n).world==w)
+ end
+end end
+print('PASS: MORE explicit tile blockers suppress later failing queries; global-order limits keep only the completed creation prefix and Undo')

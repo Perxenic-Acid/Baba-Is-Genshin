@@ -1470,33 +1470,37 @@ function RW_ResolveAutomatic(world,empty_directions)
     end
     local state=world.random_state or 1;local original_state=state
     local autonomous,reasons,empty_tasks={},{},{}
-    -- Real MOVE/AUTO precede CHILL; real CHILL draws occur during collection.
-    -- EMPTY draws at dispatch; later properties reuse occupied collection slots.
+    -- Real collection follows property, physical declaration and unit-list order.
+    -- Counts alone cannot assign CHILL's random draws to the right identities.
+    local automatic_order,automatic_seen={},{}
     for _,id in ipairs(ids) do
-        local entity=working.entities[id]
-        local counts=working.trait_counts[id] or {}
-        local function count(trait) return counts[trait] or (has_capability(world,entity,trait) and 1 or 0) end
-        local total=0
-        if id<0 then
-            empty_tasks[id]={}
-        elseif not has_capability(world,entity,"sleep") then
-            local v=vectors[entity.direction]
-            if v and not intent_immobile(working,entity,v[1],v[2]) then
-                local moves,autos=count("move"),count("auto")
-                total=moves+autos
-                if moves>0 then reasons[id]="move" elseif autos>0 then reasons[id]="auto" end
-            end
-            for i=1,count("chill") do
-                state=(state*48271)%2147483647
-                entity.direction=({"Right","Up","Left","Down"})[state%4+1]
-                v=vectors[entity.direction]
-                if not intent_immobile(working,entity,v[1],v[2]) then
-                    total=total+1;reasons[id]=reasons[id] or "chill"
+        autonomous[id]=0;if id<0 then empty_tasks[id]={} end
+    end
+    for _,trait in ipairs({"move","auto","chill"}) do
+        local groups=world.automatic_source_groups and world.automatic_source_groups[trait]
+        if not groups then
+            groups={}
+            for _,id in ipairs(ids) do if id>0 then
+                local entity=working.entities[id];local counts=working.trait_counts[id] or {}
+                for i=1,(counts[trait] or (has_capability(world,entity,trait) and 1 or 0)) do groups[#groups+1]={id} end
+            end end
+        end
+        for _,group in ipairs(groups) do for _,id in ipairs(group) do
+            local entity=working.entities[id]
+            if entity and not has_capability(world,entity,"sleep") then
+                if trait=="chill" then
+                    state=(state*48271)%2147483647
+                    entity.direction=({"Right","Up","Left","Down"})[state%4+1]
+                end
+                local v=vectors[entity.direction]
+                if v and not intent_immobile(working,entity,v[1],v[2]) then
+                    autonomous[id]=autonomous[id]+1;reasons[id]=reasons[id] or trait
+                    if not automatic_seen[id] then automatic_seen[id]=true;automatic_order[#automatic_order+1]=id end
                 end
             end
-        end
-        autonomous[id]=total
+        end end
     end
+    -- EMPTY draws at dispatch; later properties reuse occupied collection slots.
     -- EMPTY seen codes belong to the whole property list, not to one vacancy.
     -- An earlier slot with any eligible cell suppresses that slot everywhere in
     -- later properties, while an entirely filtered/empty slot consumes no code.
@@ -1535,8 +1539,9 @@ function RW_ResolveAutomatic(world,empty_directions)
             remember_empty_death(working,death)
         end
     end
+    for _,id in ipairs(ids) do if id<0 then automatic_order[#automatic_order+1]=id end end
     for _,spec in ipairs({{"move"},{"nudgeright","Right"},{"nudgeup","Up"},{"nudgeleft","Left"},{"nudgedown","Down"}}) do
-        for _,id in ipairs(ids) do
+        for _,id in ipairs(spec[1]=="move" and automatic_order or ids) do
             local entity=working.entities[id]
             local counts=working.trait_counts[id] or {}
             local count=spec[1]=="move" and autonomous[id] or (counts[spec[1]] or (entity and has_capability(world,entity,spec[1]) and 1 or 0))

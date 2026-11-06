@@ -70,4 +70,26 @@ end end
 local plan,e=RW_PlanTurn(s.world,{type="wait"},services);assert(plan,e and e.reason)
 local n,r=RW_Commit(s,plan);assert(r.accepted,r.reason);assert(n.world.random_state==48271 and n.world.entities[1].y==5)
 assert(RW_Undo(n).world==s.world)
+-- Physical duplicate clauses must draw by declaration, then noun unit-list order.
+do
+ local session=RW_CreateSession();local world=session.world
+ world.width=40;world.height=30;world.random_state=1
+ world.language.nouns.ROCK="rock"
+ world.entities={};world.unit_order={12,11};world.next_entity_id=20
+ for _,id in ipairs({11,12}) do world.entities[id]={id=id,kind="object",class="object",archetype="rock",x=id==11 and 15 or 25,y=15,direction="Up"} end
+ for row=1,2 do for x,word in ipairs({"ROCK","IS","CHILL"}) do
+  local id=world.next_entity_id;world.next_entity_id=id+1
+  world.entities[id]={id=id,kind="object",class="text",text={name=word},x=x,y=row*3,direction="None"}
+  world.unit_order[#world.unit_order+1]=id
+ end end
+ local turn,err=RW_PlanTurn(world,{type="wait"},services);assert(turn,err and err.reason)
+ local after,report=RW_Commit(session,turn);assert(report.accepted,report.reason)
+ local state,facings=1,{}
+ for pass=1,2 do for _,id in ipairs({12,11}) do state=state*48271%2147483647;facings[id]=directions[state%4+1] end end
+ assert(after.world.random_state==state)
+ for _,id in ipairs({12,11}) do assert(after.world.entities[id].direction==facings[id],"physical CHILL draw order") end
+ assert(RW_Undo(after).world==world)
+ local again=assert(RW_PlanTurn(world,{type="wait"},services));local replay,accepted=RW_Commit(session,again)
+ assert(accepted.accepted and replay.world.random_state==state)
+end
 print("CHILL: deterministic motion/rollback and "..cases.." installed collection oracle cases passed")

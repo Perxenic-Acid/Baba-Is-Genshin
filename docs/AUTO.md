@@ -74,7 +74,7 @@ Conditional scoped LEVEL evaluation and the full mutable original collision
 scheduler retain their documented shared limits.
 
 Virtual EMPTY and synthetic scoped autonomous displacement remain shared motion
-subsystem gaps. Real unit processing remains sorted serial resolution, not the full
+subsystem gaps. Real unit processing remains serial resolution, not the full
 original mutable collision-state scheduler. Native timer cadence and UI bindings
 must be handled separately from pure command planning; source Lua exposes native
 AUTO_DELAY state but does not define a portable wall-clock period.
@@ -83,3 +83,9 @@ AUTO_DELAY state but does not define a portable wall-clock period.
 CHILL, cardinal nudges and four FALL variants now execute in a separate late
 ordered phase. See LEVEL_MOTION.md. This does not alter AUTO's host clock/queue
 integration or establish native pulse boundary dispatch timing.
+
+2026-11-06: real automatic collection and initial dispatch now retain physical
+declaration order and per-noun unit-list order, with MOVE before AUTO before
+CHILL. This fixes which identity receives each random draw and which eligible
+reason owns its queued impulses. See CHILL.md for installed collection oracles
+and the remaining mixed EMPTY/real queue and collision-scheduler limits.

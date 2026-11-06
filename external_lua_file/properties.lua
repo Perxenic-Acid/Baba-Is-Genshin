@@ -207,12 +207,13 @@ function RW_ProjectWorld(world, effects, level_traits)
     projected.more_source_groups={}
     projected.done_source_groups={}
     projected.end_source_groups={}
+    projected.automatic_source_groups={move={},auto={},chill={}}
     local unit_rank={};for index,id in ipairs(world.unit_order or {}) do unit_rank[id]=index end
     local motion_indices={}
     for _, effect in ipairs(effects) do
         if effect.op == "grant_trait" then
             local behavior = registry[effect.trait] or {}
-            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more","done","end"}) do if behavior[capability] then
+            for _,capability in ipairs({"control","control2","bonus","hold","tele","sink","weak","melt","open","shut","boom","more","done","end","move","auto","chill"}) do if behavior[capability] then
                 local group={}
                 for _,id in ipairs(effect.entity_ids) do
                     if not (denied[id] and denied[id][effect.trait]) then group[#group+1]=id end
@@ -226,6 +227,7 @@ function RW_ProjectWorld(world, effects, level_traits)
                 if capability=="hold" then projected.hold_source_groups[#projected.hold_source_groups+1]=group
                 elseif capability=="tele" then projected.tele_source_groups[#projected.tele_source_groups+1]=group
                 elseif capability=="sink" then projected.sink_source_groups[#projected.sink_source_groups+1]=group
+                elseif projected.automatic_source_groups[capability] then projected.automatic_source_groups[capability][#projected.automatic_source_groups[capability]+1]=group
                 elseif capability=="weak" or capability=="melt" or capability=="open" or capability=="shut" or capability=="boom" or capability=="more" or capability=="done" or capability=="end" then projected[capability.."_source_groups"][#projected[capability.."_source_groups"]+1]=group
                 else projected.bonus_contact_groups[capability][#projected.bonus_contact_groups[capability]+1]=group end
             end end
